@@ -1,0 +1,1 @@
+::: proactivegoalinference.foo

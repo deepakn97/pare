@@ -1,0 +1,52 @@
+site_name: proactiveGoalInference
+repo_url: https://github.com/deepakn97/proactiveGoalInference
+site_url: https://deepakn97.github.io/proactiveGoalInference
+site_description: This repository contains code for the Proactive Goal Inference Agent project in collaboration with Apple.
+site_author: Deepak Nathani
+edit_uri: edit/main/docs/
+repo_name: deepakn97/proactiveGoalInference
+copyright: Maintained by <a href="https://deepakn97.com">deepakn97</a>.
+
+nav:
+  - Home: index.md
+  - Modules: modules.md
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["src/proactivegoalinference"]
+theme:
+  name: material
+  feature:
+    tabs: true
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/deepakn97/proactiveGoalInference
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/proactiveGoalInference
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
