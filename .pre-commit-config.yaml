@@ -2,8 +2,11 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: "v5.0.0"
     hooks:
+      - id: check-ast
       - id: check-case-conflict
       - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [ '--maxkb=1024' ]
       - id: check-toml
       - id: check-yaml
       - id: check-json
@@ -13,10 +16,25 @@ repos:
         args: [--autofix, --no-sort-keys]
       - id: end-of-file-fixer
       - id: trailing-whitespace
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.12.7"
+      - id: detect-private-key
+      - id: check-executables-have-shebangs
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.8.1
     hooks:
-      - id: ruff-check
-        args: [ --exit-non-zero-on-fix ]
+      - id: nbstripout
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.13.2"
+    hooks:
+      - id: ruff
+        args: [ --fix ]
+      # Run the formatter
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: python
+        types: [ python ]
+        require_serial: true
+        verbose: true
