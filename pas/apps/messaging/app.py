@@ -35,13 +35,19 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
         Args:
             event: Completed event from tool execution
         """
+        current_state = self.current_state
         function_name = event.function_name()
 
+        if current_state is None or function_name is None:
+            return
+
         # Transition: ConversationList -> ConversationOpened
-        if function_name == "open_conversation":
-            conversation_id = event.action.args.get("conversation_id")
-            if conversation_id:
-                new_state = ConversationOpened(conversation_id)
-                self.set_current_state(new_state)
+        if isinstance(current_state, ConversationList):
+            if function_name == "open_conversation":
+                args = event.action.resolved_args or event.action.args
+                conversation_id = args.get("conversation_id")
+                if conversation_id:
+                    new_state = ConversationOpened(conversation_id)
+                    self.set_current_state(new_state)
 
         # go_back transitions are handled automatically by StatefulApp.go_back()
