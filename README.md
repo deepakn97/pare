@@ -1,4 +1,4 @@
-# proactiveGoalInference
+# Proactive Agent Sandbox (PAS)
 
 [![Release](https://img.shields.io/github/v/release/deepakn97/proactiveGoalInference)](https://img.shields.io/github/v/release/deepakn97/proactiveGoalInference)
 [![Build status](https://img.shields.io/github/actions/workflow/status/deepakn97/proactiveGoalInference/main.yml?branch=main)](https://github.com/deepakn97/proactiveGoalInference/actions/workflows/main.yml?query=branch%3Amain)
@@ -8,62 +8,75 @@
 
 This repository contains code for the Proactive Goal Inference Agent project in collaboration with Apple.
 
+PAS extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based navigation architecture for mobile app simulation, enabling proactive agent research with context-aware action spaces.
+
 - **Github repository**: <https://github.com/deepakn97/proactiveGoalInference/>
-- **Documentation** <https://deepakn97.github.io/proactiveGoalInference/>
+- **Documentation**: <https://deepakn97.github.io/proactiveGoalInference/>
 
-## Getting started with your project
+## Setup
 
-### 1. Create a New Repository
+### Prerequisites
 
-First, create a repository on GitHub with the same name as this project, and then run the following commands:
+- Python 3.12 or higher
+- [uv](https://github.com/astral-sh/uv) package manager
 
+### Installation
+
+1. Clone the repository:
 ```bash
-git init -b main
-git add .
-git commit -m "init commit"
-git remote add origin git@github.com:deepakn97/proactiveGoalInference.git
-git push -u origin main
+git clone git@github.com:deepakn97/proactiveGoalInference.git
+cd proactiveGoalInference
 ```
 
-### 2. Set Up Your Development Environment
-
-Then, install the environment and the pre-commit hooks with
-
+2. Install the environment and pre-commit hooks:
 ```bash
 make install
 ```
 
-This will also generate your `uv.lock` file
+This will:
+- Create a virtual environment using uv
+- Install all dependencies from `pyproject.toml`
+- Install pre-commit hooks for code quality checks
 
-### 3. Run the pre-commit hooks
-
-Initially, the CI/CD pipeline might be failing due to formatting issues. To resolve those run:
-
+3. Verify installation:
 ```bash
-uv run pre-commit run -a
+make check  # Run linting, type checking, and dependency checks
+make test   # Run test suite
 ```
 
-### 4. Commit the changes
+## Development
 
-Lastly, commit the changes made by the two steps above to your repository.
+### Running Code Quality Checks
 
 ```bash
-git add .
-git commit -m 'Fix formatting issues'
-git push origin main
+make check
 ```
 
-You are now ready to start development on your project!
-The CI/CD pipeline will be triggered when you open a pull request, merge to main, or when you create a new release.
+This runs:
+- `uv lock --locked` - Verify lock file consistency
+- `pre-commit run -a` - Run all pre-commit hooks (ruff, mypy, etc.)
+- `mypy` - Static type checking
+- `deptry` - Check for dependency issues
 
-To finalize the set-up for publishing to PyPI, see [here](https://fpgmaas.github.io/cookiecutter-uv/features/publishing/#set-up-for-pypi).
-For activating the automatic documentation with MkDocs, see [here](https://fpgmaas.github.io/cookiecutter-uv/features/mkdocs/#enabling-the-documentation-on-github).
-To enable the code coverage reports, see [here](https://fpgmaas.github.io/cookiecutter-uv/features/codecov/).
+### Running Tests
 
-## Releasing a new version
+```bash
+make test
+```
 
+Run tests with coverage report:
+```bash
+uv run pytest --cov --cov-report=html --cov-report=term-missing
+open htmlcov/index.html  # View coverage in browser
+```
 
+For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
----
+### Project Structure
 
-Repository initiated with [fpgmaas/cookiecutter-uv](https://github.com/fpgmaas/cookiecutter-uv).
+- `pas/` - Main package (Proactive Agent Sandbox)
+  - `apps/core.py` - Base classes for stateful apps (AppState, StatefulApp)
+  - `apps/messaging/` - Stateful messaging app implementation
+  - `environment.py` - Environment wrapper for state transitions
+- `tests/` - Test suite
+- `docs/_plans/` - Design documentation
