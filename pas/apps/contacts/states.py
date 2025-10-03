@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from are.simulation.apps.contacts import Contact
+from are.simulation.apps.contacts import Contact  # noqa: TC002
 from are.simulation.tool_utils import user_tool
 
 from pas.apps.core import AppState
@@ -17,6 +17,7 @@ class ContactsList(AppState):
     """Initial navigation state showing the list of contacts."""
 
     def __init__(self) -> None:
+        """Initialise the list state."""
         super().__init__()
 
     def on_enter(self) -> None:
@@ -90,6 +91,7 @@ class ContactDetail(AppState):
     """State for viewing a specific contact's details."""
 
     def __init__(self, contact_id: str) -> None:
+        """Bind the detail view to the supplied contact identifier."""
         super().__init__()
         self.contact_id = contact_id
 
@@ -125,6 +127,7 @@ class ContactEdit(AppState):
     """State representing the contact edit surface."""
 
     def __init__(self, contact_id: str) -> None:
+        """Initialise the edit state for a particular contact."""
         super().__init__()
         self.contact_id = contact_id
 

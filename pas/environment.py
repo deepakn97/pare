@@ -22,7 +22,7 @@ class StateAwareEnvironmentWrapper(Environment):
         """
         parent_handle = getattr(super(), "handle_completed_event", None)
         if callable(parent_handle):
-            parent_handle(event)  # type: ignore[misc]
+            parent_handle(event)
 
         # Handle state transitions for StatefulApps
         app_name = event.app_name()

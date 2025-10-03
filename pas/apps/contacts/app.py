@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from are.simulation.apps.contacts import ContactsApp
-from are.simulation.types import CompletedEvent
 
 from pas.apps.contacts.states import ContactDetail, ContactEdit, ContactsList
 from pas.apps.core import StatefulApp
+
+if TYPE_CHECKING:
+    from are.simulation.types import CompletedEvent
 
 
 class StatefulContactsApp(StatefulApp, ContactsApp):
     """Contacts application with explicit navigation states."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialise the contacts app and load the list view as the default state."""
         self._pending_transition: tuple[str, str] | None = None
         super().__init__(*args, **kwargs)
         self.set_current_state(ContactsList())
@@ -33,10 +36,11 @@ class StatefulContactsApp(StatefulApp, ContactsApp):
         if function_name is None:
             return
 
-        # Extract args safely – event.action may be ConditionCheckAction in other contexts.
-        event_args = {}
-        if hasattr(event, "action") and getattr(event, "action") is not None:  # type: ignore[truthy-function]
-            event_args = getattr(event.action, "args", {})  # type: ignore[attr-defined]
+        # Extract args safely - event.action may be ConditionCheckAction in other contexts.
+        event_args: dict[str, Any] = {}
+        action = getattr(event, "action", None)
+        if action is not None and hasattr(action, "args"):
+            event_args = cast("dict[str, Any]", getattr(action, "args", {}))
 
         match function_name:
             case "get_contact":
@@ -61,12 +65,14 @@ class StatefulContactsApp(StatefulApp, ContactsApp):
             if intent_contact_id != contact_id:
                 intent_contact_id = contact_id
 
-            if intent == "detail":
-                if not isinstance(self.current_state, ContactDetail) or self.current_state.contact_id != intent_contact_id:
-                    self.set_current_state(ContactDetail(intent_contact_id))
-            elif intent == "edit":
-                if not isinstance(self.current_state, ContactEdit) or self.current_state.contact_id != intent_contact_id:
-                    self.set_current_state(ContactEdit(intent_contact_id))
+            if intent == "detail" and (
+                not isinstance(self.current_state, ContactDetail) or self.current_state.contact_id != intent_contact_id
+            ):
+                self.set_current_state(ContactDetail(intent_contact_id))
+            elif intent == "edit" and (
+                not isinstance(self.current_state, ContactEdit) or self.current_state.contact_id != intent_contact_id
+            ):
+                self.set_current_state(ContactEdit(intent_contact_id))
             return
 
         # Fallback: if we are still on the list and a contact is accessed directly, open the detail view.
@@ -79,10 +85,9 @@ class StatefulContactsApp(StatefulApp, ContactsApp):
             return
 
         # After saving edits we should return to the detail view.
-        if isinstance(self.current_state, ContactEdit):
+        if isinstance(self.current_state, ContactEdit) and self.navigation_stack:
             # go_back returns to the previous detail state on the stack if present.
-            if self.navigation_stack:
-                self.go_back()
+            self.go_back()
 
         if isinstance(self.current_state, ContactDetail):
             self.current_state.contact_id = contact_id

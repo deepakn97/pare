@@ -165,7 +165,7 @@ allow-star-arg-any = true
 known-first-party = ["pas"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]
+"tests/*" = ["S101", "D", "ANN", "B009", "B010"]
 # Ignore unused imports in all `__init__.py` files
 "__init__.py" = ["F401"]
 
@@ -193,3 +193,7 @@ ignore = ["*"]
 
 [tool.uv.sources]
 meta-agents-research-environments = { git = "ssh://git@github.com/deepakn97/meta-are.git" }
+
+[[tool.mypy.overrides]]
+module = "pytest"
+ignore_missing_imports = true
