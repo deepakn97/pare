@@ -21,6 +21,13 @@ The class name **must** be `StatefulUserProxy` and live in
 `pas/user_proxy/stateful.py`. The module exports only this class and the
 exceptions defined below.
 
+> **Planner freedom**
+>
+> `_plan_actions()` (see §2.5) may use any backend — rule tables, scripted
+> heuristics, large language models, or a human-in-the-loop prompt. The rest
+> of the system only sees the resulting `ToolInvocation` list. Swapping the
+> planner does not require changes outside this module.
+
 ## 2. Public API
 
 ```python
@@ -100,6 +107,8 @@ self._logger: logging.Logger
 1. If `self._turns_taken >= max_user_turns`, raise `TurnLimitReached`.
 2. Append `{"role": "agent", "content": message}` to the transcript.
 3. Call `_plan_actions(message)` → returns `list[ToolInvocation]`.
+   - The planner may use any backend (rule engine, LLM, human operator). The
+     output must be a concrete list of tool invocations before execution.
    - Minimal viable implementation: pattern-match against a handful of
      scenario phrases. E.g. “Add Eve to my contacts” → `[{name:"create_contact", ...}]`
    - If no plan is possible, raise `UserActionFailed("Unsupported request")`.

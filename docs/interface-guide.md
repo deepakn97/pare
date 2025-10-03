@@ -8,6 +8,11 @@ This guide is the single source of truth for how the three workstreams interact:
 Every team implements their component independently and relies only on the API defined below.
 If a behaviour is not documented here, it is considered unstable and must not be used.
 
+> **Implementation freedom**
+> The contracts describe *what* information flows between components, not *how* the decisions are made.
+> Teams may plug in rules, LLMs, human operators, or any other backend without notifying others,
+> provided the public APIs remain unchanged.
+
 ## 0. Scope and Terminology
 
 - **CompletedEvent** – Meta-ARE event emitted after every tool call.

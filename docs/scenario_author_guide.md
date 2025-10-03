@@ -6,6 +6,13 @@ is required.
 
 ## 1. Goal
 
+> **Pluggable backends**
+>
+> The scenario contract does not restrict what kind of tasks or data you feed in.
+> You can wire scripted toy scenes, complex synthetic universes, or realtime
+> human-in-the-loop tasks. The only requirement is that the components are
+> instantiated via the interfaces below.
+
 Create scenarios that:
 
 - Use `StateAwareEnvironmentWrapper` and PAS stateful apps to simulate realistic

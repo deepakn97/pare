@@ -3,6 +3,13 @@
 This document is self-contained. Implement everything described here and your
 proactive agent will plug into PAS scenarios without additional knowledge.
 
+> **Backend optionality**
+>
+> The protocol below does not constrain the implementation strategy. An agent
+> may be purely rule-based, call into a hosted LLM, use a distilled model, or a
+> mix of all three. As long as the public methods honour their contracts, the
+> surrounding systems remain oblivious to the underlying AI.
+
 ## 1. Role Recap
 
 A proactive agent observes Meta-ARE events, infers user goals, seeks explicit
@@ -72,7 +79,9 @@ protocol.
 - `required_tools`: list of `@app_tool` names you expect to use during
   execution. This allows logging and future capability checks.
 
-Minimal rule-based implementation can look for simple triggers (e.g. “user added
+Any inference backend is acceptable (rules, LLMs, compact policies). The contract
+ends once a `GoalHypothesis` is returned; the surrounding system never inspects
+internal state. Minimal rule-based implementation can look for simple triggers (e.g. “user added
 attendee manually” → propose follow-up email).
 
 ## 5. Confirmation (`confirm_goal`)
