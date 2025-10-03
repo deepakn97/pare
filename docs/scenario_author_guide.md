@@ -73,15 +73,22 @@ def create_scenario() -> Scenario:
         goal = proactive.propose_goal()
         if goal is None:
             return
-        if proactive.confirm_goal(user_proxy):
-            try:
-                result = proactive.execute(goal, env)
-            except ProactiveInterventionError as exc:
-                env.logger.error("intervention failed: %s", exc)
-            else:
-                user_proxy.reply(result.notes)  # optional follow-up
-            finally:
-                proactive.handoff(env)
+        question = (
+            f"我可以为你执行：{goal.summary} (信心 {goal.confidence:.0%})。要继续吗？"
+        )
+        reply = user_proxy.reply(question)
+        accepted = reply.strip().lower() in {"yes", "y", "好", "好的"}
+        proactive.record_decision(goal, accepted)
+        if not accepted:
+            return
+        try:
+            result = proactive.execute(goal, env)
+        except ProactiveInterventionError as exc:
+            env.logger.error("intervention failed: %s", exc)
+        else:
+            user_proxy.reply(result.notes)  # optional follow-up to inform the user
+        finally:
+            proactive.handoff(env)
 
     # schedule periodic goal checks (e.g. after each event)
     env.notification_system.subscribe(EventType.ANY, lambda _: on_goal())
@@ -149,8 +156,9 @@ mid-scenario outside of tool calls; it breaks the navigation mirrors.
 
 1. Instantiate the scenario and run through a scripted conversation using the
    user proxy alone to ensure all planned user flows succeed.
-2. Trigger the proactive agent by emitting mock `CompletedEvent`s and verify
-   it proposes/executes goals as expected.
+2. Trigger the proactive agent by emitting mock `CompletedEvent`s and verify it
+   proposes goals, logs decisions via `record_decision`, and, on acceptance,
+   executes the correct tools.
 3. Confirm `AgentUserInterface` receives readable replies (inspect console
    output or scenario logs).
 4. Verify turn limits and error handling behave according to §7.

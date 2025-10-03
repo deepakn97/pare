@@ -24,11 +24,11 @@ All interfaces assume Meta-ARE 2024.10.* and the PAS stateful apps checked into 
 
 ## 1. Component Responsibilities
 
-| Component        | Owns…                                                         | Must NOT…                                               |
-|------------------|---------------------------------------------------------------|---------------------------------------------------------|
-| User Proxy       | Mapping agent messages → `@user_tool` calls; textual replies  | Call `@app_tool`s; mutate app state directly            |
-| Proactive Agent  | Observing events, hypothesising goals, executing interventions| Talk to `AgentUserInterface`; call user tools           |
-| Scenario author  | Building env & apps, wiring proxy + proactive agent, tasks    | Embed business logic inside the runner                  |
+| Component        | Owns…                                                                 | Must NOT…                                               |
+|------------------|---------------------------------------------------------------------------|---------------------------------------------------------|
+| User Proxy       | Mapping agent messages → `@user_tool` calls; textual replies              | Call `@app_tool`s; mutate app state directly            |
+| Proactive Agent  | Observing events, hypothesising goals, logging user decisions, executing interventions | Talk to `AgentUserInterface`; call user tools |
+| Scenario author  | Building env & apps, wiring proxy + proactive agent, prompting the user, overall task flow | Embed business logic inside the runner |
 
 ## 2. Module Layout (default locations)
 
@@ -102,7 +102,7 @@ class GoalHypothesis:
 class ProactiveAgentProtocol(Protocol):
     def observe(self, event: CompletedEvent) -> None: ...
     def propose_goal(self) -> GoalHypothesis | None: ...
-    def confirm_goal(self, proxy: UserProxy) -> bool: ...
+    def record_decision(self, goal: GoalHypothesis, accepted: bool) -> None: ...
     def execute(self, goal: GoalHypothesis, env: StateAwareEnvironmentWrapper) -> None: ...
     def handoff(self, env: StateAwareEnvironmentWrapper) -> None: ...
 ```
@@ -111,8 +111,8 @@ class ProactiveAgentProtocol(Protocol):
 
 - `observe`: called on *every* completed event (user or agent). Implementation may filter internally. Must be side-effect free except for updating internal state.
 - `propose_goal`: returns next actionable hypothesis, or `None` if undecided. Should not mutate the environment.
-- `confirm_goal`: uses any mechanism (LLM, rules) to decide whether to proceed after user confirmation. Must return `False` if execution should be skipped.
-- `execute`: performs the autonomous intervention.
+- `record_decision`: scenario calls this once the user has responded. Use it to log acceptance / rejection and tidy temporary state.
+- `execute`: performs the autonomous intervention (only called when the user accepted).
   - May call `@app_tool`s directly or orchestrate other helpers.
   - Must raise `ProactiveInterventionError` on failure.
 - `handoff`: restore a safe state (e.g. return to a neutral screen) and optionally enqueue a summary message for the user proxy to send later.
@@ -127,7 +127,7 @@ The proactive agent never calls user tools and never interacts with `AgentUserIn
    ```python
    env.notification_system.subscribe(EventType.ANY, proactive.observe)
    ```
-4. **Hook into scenario loop** – when `propose_goal()` returns a hypothesis, prompt the user via the proxy, call `confirm_goal()`, then `execute()` / `handoff()`.
+4. **Hook into scenario loop** – when `propose_goal()` returns a hypothesis, prompt the user via the proxy, call `record_decision(goal, accepted)`, and only if `accepted` is `True` continue with `execute()` / `handoff()`.
 5. **Pass user proxy to `AgentUserInterface`** – this is still the only object Meta-ARE touches.
 
 ### 5.1 Constructor example
@@ -178,9 +178,13 @@ env.notification_system.subscribe(EventType.ANY, on_event)
 aui = AgentUserInterface(user_proxy=proxy)
 scenario = Scenario(scenario_id="demo", agent_user_interface=aui, ...)
 
-if (goal := proactive.propose_goal()) and proactive.confirm_goal(proxy):
-    proactive.execute(goal, env)
-    proactive.handoff(env)
+if (goal := proactive.propose_goal()):
+    user_reply = proxy.reply(f"我可以执行：{goal.summary}。需要继续吗？")
+    accepted = user_reply.strip().lower() in {"yes", "y", "好", "好的"}
+    proactive.record_decision(goal, accepted)
+    if accepted:
+        proactive.execute(goal, env)
+        proactive.handoff(env)
 ```
 
 This example leaves the planning logic unspecified; teams fill it in using the interfaces above.

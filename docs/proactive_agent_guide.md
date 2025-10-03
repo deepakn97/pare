@@ -44,7 +44,7 @@ class ProactiveInterventionError(RuntimeError):
 class ProactiveAgentProtocol(Protocol):
     def observe(self, event: CompletedEvent) -> None: ...
     def propose_goal(self) -> GoalHypothesis | None: ...
-    def confirm_goal(self, proxy: UserProxy) -> bool: ...
+    def record_decision(self, goal: GoalHypothesis, accepted: bool) -> None: ...
     def execute(self, goal: GoalHypothesis, env: StateAwareEnvironmentWrapper) -> InterventionResult: ...
     def handoff(self, env: StateAwareEnvironmentWrapper) -> None: ...
 ```
@@ -84,14 +84,16 @@ ends once a `GoalHypothesis` is returned; the surrounding system never inspects
 internal state. Minimal rule-based implementation can look for simple triggers (e.g. “user added
 attendee manually” → propose follow-up email).
 
-## 5. Confirmation (`confirm_goal`)
+## 5. Recording the user's decision (`record_decision`)
 
-- Invoked only after the scenario receives explicit user consent (e.g. the user
-  replied “yes”). The method gives your agent a final chance to decline.
-- You receive the `UserProxy` instance; you may send clarification messages via
-  `proxy.reply(...)` using a canned string (“Just to confirm…”). Avoid calling
-  user tools; keep the interaction minimal.
-- Return `True` to proceed, `False` to abort.
+- Called exactly once for every hypothesis returned by `propose_goal()` after
+  the scenario has asked the user. `accepted=True` means the user wants the
+  proactive agent to proceed; `False` means the user declined.
+- Use this hook to log statistics, update learning signals, or drop any
+  temporary state tied to the hypothesis.
+- When `accepted` is `False`, the scenario will *not* call `execute()`. Your
+  implementation should therefore treat `record_decision(..., False)` as the
+  terminal event for that hypothesis.
 
 ## 6. Execution (`execute`)
 
@@ -148,9 +150,9 @@ class RuleBasedProactiveAgent(ProactiveAgentProtocol):
                 )
         return None
 
-    def confirm_goal(self, proxy: UserProxy) -> bool:
-        proxy.reply("I can send a welcome email now. Shall I proceed?")
-        return True
+    def record_decision(self, goal: GoalHypothesis, accepted: bool) -> None:
+        if not accepted:
+            self._pending_summary = "User declined proactive help."
 
     def execute(self, goal: GoalHypothesis, env: StateAwareEnvironmentWrapper) -> InterventionResult:
         email_app = cast(StatefulEmailApp, env.get_app("email"))
@@ -175,7 +177,8 @@ Scenario authors can retrieve `agent._pending_summary` (or better, expose a
 
 1. Feed a sequence of `CompletedEvent`s into `observe` and confirm
    `propose_goal()` returns the expected hypothesis.
-2. Ensure `confirm_goal()` does not call user tools and always returns a bool.
+2. Call `record_decision(goal, accepted)` with both `True` and `False` and
+   ensure state is updated correctly (no execution should occur on `False`).
 3. Verify `execute()` calls only app tools and raises `ProactiveInterventionError` on failure.
 4. After `handoff()`, the app navigation stack is empty (or in a known safe state).
 5. Structured logging (e.g. notes in `InterventionResult`) includes the tools used.
