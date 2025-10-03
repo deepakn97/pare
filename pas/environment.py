@@ -20,11 +20,16 @@ class StateAwareEnvironmentWrapper(Environment):
         Args:
             event: Completed event from tool execution
         """
-        super().handle_completed_event(event)  # Normal processing first
+        parent_handle = getattr(super(), "handle_completed_event", None)
+        if callable(parent_handle):
+            parent_handle(event)  # type: ignore[misc]
 
         # Handle state transitions for StatefulApps
         app_name = event.app_name()
-        app = self.get_app_by_name(app_name)
+        if app_name is None:
+            return
+
+        app = self.get_app(app_name)
 
         if isinstance(app, StatefulApp):
             app.handle_state_transition(event)
