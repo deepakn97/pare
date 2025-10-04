@@ -86,7 +86,7 @@ def create_scenario() -> Scenario:
         if not accepted:
             return
         try:
-            result = proactive.execute(task, env)
+            result = proactive.execute(task, env)  # returns InterventionResult (success flag + user-facing notes)
         except ProactiveInterventionError as exc:
             env.logger.error("intervention failed: %s", exc)
         else:
@@ -137,8 +137,9 @@ multiple environments in parallel.
 Leverage Meta-ARE’s existing validation hooks (`Scenario.validate`). Ensure you
 store sufficient metadata to judge success:
 
-- Use the proactive agent’s `InterventionResult.notes` and the proxy’s
-  structured replies as evidence.
+- Use the proactive agent’s `InterventionResult.notes` (defined in
+  `docs/proactive_agent_guide.md`) and the proxy’s structured replies as
+  evidence.
 - Record important `CompletedEvent`s for post-run inspection (you can reuse the
   `StateAwareEnvironmentWrapper.event_log`).
 
