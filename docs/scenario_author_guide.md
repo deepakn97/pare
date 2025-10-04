@@ -1,8 +1,9 @@
 # Scenario Authoring Guide
 
 This document contains everything a scenario author needs to wire the PAS user
-proxy, proactive agent, and stateful apps into Meta-ARE. No other documentation
-is required.
+proxy, proactive agent, and stateful apps into Meta-ARE. When you need deeper
+details on a referenced component, follow the inline links to the dedicated
+guides.
 
 ## 1. Goal
 
