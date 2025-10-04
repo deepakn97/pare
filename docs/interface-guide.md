@@ -121,7 +121,7 @@ The proactive agent never calls user tools and never interacts with `AgentUserIn
 
 ```python
 proxy = StatefulUserProxy(env, env.notification_system, summary_style="structured")
-proactive = RuleBasedProactiveAgent()
+proactive = LLMBasedProactiveAgent()
 aui = AgentUserInterface(user_proxy=proxy, ...)
 ```
 
@@ -155,7 +155,7 @@ env = StateAwareEnvironmentWrapper()
 env.register_apps([StatefulContactsApp(name="contacts"), StatefulEmailApp(name="email")])
 
 proxy = StatefulUserProxy(env, env.notification_system)
-proactive = RuleBasedProactiveAgent()
+proactive = LLMBasedProactiveAgent()
 
 def on_event(event: CompletedEvent) -> None:
     proactive.observe(event)

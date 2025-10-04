@@ -42,7 +42,7 @@ class ProactiveAgentProtocol(Protocol):
     def handoff(self, env: StateAwareEnvironmentWrapper) -> None: ...
 ```
 
-Your concrete implementation (e.g. `RuleBasedProactiveAgent`) must satisfy this
+Your concrete implementation (e.g. `LLMBasedProactiveAgent`) must satisfy this
 protocol.
 
 ## 3. Event Ingestion (`observe`)
@@ -109,38 +109,36 @@ Any inference backend is acceptable (rules, LLMs, compact policies). The contrac
 ## 8. Minimal Implementation Template
 
 ```python
-class RuleBasedProactiveAgent(ProactiveAgentProtocol):
-    def __init__(self) -> None:
+class LLMBasedProactiveAgent(ProactiveAgentProtocol):
+    def __init__(self, llm: LLMClient, *, system_prompt: str, max_context_events: int = 200) -> None:
         self._events: deque[CompletedEvent] = deque()
         self._pending_summary: str | None = None
+        self._llm = llm
+        self._system_prompt = system_prompt
+        self._max_context_events = max_context_events
 
     def observe(self, event: CompletedEvent) -> None:
-        if len(self._events) > 200:
+        if len(self._events) >= self._max_context_events:
             self._events.popleft()
         self._events.append(event)
 
     def propose_goal(self) -> str | None:
-        # naive example: if user recently added a contact, propose sending an email
-        for event in reversed(self._events):
-            if event.function_name() == "create_contact":
-                return "Send a welcome email to the new contact"
-        return None
+        history = list(self._events)
+        prompt = self._build_goal_prompt(history)
+        response = self._llm.complete(prompt)
+        return self._parse_goal(response)
 
     def record_decision(self, task_guess: str, accepted: bool) -> None:
         if not accepted:
             self._pending_summary = "User declined proactive help."
 
     def execute(self, task_guess: str, env: StateAwareEnvironmentWrapper) -> InterventionResult:
-        email_app = cast(StatefulEmailApp, env.get_app("email"))
-        try:
-            email_app.compose_and_send(subject="Welcome", content="Hi!", recipients=["new@contact"])
-        except Exception as exc:  # replace with concrete call
-            raise ProactiveInterventionError("Email send failed") from exc
-        self._pending_summary = "Sent the welcome email."
-        return InterventionResult(success=True, notes="Sent welcome email")
+        intervention_plan = plan_intervention(task_guess, env)
+        notes = run_plan(intervention_plan, env)
+        self._pending_summary = notes.summary
+        return notes
 
     def handoff(self, env: StateAwareEnvironmentWrapper) -> None:
-        # ensure we're back on inbox
         email_app = cast(StatefulEmailApp, env.get_app("email"))
         while email_app.navigation_stack:
             email_app.go_back()
@@ -154,6 +152,10 @@ class RuleBasedProactiveAgent(ProactiveAgentProtocol):
 Always expose a documented accessor like `pop_summary()` (above) instead of
 touching underscored attributes directly. Scenario authors can call this method
 and pass the returned text to the user proxy for final messaging.
+
+`LLMClient`, `_build_goal_prompt`, `_parse_goal`, `plan_intervention`, and
+`run_plan` are placeholders – implement them however your stack requires
+(synchronous calls, queued jobs, hybrid orchestration, etc.).
 
 ## 9. Testing Checklist
 

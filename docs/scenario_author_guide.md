@@ -34,7 +34,7 @@ from are.simulation.types import CompletedEvent, EventType
 from pas.apps.calendar import StatefulCalendarApp
 from pas.apps.contacts import StatefulContactsApp
 from pas.environment import StateAwareEnvironmentWrapper
-from pas.proactive.agent import ProactiveAgentProtocol
+from pas.proactive.agent import LLMBasedProactiveAgent, ProactiveAgentProtocol
 from pas.user_proxy.stateful import StatefulUserProxy, TurnLimitReached
 ```
 
@@ -55,11 +55,18 @@ def build_env() -> tuple[StateAwareEnvironmentWrapper, StatefulUserProxy, Proact
 
     notification_system = env.notification_system
     user_proxy = StatefulUserProxy(env, notification_system, summary_style="structured")
-    proactive_agent = RuleBasedProactiveAgent()  # your implementation
+    llm_client = build_llm_client()  # your integration point
+    proactive_agent = LLMBasedProactiveAgent(
+        llm=llm_client,
+        system_prompt="You are a helpful proactive iOS assistant.",
+    )
 
     notification_system.subscribe(EventType.ANY, proactive_agent.observe)
     return env, user_proxy, proactive_agent
 ```
+
+`build_llm_client()` stands in for whatever LLM integration your team uses – a
+hosted API, local inference server, or any other wrapper.
 
 ## 4. Wiring into a Scenario
 
@@ -115,7 +122,11 @@ provide them via the constructors inside `build_env()`. Examples:
 
 ```python
 user_proxy = StatefulUserProxy(env, notification_system, max_user_turns=20)
-proactive = RuleBasedProactiveAgent(max_hypotheses=3)
+proactive = LLMBasedProactiveAgent(
+    llm=llm_client,
+    system_prompt="You are a proactive assistant.",
+    max_context_events=256,
+)
 ```
 
 Avoid global variables; keep everything encapsulated so tests can instantiate
