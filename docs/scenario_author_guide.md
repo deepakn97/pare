@@ -34,7 +34,7 @@ from are.simulation.types import CompletedEvent, EventType
 from pas.apps.calendar import StatefulCalendarApp
 from pas.apps.contacts import StatefulContactsApp
 from pas.environment import StateAwareEnvironmentWrapper
-from pas.proactive.agent import GoalHypothesis, ProactiveAgentProtocol
+from pas.proactive.agent import ProactiveAgentProtocol
 from pas.user_proxy.stateful import StatefulUserProxy, TurnLimitReached
 ```
 
@@ -70,23 +70,22 @@ def create_scenario() -> Scenario:
     env, user_proxy, proactive = build_env()
 
     def on_goal() -> None:
-        goal = proactive.propose_goal()
-        if goal is None:
+        task = proactive.propose_goal()
+        if task is None:
             return
-        question = (
-            f"我可以为你执行：{goal.summary} (信心 {goal.confidence:.0%})。要继续吗？"
-        )
-        reply = user_proxy.reply(question)
-        accepted = reply.strip().lower() in {"yes", "y", "好", "好的"}
-        proactive.record_decision(goal, accepted)
+        reply = user_proxy.reply(f"I can handle this: {task}. Should I proceed?")
+        accepted = reply.strip().lower() in {"yes", "y", "sure", "please do"}
+        proactive.record_decision(task, accepted)
         if not accepted:
             return
         try:
-            result = proactive.execute(goal, env)
+            result = proactive.execute(task, env)
         except ProactiveInterventionError as exc:
             env.logger.error("intervention failed: %s", exc)
         else:
             user_proxy.reply(result.notes)  # optional follow-up to inform the user
+            if (summary := proactive.pop_summary()):
+                user_proxy.reply(summary)
         finally:
             proactive.handoff(env)
 
@@ -106,13 +105,16 @@ def create_scenario() -> Scenario:
 The above pattern ensures the proactive agent is considered after each event.
 Real scenarios may wish to debounce `on_goal()` (e.g. only after user turns).
 
+Always use documented accessors (such as `proactive.pop_summary()`) when the
+agent wants to surface follow-up copy; never reach into underscored fields.
+
 ## 5. Passing contextual data
 
 If the scenario needs to pass configuration to the proxy or proactive agent,
 provide them via the constructors inside `build_env()`. Examples:
 
 ```python
-user_proxy = StatefulUserProxy(env, notification_system, max_user_turns=20, greeting="Hey there!")
+user_proxy = StatefulUserProxy(env, notification_system, max_user_turns=20)
 proactive = RuleBasedProactiveAgent(max_hypotheses=3)
 ```
 
@@ -157,7 +159,7 @@ mid-scenario outside of tool calls; it breaks the navigation mirrors.
 1. Instantiate the scenario and run through a scripted conversation using the
    user proxy alone to ensure all planned user flows succeed.
 2. Trigger the proactive agent by emitting mock `CompletedEvent`s and verify it
-   proposes goals, logs decisions via `record_decision`, and, on acceptance,
+   proposes task strings, logs decisions via `record_decision`, and, on acceptance,
    executes the correct tools.
 3. Confirm `AgentUserInterface` receives readable replies (inspect console
    output or scenario logs).

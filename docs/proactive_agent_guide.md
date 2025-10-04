@@ -27,13 +27,6 @@ Create `pas/proactive/agent.py` with the following protocol and base class:
 from dataclasses import dataclass
 
 @dataclass(slots=True)
-class GoalHypothesis:
-    summary: str
-    confidence: float
-    supporting_events: list[CompletedEvent]
-    required_tools: list[str]
-
-@dataclass(slots=True)
 class InterventionResult:
     success: bool
     notes: str
@@ -43,9 +36,9 @@ class ProactiveInterventionError(RuntimeError):
 
 class ProactiveAgentProtocol(Protocol):
     def observe(self, event: CompletedEvent) -> None: ...
-    def propose_goal(self) -> GoalHypothesis | None: ...
-    def record_decision(self, goal: GoalHypothesis, accepted: bool) -> None: ...
-    def execute(self, goal: GoalHypothesis, env: StateAwareEnvironmentWrapper) -> InterventionResult: ...
+    def propose_goal(self) -> str | None: ...
+    def record_decision(self, task_guess: str, accepted: bool) -> None: ...
+    def execute(self, task_guess: str, env: StateAwareEnvironmentWrapper) -> InterventionResult: ...
     def handoff(self, env: StateAwareEnvironmentWrapper) -> None: ...
 ```
 
@@ -71,37 +64,25 @@ protocol.
 
 ## 4. Goal Hypothesis (`propose_goal`)
 
-- Analyse accumulated events and return the next actionable `GoalHypothesis`, or
-  `None` if no confident goal exists.
-- `summary`: plain-language description (“Add Eve to tomorrow’s sync”).
-- `confidence`: float 0.0–1.0. Scenarios may filter based on threshold.
-- `supporting_events`: subset of observed events that justify the hypothesis.
-- `required_tools`: list of `@app_tool` names you expect to use during
-  execution. This allows logging and future capability checks.
+- Analyse accumulated events and return a short task guess (string), or `None` if the agent is unsure.
+- The string should be human-readable and suitable for sending to the user proxy (for example: "Send a welcome email to the new contact").
 
-Any inference backend is acceptable (rules, LLMs, compact policies). The contract
-ends once a `GoalHypothesis` is returned; the surrounding system never inspects
-internal state. Minimal rule-based implementation can look for simple triggers (e.g. “user added
-attendee manually” → propose follow-up email).
+Any inference backend is acceptable (rules, LLMs, compact policies). The contract ends once a string is returned; the surrounding system never inspects internal state. Minimal rule-based implementation can look for simple triggers (e.g. "user added attendee manually" → propose sending a follow-up email).
 
-## 5. Recording the user's decision (`record_decision`)
+## 5. Recording the user decision (`record_decision`)
 
-- Called exactly once for every hypothesis returned by `propose_goal()` after
-  the scenario has asked the user. `accepted=True` means the user wants the
-  proactive agent to proceed; `False` means the user declined.
-- Use this hook to log statistics, update learning signals, or drop any
-  temporary state tied to the hypothesis.
-- When `accepted` is `False`, the scenario will *not* call `execute()`. Your
-  implementation should therefore treat `record_decision(..., False)` as the
-  terminal event for that hypothesis.
+- Called exactly once for every task guess returned by `propose_goal()` after the scenario has asked the user.
+- `accepted=True` means the user wants the proactive agent to proceed; `False` means the user declined.
+- Use this hook to log statistics, update learning signals, or drop any temporary state tied to the guess.
+- When `accepted` is `False`, the scenario will *not* call `execute()`. This marks the terminal event for that guess.
 
 ## 6. Execution (`execute`)
 
-- Called with the confirmed `GoalHypothesis`.
+- Called with the confirmed task guess string.
 - Perform intervention strictly via `@app_tool`s. Example:
 
   ```python
-  def execute(self, goal: GoalHypothesis, env: StateAwareEnvironmentWrapper) -> InterventionResult:
+  def execute(self, task_guess: str, env: StateAwareEnvironmentWrapper) -> InterventionResult:
       email_app = cast(StatefulEmailApp, env.get_app("email"))
       try:
           email_app.send_email_to_user(subject="Agenda", content="...")
@@ -138,23 +119,18 @@ class RuleBasedProactiveAgent(ProactiveAgentProtocol):
             self._events.popleft()
         self._events.append(event)
 
-    def propose_goal(self) -> GoalHypothesis | None:
+    def propose_goal(self) -> str | None:
         # naive example: if user recently added a contact, propose sending an email
         for event in reversed(self._events):
             if event.function_name() == "create_contact":
-                return GoalHypothesis(
-                    summary="Send a welcome email to the new contact",
-                    confidence=0.7,
-                    supporting_events=[event],
-                    required_tools=["compose_email"],
-                )
+                return "Send a welcome email to the new contact"
         return None
 
-    def record_decision(self, goal: GoalHypothesis, accepted: bool) -> None:
+    def record_decision(self, task_guess: str, accepted: bool) -> None:
         if not accepted:
             self._pending_summary = "User declined proactive help."
 
-    def execute(self, goal: GoalHypothesis, env: StateAwareEnvironmentWrapper) -> InterventionResult:
+    def execute(self, task_guess: str, env: StateAwareEnvironmentWrapper) -> InterventionResult:
         email_app = cast(StatefulEmailApp, env.get_app("email"))
         try:
             email_app.compose_and_send(subject="Welcome", content="Hi!", recipients=["new@contact"])
@@ -168,17 +144,21 @@ class RuleBasedProactiveAgent(ProactiveAgentProtocol):
         email_app = cast(StatefulEmailApp, env.get_app("email"))
         while email_app.navigation_stack:
             email_app.go_back()
+
+    def pop_summary(self) -> str | None:
+        summary = self._pending_summary
+        self._pending_summary = None
+        return summary
 ```
 
-Scenario authors can retrieve `agent._pending_summary` (or better, expose a
-`get_summary()` method) and pass it to the user proxy for final messaging.
+Always expose a documented accessor like `pop_summary()` (above) instead of
+touching underscored attributes directly. Scenario authors can call this method
+and pass the returned text to the user proxy for final messaging.
 
 ## 9. Testing Checklist
 
-1. Feed a sequence of `CompletedEvent`s into `observe` and confirm
-   `propose_goal()` returns the expected hypothesis.
-2. Call `record_decision(goal, accepted)` with both `True` and `False` and
-   ensure state is updated correctly (no execution should occur on `False`).
+1. Feed a sequence of `CompletedEvent`s into `observe` and confirm `propose_goal()` returns the expected task string.
+2. Call `record_decision(task, accepted)` with both `True` and `False` and ensure state is updated correctly (no execution should occur on `False`).
 3. Verify `execute()` calls only app tools and raises `ProactiveInterventionError` on failure.
 4. After `handoff()`, the app navigation stack is empty (or in a known safe state).
 5. Structured logging (e.g. notes in `InterventionResult`) includes the tools used.

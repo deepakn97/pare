@@ -51,7 +51,6 @@ class StatefulUserProxy(UserProxy):
         notification_system: NotificationSystem,
         *,
         max_user_turns: int = 40,
-        summary_style: Literal["plain", "structured"] = "plain",
         logger: logging.Logger | None = None,
     ) -> None: ...
 
@@ -64,55 +63,43 @@ class StatefulUserProxy(UserProxy):
 - `env`: shared environment wrapper. Proxy must only interact via exposed `@user_tool`s.
 - `notification_system`: subscribe to `CompletedEvent`s to update state.
 - `max_user_turns`: once reached, `reply()` raises `StopIteration`.
-- `summary_style`:
-  - `plain` → single conversational sentence.
-  - `structured` → fenced block with key/value pairs (see §6).
 - `logger`: optional logger (default uses module-level logger).
 
 ### 3.2 Behaviour of `init_conversation()`
 
-- Returns a greeting (configurable) and must not trigger any tool calls.
-- Adds the message to the proxy's transcript.
-
+- Returns an empty string and must not trigger any tool calls.
+- Scenarios may immediately call `reply()` with their preferred greeting.
 ### 3.3 Behaviour of `reply(message)`
 
 1. Append agent message to transcript (used for context).
 2. Plan and execute one or more `@user_tool` calls. For MVP this can be a hard-coded flow; future logic must stay internal.
 3. After each tool call, wait for a `CompletedEvent` from the notification system. Use it to update navigation state (`env.get_app(...).current_state`).
 4. If a tool fails, raise `UserActionFailed` with an explanatory message.
-5. Compose the textual reply:
-   - `plain`: e.g. `"I added Eve to the planning meeting."`
-   - `structured`: see §6 for formatting.
+5. Compose a short textual reply summarising the outcome (success or failure).
 6. Record the reply in the transcript and return it.
 
 ### 3.4 Transcript + helpers
 
-`StatefulUserProxy` keeps an internal list of dicts with `role` (`agent` / `user`) and `content`. When summary style is `structured`, it should also store the raw tool call log (`List[ToolInvocation]`). This allows later export without additional coordination.
+`StatefulUserProxy` keeps an internal list of dicts with `role` (`agent` / `user`) and `content`. Optionally store the raw tool log (`List[ToolInvocation]`) for debugging or export.
 
 ## 4. Proactive Agent Contract
 
 ```python
-@dataclass(slots=True)
-class GoalHypothesis:
-    summary: str
-    confidence: float
-    supporting_events: list[CompletedEvent]
-    required_tools: list[str]
-
 class ProactiveAgentProtocol(Protocol):
     def observe(self, event: CompletedEvent) -> None: ...
-    def propose_goal(self) -> GoalHypothesis | None: ...
-    def record_decision(self, goal: GoalHypothesis, accepted: bool) -> None: ...
-    def execute(self, goal: GoalHypothesis, env: StateAwareEnvironmentWrapper) -> None: ...
+    def propose_goal(self) -> str | None: ...
+    def record_decision(self, task_guess: str, accepted: bool) -> None: ...
+    def execute(self, task_guess: str, env: StateAwareEnvironmentWrapper) -> None: ...
     def handoff(self, env: StateAwareEnvironmentWrapper) -> None: ...
 ```
+
 
 ### 4.1 Semantics
 
 - `observe`: called on *every* completed event (user or agent). Implementation may filter internally. Must be side-effect free except for updating internal state.
-- `propose_goal`: returns next actionable hypothesis, or `None` if undecided. Should not mutate the environment.
+- `propose_goal`: returns a human-readable task guess string (or `None` if undecided). Should not mutate the environment.
 - `record_decision`: scenario calls this once the user has responded. Use it to log acceptance / rejection and tidy temporary state.
-- `execute`: performs the autonomous intervention (only called when the user accepted).
+- `execute`: performs the autonomous intervention (only called when the user accepted). Receives the same task guess string.
   - May call `@app_tool`s directly or orchestrate other helpers.
   - Must raise `ProactiveInterventionError` on failure.
 - `handoff`: restore a safe state (e.g. return to a neutral screen) and optionally enqueue a summary message for the user proxy to send later.
@@ -179,17 +166,17 @@ aui = AgentUserInterface(user_proxy=proxy)
 scenario = Scenario(scenario_id="demo", agent_user_interface=aui, ...)
 
 if (goal := proactive.propose_goal()):
-    user_reply = proxy.reply(f"我可以执行：{goal.summary}。需要继续吗？")
-    accepted = user_reply.strip().lower() in {"yes", "y", "好", "好的"}
-    proactive.record_decision(goal, accepted)
+    user_reply = proxy.reply(f"I can take care of this: {task}. Should I proceed?")
+    accepted = user_reply.strip().lower() in {"yes", "y", "sure", "please do"}
+    proactive.record_decision(task, accepted)
     if accepted:
-        proactive.execute(goal, env)
+        proactive.execute(task, env)
         proactive.handoff(env)
 ```
 
 This example leaves the planning logic unspecified; teams fill it in using the interfaces above.
 
-## 8. Extensibility Guidelines
+## 7. Extensibility Guidelines
 
 - New summary styles must be added behind a feature flag and documented here before adoption.
 - Additional proactive agent hooks (e.g. `reset`) require consensus from all teams – update the protocol and document the migration path.

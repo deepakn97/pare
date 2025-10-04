@@ -52,8 +52,6 @@ class StatefulUserProxy(UserProxy):
         notification_system: NotificationSystem,
         *,
         max_user_turns: int = 40,
-        summary_style: Literal["plain", "structured"] = "plain",
-        greeting: str = "Hi! How can I help you today?",
         logger: logging.Logger | None = None,
     ) -> None: ...
 
@@ -63,14 +61,12 @@ class StatefulUserProxy(UserProxy):
 
 ### 2.1 Constructor semantics
 
-- `env`: shared environment. Access apps via `env.get_app("contacts")`, never
+- `env`: shared environment. Access apps via `env.get_app("APPNAME")`, never
   instantiate new apps.
 - `notification_system`: subscribe for `CompletedEvent` notifications.
 - `max_user_turns`: number of successful replies before raising
   `TurnLimitReached`. Initialise an internal counter at 0; increment after each
   successful `reply` return.
-- `summary_style`: choose output format (see §4).
-- `greeting`: text returned by `init_conversation()`.
 - `logger`: default to `logging.getLogger(__name__)` if `None`.
 
 The constructor must register a callback:
@@ -91,16 +87,14 @@ Keep the following attributes:
 self._transcript: list[dict[str, str]]  # [{'role': 'agent'|'user', 'content': str}, ...]
 self._recent_events: deque[CompletedEvent]
 self._turns_taken: int
-self._summary_style: Literal["plain", "structured"]
-self._greeting: str
 self._logger: logging.Logger
 ```
 
 ### 2.3 `init_conversation()` implementation
 
 1. Reset `self._recent_events` and `self._turns_taken` to 0.
-2. Append `{"role": "user", "content": greeting}` to the transcript.
-3. Return the greeting string. **No** tool calls or environment mutation.
+2. Return an empty string (scenarios may immediately send their own greeting via `reply`).
+3. **No** tool calls or environment mutation.
 
 ### 2.4 `reply(message)` workflow
 
@@ -117,9 +111,10 @@ self._logger: logging.Logger
    - Ensure the required tool is in `current_state.get_available_actions()`.
    - Execute the tool and collect `CompletedEvent` from `_recent_events`. If an
      event is not received within a timeout (default 2 seconds), raise
-     `UserActionFailed("Tool did not complete")`.
+     `UserActionFailed(f"Tool did not complete within {timeout}s")` where
+     `timeout` matches the configured wait.
    - Store the `ToolInvocation` in a local list with the actual result.
-5. Produce reply text using `_summarise(invocations)`.
+5. Produce a short sentence summarising the overall outcome (success or failure).
 6. Append `{"role": "user", "content": reply}` to the transcript.
 7. Increment `_turns_taken` and return the reply.
 
@@ -129,13 +124,8 @@ Implement at least these private methods:
 
 ```python
 def _plan_actions(self, message: str) -> list[ToolInvocation]: ...
-def _await_event(self, expected_tool: str, timeout: float = 2.0) -> CompletedEvent: ...
-def _summarise(self, invocations: list[ToolInvocation]) -> str: ...
 def _on_event(self, event: CompletedEvent) -> None: ...
 ```
-
-`_await_event` pops from `self._recent_events` until it finds a matching
-function name (`event.function_name() == expected_tool`).
 
 ## 3. Tool execution rules
 
@@ -143,59 +133,27 @@ function name (`event.function_name() == expected_tool`).
   expose the method. If not, raise `UserActionFailed` immediately; never call
   tools on inactive states.
 - After each action, allow the environment transition to complete before
-  executing the next action. `_await_event` provides this synchronisation.
+  executing the next action. Wait for the corresponding `CompletedEvent` so the navigation state is up to date before issuing the next tool call.
 - Do **not** catch `RuntimeError`s emitted by the app unless you intend to
   convert them into a user-facing message – let them propagate as
   `UserActionFailed`.
 
-## 4. Reply format
-
-### Plain style
-
-Return a single sentence summarising the outcome:
-
-```python
-return "I added Eve to tomorrow's sync meeting."
-```
-
-### Structured style
-
-Return a fenced block with language hint `pas` plus an optional summary line:
-
-```
-```pas
-action: add_attendee
-input:  email="eve@example.com"
-result: success
-
-action: send_email
-input:  subject="Agenda"
-result: error: smtp timeout
-```
-summary: Added Eve, email failed (see above).
-```
-
-When errors occur, the proxy still sends the structured block, but must add a
-summary explaining what failed.
-
-## 5. Error handling
+## 4. Error handling
 
 - **`UserActionFailed`** → stop processing, do not increment turn count, let the
   caller decide whether to retry.
 - **`TurnLimitReached`** → indicates the conversation is over. Scenarios should
   catch it and transition control back to the main agent.
 
-## 6. Testing checklist
+## 5. Testing checklist
 
 Before handing off, verify:
 
-1. `init_conversation()` returns the greeting and leaves navigation untouched.
+1. `init_conversation()` returns an empty string and resets internal state.
 2. `reply()` executes planned tools in sequence and updates transcript. If you
    stub `_plan_actions` to return `[]`, it should raise `UserActionFailed`.
-3. Structured replies contain one `action` block per tool.
-4. When the environment emits unexpected events, `_await_event` times out and
-   raises `UserActionFailed`.
-5. Turn limit triggers `TurnLimitReached`.
+3. If the expected `CompletedEvent` never arrives, treat the tool call as failed and raise `UserActionFailed`.
+4. Turn limit triggers `TurnLimitReached`.
 
 With these rules implemented, no further context is needed to interoperate with
 scenarios or proactive agents.
