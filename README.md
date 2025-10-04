@@ -70,6 +70,16 @@ uv run pytest --cov --cov-report=html --cov-report=term-missing
 open htmlcov/index.html  # View coverage in browser
 ```
 
+To validate the package against every supported Python version (mirrors the CI
+matrix), run:
+
+```bash
+tox
+```
+
+This requires the corresponding Python interpreters to be available locally; if
+they are missing, you can rely on the CI job instead.
+
 For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Project Structure
