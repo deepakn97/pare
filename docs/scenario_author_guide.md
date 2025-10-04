@@ -81,8 +81,8 @@ def create_scenario() -> Scenario:
         task = proactive.propose_goal()
         if task is None:
             return
-        reply = user_proxy.reply(f"I can handle this: {task}. Should I proceed?")
-        accepted = reply.strip().lower() in {"yes", "y", "sure", "please do"}
+        reply = user_proxy.reply(f"I can handle this: {task}. Should I proceed? Only say yes or no")
+        accepted = reply.strip().lower() in {"yes"}
         proactive.record_decision(task, accepted)
         if not accepted:
             return
