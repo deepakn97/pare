@@ -106,6 +106,10 @@ class ProactiveAgentProtocol(Protocol):
 
 The proactive agent never calls user tools and never interacts with `AgentUserInterface` directly.
 
+For full constructor options and exception semantics of
+`LLMBasedProactiveAgent`/`ProactiveInterventionError`, refer to
+`docs/proactive_agent_guide.md`.
+
 ## 5. Scenario Authoring Responsibilities
 
 1. **Environment setup** – instantiate `StateAwareEnvironmentWrapper`, register stateful apps.
@@ -121,7 +125,7 @@ The proactive agent never calls user tools and never interacts with `AgentUserIn
 
 ```python
 proxy = StatefulUserProxy(env, env.notification_system, summary_style="structured")
-proactive = LLMBasedProactiveAgent()
+proactive = LLMBasedProactiveAgent()  # see docs/proactive_agent_guide.md for constructor details
 aui = AgentUserInterface(user_proxy=proxy, ...)
 ```
 
@@ -155,7 +159,8 @@ env = StateAwareEnvironmentWrapper()
 env.register_apps([StatefulContactsApp(name="contacts"), StatefulEmailApp(name="email")])
 
 proxy = StatefulUserProxy(env, env.notification_system)
-proactive = LLMBasedProactiveAgent()
+llm_client = build_llm_client()  # your LLM factory
+proactive = LLMBasedProactiveAgent(llm=llm_client, system_prompt="...")
 
 def on_event(event: CompletedEvent) -> None:
     proactive.observe(event)
@@ -166,11 +171,11 @@ aui = AgentUserInterface(user_proxy=proxy)
 scenario = Scenario(scenario_id="demo", agent_user_interface=aui, ...)
 
 if (goal := proactive.propose_goal()):
-    user_reply = proxy.reply(f"I can take care of this: {task}. Should I proceed?")
+    user_reply = proxy.reply(f"I can take care of this: {goal}. Should I proceed?")
     accepted = user_reply.strip().lower() in {"yes", "y", "sure", "please do"}
-    proactive.record_decision(task, accepted)
+    proactive.record_decision(goal, accepted)
     if accepted:
-        proactive.execute(task, env)
+        proactive.execute(goal, env)
         proactive.handoff(env)
 ```
 

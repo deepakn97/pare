@@ -114,6 +114,8 @@ Real scenarios may wish to debounce `on_goal()` (e.g. only after user turns).
 
 Always use documented accessors (such as `proactive.pop_summary()`) when the
 agent wants to surface follow-up copy; never reach into underscored fields.
+`ProactiveInterventionError` and `pop_summary()` are described in
+`docs/proactive_agent_guide.md`.
 
 ## 5. Passing contextual data
 
@@ -146,9 +148,11 @@ store sufficient metadata to judge success:
 ## 7. Error handling conventions
 
 - Catch `TurnLimitReached` from the user proxy and end the scenario gracefully
-  (e.g. mark as incomplete, prompt user to retry).
-- Catch `UserActionFailed` or `ProactiveInterventionError` and log them; do not
-  crash the environment.
+  (e.g. mark as incomplete, prompt user to retry). This exception is defined in
+  `docs/user_proxy_guide.md`.
+- Catch `UserActionFailed` (see `docs/user_proxy_guide.md`) or
+  `ProactiveInterventionError` (see `docs/proactive_agent_guide.md`) and log
+  them; do not crash the environment.
 - Always call `proactive.handoff(env)` in a `finally` block when an intervention
   was attempted, so the UI state is restored.
 
