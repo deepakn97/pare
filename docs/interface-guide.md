@@ -1,6 +1,8 @@
 # PAS Integration Interfaces
 
-This guide is the single source of truth for how the three workstreams interact:
+This guide is the single source of truth for how the three workstreams interact;
+it links out to the component-specific guides when deeper implementation
+details are required:
 1. **User Proxy** (simulated user / UI driver)
 2. **Proactive Agent** (goal inference + intervention)
 3. **Scenario Authoring** (task data + wiring)

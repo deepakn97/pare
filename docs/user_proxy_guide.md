@@ -1,8 +1,9 @@
 # User Proxy Implementation Guide
 
-This document is the *only* reference a user-proxy developer needs. When you
-finish the implementation described here, the component will plug into PAS and
-Meta-ARE without any additional coordination.
+This guide covers everything specific to the user proxy. When the text points
+at other components, follow the referenced guides for additional details; once
+you satisfy the contracts here, the proxy will plug into PAS and Meta-ARE
+without extra coordination.
 
 ## 1. Objective
 

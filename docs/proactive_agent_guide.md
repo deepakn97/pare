@@ -1,7 +1,8 @@
 # Proactive Agent Implementation Guide
 
-This document is self-contained. Implement everything described here and your
-proactive agent will plug into PAS scenarios without additional knowledge.
+This guide outlines everything a proactive-agent developer needs. Follow the
+inline references when you need deeper context from the shared interface docs,
+and your implementation will plug into PAS scenarios without extra coordination.
 
 > **Backend optionality**
 >
