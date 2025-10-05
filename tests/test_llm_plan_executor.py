@@ -30,7 +30,7 @@ def test_llm_plan_executor_sends_email(monkeypatch: MonkeyPatch) -> None:
     user_llm = QueueLLM(['{"actions": [{"tool": "contacts.list_contacts", "args": {"offset": 0}}]}'])
     llm = QueueLLM([
         "Send a follow-up email to Alex Smith about planning lunch.",
-        '{"tool": "send_email", "args": {"recipient": "Alex", "subject": "Lunch follow-up", "body": "Shall we confirm the time?"}}',
+        '{"tool": "email.send_email", "args": {"recipients": ["alex.smith@example.com"], "subject": "Lunch follow-up", "content": "Shall we confirm the time?"}}',
     ])
 
     env, proxy, agent, _decision_maker = build_contacts_followup_components(

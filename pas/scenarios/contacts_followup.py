@@ -37,7 +37,13 @@ from pas.user_proxy import StatefulUserProxy
 from pas.user_proxy.decision_maker import LLMDecisionMaker
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from are.simulation.tool_utils import AppTool
+
     from pas.environment import StateAwareEnvironmentWrapper
+else:  # pragma: no cover - used for runtime duck typing only
+    AppTool = object
 
 __all__ = ["build_contacts_followup_components"]
 
@@ -103,11 +109,11 @@ def build_contacts_followup_components(
     decision_maker = LLMDecisionMaker(user_llm, logger=decision_logger)
     plan_executor_cb = build_plan_executor(
         llm,
-        _default_tool_specs(),
+        _build_plan_tool_specs(env),
         system_prompt=(
-            "You plan proactive interventions for a mobile assistant. "
-            "Select the single best tool to advance the confirmed task. "
-            "Every email-related field must contain a fully qualified email address (e.g. jordan.lee@example.com)."
+            "You plan proactive interventions as a mobile assistant. "
+            "Reason about the goal, identify missing context, and pick the next tool that advances progress. "
+            "Gather supporting information before committing to final actions. One response represents a single step in a multi-step plan."
         ),
         logger=orchestrator_logger,
     )
@@ -196,93 +202,73 @@ def _emit_initial_message(app: StatefulMessagingApp, *, conversation_id: str, se
     app.create_and_add_message(conversation_id=conversation_id, sender_id=sender_id, content=message)
 
 
-def _default_tool_specs() -> list[ToolSpec]:
-    return [
-        ToolSpec(
-            name="send_email",
-            description=(
-                "Send a follow-up email to an existing contact or email address. When the task references "
-                "Jordan Lee or Morgan Rivera, use their actual email addresses (jordan.lee@example.com, "
-                "morgan.rivera@example.com)."
-            ),
-            parameters=[
-                ToolParameter(
-                    "recipient",
-                    (
-                        "Contact name or direct email address. Always resolve names to actual email addresses "
-                        "(e.g. jordan.lee@example.com)."
-                    ),
-                ),
-                ToolParameter("subject", "Subject line for the email"),
-                ToolParameter("body", "Email body content"),
-                ToolParameter(
-                    "cc",
-                    "Optional list of CC email addresses. Provide fully qualified addresses (e.g. morgan.rivera@example.com).",
-                    required=False,
-                ),
-            ],
-            executor=_execute_send_email,
+def _build_plan_tool_specs(env: StateAwareEnvironmentWrapper) -> list[ToolSpec]:
+    return [_app_tool_to_tool_spec(tool) for tool in env.get_tools() if tool.function is not None]
+
+
+def _app_tool_to_tool_spec(tool: AppTool) -> ToolSpec:
+    app_name = getattr(tool, "app_name", "")
+    method_name = tool.func_name or tool.name
+    public_name = f"{app_name}.{method_name}" if app_name else tool.name
+
+    parameters = [
+        ToolParameter(
+            arg.name,
+            arg.description or "No description provided.",
+            type_hint=str(arg.arg_type) if arg.arg_type is not None else "string",
+            required=not arg.has_default,
         )
+        for arg in tool.args
     ]
 
-
-def _execute_send_email(env: StateAwareEnvironmentWrapper, args: dict[str, Any]) -> InterventionResult:
-    recipient = _require_text(args, "recipient")
-    if recipient is None:
-        return InterventionResult(False, "Missing recipient for send_email tool.")
-
-    subject = _require_text(args, "subject")
-    if subject is None:
-        return InterventionResult(False, "Missing subject for send_email tool.")
-
-    body = _require_text(args, "body")
-    if body is None:
-        return InterventionResult(False, "Missing body for send_email tool.")
-
-    email_address = _resolve_recipient_email(env, recipient)
-    if email_address is None:
-        return InterventionResult(False, f"Could not determine email address for '{recipient}'.")
-
-    email_app: StatefulEmailApp = env.get_app("email")
-
-    cc_list = _normalise_cc(args.get("cc"))
-
-    email_app.send_email(recipients=[email_address], subject=subject, content=body, cc=cc_list)
-    return InterventionResult(True, f"Email sent to {email_address}")
+    return ToolSpec(
+        name=public_name,
+        description=tool.function_description or "No description provided.",
+        parameters=parameters,
+        executor=_build_app_tool_executor(app_name, method_name, public_name),
+    )
 
 
-def _resolve_recipient_email(env: StateAwareEnvironmentWrapper, recipient: str) -> str | None:
-    if "@" in recipient:
-        return recipient
+def _build_app_tool_executor(
+    app_name: str, method_name: str, tool_name: str
+) -> Callable[[StateAwareEnvironmentWrapper, dict[str, Any]], InterventionResult]:
+    def _executor(env: StateAwareEnvironmentWrapper, args: dict[str, Any]) -> InterventionResult:
+        try:
+            app = env.get_app(app_name)
+        except KeyError:  # pragma: no cover - defensive guard
+            return InterventionResult(False, f"App '{app_name}' not registered when executing {tool_name}.")
 
-    contacts_app: StatefulContactsApp = env.get_app("contacts")
-    matches = contacts_app.search_contacts(query=recipient)
-    for contact in matches:
-        email = contact.email
-        if isinstance(email, str) and email:
-            return email
-    return None
+        method = getattr(app, method_name, None)
+        if method is None:
+            return InterventionResult(False, f"Tool '{tool_name}' is unavailable in the current environment state.")
 
+        try:
+            result = method(**args)
+        except Exception as exc:
+            return InterventionResult(False, f"{tool_name} failed: {exc}")
 
-def _normalise_cc(raw: object) -> list[str]:
-    if isinstance(raw, str):
-        cleaned = raw.strip()
-        return [cleaned] if cleaned else []
-    if isinstance(raw, list):
-        values: list[str] = []
-        for item in raw:
-            if isinstance(item, str):
-                candidate = item.strip()
-                if candidate:
-                    values.append(candidate)
-        return values
-    return []
+        notes = _format_tool_result(tool_name, result)
+        metadata = _build_tool_metadata(result)
+        return InterventionResult(True, notes, metadata)
+
+    return _executor
 
 
-def _require_text(args: dict[str, Any], key: str) -> str | None:
-    value = args.get(key)
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if cleaned:
-            return cleaned
-    return None
+def _format_tool_result(tool_name: str, result: object) -> str:
+    if result is None:
+        return f"{tool_name} executed successfully."
+    preview = _truncate(str(result), 200)
+    return f"{tool_name} executed successfully. Result: {preview}"
+
+
+def _build_tool_metadata(result: object) -> dict[str, object] | None:
+    if result is None:
+        return None
+    preview = _truncate(str(result), 500)
+    return {"result": preview}
+
+
+def _truncate(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    return f"{value[: limit - 3]}..."

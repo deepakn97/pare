@@ -92,7 +92,7 @@ class LLMPlanExecutor:
 
     # ------------------------------------------------------------------
     def _build_prompt(self, task: str) -> str:
-        lines = [self._system_prompt.strip(), "Available tools (choose exactly one):"]
+        lines = [self._system_prompt.strip(), f"Confirmed goal: {task}", "Available tools (choose exactly one):"]
         for tool in self._tool_map.values():
             lines.append(f"- {tool.name}: {tool.description}")
             for param in tool.parameters:
@@ -103,7 +103,6 @@ class LLMPlanExecutor:
             '{"tool": "<tool_name>", "args": {"param": value}}',
             'If nothing is appropriate, return {"tool": "none"}.',
             "Tool arguments must match the specification above.",
-            f"Task: {task}",
         ])
         return "\n".join(lines)
 
