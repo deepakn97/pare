@@ -130,7 +130,10 @@ class ConversationList(AppState):
         Returns:
             List of matching conversations
         """
-        return self.app.search(query=query, min_date=min_date, max_date=max_date, limit=limit)
+        results = self.app.search(query=query, min_date=min_date, max_date=max_date)
+        if limit < len(results):
+            return results[:limit]
+        return results
 
     @user_tool()
     def open_conversation(self, conversation_id: str, offset: int = 0, limit: int = 20) -> dict[str, object]:

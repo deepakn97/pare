@@ -5,12 +5,34 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from are.simulation.apps.contacts import Contact  # noqa: TC002
-from are.simulation.tool_utils import user_tool
+from are.simulation.tool_utils import AppTool, user_tool
 
 from pas.apps.core import AppState
 
 if TYPE_CHECKING:
     from pas.apps.contacts.app import StatefulContactsApp
+
+
+CONTACT_TOOL_ARG_DESCRIPTIONS = {
+    "list_contacts": {"offset": "Zero-based pagination offset"},
+    "search_contacts": {"query": "Free-form search query"},
+    "open_contact": {"contact_id": "Contact identifier"},
+    "create_contact": {
+        "first_name": "Given name",
+        "last_name": "Family name",
+        "gender": "Gender label",
+        "age": "Approximate age",
+        "nationality": "Country of origin",
+        "city_living": "Home city",
+        "country": "Home country",
+        "status": "Relationship status",
+        "job": "Occupation",
+        "description": "Short bio",
+        "phone": "Primary phone number",
+        "email": "Primary email address",
+        "address": "Postal address",
+    },
+}
 
 
 class ContactsList(AppState):
@@ -50,6 +72,19 @@ class ContactsList(AppState):
         """View the contact card for the current user persona."""
         app = cast("StatefulContactsApp", self.app)
         return app.get_current_user_details()
+
+    def get_available_actions(self) -> list[AppTool]:
+        """Annotate tool argument descriptions for the current state."""
+        actions = super().get_available_actions()
+        for tool in actions:
+            mapping = CONTACT_TOOL_ARG_DESCRIPTIONS.get(tool.function.__name__)
+            if mapping is None:
+                continue
+            for arg in tool.args:
+                description = mapping.get(arg.name)
+                if description is not None:
+                    arg.description = description
+        return actions
 
     @user_tool()
     def create_contact(

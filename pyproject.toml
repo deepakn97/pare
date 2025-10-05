@@ -16,6 +16,8 @@ classifiers = [
 ]
 dependencies = [
     "meta-agents-research-environments",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.urls]
@@ -196,4 +198,12 @@ meta-agents-research-environments = { git = "ssh://git@github.com/deepakn97/meta
 
 [[tool.mypy.overrides]]
 module = "pytest"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "openai"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "dotenv"
 ignore_missing_imports = true

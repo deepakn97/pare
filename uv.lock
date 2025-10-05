@@ -1755,6 +1755,8 @@ version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "meta-agents-research-environments" },
+    { name = "openai" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -1772,7 +1774,11 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "meta-agents-research-environments", git = "ssh://git@github.com/deepakn97/meta-are.git" }]
+requires-dist = [
+    { name = "meta-agents-research-environments", git = "ssh://git@github.com/deepakn97/meta-are.git" },
+    { name = "openai", specifier = ">=1.0.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [

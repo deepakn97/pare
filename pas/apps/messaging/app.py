@@ -5,6 +5,7 @@ from are.simulation.types import CompletedEvent
 
 from pas.apps.core import StatefulApp
 from pas.apps.messaging.states import ConversationList, ConversationOpened
+from pas.notifications import format_incoming_message, register_popup_for_event
 
 
 class StatefulMessagingApp(StatefulApp, MessagingAppV2):
@@ -42,11 +43,13 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
             return
 
         # Transition: ConversationList -> ConversationOpened
-        if isinstance(current_state, ConversationList) and function_name == "open_conversation":
+        if isinstance(current_state, ConversationList) and function_name in {"open_conversation", "read_conversation"}:
             args = event.action.resolved_args or event.action.args
             conversation_id = args.get("conversation_id")
             if conversation_id:
-                new_state = ConversationOpened(conversation_id)
-                self.set_current_state(new_state)
+                self.set_current_state(ConversationOpened(conversation_id))
 
         # go_back transitions are handled automatically by StatefulApp.go_back()
+
+
+register_popup_for_event("StatefulMessagingApp", "create_and_add_message", builder=format_incoming_message)

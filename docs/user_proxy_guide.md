@@ -1,160 +1,154 @@
-# User Proxy Implementation Guide
+# User Proxy Guide
 
-This guide covers everything specific to the user proxy. When the text points
-at other components, follow the referenced guides for additional details; once
-you satisfy the contracts here, the proxy will plug into PAS and Meta-ARE
-without extra coordination.
+This guide explains how the PAS user proxy is structured today and how to plug
+in alternative planners while keeping the public contract stable.
 
-## 1. Objective
+## 1. Overview
 
-Implement a concrete subclass of `are.simulation.agents.user_proxy.UserProxy`
-that:
+`pas/user_proxy/stateful.py` exports `StatefulUserProxy`, a drop-in replacement
+for Meta-ARE’s default proxy. Its core responsibilities are:
 
-1. Converts free-form agent requests into Meta-ARE `@user_tool` invocations.
-2. Tracks navigation state using PAS’s `StateAwareEnvironmentWrapper` so that
-   tool availability is always up to date.
-3. Returns textual replies in either conversational (`plain`) or structured
-   format, as requested by the scenario.
-4. Guarantees at-most-*N* user turns before stopping (to keep scenarios
-   bounded).
+1. Translate free-form messages (from the agent or system pop-ups) into concrete
+   tool invocations.
+2. Execute those tools against the current navigation state while tracking
+   recent events.
+3. Surface structured replies and maintain a transcript for logging/debugging.
+4. Enforce turn limits to keep conversations bounded.
 
-The class name **must** be `StatefulUserProxy` and live in
-`pas/user_proxy/stateful.py`. The module exports only this class and the
-exceptions defined below.
+The proxy is planner-agnostic. Today we ship `pas/user_proxy/llm_planner.py`
+which generates tool calls via the OpenAI Responses API, but you can swap in a
+rule-based or human planner as long as it matches the callable signature.
 
-> **Planner freedom**
->
-> `_plan_actions()` (see §2.5) may use any backend — rule tables, scripted
-> heuristics, large language models, or a human-in-the-loop prompt. The rest
-> of the system only sees the resulting `ToolInvocation` list. Swapping the
-> planner does not require changes outside this module.
-
-## 2. Public API
+## 2. Constructor
 
 ```python
-# pas/user_proxy/stateful.py
-
-@dataclass(slots=True)
-class ToolInvocation:
-    name: str
-    args: dict[str, object]
-    result: object | None
-
-class UserActionFailed(RuntimeError):
-    """Raised when a user-tool action cannot be completed."""
-
-class TurnLimitReached(RuntimeError):
-    """Raised when max_user_turns is exceeded."""
-
 class StatefulUserProxy(UserProxy):
     def __init__(
         self,
         env: StateAwareEnvironmentWrapper,
-        notification_system: NotificationSystem,
+        notification_system: BaseNotificationSystem,
         *,
         max_user_turns: int = 40,
-        logger: logging.Logger | None = None,
-    ) -> None: ...
-
-    def init_conversation(self) -> str: ...
-    def reply(self, message: str) -> str: ...
+        logger: logging.Logger,
+        planner: PlannerCallable | None = None,
+        event_timeout: float = 2.0,
+    ) -> None:
+        ...
 ```
 
-### 2.1 Constructor semantics
+- `env`: shared environment wrapper. Access apps via `env.get_app(...)`.
+- `notification_system`: provides pop-up notifications triggered by
+  `pas.notifications` for the scenario.
+- `planner`: callable that accepts the incoming message and the proxy instance,
+  then returns a list of `(app_name, method_name, args)` tuples.
+- `max_user_turns`: after this many replies, `TurnLimitReached` is raised.
+- `event_timeout`: how long to wait for a matching `CompletedEvent` when a tool
+  is marked as a write operation.
 
-- `env`: shared environment. Access apps via `env.get_app("APPNAME")`, never
-  instantiate new apps.
-- `notification_system`: subscribe for `CompletedEvent` notifications.
-- `max_user_turns`: number of successful replies before raising
-  `TurnLimitReached`. Initialise an internal counter at 0; increment after each
-  successful `reply` return.
-- `logger`: default to `logging.getLogger(__name__)` if `None`.
+Upon construction, the proxy subscribes to the environment’s completed events
+and records user-originating events in `_recent_events` for later lookups.
 
-The constructor must register a callback:
+## 3. Notification Handling
+
+Scenarios convert tool completions into pop-ups via
+`pas.notifications.register_popup_for_event` or `register_popup`. The proxy
+consumes them with:
 
 ```python
-notification_system.subscribe(EventType.ANY, self._on_event)
+notifications = proxy.consume_notifications()
+for text in notifications:
+    proxy.react_to_event(text)
 ```
 
-`_on_event` filters events originating from user tools (OperationType.WRITE /
-EventType.USER) and appends them to `self._recent_events` so that `_plan()` can
-react.
+The default implementation filters out noisy meta-events (e.g. raw
+conversation IDs) and logs a friendly summary (`Notification (app: messaging)`
+...). These pop-ups feed back into the planner so the user LLM receives the
+same context a human would see on a phone lock screen.
 
-### 2.2 Internal state
+## 4. Planner Contract
 
-Keep the following attributes:
+`PlannerCallable` is defined as:
 
 ```python
-self._transcript: list[dict[str, str]]  # [{'role': 'agent'|'user', 'content': str}, ...]
-self._recent_events: deque[CompletedEvent]
-self._turns_taken: int
-self._logger: logging.Logger
+PlannerCallable = Callable[[str, StatefulUserProxy], Sequence[tuple[str, str, dict[str, object]]]]
 ```
 
-### 2.3 `init_conversation()` implementation
+The built-in `LLMUserPlanner` prepares a prompt that includes:
 
-1. Reset `self._recent_events` and `self._turns_taken` to 0.
-2. Return an empty string (scenarios may immediately send their own greeting via `reply`).
-3. **No** tool calls or environment mutation.
+- Instructions + current app/view (e.g. `messaging` / `ConversationOpened`).
+- The latest system notification.
+- A catalog of available tools, identified as `option_1`, `option_2`, ... with
+  parameter metadata.
 
-### 2.4 `reply(message)` workflow
+It expects the LLM to return JSON of the form:
 
-1. If `self._turns_taken >= max_user_turns`, raise `TurnLimitReached`.
-2. Append `{"role": "agent", "content": message}` to the transcript.
-3. Call `_plan_actions(message)` → returns `list[ToolInvocation]`.
-   - The planner may use any backend (rule engine, LLM, human operator). The
-     output must be a concrete list of tool invocations before execution.
-   - Minimal viable implementation: pattern-match against a handful of
-     scenario phrases. E.g. “Add Eve to my contacts” → `[{name:"create_contact", ...}]`
-   - If no plan is possible, raise `UserActionFailed("Unsupported request")`.
-4. For each planned invocation:
-   - Fetch the owning app via `env.get_app(app_name)`.
-   - Ensure the required tool is in `current_state.get_available_actions()`.
-   - Execute the tool and collect `CompletedEvent` from `_recent_events`. If an
-     event is not received within a timeout (default 2 seconds), raise
-     `UserActionFailed(f"Tool did not complete within {timeout}s")` where
-     `timeout` matches the configured wait.
-   - Store the `ToolInvocation` in a local list with the actual result.
-5. Produce a short sentence summarising the overall outcome (success or failure).
-6. Append `{"role": "user", "content": reply}` to the transcript.
-7. Increment `_turns_taken` and return the reply.
-
-### 2.5 Helper requirements
-
-Implement at least these private methods:
-
-```python
-def _plan_actions(self, message: str) -> list[ToolInvocation]: ...
-def _on_event(self, event: CompletedEvent) -> None: ...
+```json
+{"actions": [{"tool": "option_1", "args": {"conversation_id": "..."}}]}
 ```
 
-## 3. Tool execution rules
+`StatefulUserProxy` executes each action in order, collecting `ToolInvocation`
+dataclasses that capture the name, arguments, return value, and corresponding
+event (if any).
 
-- Always call tools on the current navigation state: `app.current_state` must
-  expose the method. If not, raise `UserActionFailed` immediately; never call
-  tools on inactive states.
-- After each action, allow the environment transition to complete before
-  executing the next action. Wait for the corresponding `CompletedEvent` so the navigation state is up to date before issuing the next tool call.
-- Do **not** catch `RuntimeError`s emitted by the app unless you intend to
-  convert them into a user-facing message – let them propagate as
-  `UserActionFailed`.
+### System-level confirmations
 
-## 4. Error handling
+Scenarios now ask the user to confirm proactive assistance through a dedicated
+decision maker (`pas.user_proxy.decision_maker.LLMDecisionMaker`). This keeps
+YES/NO prompts out of Messaging threads. The decision maker talks directly to
+the user LLM and returns `True`/`False`/`None`; `ProactiveSession` records the
+raw text for auditing. The user proxy itself does not send confirmation
+messages anymore—it continues to focus on app navigation and tool execution.
 
-- **`UserActionFailed`** → stop processing, do not increment turn count, let the
-  caller decide whether to retry.
-- **`TurnLimitReached`** → indicates the conversation is over. Scenarios should
-  catch it and transition control back to the main agent.
+## 5. Reply Workflow
 
-## 5. Testing checklist
+`reply(message: str)` handles both agent prompts and direct user LLM outputs:
 
-Before handing off, verify:
+1. Guard the turn limit.
+2. Append the incoming message to the transcript (`role="agent"` or
+   `role="system"` for notifications).
+3. Call the planner to produce tool invocations. Empty plans raise
+   `UserActionFailed`.
+4. Execute tools, waiting for write events when required. `UserActionFailed`
+   propagates immediately and does not increment the turn counter.
+5. Format a short reply summarising the completed tool calls
+   (`Completed: app.tool -> {...}`) and log it.
+6. Append the reply to the transcript with `role="user"` and increment
+   `_turns_taken`.
 
-1. `init_conversation()` returns an empty string and resets internal state.
-2. `reply()` executes planned tools in sequence and updates transcript. If you
-   stub `_plan_actions` to return `[]`, it should raise `UserActionFailed`.
-3. If the expected `CompletedEvent` never arrives, treat the tool call as failed and raise `UserActionFailed`.
-4. Turn limit triggers `TurnLimitReached`.
+`react_to_event` simply marks the source as `system` but otherwise shares the
+same path as `reply`.
 
-With these rules implemented, no further context is needed to interoperate with
-scenarios or proactive agents.
+## 6. Turn Limits and Errors
+
+- `TurnLimitReached`: raised when the proxy has already produced
+  `max_user_turns` successful replies. Scenarios should catch it and hand control
+  back to the main agent.
+- `UserActionFailed`: indicates the planner or execution path could not fulfil
+  the request (missing tool, invalid arguments, event timeout, etc.). The caller
+  decides how to recover.
+
+## 7. Logging
+
+Use `pas.logging_utils.get_pas_file_logger` to create dedicated loggers:
+
+- `pas.user_proxy` – high-level transcripts (`Agent message received ...`,
+  `User reply ...`).
+- `pas.user_proxy.planner` – full planner prompts and LLM responses.
+- `pas.events` (from `attach_event_logging`) – canonical view of all completed
+  events for audit.
+
+Running `pas/scripts/run_contacts_demo.py` prints the log locations so you can
+tail them while developing new planners or scenarios.
+
+## 8. Extending the Proxy
+
+- Swap in an alternative planner by passing a different callable to the
+  constructor. Keep the same return structure so execution stays intact.
+- Override `_format_reply` if you prefer structured JSON or richer
+  explanations.
+- Adjust `consume_notifications` if your pop-up format differs from the default
+  `Notification (app: ...)` style.
+
+With these pieces in place, the user proxy will interoperate with the proactive
+session loop, logging utilities, and Meta-ARE agent interface without further
+changes.

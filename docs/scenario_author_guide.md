@@ -1,187 +1,229 @@
 # Scenario Authoring Guide
 
-This document contains everything a scenario author needs to wire the PAS user
-proxy, proactive agent, and stateful apps into Meta-ARE. When you need deeper
-details on a referenced component, follow the inline links to the dedicated
-guides.
+This guide describes how to assemble a full PAS scenario that combines
+stateful apps, the LLM-backed user proxy, and the proactive agent stack. It
+reflects the current implementation shipped in `pas/scenarios/contacts_followup.py`.
 
-## 1. Goal
+## 1. Architecture at a Glance
 
-> **Pluggable backends**
->
-> The scenario contract does not restrict what kind of tasks or data you feed in.
-> You can wire scripted toy scenes, complex synthetic universes, or realtime
-> human-in-the-loop tasks. The only requirement is that the components are
-> instantiated via the interfaces below.
+Every scenario wires the following layers together:
 
-Create scenarios that:
+1. **Runtime + logging** – `pas.system.runtime.initialise_runtime` prepares the
+   log files and notification system before any apps are registered.
+2. **Stateful apps** – register `Stateful*App` instances with
+   `StateAwareEnvironmentWrapper`. Apps surface tools that the user proxy and
+   proactive agent invoke.
+3. **Notification pop-ups** – use `pas.notifications.register_popup_for_event`
+   (or the decorator helper) so that completed events turn into human readable
+   system pop-ups. The user proxy consumes these via
+   `StatefulUserProxy.consume_notifications()`.
+4. **User planner** – `pas.system.user.build_stateful_user_planner` builds an
+   LLM-backed planner that enumerates per-app tools and system navigation tools
+   depending on the current state.
+5. **Decision maker** – `pas.user_proxy.decision_maker.LLMDecisionMaker` (or a
+   custom implementation) turns system-level prompts into ACCEPT/DECLINE style
+   decisions without touching app tools.
+6. **Proactive agent** – `pas.proactive.LLMBasedProactiveAgent` stores recent
+   events, proposes a goal, executes the confirmed plan via
+   `pas.system.proactive.build_plan_executor`, then hands control back.
+7. **Session loop** – `pas.system.session.ProactiveSession` coordinates one
+   “proactive cycle”: drain pop-up notifications, ask the agent to propose a
+   goal, confirm with the user via the decision maker, execute, and surface a
+   completion summary.
 
-- Use `StateAwareEnvironmentWrapper` and PAS stateful apps to simulate realistic
-  mobile navigation.
-- Route every `CompletedEvent` to the proactive agent for goal detection.
-- Inject the custom `StatefulUserProxy` into Meta-ARE’s
-  `AgentUserInterface` so that the agent receives conversational replies.
-- Define initial data, success criteria, and failure handling.
-
-## 2. Required dependencies
-
-Ensure your scenario module imports:
-
-```python
-from collections.abc import Callable
-from are.simulation.apps.agent_user_interface import AgentUserInterface
-from are.simulation.notification_system import NotificationSystem
-from are.simulation.types import CompletedEvent, EventType
-from pas.apps.calendar import StatefulCalendarApp
-from pas.apps.contacts import StatefulContactsApp
-from pas.environment import StateAwareEnvironmentWrapper
-from pas.proactive.agent import LLMBasedProactiveAgent, ProactiveAgentProtocol
-from pas.user_proxy.stateful import StatefulUserProxy, TurnLimitReached
-```
-
-Add other stateful apps as needed.
-
-## 3. Scenario structure template
-
-Create a helper that builds the environment + components:
+## 2. Minimal Wiring Example
 
 ```python
-def build_env() -> tuple[StateAwareEnvironmentWrapper, StatefulUserProxy, ProactiveAgentProtocol]:
-    env = StateAwareEnvironmentWrapper()
-    env.register_apps([
-        StatefulContactsApp(name="contacts"),
-        StatefulCalendarApp(name="calendar"),
-        # add more apps here
-    ])
+from pathlib import Path
+from typing import Sequence
 
-    notification_system = env.notification_system
-    user_proxy = StatefulUserProxy(env, notification_system, summary_style="structured")
-    llm_client = build_llm_client()  # your integration point
+from are.simulation.validation.constants import APP_ALIAS
+
+from pas.apps.contacts.app import StatefulContactsApp
+from pas.apps.email.app import StatefulEmailApp
+from pas.apps.messaging.app import StatefulMessagingApp
+from pas.logging_utils import get_pas_file_logger, initialise_pas_logs
+from pas.notifications import register_popup_for_event, format_incoming_message
+from pas.proactive import LLMBasedProactiveAgent, ToolSpec, ToolParameter
+from pas.scenarios.contacts_followup import _execute_send_email  # reuse executor helper
+from pas.system import (
+    ProactiveSession,
+    attach_event_logging,
+    build_plan_executor,
+    build_stateful_user_planner,
+    create_environment,
+    create_notification_system,
+    initialise_runtime,
+)
+from pas.user_proxy import StatefulUserProxy
+from pas.user_proxy.decision_maker import LLMDecisionMaker
+
+
+def build_components(llm_client, user_llm_client):
+    log_dir = Path("logs") / "pas"
+    user_log = log_dir / "user_proxy.log"
+    proactive_log = log_dir / "proactive_agent.log"
+    events_log = log_dir / "events.log"
+
+    initialise_runtime(log_paths=[user_log, proactive_log, events_log], clear_existing=True)
+
+    notification_system = create_notification_system()
+    env = create_environment(notification_system)
+
+    contacts = StatefulContactsApp(name="contacts")
+    messaging = StatefulMessagingApp(name="messaging")
+    email = StatefulEmailApp(name="email")
+    env.register_apps([contacts, messaging, email])
+
+    attach_event_logging(env, events_log)
+
+    # Ensure Messaging pop-ups show human text
+    register_popup_for_event(
+        "StatefulMessagingApp",
+        "create_and_add_message",
+        builder=format_incoming_message,
+    )
+
+    # Contacts is the default app when the conversation begins
+    planner_logger = get_pas_file_logger("pas.user_proxy.planner", user_log)
+    planner = build_stateful_user_planner(
+        user_llm_client,
+        apps=[contacts, messaging],
+        initial_app_name="messaging",
+        include_system_tools=True,
+        logger=planner_logger,
+    )
+
+    decision_logger = get_pas_file_logger("pas.user_proxy.decisions", user_log)
+    decision_maker = LLMDecisionMaker(user_llm_client, logger=decision_logger)
+
+    user_logger = get_pas_file_logger("pas.user_proxy", user_log)
+    user_proxy = StatefulUserProxy(
+        env,
+        notification_system,
+        max_user_turns=25,
+        logger=user_logger,
+        planner=planner,
+    )
+
+    tool_specs: Sequence[ToolSpec] = [
+        ToolSpec(
+            name="send_email",
+            description=(
+                "Send a follow-up email to a specific recipient. Always resolve contacts to actual email "
+                "addresses (Jordan Lee → jordan.lee@example.com, Morgan Rivera → morgan.rivera@example.com)."
+            ),
+            parameters=[
+                ToolParameter(
+                    "recipient",
+                    "Contact name or email. Provide the full address (e.g. jordan.lee@example.com).",
+                ),
+                ToolParameter("subject", "Email subject"),
+                ToolParameter("body", "Email body"),
+                ToolParameter(
+                    "cc",
+                    "Optional CC list. Supply fully qualified email addresses (e.g. morgan.rivera@example.com).",
+                    required=False,
+                ),
+            ],
+            executor=_execute_send_email,
+        ),
+    ]
+
+    orchestrator_logger = get_pas_file_logger("pas.proactive.orchestrator", proactive_log)
+    plan_executor = build_plan_executor(
+        llm_client,
+        tool_specs,
+        system_prompt=(
+            "Choose the single best tool to satisfy the confirmed goal. Every email-related argument must be a "
+            "valid email address. If you cannot provide a proper address, leave optional fields empty instead of "
+            "guessing."
+        ),
+        logger=orchestrator_logger,
+    )
+
+    agent_logger = get_pas_file_logger("pas.proactive.agent", proactive_log)
     proactive_agent = LLMBasedProactiveAgent(
         llm=llm_client,
-        system_prompt="You are a helpful proactive iOS assistant.",
+        system_prompt="You are a proactive mobile assistant.",
+        max_context_events=200,
+        plan_executor=plan_executor,
+        summary_builder=lambda result: result.notes,
+        logger=agent_logger,
     )
 
-    notification_system.subscribe(EventType.ANY, proactive_agent.observe)
-    return env, user_proxy, proactive_agent
-```
+    env.subscribe_to_completed_events(proactive_agent.observe)
 
-`build_llm_client()` stands in for whatever LLM integration your team uses – a
-hosted API, local inference server, or any other wrapper.
-
-## 4. Wiring into a Scenario
-
-Example using Meta-ARE’s `Scenario` API:
-
-```python
-def create_scenario() -> Scenario:
-    env, user_proxy, proactive = build_env()
-
-    def on_goal() -> None:
-        task = proactive.propose_goal()
-        if task is None:
-            return
-        reply = user_proxy.reply(f"I can handle this: {task}. Should I proceed? Only say yes or no")
-        accepted = reply.strip().lower() in {"yes"}
-        proactive.record_decision(task, accepted)
-        if not accepted:
-            return
-        try:
-            result = proactive.execute(task, env)  # returns InterventionResult (success flag + user-facing notes)
-        except ProactiveInterventionError as exc:
-            env.logger.error("intervention failed: %s", exc)
-        else:
-            user_proxy.reply(result.notes)  # optional follow-up to inform the user
-            if (summary := proactive.pop_summary()):
-                user_proxy.reply(summary)
-        finally:
-            proactive.handoff(env)
-
-    # schedule periodic goal checks (e.g. after each event)
-    env.notification_system.subscribe(EventType.ANY, lambda _: on_goal())
-
-    agent_ui = AgentUserInterface(user_proxy=user_proxy)
-    scenario = Scenario(
-        scenario_id="contacts_followup",
-        agent_user_interface=agent_ui,
-        environment=env,
-        description="User wants to follow up with newly added contact.",
+    session_logger = get_pas_file_logger("pas.session.demo", proactive_log)
+    session = ProactiveSession(
+        env,
+        user_proxy,
+        proactive_agent,
+        decision_maker=decision_maker,
+        confirm_goal=lambda goal: True,
+        logger=session_logger,
     )
-    return scenario
+
+    return env, user_proxy, proactive_agent, decision_maker, session
 ```
 
-The above pattern ensures the proactive agent is considered after each event.
-Real scenarios may wish to debounce `on_goal()` (e.g. only after user turns).
+The helper returns all building blocks so your scenario can initialise data,
+launch an initial notification, and step through `session.run_cycle()`.
 
-Always use documented accessors (such as `proactive.pop_summary()`) when the
-agent wants to surface follow-up copy; never reach into underscored fields.
-`ProactiveInterventionError` and `pop_summary()` are described in
-`docs/proactive_agent_guide.md`.
+## 3. Logging & Notifications
 
-## 5. Passing contextual data
+- `initialise_runtime` clears and recreates `logs/pas/*.log` on every run when
+  `clear_existing=True`. Provide absolute or relative paths depending on your
+  sandbox.
+- Use `get_pas_file_logger` to attach file handlers once; the helper prevents
+  duplicate handlers when tests run repeatedly.
+- Convert app events into pop-ups with `register_popup_for_event` or
+  `register_popup`. Builders receive a `CompletedEvent` and return the text that
+  the user LLM sees (for example, `format_incoming_message`). By default pop-ups
+  are posted on the "system" channel, matching the logs produced in
+  `logs/pas/user_proxy.log`.
 
-If the scenario needs to pass configuration to the proxy or proactive agent,
-provide them via the constructors inside `build_env()`. Examples:
+## 4. User Planner Expectations
 
-```python
-user_proxy = StatefulUserProxy(env, notification_system, max_user_turns=20)
-proactive = LLMBasedProactiveAgent(
-    llm=llm_client,
-    system_prompt="You are a proactive assistant.",
-    max_context_events=256,
-)
-```
+`build_stateful_user_planner` dynamically inspects the current app state and
+exposes only the tools that are presently valid. The planner prompt contains:
 
-Avoid global variables; keep everything encapsulated so tests can instantiate
-multiple environments in parallel.
+- Current app + view (derived from the active state's class name).
+- Most recent pop-up text (system notification).
+- Option IDs (`option_1`, `option_2`, …) mapped to concrete
+  `app_name.method_name` pairs plus parameter descriptions.
 
-## 6. Success / failure criteria
+The planner must be called for every agent/user message as well as for pop-up
+reactions (`StatefulUserProxy.react_to_event`). Planner outputs are JSON-encoded
+tool invocations that the proxy executes in order.
 
-Leverage Meta-ARE’s existing validation hooks (`Scenario.validate`). Ensure you
-store sufficient metadata to judge success:
+## 5. Proactive Session Loop
 
-- Use the proactive agent’s `InterventionResult.notes` (defined in
-  `docs/proactive_agent_guide.md`) and the proxy’s structured replies as
-  evidence.
-- Record important `CompletedEvent`s for post-run inspection (you can reuse the
-  `StateAwareEnvironmentWrapper.event_log`).
+`ProactiveSession.run_cycle()` performs the end-to-end proactive flow:
 
-## 7. Error handling conventions
+1. Drain notification queue (`StatefulUserProxy.consume_notifications()`)
+   and let the user proxy respond.
+2. Call `agent.propose_goal()` once, using all events collected so far.
+3. Prompt the user via the messaging app to accept or decline.
+4. On approval, run `agent.execute(...)`, capture the `InterventionResult`, and
+   deliver the summary back to the user.
 
-- Catch `TurnLimitReached` from the user proxy and end the scenario gracefully
-  (e.g. mark as incomplete, prompt user to retry). This exception is defined in
-  `docs/user_proxy_guide.md`.
-- Catch `UserActionFailed` (see `docs/user_proxy_guide.md`) or
-  `ProactiveInterventionError` (see `docs/proactive_agent_guide.md`) and log
-  them; do not crash the environment.
-- Always call `proactive.handoff(env)` in a `finally` block when an intervention
-  was attempted, so the UI state is restored.
+Scenarios can run multiple cycles back-to-back if new notifications arrive.
 
-## 8. Scenario data seeding
+## 6. Integrating with Meta-ARE Scenarios
 
-Scenario authors are responsible for providing initial data in PAS apps:
+- After `build_components`, the canonical integration is:
 
-```python
-contacts = env.get_app("contacts")
-contacts.add_contacts([...])
-calendar = env.get_app("calendar")
-calendar.populate_events([...])
-```
+  ```python
+  env, user_proxy, agent, session = build_components(agent_llm, user_llm)
+  user_proxy.init_conversation()
+  session.run_cycle()
+  ```
 
-Perform seeding **before** the scenario starts running. Avoid modifying data
-mid-scenario outside of tool calls; it breaks the navigation mirrors.
+- Hook the `user_proxy` into `AgentUserInterface` (see `docs/user_proxy_guide.md`).
+- Schedule additional cycles whenever external events enter the system (for
+  example, after Meta-ARE delivers a new message).
 
-## 9. Testing checklist
-
-1. Instantiate the scenario and run through a scripted conversation using the
-   user proxy alone to ensure all planned user flows succeed.
-2. Trigger the proactive agent by emitting mock `CompletedEvent`s and verify it
-   proposes task strings, logs decisions via `record_decision`, and, on acceptance,
-   executes the correct tools.
-3. Confirm `AgentUserInterface` receives readable replies (inspect console
-   output or scenario logs).
-4. Verify turn limits and error handling behave according to §7.
-
-With this wiring, the scenario can evolve independently of the user proxy and
-proactive agent implementations. Any future extensions should append to this
-contract and keep backwards compatibility.
+By following these steps you can port the reference contacts follow-up scenario
+to new domains while reusing the LLM planner, logging utilities, and proactive
+session loop.
