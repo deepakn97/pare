@@ -5,12 +5,13 @@ from __future__ import annotations
 import typing
 from typing import TYPE_CHECKING
 
-from pas.proactive import InterventionResult, LLMClientProtocol, LLMPlanExecutor, ToolSpec
+from pas.proactive.react_adapter import react_intervention
 
 if TYPE_CHECKING:
     import logging
 
     from pas.environment import StateAwareEnvironmentWrapper
+    from pas.proactive import InterventionResult, LLMClientProtocol, ToolSpec
 else:
     StateAwareEnvironmentWrapper = object  # type: ignore[assignment]
 
@@ -18,11 +19,10 @@ else:
 def build_plan_executor(
     llm_client: LLMClientProtocol, tool_specs: typing.Sequence[ToolSpec], *, system_prompt: str, logger: logging.Logger
 ) -> typing.Callable[[str, StateAwareEnvironmentWrapper], InterventionResult]:
-    """Create a callable that delegates execution to the LLM orchestrator."""
-    orchestrator = LLMPlanExecutor(llm_client, list(tool_specs), system_prompt=system_prompt, logger=logger)
+    """Create a callable that runs a Meta ARE-style ReAct loop over PAS tools."""
 
     def _execute(task: str, env: StateAwareEnvironmentWrapper) -> InterventionResult:
-        return orchestrator(task, env)
+        return react_intervention(goal=task, env=env, llm=llm_client, logger=logger)
 
     return _execute
 

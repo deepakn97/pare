@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from are.simulation.apps.contacts import Contact, ContactsApp, Gender, Status
 from are.simulation.apps.system import SystemApp
@@ -17,14 +17,7 @@ from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
 from pas.logging_utils import get_pas_file_logger
-from pas.proactive import (
-    InterventionResult,
-    LLMBasedProactiveAgent,
-    LLMClientProtocol,
-    ProactiveAgentProtocol,
-    ToolParameter,
-    ToolSpec,
-)
+from pas.proactive import LLMBasedProactiveAgent, LLMClientProtocol, ProactiveAgentProtocol
 from pas.system import (
     attach_event_logging,
     build_plan_executor,
@@ -37,13 +30,7 @@ from pas.user_proxy import StatefulUserProxy
 from pas.user_proxy.decision_maker import LLMDecisionMaker
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from are.simulation.tool_utils import AppTool
-
     from pas.environment import StateAwareEnvironmentWrapper
-else:  # pragma: no cover - used for runtime duck typing only
-    AppTool = object
 
 __all__ = ["build_contacts_followup_components"]
 
@@ -109,7 +96,7 @@ def build_contacts_followup_components(
     decision_maker = LLMDecisionMaker(user_llm, logger=decision_logger)
     plan_executor_cb = build_plan_executor(
         llm,
-        _build_plan_tool_specs(env),
+        (),
         system_prompt=(
             "You plan proactive interventions as a mobile assistant. "
             "Reason about the goal, identify missing context, and pick the next tool that advances progress. "
@@ -200,75 +187,3 @@ def _emit_initial_message(app: StatefulMessagingApp, *, conversation_id: str, se
         "so they can catch up before the client call."
     )
     app.create_and_add_message(conversation_id=conversation_id, sender_id=sender_id, content=message)
-
-
-def _build_plan_tool_specs(env: StateAwareEnvironmentWrapper) -> list[ToolSpec]:
-    return [_app_tool_to_tool_spec(tool) for tool in env.get_tools() if tool.function is not None]
-
-
-def _app_tool_to_tool_spec(tool: AppTool) -> ToolSpec:
-    app_name = getattr(tool, "app_name", "")
-    method_name = tool.func_name or tool.name
-    public_name = f"{app_name}.{method_name}" if app_name else tool.name
-
-    parameters = [
-        ToolParameter(
-            arg.name,
-            arg.description or "No description provided.",
-            type_hint=str(arg.arg_type) if arg.arg_type is not None else "string",
-            required=not arg.has_default,
-        )
-        for arg in tool.args
-    ]
-
-    return ToolSpec(
-        name=public_name,
-        description=tool.function_description or "No description provided.",
-        parameters=parameters,
-        executor=_build_app_tool_executor(app_name, method_name, public_name),
-    )
-
-
-def _build_app_tool_executor(
-    app_name: str, method_name: str, tool_name: str
-) -> Callable[[StateAwareEnvironmentWrapper, dict[str, Any]], InterventionResult]:
-    def _executor(env: StateAwareEnvironmentWrapper, args: dict[str, Any]) -> InterventionResult:
-        try:
-            app = env.get_app(app_name)
-        except KeyError:  # pragma: no cover - defensive guard
-            return InterventionResult(False, f"App '{app_name}' not registered when executing {tool_name}.")
-
-        method = getattr(app, method_name, None)
-        if method is None:
-            return InterventionResult(False, f"Tool '{tool_name}' is unavailable in the current environment state.")
-
-        try:
-            result = method(**args)
-        except Exception as exc:
-            return InterventionResult(False, f"{tool_name} failed: {exc}")
-
-        notes = _format_tool_result(tool_name, result)
-        metadata = _build_tool_metadata(result)
-        return InterventionResult(True, notes, metadata)
-
-    return _executor
-
-
-def _format_tool_result(tool_name: str, result: object) -> str:
-    if result is None:
-        return f"{tool_name} executed successfully."
-    preview = _truncate(str(result), 200)
-    return f"{tool_name} executed successfully. Result: {preview}"
-
-
-def _build_tool_metadata(result: object) -> dict[str, object] | None:
-    if result is None:
-        return None
-    preview = _truncate(str(result), 500)
-    return {"result": preview}
-
-
-def _truncate(value: str, limit: int) -> str:
-    if len(value) <= limit:
-        return value
-    return f"{value[: limit - 3]}..."
