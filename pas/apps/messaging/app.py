@@ -53,3 +53,4 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
 
 
 register_popup_for_event("StatefulMessagingApp", "create_and_add_message", builder=format_incoming_message)
+register_popup_for_event("MessagingApp", "add_message", builder=format_incoming_message)

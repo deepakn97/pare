@@ -5,12 +5,17 @@ from __future__ import annotations
 import logging
 import typing
 from pathlib import Path
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
 from pas.proactive import LLMBasedProactiveAgent, OpenAILLMClient
+
+if TYPE_CHECKING:
+    from pas.proactive.openai_client import OpenAIClientProtocol
+else:  # pragma: no cover - runtime alias for typing only
+    OpenAIClientProtocol = object
 from pas.scenarios import build_contacts_followup_components
 from pas.system import ProactiveSession
 
@@ -19,13 +24,14 @@ def run_demo(messages: typing.Iterable[str] | None = None, mode: Literal["event"
     """Execute a single scenario run and print high-level results plus log paths."""
     log_dir = (Path("logs") / "pas").resolve()
     load_dotenv(override=False)
-    client = OpenAI()
+    client = cast("OpenAIClientProtocol", OpenAI())
     llm = OpenAILLMClient(client=client, default_parameters={})
     user_llm = OpenAILLMClient(client=client, default_parameters={})
 
-    env, proxy, agent_protocol, decision_maker = build_contacts_followup_components(
+    setup = build_contacts_followup_components(
         llm=llm, user_llm=user_llm, max_user_turns=25, log_mode="overwrite", primary_app="messaging"
     )
+    env, proxy, agent_protocol, decision_maker = setup
     agent = cast("LLMBasedProactiveAgent", agent_protocol)
     session_logger = logging.getLogger("pas.session.demo")
     session_logger.setLevel(logging.INFO)

@@ -7,7 +7,12 @@ from are.simulation.scenarios.scenario_tutorial.scenario import ScenarioTutorial
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
-from pas.meta_adapter import build_meta_scenario_components, build_pas_contacts_meta_components
+from pas.meta_adapter import (
+    build_meta_scenario_components,
+    build_meta_task_from_scenario,
+    build_pas_contacts_meta_components,
+)
+from pas.tasks.types import TaskContext
 
 
 class StubLLM:
@@ -25,13 +30,18 @@ def test_pas_contacts_meta_components_populates_message(monkeypatch: MonkeyPatch
     llm = StubLLM(["none"])
     user_llm = StubLLM(['{"actions": []}'])
 
-    env, _proxy, _agent, _decision_maker = build_pas_contacts_meta_components(
+    setup = build_pas_contacts_meta_components(
         llm=llm, user_llm=user_llm, max_user_turns=1, log_mode="overwrite", primary_app="messaging"
     )
+    env, _proxy, _agent, _decision_maker = setup
 
     messaging = env.get_app("messaging")
     state = messaging.get_state()
     assert state["conversations"], "Expected seeded messaging conversation"
+    assert setup.oracle_actions
+    contact_oracle = setup.oracle_actions[0]
+    assert contact_oracle.app == "email"
+    assert "jordan.lee@example.com" in contact_oracle.args.get("recipients", [])
 
 
 def test_meta_scenario_tutorial_conversion(monkeypatch: MonkeyPatch) -> None:
@@ -40,10 +50,36 @@ def test_meta_scenario_tutorial_conversion(monkeypatch: MonkeyPatch) -> None:
     user_llm = StubLLM(['{"actions": []}'])
 
     scenario = ScenarioTutorial()
-    env, _proxy, _agent, _decision_maker = build_meta_scenario_components(
+    setup = build_meta_scenario_components(
         scenario, llm=llm, user_llm=user_llm, max_user_turns=1, log_mode="overwrite", primary_app="contacts"
     )
+    env, _proxy, _agent, _decision_maker = setup
 
     assert "contacts" in env.apps
     contacts_state = env.get_app("contacts").get_contacts()
     assert contacts_state["contacts"], "Contacts should be populated from scenario"
+    assert setup.oracle_actions
+    oracle = setup.oracle_actions[0]
+    assert oracle.app == "email"
+    assert oracle.function == "forward_email"
+    assert oracle.args.get("recipients") == ["johndoe@example.com"]
+
+
+def test_build_meta_task_from_scenario(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    llm = StubLLM(["none"])
+    user_llm = StubLLM(['{"actions": []}'])
+
+    task = build_meta_task_from_scenario(
+        scenario_factory=ScenarioTutorial,
+        task_id="tutorial",
+        description="Transfer music list to John",
+        primary_app="contacts",
+    )
+
+    context = TaskContext(llm=llm, user_llm=user_llm, max_user_turns=1, log_mode="overwrite", primary_app="contacts")
+
+    setup = task.scenario_builder(context)
+    assert setup.oracle_actions
+    oracle = setup.oracle_actions[0]
+    assert oracle.function in {"forward_email", "send_email"}

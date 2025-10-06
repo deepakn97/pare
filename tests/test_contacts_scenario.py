@@ -8,7 +8,8 @@ if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
 from pas.proactive import InterventionResult
-from pas.scenarios import build_contacts_followup_components
+from pas.scenarios import build_contacts_followup_components, build_contacts_followup_task
+from pas.tasks.types import TaskContext
 
 
 @dataclass
@@ -27,9 +28,10 @@ def test_build_contacts_followup_components_sets_up_defaults(monkeypatch: Monkey
     monkeypatch.setenv("OPENAI_API_KEY", "")
     agent_llm = QueueLLM(["none"])
     user_llm = QueueLLM(['{"actions": [{"tool": "contacts.list_contacts", "args": {"offset": 0}}]}'])
-    env, proxy, agent, _decision_maker = build_contacts_followup_components(
+    setup = build_contacts_followup_components(
         llm=agent_llm, user_llm=user_llm, max_user_turns=5, log_mode="overwrite", primary_app="contacts"
     )
+    env, proxy, agent, _decision_maker = setup
     contacts_app = env.get_app("contacts")
 
     proxy.init_conversation()
@@ -37,6 +39,7 @@ def test_build_contacts_followup_components_sets_up_defaults(monkeypatch: Monkey
     assert "Completed" in reply
     assert contacts_app.get_contacts()["contacts"]
     assert agent.propose_goal() is None
+    assert setup.oracle_actions
 
 
 def test_llm_agent_uses_plan_executor_and_summary(monkeypatch: MonkeyPatch) -> None:
@@ -57,10 +60,11 @@ def test_llm_agent_uses_plan_executor_and_summary(monkeypatch: MonkeyPatch) -> N
     ) -> typing.Callable[[str, Any], InterventionResult]:
         return executor
 
-    monkeypatch.setattr("pas.scenarios.contacts_followup.build_plan_executor", plan_executor_factory)
-    env, proxy, agent, _decision_maker = build_contacts_followup_components(
+    monkeypatch.setattr("pas.scenarios.base.build_plan_executor", plan_executor_factory)
+    setup = build_contacts_followup_components(
         llm=llm, user_llm=user_llm, max_user_turns=5, log_mode="overwrite", primary_app="contacts"
     )
+    env, proxy, agent, _decision_maker = setup
     proxy.init_conversation()
     proxy.reply("list contacts")
 
@@ -74,3 +78,21 @@ def test_llm_agent_uses_plan_executor_and_summary(monkeypatch: MonkeyPatch) -> N
     summary = agent.pop_summary()
     assert summary == f"Executed: {goal}"
     agent.handoff(env)
+    assert setup.oracle_actions
+    expected_recipient = setup.oracle_actions[0].args["recipients"][0]
+    assert expected_recipient.endswith("@example.com")
+
+
+def test_contacts_followup_task_definition(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    agent_llm = QueueLLM(["none"])
+    user_llm = QueueLLM(['{"actions": []}'])
+
+    task = build_contacts_followup_task()
+    context = TaskContext(
+        llm=agent_llm, user_llm=user_llm, max_user_turns=3, log_mode="overwrite", primary_app="contacts"
+    )
+
+    setup = task.scenario_builder(context)
+    assert setup.oracle_actions
+    assert setup.env.get_app("contacts")

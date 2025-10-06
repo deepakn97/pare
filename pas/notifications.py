@@ -127,3 +127,18 @@ def format_incoming_message(event: CompletedEvent) -> str | None:
         lines.append("Message:")
         lines.append(f"  {content}")
     return "\n".join(lines)
+
+
+def format_agent_ui_prompt(event: CompletedEvent) -> str | None:
+    """Render agent UI messages so the user proxy can see the request."""
+    action = event.action
+    args = action.resolved_args or action.args or {}
+    content = args.get("content")
+    if not content:
+        return None
+    lines = ["Agent message:", content]
+    return "\n".join(lines)
+
+
+# Register default pop-ups for apps we rely on
+register_popup_for_event("AgentUserInterface", "send_message_to_agent", builder=format_agent_ui_prompt)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from are.simulation.scenarios.scenario_tutorial.scenario import ScenarioTutorial
 from dotenv import load_dotenv
@@ -12,6 +12,11 @@ from openai import OpenAI
 
 from pas.meta_adapter import build_meta_scenario_components
 from pas.proactive import LLMBasedProactiveAgent, OpenAILLMClient
+
+if TYPE_CHECKING:
+    from pas.proactive.openai_client import OpenAIClientProtocol
+else:  # pragma: no cover - runtime alias for typing only
+    OpenAIClientProtocol = object
 from pas.system import ProactiveSession
 
 
@@ -19,15 +24,16 @@ def run_demo() -> None:
     """Execute the tutorial scenario once and print high-level results."""
     log_dir = (Path("logs") / "pas").resolve()
     load_dotenv(override=False)
-    client = OpenAI()
+    client = cast("OpenAIClientProtocol", OpenAI())
     llm = OpenAILLMClient(client=client, default_parameters={})
     user_llm = OpenAILLMClient(client=client, default_parameters={})
 
     scenario = ScenarioTutorial()
 
-    env, proxy, agent_protocol, decision_maker = build_meta_scenario_components(
+    setup = build_meta_scenario_components(
         scenario, llm=llm, user_llm=user_llm, max_user_turns=25, log_mode="overwrite", primary_app="contacts"
     )
+    env, proxy, agent_protocol, decision_maker = setup
     agent = cast("LLMBasedProactiveAgent", agent_protocol)
 
     session_logger = logging.getLogger("pas.session.meta_tutorial")

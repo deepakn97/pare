@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from are.simulation.apps.contacts import Contact, ContactsApp, Gender, Status
@@ -16,23 +14,14 @@ from pas.apps.calendar.app import StatefulCalendarApp
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
-from pas.logging_utils import get_pas_file_logger
-from pas.proactive import LLMBasedProactiveAgent, LLMClientProtocol, ProactiveAgentProtocol
-from pas.system import (
-    attach_event_logging,
-    build_plan_executor,
-    build_stateful_user_planner,
-    create_environment,
-    create_notification_system,
-    initialise_runtime,
-)
-from pas.user_proxy import StatefulUserProxy
-from pas.user_proxy.decision_maker import LLMDecisionMaker
+from pas.scenarios.base import build_proactive_stack
+from pas.scenarios.types import OracleAction, ScenarioSetup
+from pas.tasks.types import TaskContext, TaskDefinition
+
+__all__ = ["build_contacts_followup_components", "build_pas_contacts_meta_components"]
 
 if TYPE_CHECKING:
-    from pas.environment import StateAwareEnvironmentWrapper
-
-__all__ = ["build_contacts_followup_components"]
+    from pas.proactive import LLMClientProtocol
 
 
 def _ensure_stateful_messaging_alias() -> None:
@@ -51,19 +40,10 @@ def build_contacts_followup_components(
     max_user_turns: int,
     log_mode: Literal["overwrite", "append"],
     primary_app: str,
-) -> tuple[StateAwareEnvironmentWrapper, StatefulUserProxy, ProactiveAgentProtocol, LLMDecisionMaker]:
+) -> ScenarioSetup:
     """Construct the environment, user proxy, and proactive agent for contacts flows."""
-    log_dir = Path("logs") / "pas"
-    user_log = log_dir / "user_proxy.log"
-    proactive_log = log_dir / "proactive_agent.log"
-    events_log = log_dir / "events.log"
-
-    initialise_runtime(log_paths=[user_log, proactive_log, events_log], clear_existing=log_mode == "overwrite")
     _ensure_stateful_messaging_alias()
 
-    notification_system = create_notification_system(verbosity=VerbosityLevel.MEDIUM)
-
-    env = create_environment(notification_system)
     contacts = StatefulContactsApp(name="contacts")
     calendar = StatefulCalendarApp(name="calendar")
     email = StatefulEmailApp(name="email")
@@ -71,60 +51,78 @@ def build_contacts_followup_components(
     messaging.name = "messaging"
 
     system_app = SystemApp(name="system")
-    env.register_apps([contacts, calendar, email, messaging, system_app])
-
     _seed_contacts_app(contacts)
     messaging_context = _seed_messaging_app(messaging)
 
-    app_sequence = [contacts.name, calendar.name, email.name, messaging.name]
-    if primary_app not in app_sequence:
-        raise ValueError(f"Unknown primary_app '{primary_app}'")
+    oracle_actions = [
+        OracleAction(
+            app="email",
+            function="send_email",
+            args={
+                "recipients": ["jordan.lee@example.com"],
+                "subject": "Revised launch timeline summary",
+                "content": (
+                    "Provide Jordan with a concise rundown of the updated launch timeline, highlighting"
+                    " key milestones, any delays, and next steps."
+                ),
+                "cc": [],
+                "attachment_paths": [],
+            },
+            description=(
+                "After gathering the revised launch timeline, email Jordan Lee with a clear summary so"
+                " they can prepare before the client call."
+            ),
+        )
+    ]
 
-    user_logger = get_pas_file_logger("pas.user_proxy", user_log, level=logging.DEBUG)
-    planner_logger = get_pas_file_logger("pas.user_proxy.planner", user_log, level=logging.DEBUG)
-    decision_logger = get_pas_file_logger("pas.user_proxy.decisions", user_log, level=logging.DEBUG)
-    orchestrator_logger = get_pas_file_logger("pas.proactive.orchestrator", proactive_log, level=logging.DEBUG)
-    agent_logger = get_pas_file_logger("pas.proactive.agent", proactive_log, level=logging.DEBUG)
-
-    planner_cb = build_stateful_user_planner(
-        user_llm,
-        [contacts, calendar, email, messaging, system_app],
-        initial_app_name=primary_app,
-        include_system_tools=True,
-        logger=planner_logger,
+    setup = build_proactive_stack(
+        apps=[contacts, calendar, email, messaging, system_app],
+        llm=llm,
+        user_llm=user_llm,
+        max_user_turns=max_user_turns,
+        log_mode=log_mode,
+        primary_app=primary_app,
+        oracle_actions=oracle_actions,
+        notification_verbosity=VerbosityLevel.MEDIUM,
     )
-    decision_maker = LLMDecisionMaker(user_llm, logger=decision_logger)
-    plan_executor_cb = build_plan_executor(
-        llm,
-        (),
-        system_prompt=(
-            "You plan proactive interventions as a mobile assistant. "
-            "Reason about the goal, identify missing context, and pick the next tool that advances progress. "
-            "Gather supporting information before committing to final actions. One response represents a single step in a multi-step plan."
-        ),
-        logger=orchestrator_logger,
-    )
-
-    user_proxy = StatefulUserProxy(
-        env, env.notification_system, max_user_turns=max_user_turns, logger=user_logger, planner=planner_cb
-    )
-
-    agent = LLMBasedProactiveAgent(
-        llm,
-        system_prompt="You summarise recent completed events and suggest helpful follow-ups.",
-        max_context_events=200,
-        plan_executor=plan_executor_cb,
-        summary_builder=lambda result: result.notes,
-        logger=agent_logger,
-    )
-
-    env.subscribe_to_completed_events(agent.observe)
-    attach_event_logging(env, events_log)
 
     if messaging_context is not None:
         _emit_initial_message(messaging, **messaging_context)
 
-    return env, user_proxy, agent, decision_maker
+    return setup
+
+
+def build_pas_contacts_meta_components(
+    *,
+    llm: LLMClientProtocol,
+    user_llm: LLMClientProtocol,
+    max_user_turns: int,
+    log_mode: Literal["overwrite", "append"],
+    primary_app: str,
+) -> ScenarioSetup:
+    """Reuse the base contacts follow-up components for meta-style scaffolding."""
+    return build_contacts_followup_components(
+        llm=llm, user_llm=user_llm, max_user_turns=max_user_turns, log_mode=log_mode, primary_app=primary_app
+    )
+
+
+def build_contacts_followup_task(
+    *,
+    task_id: str = "contacts_followup",
+    description: str = "Follow up with Jordan Lee via email after receiving a manager's ping.",
+) -> TaskDefinition:
+    """Return a task definition that recreates the contacts follow-up scenario."""
+
+    def _builder(context: TaskContext) -> ScenarioSetup:
+        return build_contacts_followup_components(
+            llm=context.llm,
+            user_llm=context.user_llm,
+            max_user_turns=context.max_user_turns,
+            log_mode=context.log_mode,
+            primary_app=context.primary_app,
+        )
+
+    return TaskDefinition(task_id=task_id, description=description, scenario_builder=_builder)
 
 
 def _seed_contacts_app(app: ContactsApp) -> None:
