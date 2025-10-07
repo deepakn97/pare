@@ -34,6 +34,8 @@ def _normalise_args(args: dict[str, object]) -> dict[str, object]:
 
 def event_matches(event: CompletedEvent, oracle: OracleAction) -> bool:
     """Return ``True`` when a completed event satisfies an oracle expectation."""
+    if oracle.expected_event_type is not None and event.event_type is not oracle.expected_event_type:
+        return False
     if event.app_name() != oracle.app:
         return False
     if event.function_name() != oracle.function:

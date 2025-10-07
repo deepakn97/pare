@@ -7,11 +7,8 @@ import typing
 from pathlib import Path
 
 
-# Historical helper kept for compatibility; callers pass explicit paths now.
-def initialise_pas_logs(*, clear_existing: bool, log_paths: typing.Sequence[Path] | None = None) -> None:
+def initialise_pas_logs(*, clear_existing: bool, log_paths: typing.Sequence[Path]) -> None:
     """Prepare PAS log files, optionally clearing previous runs before logging."""
-    if log_paths is None:
-        return
     for path in log_paths:
         resolved = path if path.is_absolute() else (Path.cwd() / path)
         resolved.parent.mkdir(parents=True, exist_ok=True)

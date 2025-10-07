@@ -8,7 +8,7 @@ from are.simulation.apps.contacts import Contact, ContactsApp, Gender, Status
 from are.simulation.apps.email_client import Email, EmailFolderName
 from are.simulation.apps.system import SystemApp
 from are.simulation.notification_system import VerbosityLevel
-from are.simulation.types import disable_events
+from are.simulation.types import EventType, disable_events
 
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
@@ -48,6 +48,7 @@ def build_contacts_followup_components(
             function="forward_email",
             args={"email_id": email_id, "recipients": ["jordan.lee@example.com"], "folder_name": "INBOX"},
             description="Forward the manager's update email to Jordan Lee so they stay in sync before the meeting.",
+            expected_event_type=EventType.AGENT,
         )
     ]
 

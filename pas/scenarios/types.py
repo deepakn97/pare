@@ -6,6 +6,8 @@ import typing as t
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from are.simulation.types import EventType  # noqa: TC002 - runtime enum needed for matching
+
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from pas.environment import StateAwareEnvironmentWrapper
     from pas.proactive import ProactiveAgentProtocol
@@ -22,6 +24,7 @@ class OracleAction:
     args: dict[str, Any] = field(default_factory=dict)
     description: str | None = None
     source_event_id: str | None = None
+    expected_event_type: EventType | None = None
 
 
 @dataclass(slots=True)

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Literal
 
 from are.simulation.notification_system import VerbosityLevel
 
+from pas.apps.core import StatefulApp
 from pas.logging_utils import get_pas_file_logger
 from pas.proactive import LLMBasedProactiveAgent
 from pas.scenarios.types import OracleAction, ScenarioSetup
@@ -34,7 +35,7 @@ def build_proactive_stack(
     user_llm: LLMClientProtocol,
     max_user_turns: int,
     log_mode: Literal["overwrite", "append"],
-    primary_app: str,
+    primary_app: str | None = None,
     oracle_actions: t.Sequence[OracleAction] | None = None,
     notification_verbosity: VerbosityLevel = VerbosityLevel.MEDIUM,
     extra_notifications: dict[str, t.Iterable[str]] | None = None,
@@ -55,8 +56,13 @@ def build_proactive_stack(
     env.register_apps(list(apps))
 
     app_names = {getattr(app, "name", None) for app in apps}
-    if primary_app not in app_names:
-        raise ValueError(f"Unknown primary_app '{primary_app}'")
+    stateful_apps = [app for app in apps if isinstance(app, StatefulApp)]
+    if not stateful_apps:
+        raise ValueError("build_proactive_stack requires at least one StatefulApp")
+
+    resolved_primary = primary_app or stateful_apps[0].name
+    if resolved_primary not in app_names:
+        raise ValueError(f"Unknown primary_app '{resolved_primary}'")
 
     user_logger = get_pas_file_logger("pas.user_proxy", user_log, level=logging.DEBUG)
     planner_logger = get_pas_file_logger("pas.user_proxy.planner", user_log, level=logging.DEBUG)
@@ -67,7 +73,7 @@ def build_proactive_stack(
     planner_cb = build_stateful_user_planner(
         user_llm,
         list(env.apps.values()),
-        initial_app_name=primary_app,
+        initial_app_name=resolved_primary,
         include_system_tools=True,
         logger=planner_logger,
     )

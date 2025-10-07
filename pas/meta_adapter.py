@@ -211,7 +211,9 @@ def _literal_eval(value: str, value_type: str | None) -> object:
     return value
 
 
-def _convert_action_description(desc: ActionDescription | None, *, event_id: str | None) -> OracleAction | None:
+def _convert_action_description(
+    desc: ActionDescription | None, *, event_id: str | None, event_type: EventType | None
+) -> OracleAction | None:
     if desc is None:
         return None
 
@@ -237,6 +239,7 @@ def _convert_action_description(desc: ActionDescription | None, *, event_id: str
         args=normalised_args,
         description=f"Oracle expectation for {desc.app}.{desc.function}",
         source_event_id=event_id,
+        expected_event_type=event_type,
     )
 
 
@@ -254,7 +257,9 @@ def _partition_events(events: t.Sequence[AbstractEvent]) -> tuple[list[AbstractE
 def _convert_oracles(events: t.Iterable[OracleEvent]) -> list[OracleAction]:
     converted: list[OracleAction] = []
     for event in events:
-        oracle_action = _convert_action_description(event.action_desc, event_id=event.event_id)
+        oracle_action = _convert_action_description(
+            event.action_desc, event_id=event.event_id, event_type=event.event_type
+        )
         if oracle_action is not None:
             converted.append(oracle_action)
     return converted

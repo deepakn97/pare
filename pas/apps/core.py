@@ -33,15 +33,7 @@ class AppState(ABC):
 
     @property
     def app(self) -> App:
-        """Get the app this state is bound to.
-
-        Raises:
-            RuntimeError: If state not bound to app yet
-        """
-        # if self._app is None:
-        #     raise RuntimeError(
-        #         f"{self.__class__.__name__} not bound to app. States must be set via app.set_current_state()"
-        #     )
+        """Get the app this state is bound to."""
         return self._app
 
     def get_available_actions(self) -> list[AppTool]:

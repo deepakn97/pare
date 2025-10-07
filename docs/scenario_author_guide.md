@@ -58,6 +58,7 @@ the task is truly complete.
 from pathlib import Path
 from typing import Sequence
 
+from are.simulation.notification_system import VerbosityLevel
 from are.simulation.validation.constants import APP_ALIAS
 
 from pas.apps.contacts.app import StatefulContactsApp
@@ -65,8 +66,7 @@ from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
 from pas.logging_utils import get_pas_file_logger, initialise_pas_logs
 from pas.notifications import register_popup_for_event, format_incoming_message
-from pas.proactive import LLMBasedProactiveAgent, ToolSpec, ToolParameter
-from pas.scenarios.contacts_followup import _execute_send_email  # reuse executor helper
+from pas.proactive import LLMBasedProactiveAgent
 from pas.system import (
     ProactiveSession,
     attach_event_logging,
@@ -88,7 +88,7 @@ def build_components(llm_client, user_llm_client):
 
     initialise_runtime(log_paths=[user_log, proactive_log, events_log], clear_existing=True)
 
-    notification_system = create_notification_system()
+    notification_system = create_notification_system(verbosity=VerbosityLevel.MEDIUM)
     env = create_environment(notification_system)
 
     contacts = StatefulContactsApp(name="contacts")
@@ -127,34 +127,10 @@ def build_components(llm_client, user_llm_client):
         planner=planner,
     )
 
-    tool_specs: Sequence[ToolSpec] = [
-        ToolSpec(
-            name="send_email",
-            description=(
-                "Send a follow-up email to a specific recipient. Always resolve contacts to actual email "
-                "addresses (Jordan Lee → jordan.lee@example.com, Morgan Rivera → morgan.rivera@example.com)."
-            ),
-            parameters=[
-                ToolParameter(
-                    "recipient",
-                    "Contact name or email. Provide the full address (e.g. jordan.lee@example.com).",
-                ),
-                ToolParameter("subject", "Email subject"),
-                ToolParameter("body", "Email body"),
-                ToolParameter(
-                    "cc",
-                    "Optional CC list. Supply fully qualified email addresses (e.g. morgan.rivera@example.com).",
-                    required=False,
-                ),
-            ],
-            executor=_execute_send_email,
-        ),
-    ]
-
     orchestrator_logger = get_pas_file_logger("pas.proactive.orchestrator", proactive_log)
     plan_executor = build_plan_executor(
         llm_client,
-        tool_specs,
+        (),
         system_prompt=(
             "Choose the single best tool to satisfy the confirmed goal. Every email-related argument must be a "
             "valid email address. If you cannot provide a proper address, leave optional fields empty instead of "

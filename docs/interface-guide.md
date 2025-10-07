@@ -36,10 +36,10 @@ All interfaces assume Meta-ARE 2024.10.* and the PAS stateful apps checked into 
 
 | File / Class                                   | Responsibility                                         |
 |------------------------------------------------|-------------------------------------------------------|
-| `pas/user_proxy/stateful.py: StatefulUserProxy`| Concrete user proxy implementing the contract below  |
-| `pas/proactive/agent.py: ProactiveAgentProtocol`| Minimal protocol for all proactive implementations   |
-| `pas/proactive/errors.py`                       | Shared exceptions (`UserActionFailed`, etc.)          |
-| `pas/scenarios/utils.py`                        | Convenience helpers for scenario authors              |
+| `pas/user_proxy/stateful.py`                    | Stateful proxy plus `UserActionFailed`/`TurnLimitReached` guards |
+| `pas/proactive/agent.py`                        | Reference proactive agent + `ProactiveAgentProtocol`  |
+| `pas/oracles.py`                                | Oracle matching and tracking helpers                  |
+| `pas/scenarios/base.py`                         | Utilities to assemble PAS runtime stacks              |
 
 Teams may add additional files, but the interfaces exposed here must remain unchanged.
 
@@ -64,7 +64,7 @@ class StatefulUserProxy(UserProxy):
 
 - `env`: shared environment wrapper. Proxy must only interact via exposed `@user_tool`s.
 - `notification_system`: subscribe to `CompletedEvent`s to update state.
-- `max_user_turns`: once reached, `reply()` raises `StopIteration`.
+- `max_user_turns`: once reached, `reply()` raises `TurnLimitReached`.
 - `logger`: optional logger (default uses module-level logger).
 
 ### 3.2 Behaviour of `init_conversation()`

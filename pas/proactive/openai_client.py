@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from pas.proactive.agent import LLMClientProtocol
 
@@ -23,18 +23,26 @@ class OpenAIClientProtocol(Protocol):
 class OpenAILLMClient(LLMClientProtocol):
     """LLM client that calls OpenAI's Responses API."""
 
-    def __init__(self, *, client: OpenAIClientProtocol, default_parameters: dict[str, Any] | None) -> None:
-        """Store the underlying OpenAI client and default request parameters."""
-        self._model = "gpt-5-mini"
-        self._client = client
-        base_parameters: dict[str, Any] = {}
-        if default_parameters:
-            base_parameters.update(default_parameters)
-        self._default_parameters = base_parameters
+    def __init__(
+        self,
+        *,
+        client: OpenAIClientProtocol | None = None,
+        request_parameters: dict[str, Any] | None = None,
+        model: str = "gpt-5-mini",
+    ) -> None:
+        """Optionally accept a preconfigured OpenAI client and request defaults."""
+        if client is None:
+            from openai import OpenAI  # local import to avoid mandatory dependency at import time
+
+            client = cast("OpenAIClientProtocol", OpenAI())
+
+        self._model = model
+        self._client: OpenAIClientProtocol = client
+        self._request_parameters = dict(request_parameters or {})
 
     def complete(self, prompt: str) -> str:
         """Return text content from the Responses API for the supplied prompt."""
-        response = self._client.responses.create(model=self._model, input=prompt, **self._default_parameters)
+        response = self._client.responses.create(model=self._model, input=prompt, **self._request_parameters)
         return str(response.output_text)
 
 

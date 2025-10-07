@@ -1,17 +1,12 @@
 # Proactive Agent Sandbox (PAS)
 
-[![Release](https://img.shields.io/github/v/release/deepakn97/proactiveGoalInference)](https://img.shields.io/github/v/release/deepakn97/proactiveGoalInference)
-[![Build status](https://img.shields.io/github/actions/workflow/status/deepakn97/proactiveGoalInference/main.yml?branch=main)](https://github.com/deepakn97/proactiveGoalInference/actions/workflows/main.yml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/deepakn97/proactiveGoalInference/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/proactiveGoalInference)
-[![Commit activity](https://img.shields.io/github/commit-activity/m/deepakn97/proactiveGoalInference)](https://img.shields.io/github/commit-activity/m/deepakn97/proactiveGoalInference)
-[![License](https://img.shields.io/github/license/deepakn97/proactiveGoalInference)](https://img.shields.io/github/license/deepakn97/proactiveGoalInference)
+This repository hosts the Proactive Agent Sandbox used to explore proactive goal
+inference on top of Meta-ARE. PAS layers stateful navigation, user proxies, and
+proactive agents on the simulated mobile apps shipped with Meta-ARE.
 
-This repository contains code for the Proactive Goal Inference Agent project in collaboration with Apple.
-
-PAS extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based navigation architecture for mobile app simulation, enabling proactive agent research with context-aware action spaces.
-
-- **Github repository**: <https://github.com/deepakn97/proactiveGoalInference/>
-- **Documentation**: <https://deepakn97.github.io/proactiveGoalInference/>
+PAS extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based
+navigation architecture for mobile app simulation, enabling proactive agent
+research with context-aware action spaces.
 
 ## Setup
 
@@ -24,8 +19,8 @@ PAS extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based n
 
 1. Clone the repository:
 ```bash
-git clone git@github.com:deepakn97/proactiveGoalInference.git
-cd proactiveGoalInference
+git clone <your-repository-url> scenario-setup
+cd scenario-setup
 ```
 
 2. Install the environment and pre-commit hooks:
@@ -71,18 +66,17 @@ open htmlcov/index.html  # View coverage in browser
 ```
 
 This requires the corresponding Python interpreters to be available locally; if
-they are missing, you can rely on the CI job instead.
+they are missing, rely on the CI job instead.
 
 For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Project Structure
 
-- `pas/` - Main package (Proactive Agent Sandbox)
-  - `apps/core.py` - Base classes for stateful apps (AppState, StatefulApp)
-  - `apps/messaging/` - Stateful messaging app implementation
-  - `environment.py` - Environment wrapper for state transitions
-- `tests/` - Test suite
-- `docs/_plans/` - Design documentation
+- `pas/` – main package containing stateful apps, environment wrapper,
+  proactive agent orchestration, scenarios, and user proxy implementations
+- `tests/` – unit tests covering navigation states, adapters, planners, and
+  demos
+- `docs/` – developer documentation and app API references
 
 ### Running The Demos
 
@@ -92,12 +86,16 @@ Two runnable scripts exercise the sandbox end-to-end. They require a valid
 ```bash
 uv run python -m pas.scripts.run_contacts_demo
 uv run python -m pas.scripts.run_meta_tutorial_demo
+# generic runner example
+uv run python -m pas.scripts.run_demo \
+  --builder pas.scenarios.contacts_followup.build_contacts_followup_components \
+  --primary-app messaging
 ```
 
 Each script prints the proposed goal, execution summary, and the locations of
-the generated logs under `logs/pas/`.  Both demos rely on oracle expectations
-to ensure the agent truly forwards the target email; if a run completes without
-meeting the oracle criteria the session will raise an error instead of silently
+the generated logs under `logs/pas/`. Both demos rely on oracle expectations to
+ensure the agent truly forwards the target email; if a run completes without
+meeting the oracle criteria the session raises an error instead of silently
 accepting a partial result.
 
 ### Scenario Integration Options

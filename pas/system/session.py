@@ -88,9 +88,7 @@ class ProactiveSession:
                 self._logger.info("Goal declined: %s", goal)
                 break
 
-            (result, summary, completion_decision, new_notifications, matches_before) = self._execute_confirmed_goal(
-                goal, handled_notifications
-            )
+            result, summary, completion_decision = self._execute_confirmed_goal(goal, handled_notifications)
 
             last_result = result
             last_summary = summary
@@ -98,20 +96,17 @@ class ProactiveSession:
             accepted, should_break = self._update_acceptance(completion_decision, accepted)
             if should_break:
                 break
-
-            accepted, should_break = self._handle_oracle_state(matches_before, new_notifications, accepted)
-            if should_break:
-                break
         else:
             raise RuntimeError("Proactive session exceeded iteration budget without satisfying oracles")
 
-        return ProactiveCycleResult(handled_notifications, last_goal, accepted, last_result, last_summary)
+        cycle = ProactiveCycleResult(handled_notifications, last_goal, accepted, last_result, last_summary)
+        self._validate_cycle_outcome(cycle)
+        return cycle
 
     def _execute_confirmed_goal(
         self, goal: str, handled_notifications: list[tuple[str, str]]
-    ) -> tuple[InterventionResult, str | None, bool | None, list[tuple[str, str]], int]:
+    ) -> tuple[InterventionResult, str | None, bool | None]:
         """Execute a confirmed goal and notify the user about the outcome."""
-        matches_before = self._oracle_tracker.match_count
         result = self._agent.execute(goal, self._env)
         summary = self._agent.pop_summary()
         self._agent.handoff(self._env)
@@ -123,7 +118,7 @@ class ProactiveSession:
 
         new_notifications = self._handle_notifications()
         handled_notifications.extend(new_notifications)
-        return result, summary, completion_decision, new_notifications, matches_before
+        return result, summary, completion_decision
 
     def _update_acceptance(self, completion_decision: bool | None, current: bool) -> tuple[bool, bool]:
         """Update acceptance flag based on user completion feedback."""
@@ -135,18 +130,18 @@ class ProactiveSession:
             return True, True
         return True, False
 
-    def _handle_oracle_state(
-        self, matches_before: int, new_notifications: list[tuple[str, str]], current: bool
-    ) -> tuple[bool, bool]:
-        """Ensure oracle progress and decide whether the loop should exit."""
-        if not self._has_oracles:
-            return current, False
-        if self._oracle_tracker.is_satisfied():
-            return True, True
-        progress = self._oracle_tracker.match_count > matches_before or bool(new_notifications)
-        if not progress:
-            raise RuntimeError("Proactive intervention ended without satisfying oracle requirements.")
-        return current, False
+    def _validate_cycle_outcome(self, cycle: ProactiveCycleResult) -> None:
+        """Enforce oracle satisfaction and proactive contract guarantees."""
+        if self._has_oracles and not self._oracle_tracker.is_satisfied():
+            raise RuntimeError("Proactive session completed without satisfying oracle requirements.")
+        if cycle.goal is None:
+            raise RuntimeError("Proactive session ended without proposing a proactive goal.")
+        if not cycle.accepted:
+            raise RuntimeError("Proactive session ended without an accepted proactive plan.")
+        if cycle.result is None:
+            raise RuntimeError("Proactive session ended without executing the accepted plan.")
+        if not cycle.result.success:
+            raise RuntimeError(f"Proactive intervention reported failure: {cycle.result.notes}")
 
     def _handle_notifications(self) -> list[tuple[str, str]]:
         handled: list[tuple[str, str]] = []

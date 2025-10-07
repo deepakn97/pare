@@ -31,7 +31,7 @@ def build_stateful_user_planner(
     llm_client: LLMClientProtocol,
     apps: typing.Sequence[StatefulApp | SystemApp],
     *,
-    initial_app_name: str,
+    initial_app_name: str | None = None,
     include_system_tools: bool,
     logger: logging.Logger,
 ) -> PlannerCallable:
@@ -41,8 +41,11 @@ def build_stateful_user_planner(
     if not stateful_apps:
         raise ValueError("build_stateful_user_planner requires at least one stateful app")
 
-    if initial_app_name not in app_map:
-        raise ValueError(f"Unknown initial app '{initial_app_name}'")
+    resolved_initial = initial_app_name
+    if resolved_initial is None:
+        resolved_initial = stateful_apps[0].name
+    if resolved_initial not in app_map:
+        raise ValueError(f"Unknown initial app '{resolved_initial}'")
 
     system_app: SystemApp | None = None
     for app in apps:
@@ -53,7 +56,7 @@ def build_stateful_user_planner(
         raise ValueError("include_system_tools requested but no SystemApp provided")
 
     def _plan(message: str, proxy: StatefulUserProxy) -> list[tuple[str, str, dict[str, object]]]:
-        active_app = _select_active_app(proxy, app_map, initial_app_name)
+        active_app = _select_active_app(proxy, app_map, resolved_initial)
 
         available_specs: list[UserToolSpec] = []
         # Prioritise tools from the active app but still expose other apps so the user can switch context.
