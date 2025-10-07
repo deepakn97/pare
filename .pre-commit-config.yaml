@@ -36,6 +36,5 @@ repos:
         entry: mypy
         language: python
         types: [ python ]
-        additional_dependencies: [mypy>=1.10.0]
         require_serial: true
         verbose: true
