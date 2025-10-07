@@ -6,12 +6,13 @@ import logging
 import typing as t
 from typing import TYPE_CHECKING
 
+from pas.oracles import event_matches
 from pas.system import ProactiveSession
 from pas.tasks.types import OracleCheckResult, TaskContext, TaskDefinition, TaskRunResult
 
 LOGGER = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover - typing only
     from are.simulation.types import CompletedEvent
 
     from pas.environment import StateAwareEnvironmentWrapper
@@ -30,6 +31,7 @@ def run_task(definition: TaskDefinition, context: TaskContext) -> TaskRunResult:
         decision_maker=decision_maker,
         confirm_goal=lambda goal: True,
         logger=logging.getLogger(f"pas.tasks.{definition.task_id}"),
+        oracle_actions=setup.oracle_actions,
     )
 
     proxy.init_conversation()
@@ -51,62 +53,17 @@ def evaluate_oracles(
         raise AttributeError("StateAwareEnvironmentWrapper missing event_log for oracle evaluation")
     completed_events = list(event_log.list_view())
 
-    matches = []
+    matches: list[OracleCheckResult] = []
     for oracle in oracle_actions:
-        matched_event = _find_matching_event(completed_events, oracle)
+        matched_event = _find_first_match(completed_events, oracle)
         matches.append(
             OracleCheckResult(oracle=oracle, satisfied=matched_event is not None, matched_event=matched_event)
         )
     return matches
 
 
-def _find_matching_event(events: t.Iterable[CompletedEvent], oracle: OracleAction) -> CompletedEvent | None:
-    for event in events:
-        if event.app_name() != oracle.app:
-            continue
-        if event.function_name() != oracle.function:
-            continue
-        event_args = _normalise_args(event.action.args if event.action else {})
-        expected_args = oracle.args or {}
-        if all(_args_equal(event_args.get(key), value) for key, value in expected_args.items()):
-            return event
-    return None
-
-
-def _normalise_args(args: dict[str, object]) -> dict[str, object]:
-    normalised: dict[str, object] = {}
-    for key, value in args.items():
-        if key == "self":
-            continue
-        normalised[key] = _normalise_value(value)
-    return normalised
-
-
-def _normalise_value(value: object) -> object:
-    if isinstance(value, dict) and "value" in value and len(value) == 1:
-        return _normalise_value(value["value"])
-    if isinstance(value, dict):
-        return {k: _normalise_value(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_normalise_value(v) for v in value]
-    # Handle enums (EmailFolderName etc.)
-    if hasattr(value, "value") and not isinstance(value, str | bytes):
-        enum_value = value.value
-        if enum_value is not None:
-            return enum_value
-    return value
-
-
-def _args_equal(found: object | None, expected: object) -> bool:
-    if isinstance(expected, list):
-        return (
-            isinstance(found, list)
-            and len(found) == len(expected)
-            and all(_args_equal(f, e) for f, e in zip(found, expected, strict=False))
-        )
-    if isinstance(expected, dict):
-        return isinstance(found, dict) and all(_args_equal(found.get(k), v) for k, v in expected.items())
-    return found == expected
+def _find_first_match(events: t.Iterable[CompletedEvent], oracle: OracleAction) -> CompletedEvent | None:
+    return next((event for event in events if event_matches(event, oracle)), None)
 
 
 __all__ = ["evaluate_oracles", "run_task"]

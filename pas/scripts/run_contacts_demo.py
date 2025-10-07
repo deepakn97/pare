@@ -36,7 +36,13 @@ def run_demo(messages: typing.Iterable[str] | None = None, mode: Literal["event"
     session_logger = logging.getLogger("pas.session.demo")
     session_logger.setLevel(logging.INFO)
     session = ProactiveSession(
-        env, proxy, agent, decision_maker=decision_maker, confirm_goal=lambda goal: True, logger=session_logger
+        env,
+        proxy,
+        agent,
+        decision_maker=decision_maker,
+        confirm_goal=lambda goal: True,
+        logger=session_logger,
+        oracle_actions=setup.oracle_actions,
     )
 
     proxy.init_conversation()

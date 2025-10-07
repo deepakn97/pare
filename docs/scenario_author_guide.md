@@ -162,6 +162,7 @@ def build_components(llm_client, user_llm_client):
         decision_maker=decision_maker,
         confirm_goal=lambda goal: True,
         logger=session_logger,
+        oracle_actions=setup.oracle_actions,
     )
 
     return env, user_proxy, proactive_agent, decision_maker, session

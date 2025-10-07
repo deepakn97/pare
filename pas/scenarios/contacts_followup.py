@@ -197,7 +197,7 @@ def _seed_messaging_app(app: StatefulMessagingApp) -> dict[str, str] | None:
 
 def _emit_initial_messages(app: StatefulMessagingApp, *, conversation_id: str, sender_id: str) -> None:
     content = (
-        "Morning! I just emailed you the client sync prep notes. Please forward that message to Jordan Lee "
-        "so they're ready for the call later today."
+        "Morning! I just emailed you the client sync prep notes. Please forward that exact email to Jordan Lee "
+        "(no need to rewrite anything) so they're ready for the call later today."
     )
     app.create_and_add_message(conversation_id=conversation_id, sender_id=sender_id, content=content)

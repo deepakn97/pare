@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from types import UnionType
+from typing import TYPE_CHECKING, Any, ClassVar, Union, cast, get_origin
 
 from are.simulation.agents.are_simulation_agent_config import ARESimulationReactBaseAgentConfig
 from are.simulation.agents.default_agent.agent_factory import are_simulation_react_json_agent
@@ -16,7 +17,7 @@ from are.simulation.agents.default_agent.termination_methods.are_simulation impo
 from are.simulation.agents.default_agent.tools.json_action_executor import JsonActionExecutor
 from are.simulation.agents.llm.llm_engine import LLMEngine
 from are.simulation.tool_box import Toolbox
-from are.simulation.tool_utils import AppTool  # noqa: TC002
+from are.simulation.tool_utils import AppTool, AppToolArg  # noqa: TC002
 from are.simulation.tools import Tool
 
 from pas.proactive import InterventionResult, LLMClientProtocol
@@ -25,16 +26,46 @@ if TYPE_CHECKING:
     from pas.environment import StateAwareEnvironmentWrapper
 
 
-def _map_input_type(arg_type: str) -> str:
-    """Translate AppTool argument type to Meta ARE Tool schema type."""
-    normalised = str(arg_type).lower()
+def _map_input_type(arg: AppToolArg) -> str:
+    """Translate AppTool argument type to a Tool.validate_arguments-compatible primitive."""
+    type_obj = getattr(arg, "type_obj", None)
+    origin = get_origin(type_obj) if type_obj is not None else None
+
+    if type_obj in {int, float}:
+        return "number" if type_obj is float else "integer"
+    if type_obj is bool:
+        return "boolean"
+    if type_obj is str:
+        return "string"
+
+    if origin in {list, tuple, set, dict, Union, UnionType}:
+        return "any"
+
+    normalised = str(arg.arg_type).lower()
     if normalised in {"int", "integer"}:
         return "integer"
     if normalised in {"float", "number"}:
         return "number"
     if normalised in {"bool", "boolean"}:
         return "boolean"
+    if any(token in normalised for token in ("list[", "dict[", "|")):
+        return "any"
     return "string"
+
+
+def _format_input_description(arg: AppToolArg) -> str:
+    base = arg.description or "Argument with no description provided."
+    hint = str(arg.arg_type)
+    normalised = hint.lower()
+
+    if "list[" in normalised:
+        example = '["item@example.com"]'
+        return f"{base} Expected JSON array (e.g. {example})."
+    if "dict[" in normalised:
+        return f"{base} Expected JSON object matching {hint}."
+    if "|" in hint:
+        return f"{base} Expected type: {hint}."
+    return base
 
 
 class PasToolAdapter(Tool):
@@ -47,10 +78,7 @@ class PasToolAdapter(Tool):
         self.name = app_tool.name
         self.description = app_tool.function_description or "No description provided."
         self.inputs = {
-            arg.name: {
-                "type": _map_input_type(arg.arg_type),
-                "description": arg.description or "Argument with no description provided.",
-            }
+            arg.name: {"type": _map_input_type(arg), "description": _format_input_description(arg)}
             for arg in app_tool.args
         }
         self.output_type = "string"
