@@ -83,3 +83,19 @@ For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
   - `environment.py` - Environment wrapper for state transitions
 - `tests/` - Test suite
 - `docs/_plans/` - Design documentation
+
+### Running The Demos
+
+Two runnable scripts exercise the sandbox end-to-end. They require a valid
+`OPENAI_API_KEY` (loaded automatically via `dotenv`).
+
+```bash
+uv run python -m pas.scripts.run_contacts_demo
+uv run python -m pas.scripts.run_meta_tutorial_demo
+```
+
+Each script prints the proposed goal, execution summary, and the locations of
+the generated logs under `logs/pas/`.  Both demos rely on oracle expectations
+to ensure the agent truly forwards the target email; if a run completes without
+meeting the oracle criteria the session will raise an error instead of silently
+accepting a partial result.
