@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal
 from are.simulation.notification_system import VerbosityLevel
 
 from pas.apps.core import StatefulApp
+from pas.apps.system import HomeScreenSystemApp
 from pas.logging_utils import get_pas_file_logger
 from pas.proactive import LLMBasedProactiveAgent
 from pas.scenarios.types import OracleAction, ScenarioSetup
@@ -54,6 +55,10 @@ def build_proactive_stack(
 
     env = create_environment(notification_system)
     env.register_apps(list(apps))
+
+    for app in env.apps.values():
+        if isinstance(app, HomeScreenSystemApp):
+            app.attach_environment(env)
 
     app_names = {getattr(app, "name", None) for app in apps}
     stateful_apps = [app for app in apps if isinstance(app, StatefulApp)]

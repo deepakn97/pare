@@ -95,6 +95,16 @@ def _select_active_app(
 ) -> StatefulApp | None:
     for invocation in reversed(proxy.last_tool_invocations):
         app_name = invocation.name.split(".")[0]
+        if app_name == "system":
+            if invocation.name.endswith(".go_home"):
+                return None
+            if invocation.name.endswith(".open_app"):
+                target = invocation.args.get("app_name") if invocation.args else None
+                if isinstance(target, str):
+                    candidate = app_map.get(target)
+                    if isinstance(candidate, StatefulApp):
+                        return candidate
+            continue
         candidate = app_map.get(app_name)
         if isinstance(candidate, StatefulApp):
             return candidate

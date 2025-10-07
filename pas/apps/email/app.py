@@ -21,7 +21,7 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialise the email app with the inbox as the starting state."""
         super().__init__(*args, **kwargs)
-        self.set_current_state(MailboxView(folder=EmailFolderName.INBOX.value))
+        self.load_root_state()
 
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Update navigation state in response to completed tool events."""
@@ -203,3 +203,7 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
             self.add_email(email=email, folder_name=EmailFolderName.SENT)
 
         return email.email_id
+
+    def create_root_state(self) -> MailboxView:
+        """Return the mailbox view rooted in the inbox."""
+        return MailboxView(folder=EmailFolderName.INBOX.value)

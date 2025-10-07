@@ -25,8 +25,7 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
         """
         super().__init__(*args, **kwargs)
         # Set initial state to conversation list
-        initial_state = ConversationList()
-        self.set_current_state(initial_state)
+        self.load_root_state()
 
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Handle state transitions based on tool events.
@@ -50,6 +49,10 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
                 self.set_current_state(ConversationOpened(conversation_id))
 
         # go_back transitions are handled automatically by StatefulApp.go_back()
+
+    def create_root_state(self) -> ConversationList:
+        """Return the conversation list root state."""
+        return ConversationList()
 
 
 register_popup_for_event("StatefulMessagingApp", "create_and_add_message", builder=format_incoming_message)

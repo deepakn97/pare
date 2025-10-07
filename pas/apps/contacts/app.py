@@ -20,7 +20,7 @@ class StatefulContactsApp(StatefulApp, ContactsApp):
         """Initialise the contacts app and load the list view as the default state."""
         self._pending_transition: tuple[str, str] | None = None
         super().__init__(*args, **kwargs)
-        self.set_current_state(ContactsList())
+        self.load_root_state()
 
     def queue_contact_transition(self, intent: str, contact_id: str) -> None:
         """Record a desired transition that should fire after the next contacts API call."""
@@ -106,3 +106,7 @@ class StatefulContactsApp(StatefulApp, ContactsApp):
     def _handle_get_contacts(self) -> None:
         if not isinstance(self.current_state, ContactsList):
             self.set_current_state(ContactsList())
+
+    def create_root_state(self) -> ContactsList:
+        """Return the root navigation state for the contacts app."""
+        return ContactsList()

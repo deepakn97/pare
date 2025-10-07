@@ -112,6 +112,21 @@ class StatefulApp(App):
         app_state.on_enter()
         self.current_state = app_state
 
+    @abstractmethod
+    def create_root_state(self) -> AppState:
+        """Return a freshly constructed root navigation state."""
+
+    def load_root_state(self) -> None:
+        """Reset the app to its root navigation state."""
+        self.set_current_state(self.create_root_state())
+        self.navigation_stack.clear()
+
+    def reset_to_root(self) -> str:
+        """Reset to the root navigation state and report the new view."""
+        self.load_root_state()
+        state_name = type(self.current_state).__name__ if self.current_state else "UnknownState"
+        return f"Reset to {state_name}"
+
     @user_tool()
     def go_back(self) -> str:
         """Navigate back to the previous state of the app.

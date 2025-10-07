@@ -23,8 +23,7 @@ class StatefulCalendarApp(StatefulApp, CalendarV2):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialise the calendar app and seed the agenda with the current day."""
         super().__init__(*args, **kwargs)
-        start, end = self._default_day_range()
-        self.set_current_state(AgendaView(start_datetime=start, end_datetime=end))
+        self.load_root_state()
 
     def _default_day_range(self) -> tuple[str, str]:
         """Derive the UTC day range surrounding the current simulated time."""
@@ -173,8 +172,12 @@ class StatefulCalendarApp(StatefulApp, CalendarV2):
 
     def _reset_to_default_agenda(self) -> None:
         """Return the app to the default day agenda view."""
+        self.load_root_state()
+
+    def create_root_state(self) -> AgendaView:
+        """Return the root agenda view scoped to the current day."""
         start, end = self._default_day_range()
-        self.set_current_state(AgendaView(start_datetime=start, end_datetime=end))
+        return AgendaView(start_datetime=start, end_datetime=end)
 
     def get_state_graph(self) -> dict[str, list[str]]:
         """Return the navigation graph for the calendar app."""
