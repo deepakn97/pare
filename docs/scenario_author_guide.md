@@ -20,8 +20,9 @@ Every scenario wires the following layers together:
 4. **User planner** – `pas.system.user.build_stateful_user_planner` builds an
    LLM-backed planner that enumerates per-app tools and system navigation tools.
    When no initial app is specified the planner starts on a synthetic home
-   screen; `system.go_home` returns there and `system.open_app(app_name)` resets
-   the chosen app to its root view.
+   screen where only system tools are available; `system.go_home` returns there
+   and `system.open_app(app_name)` resets the chosen app to its root view before
+   exposing that app's tools.
 5. **Decision maker** – `pas.user_proxy.decision_maker.LLMDecisionMaker` (or a
    custom implementation) turns system-level prompts into ACCEPT/DECLINE style
    decisions without touching app tools.

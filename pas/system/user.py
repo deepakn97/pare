@@ -57,12 +57,8 @@ def build_stateful_user_planner(
         active_app = _select_active_app(proxy, app_map, resolved_initial)
 
         available_specs: list[UserToolSpec] = []
-        ordered_apps: list[StatefulApp]
-        if active_app is None:
-            ordered_apps = list(stateful_apps)
-        else:
-            ordered_apps = [active_app] + [app for app in stateful_apps if app is not active_app]
-        available_specs.extend(_collect_user_tool_specs(ordered_apps))
+        if active_app is not None:
+            available_specs.extend(_collect_user_tool_specs([active_app]))
 
         if include_system_tools and system_app is not None:
             available_specs.extend(_collect_user_tool_specs([system_app], include_system=True))
