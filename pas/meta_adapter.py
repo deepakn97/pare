@@ -279,7 +279,7 @@ def build_components_from_meta(
     user_llm: LLMClientProtocol,
     max_user_turns: int,
     log_mode: Literal["overwrite", "append"],
-    primary_app: str,
+    primary_app: str | None,
     oracle_messages: t.Sequence[str] | None = None,
 ) -> ScenarioSetup:
     """Create PAS components from meta-style app definitions."""
@@ -320,7 +320,7 @@ def build_meta_scenario_components(
     user_llm: LLMClientProtocol,
     max_user_turns: int,
     log_mode: Literal["overwrite", "append"],
-    primary_app: str,
+    primary_app: str | None = None,
 ) -> ScenarioSetup:
     """Construct components from an instantiated Meta ARE scenario class."""
     scenario.initialize()

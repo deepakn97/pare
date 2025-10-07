@@ -29,7 +29,7 @@ def build_contacts_followup_components(
     user_llm: LLMClientProtocol,
     max_user_turns: int,
     log_mode: Literal["overwrite", "append"],
-    primary_app: str,
+    primary_app: str | None = None,
 ) -> ScenarioSetup:
     """Construct the environment, user proxy, and proactive agent for contacts flows."""
     contacts = StatefulContactsApp(name="contacts")
@@ -75,7 +75,7 @@ def build_pas_contacts_meta_components(
     user_llm: LLMClientProtocol,
     max_user_turns: int,
     log_mode: Literal["overwrite", "append"],
-    primary_app: str,
+    primary_app: str | None = None,
 ) -> ScenarioSetup:
     """Reuse the base contacts follow-up components for meta-style scaffolding."""
     return build_contacts_followup_components(

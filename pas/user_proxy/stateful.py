@@ -162,15 +162,14 @@ class StatefulUserProxy(UserProxy):
 
     def _execute_tool(self, app_name: str, method_name: str, args: dict[str, object]) -> ToolInvocation:
         app = self._env.get_app(app_name)
-        state = app.current_state
-        if state is None:
-            raise UserActionFailed(f"App '{app_name}' has no active state")
+        state = getattr(app, "current_state", None)
+        available = app.get_user_tools() if state is None else state.get_available_actions()
 
-        tool = self._find_tool(state.get_available_actions(), method_name, app_name)
+        tool = self._find_tool(available, method_name, app_name)
         self._logger.info("Executing tool %s.%s with args=%s", app_name, method_name, args)
 
         start_len = len(self._recent_events)
-        result = tool.function(**args) if tool.function is not None else None
+        result = tool(**args) if state is None else tool.function(**args) if tool.function is not None else tool(**args)
 
         event = None
         if tool.write_operation is True:
