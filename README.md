@@ -88,8 +88,7 @@ uv run python -m pas.scripts.run_contacts_demo
 uv run python -m pas.scripts.run_meta_tutorial_demo
 # generic runner example
 uv run python -m pas.scripts.run_demo \
-  --builder pas.scenarios.contacts_followup.build_contacts_followup_components \
-  --primary-app messaging
+  --builder pas.scenarios.contacts_followup.build_contacts_followup_components
 ```
 
 Each script prints the proposed goal, execution summary, and the locations of

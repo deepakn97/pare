@@ -11,7 +11,7 @@ from pas.scripts.run_demo import run_proactive_demo
 
 def run_demo(messages: typing.Iterable[str] | None = None, mode: Literal["event", "user"] = "event") -> None:
     """Run the contacts follow-up scenario once and print a summary."""
-    run_proactive_demo(build_contacts_followup_components, primary_app="messaging", mode=mode, messages=messages)
+    run_proactive_demo(build_contacts_followup_components, mode=mode, messages=messages)
 
 
 if __name__ == "__main__":

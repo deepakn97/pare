@@ -11,12 +11,14 @@ from are.simulation.apps.contacts import ContactsApp
 from are.simulation.apps.email_client import EmailClientApp
 from are.simulation.apps.messaging import MessagingApp
 from are.simulation.apps.messaging_v2 import MessagingAppV2
+from are.simulation.apps.system import SystemApp
 from are.simulation.types import AbstractEvent, ActionDescription, EventType, OracleEvent
 
 from pas.apps.calendar.app import StatefulCalendarApp
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
+from pas.apps.system import HomeScreenSystemApp
 from pas.scenarios.base import build_proactive_stack
 from pas.scenarios.types import OracleAction, ScenarioSetup
 from pas.tasks.types import TaskContext, TaskDefinition
@@ -135,6 +137,10 @@ def _convert_meta_app(meta_app: object) -> object:
         return _initialise_stateful_app(
             meta_app, StatefulMessagingApp, name="messaging", transform=_normalise_messaging_state
         )
+    if isinstance(meta_app, SystemApp):
+        system = HomeScreenSystemApp(name="system")
+        system.wait_for_notification_timeout = getattr(meta_app, "wait_for_notification_timeout", None)
+        return system
 
     canonical = APP_NAME_MAP.get(meta_app.__class__.__name__, getattr(meta_app, "name", meta_app.__class__.__name__))
     if hasattr(meta_app, "name"):

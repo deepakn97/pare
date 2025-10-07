@@ -8,6 +8,8 @@
   maker utilities.
 - `pas.proactive` – proactive agent, OpenAI client wrapper, and plan executor
   bridge to Meta-ARE ReAct agents.
+- `pas.apps.system` – PAS extension of the Meta system app providing home-screen
+  user tools.
 - `pas.scenarios` – factories that assemble environments, agents, and oracle
   expectations for demos or imported Meta scenarios.
 - `pas.system` – runtime helpers to initialise logging, build planners, and run

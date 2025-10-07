@@ -18,8 +18,9 @@ Every scenario wires the following layers together:
    system pop-ups. The user proxy consumes these via
    `StatefulUserProxy.consume_notifications()`.
 4. **User planner** – `pas.system.user.build_stateful_user_planner` builds an
-   LLM-backed planner that enumerates per-app tools and system navigation tools
-   depending on the current state.
+   LLM-backed planner that enumerates per-app tools and system navigation tools.
+   When no initial app is specified the planner starts on a synthetic home
+   screen, and the `system.go_home` user tool can always return to that state.
 5. **Decision maker** – `pas.user_proxy.decision_maker.LLMDecisionMaker` (or a
    custom implementation) turns system-level prompts into ACCEPT/DECLINE style
    decisions without touching app tools.
@@ -110,7 +111,6 @@ def build_components(llm_client, user_llm_client):
     planner = build_stateful_user_planner(
         user_llm_client,
         apps=[contacts, messaging],
-        initial_app_name="messaging",
         include_system_tools=True,
         logger=planner_logger,
     )

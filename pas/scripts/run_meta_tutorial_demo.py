@@ -10,7 +10,7 @@ from pas.scripts.run_demo import run_proactive_demo
 
 def run_demo() -> None:
     """Run the Meta tutorial scenario once and print a summary."""
-    run_proactive_demo(build_meta_scenario_components, scenario_factory=ScenarioTutorial, primary_app="contacts")
+    run_proactive_demo(build_meta_scenario_components, scenario_factory=ScenarioTutorial)
 
 
 if __name__ == "__main__":

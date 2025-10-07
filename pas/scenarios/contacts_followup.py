@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Literal
 
 from are.simulation.apps.contacts import Contact, ContactsApp, Gender, Status
 from are.simulation.apps.email_client import Email, EmailFolderName
-from are.simulation.apps.system import SystemApp
 from are.simulation.notification_system import VerbosityLevel
 from are.simulation.types import EventType, disable_events
 
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
+from pas.apps.system import HomeScreenSystemApp
 from pas.scenarios.base import build_proactive_stack
 from pas.scenarios.types import OracleAction, ScenarioSetup
 from pas.tasks.types import TaskContext, TaskDefinition
@@ -37,7 +37,7 @@ def build_contacts_followup_components(
     messaging = StatefulMessagingApp(name="messaging")
     messaging.name = "messaging"
 
-    system_app = SystemApp(name="system")
+    system_app = HomeScreenSystemApp(name="system")
     _seed_contacts_app(contacts)
     email_id = _seed_email_app(email)
     messaging_context = _seed_messaging_app(messaging)
