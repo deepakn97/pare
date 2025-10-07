@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from are.simulation.apps.system import SystemApp
-from are.simulation.tool_utils import user_tool
+from are.simulation.tool_utils import AppTool, user_tool
 
 from pas.apps.core import StatefulApp
 
@@ -32,7 +32,7 @@ class HomeScreenSystemApp(SystemApp):
 
     @user_tool()
     def open_app(self, app_name: str) -> str:
-        """Reset the requested stateful app to its root state and report the view."""
+        """Switch to the requested app's root view."""
         if self._environment is None:
             raise RuntimeError("System app not attached to environment")
         app = self._environment.get_app(app_name)
@@ -40,6 +40,16 @@ class HomeScreenSystemApp(SystemApp):
             raise TypeError(f"App '{app_name}' is not a stateful app")
         message = app.reset_to_root()
         return f"Opened {app_name}: {message}"
+
+    def get_user_tools(self) -> list[AppTool]:
+        """Return system user tools with argument metadata."""
+        tools = super().get_user_tools()
+        for tool in tools:
+            if tool.function.__name__ == "open_app":
+                for arg in tool.args:
+                    if arg.name == "app_name" and arg.description is None:
+                        arg.description = "Name of the app to open"
+        return tools
 
 
 __all__ = ["HomeScreenSystemApp"]
