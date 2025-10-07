@@ -38,8 +38,8 @@ class LLMDecisionMaker(DecisionMakerProtocol):
         self._logger = logger
         self._system_prompt = system_prompt or (
             "You are the phone owner responding to a proactive assistant. "
-            "Read the prompt and output JSON with a single key 'decision' whose value is "
-            "either 'accept', 'decline', or another token you deem appropriate. Do not add prose."
+            "Read the prompt and output JSON with a single key 'decision'. "
+            "The value must be either 'accept' or 'decline'. Do not add prose."
         )
 
     def decide(
@@ -60,7 +60,7 @@ class LLMDecisionMaker(DecisionMakerProtocol):
             token_lines.append(f"Acceptance tokens: {sorted(accept)}")
         if decline:
             token_lines.append(f"Decline tokens: {sorted(decline)}")
-        instruction = 'Respond with JSON, e.g. {"decision": "accept"}. If unsure, set decision to \'unsure\'.'
+        instruction = 'Respond with JSON, e.g. {"decision": "accept"}.'
         if token_lines:
             instruction = instruction + " Allowed tokens -> " + "; ".join(token_lines)
         lines.append(instruction)
@@ -80,7 +80,7 @@ class LLMDecisionMaker(DecisionMakerProtocol):
         choice = self._extract_choice(text)
         if choice is not None:
             return self._normalise_choice(choice, accept, decline)
-        return self._match_tokens(text.lower(), accept, decline)
+        return None
 
     def _extract_choice(self, text: str) -> str | None:
         match = self._JSON_PATTERN.search(text)
@@ -97,23 +97,10 @@ class LLMDecisionMaker(DecisionMakerProtocol):
             return raw.strip().lower()
         return None
 
-    def _match_tokens(self, lowered: str, accept: set[str], decline: set[str]) -> bool | None:
-        if accept and any(token in lowered for token in accept):
-            return True
-        if decline and any(token in lowered for token in decline):
-            return False
-        return None
-
     def _normalise_choice(self, choice: str, accept: set[str], decline: set[str]) -> bool | None:
         if choice in accept or (choice == "accept" and not accept):
             return True
         if choice in decline or (choice == "decline" and not decline):
-            return False
-        if choice == "unsure":
-            return None
-        if accept and not decline and choice in {"yes", "ok", "received"}:
-            return True
-        if decline and not accept and choice in {"no"}:
             return False
         return None
 

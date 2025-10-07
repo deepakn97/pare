@@ -292,6 +292,7 @@ def build_components_from_meta(
         max_user_turns=max_user_turns,
         log_mode=log_mode,
         primary_app=primary_app,
+        goal_prompt=None,
     )
     env = setup.env
 

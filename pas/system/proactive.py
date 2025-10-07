@@ -17,7 +17,11 @@ else:
 
 
 def build_plan_executor(
-    llm_client: LLMClientProtocol, tool_specs: typing.Sequence[ToolSpec], *, system_prompt: str, logger: logging.Logger
+    llm_client: LLMClientProtocol,
+    tool_specs: typing.Sequence[ToolSpec],
+    *,
+    system_prompt: str | None = None,
+    logger: logging.Logger,
 ) -> typing.Callable[[str, StateAwareEnvironmentWrapper], InterventionResult]:
     """Create a callable that runs a Meta ARE-style ReAct loop over PAS tools."""
 

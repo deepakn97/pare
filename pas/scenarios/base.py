@@ -40,6 +40,7 @@ def build_proactive_stack(
     oracle_actions: t.Sequence[OracleAction] | None = None,
     notification_verbosity: VerbosityLevel = VerbosityLevel.MEDIUM,
     extra_notifications: dict[str, t.Iterable[str]] | None = None,
+    goal_prompt: str | None = "You summarise recent completed events and suggest helpful follow-ups.",
 ) -> ScenarioSetup:
     """Assemble environment, user proxy, and proactive agent around supplied apps."""
     log_dir = Path("logs") / "pas"
@@ -83,16 +84,7 @@ def build_proactive_stack(
         logger=planner_logger,
     )
     decision_maker = LLMDecisionMaker(user_llm, logger=decision_logger)
-    plan_executor_cb = build_plan_executor(
-        llm,
-        (),
-        system_prompt=(
-            "You plan proactive interventions as a mobile assistant. "
-            "Reason about the goal, identify missing context, and pick the next tool that advances progress. "
-            "Gather supporting information before committing to final actions. One response represents a single step in a multi-step plan."
-        ),
-        logger=orchestrator_logger,
-    )
+    plan_executor_cb = build_plan_executor(llm, (), system_prompt=None, logger=orchestrator_logger)
 
     user_proxy = StatefulUserProxy(
         env, env.notification_system, max_user_turns=max_user_turns, logger=user_logger, planner=planner_cb
@@ -100,7 +92,7 @@ def build_proactive_stack(
 
     agent = LLMBasedProactiveAgent(
         llm,
-        system_prompt="You summarise recent completed events and suggest helpful follow-ups.",
+        system_prompt=goal_prompt or "",
         max_context_events=200,
         plan_executor=plan_executor_cb,
         summary_builder=lambda result: result.notes,

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections import deque
 from contextlib import suppress
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from are.simulation.environment import Environment, EnvironmentConfig, EnvironmentType
@@ -40,6 +42,7 @@ class StateAwareEnvironmentWrapper(Environment):
         self._completed_event_subscribers: list[Callable[[CompletedEvent], None]] = []
         self._logger = logging.getLogger(__name__)
         self._processed_event_ids: set[str] = set()
+        self._notification_metadata: deque[tuple[datetime, str, str]] = deque()
 
     def subscribe_to_completed_events(self, callback: Callable[[CompletedEvent], None]) -> None:
         """Register a callback that will receive every completed event."""
@@ -83,9 +86,10 @@ class StateAwareEnvironmentWrapper(Environment):
         if spec is not None:
             message = spec.builder(event)
             if message:
-                dispatch_popup(
-                    self.notification_system, message, channel=spec.channel, timestamp=self.time_manager.time()
-                )
+                current_time = self.time_manager.time()
+                timestamp = datetime.fromtimestamp(current_time, tz=UTC)
+                self._notification_metadata.append((timestamp, event.app_name(), event.function_name()))
+                dispatch_popup(self.notification_system, message, channel=spec.channel, timestamp=current_time)
         app = self.get_app(event.app_name())
 
         if isinstance(app, StatefulApp):
@@ -99,3 +103,12 @@ class StateAwareEnvironmentWrapper(Environment):
     def handle_completed_event(self, event: CompletedEvent) -> None:  # pragma: no cover - legacy hook
         """Maintain compatibility with tests invoking the legacy hook directly."""
         self._process_completed_event(event)
+
+    def pop_notification_metadata(self, timestamp: datetime) -> tuple[str, str] | None:
+        """Return and remove metadata for the notification emitted at ``timestamp`` if available."""
+        for _ in range(len(self._notification_metadata)):
+            stored_timestamp, app_name, function_name = self._notification_metadata.popleft()
+            if stored_timestamp == timestamp:
+                return app_name, function_name
+            self._notification_metadata.append((stored_timestamp, app_name, function_name))
+        return None

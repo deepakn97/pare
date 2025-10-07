@@ -74,6 +74,8 @@ class StatefulUserProxy(UserProxy):
         self._turns_taken = 0
         self._event_condition = Condition()
         self._last_tool_invocations: list[ToolInvocation] = []
+        self._pending_notification_metadata: deque[tuple[str, str] | None] = deque()
+        self._current_notification_meta: tuple[str, str] | None = None
 
         self._env.subscribe_to_completed_events(self._on_event)
 
@@ -83,10 +85,13 @@ class StatefulUserProxy(UserProxy):
         self._recent_events.clear()
         self._last_tool_invocations.clear()
         self._turns_taken = 0
+        self._pending_notification_metadata.clear()
+        self._current_notification_meta = None
         return ""
 
     def reply(self, message: str) -> str:
         """Process a message from the agent and return the proxy's response."""
+        self._current_notification_meta = ("AgentUserInterface", "send_message_to_user")
         return self._drive_turn(message, source="agent")
 
     def react_to_event(self, message: str) -> str:
@@ -116,9 +121,20 @@ class StatefulUserProxy(UserProxy):
                 continue
             if text.startswith("StatefulMessagingApp: New message received"):
                 continue
+            metadata = None
+            pop_metadata = getattr(self._env, "pop_notification_metadata", None)
+            if callable(pop_metadata):
+                metadata = pop_metadata(notification.timestamp)
+            if metadata is not None:
+                self._logger.debug("Notification metadata resolved: %s.%s", metadata[0], metadata[1])
+            else:
+                self._logger.debug(
+                    "Notification metadata missing for message: %s", text.splitlines()[0] if text.splitlines() else text
+                )
             first_line = text.splitlines()[0] if text.splitlines() else text
             self._logger.info("Notification received (system pop-up): %s", first_line)
             messages.append(text)
+            self._pending_notification_metadata.append(metadata)
         return messages
 
     def _plan_actions(self, message: str) -> PlannerReturn:
@@ -141,6 +157,9 @@ class StatefulUserProxy(UserProxy):
         if source == "event":
             log_prefix = "Event notification received"
             transcript_role = "system"
+            self._current_notification_meta = (
+                self._pending_notification_metadata.popleft() if self._pending_notification_metadata else None
+            )
 
         self._transcript.append({"role": transcript_role, "content": message})
         self._logger.info("%s: %s", log_prefix, message)
@@ -158,7 +177,12 @@ class StatefulUserProxy(UserProxy):
         self._turns_taken += 1
         self._last_tool_invocations = invocations
         self._logger.info("User reply: %s", reply)
+        self._current_notification_meta = None
         return reply
+
+    def current_notification_metadata(self) -> tuple[str, str] | None:
+        """Return metadata about the most recent notification being processed."""
+        return self._current_notification_meta
 
     def _execute_tool(self, app_name: str, method_name: str, args: dict[str, object]) -> ToolInvocation:
         app = self._env.get_app(app_name)
@@ -199,6 +223,10 @@ class StatefulUserProxy(UserProxy):
     def _format_reply(self, invocations: Sequence[ToolInvocation]) -> str:
         if not invocations:
             return "No actions were required."
+        if len(invocations) == 1 and invocations[0].name == "AgentUserInterface.send_message_to_agent":
+            content = invocations[0].args.get("content") if invocations[0].args else None
+            if isinstance(content, str) and content:
+                return content
         parts = []
         for invocation in invocations:
             fragment = invocation.name

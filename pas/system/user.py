@@ -5,6 +5,7 @@ from __future__ import annotations
 import typing
 from typing import TYPE_CHECKING
 
+from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.system import SystemApp
 
 from pas.apps.core import StatefulApp
@@ -36,8 +37,9 @@ def build_stateful_user_planner(
     logger: logging.Logger,
 ) -> PlannerCallable:
     """Return a planner callable wired to the provided LLM client and per-app tools."""
-    app_map = {app.name: app for app in apps}
+    app_map = {app.name: app for app in apps if getattr(app, "name", None)}
     stateful_apps = [app for app in apps if isinstance(app, StatefulApp)]
+    agent_ui_apps = [app for app in apps if isinstance(app, AgentUserInterface)]
     if not stateful_apps:
         raise ValueError("build_stateful_user_planner requires at least one stateful app")
 
@@ -55,13 +57,8 @@ def build_stateful_user_planner(
 
     def _plan(message: str, proxy: StatefulUserProxy) -> list[tuple[str, str, dict[str, object]]]:
         active_app = _select_active_app(proxy, app_map, resolved_initial)
-
-        available_specs: list[UserToolSpec] = []
-        if active_app is not None:
-            available_specs.extend(_collect_user_tool_specs([active_app]))
-
-        if include_system_tools and system_app is not None:
-            available_specs.extend(_collect_user_tool_specs([system_app], include_system=True))
+        metadata = proxy.current_notification_metadata() if hasattr(proxy, "current_notification_metadata") else None
+        available_specs = _select_available_specs(metadata, active_app, agent_ui_apps, system_app, include_system_tools)
 
         if not available_specs:
             raise RuntimeError("No available tools for user planner")
@@ -72,6 +69,45 @@ def build_stateful_user_planner(
         return local_planner(message, proxy)
 
     return _plan
+
+
+def _select_available_specs(
+    metadata: tuple[str, str] | None,
+    active_app: StatefulApp | None,
+    agent_ui_apps: typing.Sequence[AgentUserInterface],
+    system_app: SystemApp | None,
+    include_system_tools: bool,
+) -> list[UserToolSpec]:
+    if metadata == ("AgentUserInterface", "send_message_to_user") and agent_ui_apps:
+        return _deduplicate_specs(_collect_user_tool_specs(agent_ui_apps))
+
+    specs = list(_collect_initial_specs(active_app, agent_ui_apps))
+    seen = {spec.name for spec in specs}
+
+    if agent_ui_apps:
+        _extend_with_new_specs(specs, seen, _collect_user_tool_specs(agent_ui_apps))
+
+    if include_system_tools and system_app is not None:
+        _extend_with_new_specs(specs, seen, _collect_user_tool_specs([system_app], include_system=True))
+
+    return specs
+
+
+def _extend_with_new_specs(
+    accumulator: list[UserToolSpec], seen: set[str], candidates: typing.Iterable[UserToolSpec]
+) -> None:
+    for spec in candidates:
+        if spec.name in seen:
+            continue
+        accumulator.append(spec)
+        seen.add(spec.name)
+
+
+def _deduplicate_specs(specs: typing.Iterable[UserToolSpec]) -> list[UserToolSpec]:
+    unique: dict[str, UserToolSpec] = {}
+    for spec in specs:
+        unique.setdefault(spec.name, spec)
+    return list(unique.values())
 
 
 def build_user_system_prompt(active_app: StatefulApp | None) -> str:
@@ -113,42 +149,66 @@ def _select_active_app(
     return None
 
 
-def _collect_user_tool_specs(
-    apps: typing.Sequence[StatefulApp | SystemApp], *, include_system: bool = False
-) -> list[UserToolSpec]:
+def _collect_initial_specs(
+    active_app: StatefulApp | None, agent_ui_apps: typing.Sequence[AgentUserInterface]
+) -> typing.Iterable[UserToolSpec]:
+    if active_app is not None:
+        return _collect_user_tool_specs([active_app])
+    if agent_ui_apps:
+        return _collect_user_tool_specs(agent_ui_apps)
+    return []
+
+
+def _collect_user_tool_specs(apps: typing.Sequence[object], *, include_system: bool = False) -> list[UserToolSpec]:
     specs: list[UserToolSpec] = []
     seen: set[str] = set()
 
-    def add_spec(app: StatefulApp | SystemApp, tool: AppTool) -> None:
-        try:
-            candidate = _app_tool_to_user_spec(app, tool)
-        except ValueError:
-            return
-        if candidate.name in seen:
-            return
-        specs.append(candidate)
-        seen.add(candidate.name)
-
     for app in apps:
-        if isinstance(app, SystemApp):
-            if not include_system:
-                raise ValueError("System app provided without include_system flag")
-            for tool in app.get_user_tools():
-                add_spec(app, tool)
-            continue
-
-        state = app.current_state
-        if state is None:
-            raise RuntimeError(f"App '{app.name}' has no current state")
-
-        for tool in state.get_available_actions():
-            add_spec(app, tool)
+        for tool in _iter_user_tools_for_app(app, include_system):
+            try:
+                candidate = _app_tool_to_user_spec(app, tool)
+            except ValueError:
+                continue
+            if candidate.name in seen:
+                continue
+            specs.append(candidate)
+            seen.add(candidate.name)
 
     return specs
 
 
-def _app_tool_to_user_spec(app: StatefulApp | SystemApp, tool: AppTool) -> UserToolSpec:
-    tool_name = f"{app.name}.{tool.function.__name__}"
+def _iter_user_tools_for_app(app: object, include_system: bool) -> typing.Iterable[AppTool]:
+    if isinstance(app, SystemApp):
+        if not include_system:
+            raise ValueError("System app provided without include_system flag")
+        yield from app.get_user_tools()
+        return
+
+    if isinstance(app, AgentUserInterface):
+        yield from app.get_user_tools()
+        return
+
+    if isinstance(app, StatefulApp):
+        state = app.current_state
+        if state is None:
+            raise RuntimeError(f"App '{app.name}' has no current state")
+        yield from state.get_available_actions()
+        return
+
+    tool_getter = getattr(app, "get_user_tools", None)
+    if callable(tool_getter):
+        yield from tool_getter()
+
+
+def _app_tool_to_user_spec(app: object, tool: AppTool) -> UserToolSpec:
+    app_name = getattr(app, "name", None)
+    if not isinstance(app_name, str):
+        raise TypeError("Tool host app is missing a name attribute")
+    function = tool.function
+    func_name = getattr(function, "__name__", None)
+    if not isinstance(func_name, str):
+        raise TypeError("Tool is missing a callable function")
+    tool_name = f"{app_name}.{func_name}"
     if not tool.function_description:
         raise ValueError(f"Tool {tool_name} is missing a description")
     description = tool.function_description
@@ -164,9 +224,7 @@ def _app_tool_to_user_spec(app: StatefulApp | SystemApp, tool: AppTool) -> UserT
                 required=not arg.has_default,
             )
         )
-    return UserToolSpec(
-        name=tool_name, description=description, app=app.name, method=tool.function.__name__, parameters=parameters
-    )
+    return UserToolSpec(name=tool_name, description=description, app=app_name, method=func_name, parameters=parameters)
 
 
 __all__ = ["DEFAULT_USER_SYSTEM_PROMPT", "build_stateful_user_planner", "build_user_system_prompt"]

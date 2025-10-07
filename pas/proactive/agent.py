@@ -97,18 +97,25 @@ class LLMBasedProactiveAgent(ProactiveAgentProtocol):
 
     def propose_goal(self) -> str | None:
         """Generate a proactive goal proposal via the LLM."""
-        prompt = self._build_goal_prompt(self._events)
-        self._logger.debug("LLM prompt:\n%s", prompt)
-        response = self._llm.complete(prompt)
-        goal = self._parse_goal(response)
-        self._logger.info("LLM prompt built with %d events", len(self._events))
-        self._logger.info("LLM response: %s", response)
+        goal = None
+        if self._system_prompt:
+            prompt = self._build_goal_prompt(self._events)
+            self._logger.debug("LLM prompt:\n%s", prompt)
+            response = self._llm.complete(prompt)
+            goal = self._parse_goal(response)
+            self._logger.info("LLM prompt built with %d events", len(self._events))
+            self._logger.info("LLM response: %s", response)
+
+        if not goal:
+            goal = self._extract_agent_request(self._events)
+
         if goal:
             self._last_task = goal
             self._logger.info("Proposed goal: %s", goal)
-        else:
-            self._logger.info("LLM returned no actionable goal")
-        return goal
+            return goal
+
+        self._logger.info("No actionable goal identified")
+        return None
 
     def record_decision(self, task_guess: str, accepted: bool) -> None:
         """Note whether the user accepted the proposed goal."""
@@ -164,6 +171,19 @@ class LLMBasedProactiveAgent(ProactiveAgentProtocol):
         if not cleaned or cleaned.lower() == "none":
             return None
         return cleaned
+
+    @staticmethod
+    def _extract_agent_request(events: typing.Iterable[CompletedEvent]) -> str | None:
+        """Return the latest AgentUserInterface message content, if any."""
+        for event in reversed(list(events)):
+            if event.app_name() != "AgentUserInterface":
+                continue
+            if event.function_name() != "send_message_to_user":
+                continue
+            content = event.action.args.get("content") if event.action and event.action.args else None
+            if isinstance(content, str) and content:
+                return content
+        return None
 
 
 __all__ = [

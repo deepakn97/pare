@@ -6,6 +6,8 @@ import typing
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from are.simulation.apps.agent_user_interface import AgentUserInterface
+
 from pas.oracles import OracleTracker
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
@@ -56,6 +58,10 @@ class ProactiveSession:
         self._oracle_tracker = OracleTracker(env, oracle_actions or [])
         self._has_oracles = bool(oracle_actions)
 
+        for app in env.apps.values():
+            if isinstance(app, AgentUserInterface):
+                app.user_proxy = proxy
+
     def run_cycle(self) -> ProactiveCycleResult:
         """Drain notifications, allow the agent to act, and repeat until idle."""
         handled_notifications = self._handle_notifications()
@@ -81,7 +87,9 @@ class ProactiveSession:
             last_goal = goal
 
             decision = self._prompt_goal_confirmation(goal)
-            confirmed = self._confirm_goal(goal) if decision is None else decision and self._confirm_goal(goal)
+            if decision is None:
+                raise RuntimeError(f"User decision was not captured for goal: {goal}")
+            confirmed = decision and self._confirm_goal(goal)
 
             self._agent.record_decision(goal, confirmed)
             if not confirmed:
@@ -89,6 +97,10 @@ class ProactiveSession:
                 break
 
             result, summary, completion_decision = self._execute_confirmed_goal(goal, handled_notifications)
+
+            requires_ack = bool(summary or getattr(result, "notes", None))
+            if requires_ack and completion_decision is None:
+                raise RuntimeError("User failed to acknowledge proactive completion summary")
 
             last_result = result
             last_summary = summary
