@@ -36,8 +36,9 @@ def build_stateful_user_planner(
     logger: logging.Logger,
 ) -> PlannerCallable:
     """Return a planner callable wired to the provided LLM client and per-app tools."""
-    app_map = {app.name: app for app in apps}
+    app_map = {app.name: app for app in apps if getattr(app, "name", None)}
     stateful_apps = [app for app in apps if isinstance(app, StatefulApp)]
+    ancillary_apps = [app for app in apps if not isinstance(app, StatefulApp)]
     if not stateful_apps:
         raise ValueError("build_stateful_user_planner requires at least one stateful app")
 
@@ -59,6 +60,8 @@ def build_stateful_user_planner(
         available_specs: list[UserToolSpec] = []
         if active_app is not None:
             available_specs.extend(_collect_user_tool_specs([active_app]))
+        else:
+            available_specs.extend(_collect_home_screen_specs(ancillary_apps))
 
         if include_system_tools and system_app is not None:
             available_specs.extend(_collect_user_tool_specs([system_app], include_system=True))
@@ -113,13 +116,11 @@ def _select_active_app(
     return None
 
 
-def _collect_user_tool_specs(
-    apps: typing.Sequence[StatefulApp | SystemApp], *, include_system: bool = False
-) -> list[UserToolSpec]:
+def _collect_user_tool_specs(apps: typing.Sequence[object], *, include_system: bool = False) -> list[UserToolSpec]:
     specs: list[UserToolSpec] = []
     seen: set[str] = set()
 
-    def add_spec(app: StatefulApp | SystemApp, tool: AppTool) -> None:
+    def add_spec(app: object, tool: AppTool) -> None:
         try:
             candidate = _app_tool_to_user_spec(app, tool)
         except ValueError:
@@ -129,26 +130,50 @@ def _collect_user_tool_specs(
         specs.append(candidate)
         seen.add(candidate.name)
 
-    for app in apps:
-        if isinstance(app, SystemApp):
-            if not include_system:
-                raise ValueError("System app provided without include_system flag")
-            for tool in app.get_user_tools():
-                add_spec(app, tool)
-            continue
-
-        state = app.current_state
-        if state is None:
-            raise RuntimeError(f"App '{app.name}' has no current state")
-
-        for tool in state.get_available_actions():
-            add_spec(app, tool)
+    for host, tool in _iter_user_tools(apps, include_system=include_system):
+        add_spec(host, tool)
 
     return specs
 
 
-def _app_tool_to_user_spec(app: StatefulApp | SystemApp, tool: AppTool) -> UserToolSpec:
-    tool_name = f"{app.name}.{tool.function.__name__}"
+def _collect_home_screen_specs(apps: typing.Sequence[object]) -> list[UserToolSpec]:
+    ancillary = [app for app in apps if not isinstance(app, SystemApp)]
+    return _collect_user_tool_specs(ancillary) if ancillary else []
+
+
+def _iter_user_tools(apps: typing.Sequence[object], *, include_system: bool) -> typing.Iterable[tuple[object, AppTool]]:
+    for app in apps:
+        if isinstance(app, SystemApp):
+            name = getattr(app, "name", None)
+            if not include_system and name == "system":
+                continue
+            for tool in app.get_user_tools():
+                yield app, tool
+            continue
+
+        if isinstance(app, StatefulApp):
+            state = app.current_state
+            if state is None:
+                raise RuntimeError(f"App '{app.name}' has no current state")
+            for tool in state.get_available_actions():
+                yield app, tool
+            continue
+
+        tool_getter = getattr(app, "get_user_tools", None)
+        if callable(tool_getter):
+            for tool in tool_getter():
+                yield app, tool
+
+
+def _app_tool_to_user_spec(app: object, tool: AppTool) -> UserToolSpec:
+    app_name = getattr(app, "name", None)
+    if not isinstance(app_name, str):
+        raise TypeError("Tool host app is missing a name attribute")
+    function = tool.function
+    func_name = getattr(function, "__name__", None)
+    if not isinstance(func_name, str):
+        raise TypeError("Tool is missing a callable function")
+    tool_name = f"{app_name}.{func_name}"
     if not tool.function_description:
         raise ValueError(f"Tool {tool_name} is missing a description")
     description = tool.function_description
@@ -164,9 +189,7 @@ def _app_tool_to_user_spec(app: StatefulApp | SystemApp, tool: AppTool) -> UserT
                 required=not arg.has_default,
             )
         )
-    return UserToolSpec(
-        name=tool_name, description=description, app=app.name, method=tool.function.__name__, parameters=parameters
-    )
+    return UserToolSpec(name=tool_name, description=description, app=app_name, method=func_name, parameters=parameters)
 
 
 __all__ = ["DEFAULT_USER_SYSTEM_PROMPT", "build_stateful_user_planner", "build_user_system_prompt"]
