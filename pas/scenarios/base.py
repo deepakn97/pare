@@ -60,8 +60,8 @@ def build_proactive_stack(
     if not stateful_apps:
         raise ValueError("build_proactive_stack requires at least one StatefulApp")
 
-    resolved_primary = primary_app or stateful_apps[0].name
-    if resolved_primary not in app_names:
+    resolved_primary = primary_app
+    if resolved_primary is not None and resolved_primary not in app_names:
         raise ValueError(f"Unknown primary_app '{resolved_primary}'")
 
     user_logger = get_pas_file_logger("pas.user_proxy", user_log, level=logging.DEBUG)

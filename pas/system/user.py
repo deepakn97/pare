@@ -42,9 +42,7 @@ def build_stateful_user_planner(
         raise ValueError("build_stateful_user_planner requires at least one stateful app")
 
     resolved_initial = initial_app_name
-    if resolved_initial is None:
-        resolved_initial = stateful_apps[0].name
-    if resolved_initial not in app_map:
+    if resolved_initial is not None and resolved_initial not in app_map:
         raise ValueError(f"Unknown initial app '{resolved_initial}'")
 
     system_app: SystemApp | None = None
@@ -59,8 +57,11 @@ def build_stateful_user_planner(
         active_app = _select_active_app(proxy, app_map, resolved_initial)
 
         available_specs: list[UserToolSpec] = []
-        # Prioritise tools from the active app but still expose other apps so the user can switch context.
-        ordered_apps: list[StatefulApp] = [active_app] + [app for app in stateful_apps if app is not active_app]
+        ordered_apps: list[StatefulApp]
+        if active_app is None:
+            ordered_apps = list(stateful_apps)
+        else:
+            ordered_apps = [active_app] + [app for app in stateful_apps if app is not active_app]
         available_specs.extend(_collect_user_tool_specs(ordered_apps))
 
         if include_system_tools and system_app is not None:
@@ -77,8 +78,10 @@ def build_stateful_user_planner(
     return _plan
 
 
-def build_user_system_prompt(active_app: StatefulApp) -> str:
+def build_user_system_prompt(active_app: StatefulApp | None) -> str:
     """Create a system prompt that reflects the currently focused app/state."""
+    if active_app is None:
+        return f"{DEFAULT_USER_SYSTEM_PROMPT} Current context: home_screen."
     state = active_app.current_state
     if state is None:
         raise RuntimeError(f"State for app '{active_app.name}' is not initialised")
@@ -88,19 +91,20 @@ def build_user_system_prompt(active_app: StatefulApp) -> str:
 
 
 def _select_active_app(
-    proxy: StatefulUserProxy, app_map: dict[str, StatefulApp | SystemApp], initial_app_name: str
-) -> StatefulApp:
+    proxy: StatefulUserProxy, app_map: dict[str, StatefulApp | SystemApp], initial_app_name: str | None
+) -> StatefulApp | None:
     for invocation in reversed(proxy.last_tool_invocations):
         app_name = invocation.name.split(".")[0]
         candidate = app_map.get(app_name)
         if isinstance(candidate, StatefulApp):
             return candidate
 
-    candidate = app_map.get(initial_app_name)
-    if isinstance(candidate, StatefulApp):
-        return candidate
+    if initial_app_name is not None:
+        candidate = app_map.get(initial_app_name)
+        if isinstance(candidate, StatefulApp):
+            return candidate
 
-    raise RuntimeError("Unable to determine active stateful app for planner")
+    return None
 
 
 def _collect_user_tool_specs(
