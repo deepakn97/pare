@@ -16,10 +16,11 @@ if TYPE_CHECKING:
 class HomeScreenSystemApp(SystemApp):
     """System app that exposes user tools for switching contexts."""
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
+    def __init__(self, *args: object, max_wait_seconds: int = 300, **kwargs: object) -> None:
         """Initialise the system app and prepare environment attachment hook."""
         super().__init__(*args, **kwargs)
         self._environment: StateAwareEnvironmentWrapper | None = None
+        self._max_wait_seconds = max_wait_seconds
 
     def attach_environment(self, env: StateAwareEnvironmentWrapper) -> None:
         """Remember the environment so open_app can resolve stateful apps."""
@@ -52,6 +53,12 @@ class HomeScreenSystemApp(SystemApp):
             raise TypeError(f"App '{app_name}' is not a stateful app")
         message = app.reset_to_root()
         return f"Opened {canonical_name}: {message}"
+
+    @user_tool()
+    def wait_for_notification(self, timeout: int = 0) -> None:
+        """Clamp the wait timeout to avoid long-running idle periods."""
+        bounded = min(int(timeout), self._max_wait_seconds)
+        super().wait_for_notification(timeout=bounded)
 
     def get_user_tools(self) -> list[AppTool]:
         """Return system user tools with argument metadata."""
