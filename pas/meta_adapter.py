@@ -284,6 +284,8 @@ def build_components_from_meta(
 ) -> ScenarioSetup:
     """Create PAS components from meta-style app definitions."""
     stateful_apps = _convert_meta_apps(meta_apps)
+    if not any(isinstance(app, HomeScreenSystemApp) for app in stateful_apps):
+        stateful_apps.append(HomeScreenSystemApp(name="system"))
 
     setup = build_proactive_stack(
         apps=list(stateful_apps),
