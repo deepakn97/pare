@@ -31,6 +31,27 @@ Every scenario wires the following layers together:
    goal, confirm with the user via the decision maker, execute, and surface a
    completion summary.
 
+### Meta-ARE or PAS-native?
+
+There are two equivalent ways to author a scenario:
+
+1. **Reuse a Meta `Scenario`** – build the environment exactly as Meta does
+   (events + oracles) and call
+   `pas.meta_adapter.build_meta_scenario_components(...)`. The adapter converts
+   the Meta apps into PAS stateful apps, registers the oracle actions, and wires
+   them into the proactive session. This is the preferred approach when you can
+   describe the flow with Meta’s primitives (see `ScenarioTutorial`).
+2. **Author directly in PAS** – construct the apps and oracle actions yourself
+   using helpers such as `build_contacts_followup_components`. This gives full
+   control over initial state or bespoke PAS-only behaviour while still plugging
+   into the same session/oracle machinery.
+
+Unless a scenario needs PAS-specific seeding, start with option (1); it keeps
+the code minimal and lets PAS inherit Meta’s validation tooling. Option (2) is
+useful when you need extra state (e.g. our contacts follow-up demo) but should
+still emit explicit `OracleAction` entries so that the proactive loop knows when
+the task is truly complete.
+
 ## 2. Minimal Wiring Example
 
 ```python

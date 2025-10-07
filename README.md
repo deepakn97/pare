@@ -99,3 +99,21 @@ the generated logs under `logs/pas/`.  Both demos rely on oracle expectations
 to ensure the agent truly forwards the target email; if a run completes without
 meeting the oracle criteria the session will raise an error instead of silently
 accepting a partial result.
+
+### Scenario Integration Options
+
+- **Meta-authored scenarios** – use `pas.meta_adapter.build_meta_scenario_components`
+  to convert any Meta ARE `Scenario` (e.g. `ScenarioTutorial`) into the PAS
+  runtime stack. The adapter preserves Meta’s apps, events, and oracles, so the
+  proactive session will enforce the same validation rules.
+- **PAS-authored scenarios** – build directly with `pas.scenarios.contacts_followup.build_contacts_followup_components`
+  (or your own builder). This path gives full control over seeding the PAS
+  stateful apps while still supplying `OracleAction` entries for validation.
+
+In practice new scenarios should follow Meta’s format whenever possible: emit a
+standard `Scenario` with events + oracle expectations, then reuse the adapter to
+obtain a PAS environment. This keeps the codebase minimal and lets us leverage
+Meta’s judge ecosystem while adding PAS-specific UX (stateful navigation,
+decision prompts, etc.). If a scenario truly needs bespoke PAS state, use the
+contacts example as a template and provide matching oracle actions so the loop
+still detects success.
