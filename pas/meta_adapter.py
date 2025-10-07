@@ -18,11 +18,8 @@ from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
 from pas.scenarios.base import build_proactive_stack
-from pas.scenarios.contacts_followup import build_pas_contacts_meta_components as _build_pas_contacts_meta_components
 from pas.scenarios.types import OracleAction, ScenarioSetup
 from pas.tasks.types import TaskContext, TaskDefinition
-
-build_pas_contacts_meta_components = _build_pas_contacts_meta_components
 
 LOGGER = logging.getLogger(__name__)
 
@@ -92,7 +89,12 @@ def _normalise_messaging_state(state: dict[str, t.Any]) -> dict[str, t.Any]:
         }
 
     current_name = state.get("current_user_name")
-    current_id = ensure_user(current_name) if isinstance(current_name, str) else state.get("current_user_id")
+    if isinstance(current_name, str) and current_name:
+        current_id = ensure_user(current_name)
+    else:
+        default_name = "Me"
+        current_id = ensure_user(default_name)
+        current_name = default_name
 
     return {
         "conversations": upgraded_conversations,
@@ -288,10 +290,8 @@ def build_components_from_meta(
         _apply_events(env, env_events)
         extracted_oracles.extend(oracle_events)
 
-    if oracle_messages:
-        candidate_names = ("agent_ui", "AgentUserInterface")
-        agent_ui_name = next(name for name in candidate_names if name in env.apps)
-        agent_ui = env.get_app(agent_ui_name)
+    if oracle_messages and "AgentUserInterface" in env.apps:
+        agent_ui = env.get_app("AgentUserInterface")
         for content in oracle_messages:
             agent_ui.send_message_to_user(content=content)
 
@@ -320,7 +320,7 @@ def build_meta_scenario_components(
         event
         for event in meta_events
         if not isinstance(event, OracleEvent)
-        and event.app_name() in {"AgentUserInterface", "agent_ui"}
+        and event.app_name() == "AgentUserInterface"
         and event.function_name() == "send_message_to_agent"
     ]
     if aui_events:

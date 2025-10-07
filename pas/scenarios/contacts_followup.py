@@ -5,12 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from are.simulation.apps.contacts import Contact, ContactsApp, Gender, Status
+from are.simulation.apps.email_client import Email, EmailFolderName
 from are.simulation.apps.system import SystemApp
 from are.simulation.notification_system import VerbosityLevel
 from are.simulation.types import disable_events
-from are.simulation.validation.constants import APP_ALIAS
 
-from pas.apps.calendar.app import StatefulCalendarApp
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
@@ -24,15 +23,6 @@ if TYPE_CHECKING:
     from pas.proactive import LLMClientProtocol
 
 
-def _ensure_stateful_messaging_alias() -> None:
-    if "MessagingAppV2" not in APP_ALIAS:
-        APP_ALIAS["MessagingAppV2"] = ["StatefulMessagingApp"]
-        return
-    aliases = APP_ALIAS["MessagingAppV2"]
-    if "StatefulMessagingApp" not in aliases:
-        aliases.append("StatefulMessagingApp")
-
-
 def build_contacts_followup_components(
     *,
     llm: LLMClientProtocol,
@@ -42,41 +32,27 @@ def build_contacts_followup_components(
     primary_app: str,
 ) -> ScenarioSetup:
     """Construct the environment, user proxy, and proactive agent for contacts flows."""
-    _ensure_stateful_messaging_alias()
-
     contacts = StatefulContactsApp(name="contacts")
-    calendar = StatefulCalendarApp(name="calendar")
     email = StatefulEmailApp(name="email")
     messaging = StatefulMessagingApp(name="messaging")
     messaging.name = "messaging"
 
     system_app = SystemApp(name="system")
     _seed_contacts_app(contacts)
+    email_id = _seed_email_app(email)
     messaging_context = _seed_messaging_app(messaging)
 
     oracle_actions = [
         OracleAction(
             app="email",
-            function="send_email",
-            args={
-                "recipients": ["jordan.lee@example.com"],
-                "subject": "Revised launch timeline summary",
-                "content": (
-                    "Provide Jordan with a concise rundown of the updated launch timeline, highlighting"
-                    " key milestones, any delays, and next steps."
-                ),
-                "cc": [],
-                "attachment_paths": [],
-            },
-            description=(
-                "After gathering the revised launch timeline, email Jordan Lee with a clear summary so"
-                " they can prepare before the client call."
-            ),
+            function="forward_email",
+            args={"email_id": email_id, "recipients": ["jordan.lee@example.com"], "folder_name": "INBOX"},
+            description="Forward the manager's update email to Jordan Lee so they stay in sync before the meeting.",
         )
     ]
 
     setup = build_proactive_stack(
-        apps=[contacts, calendar, email, messaging, system_app],
+        apps=[contacts, email, messaging, system_app],
         llm=llm,
         user_llm=user_llm,
         max_user_turns=max_user_turns,
@@ -87,7 +63,7 @@ def build_contacts_followup_components(
     )
 
     if messaging_context is not None:
-        _emit_initial_message(messaging, **messaging_context)
+        _emit_initial_messages(messaging, **messaging_context)
 
     return setup
 
@@ -126,28 +102,68 @@ def build_contacts_followup_task(
 
 
 def _seed_contacts_app(app: ContactsApp) -> None:
-    if app.get_contacts()["contacts"]:
-        return
-    app.add_contact(
-        Contact(
-            first_name="Alex",
-            last_name="Smith",
-            phone="+1-202-555-0110",
-            email="alex.smith@example.com",
-            gender=Gender.MALE,
-            status=Status.EMPLOYED,
+    existing_pairs = {(contact.first_name, contact.last_name) for contact in app.contacts.values()}
+    if ("Alex", "Smith") not in existing_pairs:
+        app.add_contact(
+            Contact(
+                first_name="Alex",
+                last_name="Smith",
+                phone="+1-202-555-0110",
+                email="alex.smith@example.com",
+                gender=Gender.MALE,
+                status=Status.EMPLOYED,
+            )
         )
-    )
-    app.add_contact(
-        Contact(
-            first_name="Jordan",
-            last_name="Lee",
-            phone="+1-202-555-0188",
-            email="jordan.lee@example.com",
-            gender=Gender.OTHER,
-            status=Status.UNKNOWN,
+    if ("Jordan", "Lee") not in existing_pairs:
+        app.add_contact(
+            Contact(
+                first_name="Jordan",
+                last_name="Lee",
+                phone="+1-202-555-0188",
+                email="jordan.lee@example.com",
+                gender=Gender.OTHER,
+                status=Status.UNKNOWN,
+            )
         )
+    has_user_contact = any(contact.is_user for contact in app.contacts.values())
+    if not has_user_contact:
+        app.add_contact(
+            Contact(
+                first_name="Taylor",
+                last_name="Brooks",
+                phone="+1-202-555-0150",
+                email="taylor.brooks@example.com",
+                gender=Gender.OTHER,
+                status=Status.EMPLOYED,
+                is_user=True,
+            )
+        )
+
+
+def _seed_email_app(app: StatefulEmailApp) -> str:
+    inbox = app.folders.get(EmailFolderName.INBOX)
+    if inbox is None:
+        raise RuntimeError("Email inbox missing")
+
+    existing = next((email for email in inbox.emails if email.subject == "Client sync prep notes"), None)
+    if existing is not None:
+        return existing.email_id
+
+    email = Email(
+        sender="morgan.rivera@example.com",
+        recipients=["user@meta.com"],
+        subject="Client sync prep notes",
+        content=(
+            "Just jotting these down so they're easy to forward:\n\n"
+            "- Let Jordan know the deck needs the latest dates\n"
+            "- Have them remind engineering about the mobile build freeze\n"
+            "- Share the call-in info if they can't join onsite\n\n"
+            "Appreciate it!"
+        ),
+        email_id="client-sync-prep-notes",
     )
+    app.add_email(email, folder_name=EmailFolderName.INBOX)
+    return email.email_id
 
 
 def _seed_messaging_app(app: StatefulMessagingApp) -> dict[str, str] | None:
@@ -179,9 +195,9 @@ def _seed_messaging_app(app: StatefulMessagingApp) -> dict[str, str] | None:
     return {"conversation_id": conversation_id, "sender_id": manager_id}
 
 
-def _emit_initial_message(app: StatefulMessagingApp, *, conversation_id: str, sender_id: str) -> None:
-    message = (
-        "Jordan missed the standup. Please email Jordan Lee a quick summary of the revised launch timeline "
-        "so they can catch up before the client call."
+def _emit_initial_messages(app: StatefulMessagingApp, *, conversation_id: str, sender_id: str) -> None:
+    content = (
+        "Morning! I just emailed you the client sync prep notes. Please forward that message to Jordan Lee "
+        "so they're ready for the call later today."
     )
-    app.create_and_add_message(conversation_id=conversation_id, sender_id=sender_id, content=message)
+    app.create_and_add_message(conversation_id=conversation_id, sender_id=sender_id, content=content)

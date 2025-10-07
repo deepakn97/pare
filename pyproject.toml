@@ -167,7 +167,7 @@ allow-star-arg-any = true
 known-first-party = ["pas"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "D", "ANN", "B009", "B010"]
+"tests/*" = ["S101"]
 # Ignore unused imports in all `__init__.py` files
 "__init__.py" = ["F401"]
 

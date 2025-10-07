@@ -87,18 +87,30 @@ class ProactiveSession:
         return handled
 
     def _prompt_goal_confirmation(self, goal: str) -> bool | None:
-        prompt = (
-            "Proactive assistant suggestion:\n"
-            f"{goal}\n"
-            "Reply with ACCEPT to let the proactive assistant handle it, or DECLINE to keep control yourself."
-        )
+        latest_system = self._latest_system_message()
+        sections: list[str] = []
+        if latest_system:
+            sections.append("Latest notification:")
+            sections.append(latest_system.strip())
+        sections.append("Proposed proactive action:")
+        sections.append(goal.strip())
+        sections.append("Do you want the assistant to proceed?")
+        prompt = "\n\n".join(sections)
         return self._prompt_user(prompt, accept_tokens={"accept"}, decline_tokens={"decline"})
 
     def _notify_user_completion(self, summary: str | None) -> None:
         if not summary:
             return
-        prompt = f"Proactive assistant completed the request. Summary: {summary}\nReply RECEIVED to acknowledge."
-        self._prompt_user(prompt, accept_tokens={"received"}, decline_tokens=set(), capture_decision=False)
+        latest_system = self._latest_system_message()
+        sections: list[str] = []
+        if latest_system:
+            sections.append("Latest notification:")
+            sections.append(latest_system.strip())
+        sections.append("Proactive assistant completed the request. Summary:")
+        sections.append(summary.strip())
+        sections.append("Reply ACCEPT to acknowledge or DECLINE if something looks wrong.")
+        prompt = "\n\n".join(sections)
+        self._prompt_user(prompt, accept_tokens={"accept"}, decline_tokens={"decline"}, capture_decision=False)
 
     def _prompt_user(
         self,
@@ -114,6 +126,13 @@ class ProactiveSession:
 
         self._logger.info("System prompt response: %s", raw)
         return decision
+
+    def _latest_system_message(self) -> str | None:
+        transcript = getattr(self._proxy, "transcript", ())
+        for entry in reversed(transcript):
+            if entry.get("role") == "system":
+                return entry.get("content")
+        return None
 
 
 __all__ = ["ProactiveCycleResult", "ProactiveSession"]

@@ -22,7 +22,8 @@ else:
 
 
 DEFAULT_USER_SYSTEM_PROMPT = (
-    "You are manually operating your phone. Choose actions that genuinely reflect what you want to do next."
+    "You are manually operating your phone. Choose actions that genuinely reflect what you want to do next. "
+    "You may interact with any available app; call the appropriate tool for that app when you need to switch contexts."
 )
 
 
@@ -55,7 +56,9 @@ def build_stateful_user_planner(
         active_app = _select_active_app(proxy, app_map, initial_app_name)
 
         available_specs: list[UserToolSpec] = []
-        available_specs.extend(_collect_user_tool_specs([active_app]))
+        # Prioritise tools from the active app but still expose other apps so the user can switch context.
+        ordered_apps: list[StatefulApp] = [active_app] + [app for app in stateful_apps if app is not active_app]
+        available_specs.extend(_collect_user_tool_specs(ordered_apps))
 
         if include_system_tools and system_app is not None:
             available_specs.extend(_collect_user_tool_specs([system_app], include_system=True))
@@ -103,15 +106,22 @@ def _collect_user_tool_specs(
     specs: list[UserToolSpec] = []
     seen: set[str] = set()
 
+    def add_spec(app: StatefulApp | SystemApp, tool: AppTool) -> None:
+        try:
+            candidate = _app_tool_to_user_spec(app, tool)
+        except ValueError:
+            return
+        if candidate.name in seen:
+            return
+        specs.append(candidate)
+        seen.add(candidate.name)
+
     for app in apps:
         if isinstance(app, SystemApp):
             if not include_system:
                 raise ValueError("System app provided without include_system flag")
             for tool in app.get_user_tools():
-                spec = _app_tool_to_user_spec(app, tool)
-                if spec.name not in seen:
-                    specs.append(spec)
-                    seen.add(spec.name)
+                add_spec(app, tool)
             continue
 
         state = app.current_state
@@ -119,10 +129,7 @@ def _collect_user_tool_specs(
             raise RuntimeError(f"App '{app.name}' has no current state")
 
         for tool in state.get_available_actions():
-            spec = _app_tool_to_user_spec(app, tool)
-            if spec.name not in seen:
-                specs.append(spec)
-                seen.add(spec.name)
+            add_spec(app, tool)
 
     return specs
 

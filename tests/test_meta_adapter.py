@@ -7,25 +7,25 @@ from are.simulation.scenarios.scenario_tutorial.scenario import ScenarioTutorial
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
-from pas.meta_adapter import (
-    build_meta_scenario_components,
-    build_meta_task_from_scenario,
-    build_pas_contacts_meta_components,
-)
+from pas.meta_adapter import build_meta_scenario_components, build_meta_task_from_scenario
+from pas.scenarios.contacts_followup import build_pas_contacts_meta_components
 from pas.tasks.types import TaskContext
 
 
 class StubLLM:
+    """Minimal queue-driven LLM stub used in meta adapter tests."""
+
     def __init__(self, responses: list[str]) -> None:
+        """Initialise stub with the responses that should be returned in order."""
         self._responses = responses
 
     def complete(self, prompt: str) -> str:
-        """Return the next canned response."""
-
+        """Return the next canned response or 'none' if the queue is empty."""
         return self._responses.pop(0) if self._responses else "none"
 
 
 def test_pas_contacts_meta_components_populates_message(monkeypatch: MonkeyPatch) -> None:
+    """Ensure PAS-flavoured scenario seeds messaging app and oracle correctly."""
     monkeypatch.setenv("OPENAI_API_KEY", "")
     llm = StubLLM(["none"])
     user_llm = StubLLM(['{"actions": []}'])
@@ -45,6 +45,7 @@ def test_pas_contacts_meta_components_populates_message(monkeypatch: MonkeyPatch
 
 
 def test_meta_scenario_tutorial_conversion(monkeypatch: MonkeyPatch) -> None:
+    """Ensure Meta tutorial scenarios convert into PAS components with oracles."""
     monkeypatch.setenv("OPENAI_API_KEY", "")
     llm = StubLLM(["none"])
     user_llm = StubLLM(['{"actions": []}'])
@@ -66,6 +67,7 @@ def test_meta_scenario_tutorial_conversion(monkeypatch: MonkeyPatch) -> None:
 
 
 def test_build_meta_task_from_scenario(monkeypatch: MonkeyPatch) -> None:
+    """Meta task factory should expose oracle actions when invoked via TaskDefinition."""
     monkeypatch.setenv("OPENAI_API_KEY", "")
     llm = StubLLM(["none"])
     user_llm = StubLLM(['{"actions": []}'])

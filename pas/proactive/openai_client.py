@@ -23,11 +23,14 @@ class OpenAIClientProtocol(Protocol):
 class OpenAILLMClient(LLMClientProtocol):
     """LLM client that calls OpenAI's Responses API."""
 
-    def __init__(self, *, client: OpenAIClientProtocol, default_parameters: dict[str, Any]) -> None:
+    def __init__(self, *, client: OpenAIClientProtocol, default_parameters: dict[str, Any] | None) -> None:
         """Store the underlying OpenAI client and default request parameters."""
         self._model = "gpt-5-mini"
         self._client = client
-        self._default_parameters = default_parameters
+        base_parameters: dict[str, Any] = {}
+        if default_parameters:
+            base_parameters.update(default_parameters)
+        self._default_parameters = base_parameters
 
     def complete(self, prompt: str) -> str:
         """Return text content from the Responses API for the supplied prompt."""

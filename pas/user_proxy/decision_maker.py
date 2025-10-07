@@ -54,12 +54,16 @@ class LLMDecisionMaker(DecisionMakerProtocol):
         accept = {token.strip().lower() for token in accept_tokens if token.strip()}
         decline = {token.strip().lower() for token in decline_tokens if token.strip()}
 
-        lines: list[str] = [self._system_prompt, "Prompt:", prompt.strip(), ""]
+        lines: list[str] = [self._system_prompt, "Context:", prompt.strip(), ""]
+        token_lines: list[str] = []
         if accept:
-            lines.append(f"Treat the following as acceptance tokens: {sorted(accept)}")
+            token_lines.append(f"Acceptance tokens: {sorted(accept)}")
         if decline:
-            lines.append(f"Treat the following as decline tokens: {sorted(decline)}")
-        lines.append('Respond with JSON, e.g. {"decision": "accept"}. If unsure, set decision to \'unsure\'.')
+            token_lines.append(f"Decline tokens: {sorted(decline)}")
+        instruction = 'Respond with JSON, e.g. {"decision": "accept"}. If unsure, set decision to \'unsure\'.'
+        if token_lines:
+            instruction = instruction + " Allowed tokens -> " + "; ".join(token_lines)
+        lines.append(instruction)
         request = "\n".join(lines)
 
         self._logger.debug("Decision prompt:\n%s", request)
