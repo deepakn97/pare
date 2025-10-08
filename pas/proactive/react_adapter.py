@@ -144,16 +144,40 @@ class PasLLMEngine(LLMEngine):
     ) -> tuple[str, dict[str, Any] | None]:
         """Format messages for the PAS client and relay the response."""
         prompt = self._format_messages(messages)
-        if stop_sequences:
-            prompt = f"{prompt}\n\n[Stop tokens: {', '.join(stop_sequences)}]"
-        response = self._llm.complete(prompt)
+        stop_tokens: tuple[str, ...] = tuple(stop_sequences or ())
+
+        response: str
+        metadata: dict[str, Any]
+        completion_with_metadata = getattr(self._llm, "complete_with_metadata", None)
+        temperature = kwargs.get("temperature")
+        if callable(completion_with_metadata):
+            response, metadata = completion_with_metadata(prompt, temperature=temperature)
+        else:
+            response = self._llm.complete(prompt)
+            metadata = {}
+
+        if stop_tokens:
+            response = self._truncate_at_stop(response, stop_tokens)
+
         self._logger.debug("Meta ARE bridge prompt:\n%s", prompt)
         self._logger.debug("Meta ARE bridge response: %s", response)
-        return response, None
+        return response, metadata or {}
 
     def simple_call(self, prompt: str) -> str:
         """Proxy simple prompts directly to the PAS client."""
         return self._llm.complete(prompt)
+
+    @staticmethod
+    def _truncate_at_stop(text: str, stop_tokens: tuple[str, ...]) -> str:
+        """Trim text at the first occurrence of any stop token."""
+        end_index = len(text)
+        for token in stop_tokens:
+            if not token:
+                continue
+            index = text.find(token)
+            if index != -1:
+                end_index = min(end_index, index + len(token))
+        return text[:end_index]
 
 
 @dataclass
