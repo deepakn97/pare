@@ -66,6 +66,14 @@ ARG_TRANSFORMERS: dict[str, dict[str, t.Callable[[dict[str, object], object], di
 }
 
 
+def _resolve_limit(value: object, fallback: int) -> int:
+    if isinstance(value, (int, float)):
+        candidate = int(value)
+        if candidate > 0:
+            return max(candidate, fallback)
+    return fallback
+
+
 def _normalise_messaging_state(state: dict[str, t.Any]) -> dict[str, t.Any]:
     conversations = state.get("conversations", {})
     name_to_id: dict[str, str] = dict(state.get("name_to_id", {}))
@@ -100,8 +108,8 @@ def _normalise_messaging_state(state: dict[str, t.Any]) -> dict[str, t.Any]:
 
     return {
         "conversations": upgraded_conversations,
-        "messages_view_limit": state.get("messages_view_limit", 10),
-        "conversation_view_limit": state.get("conversation_view_limit", 5),
+        "messages_view_limit": _resolve_limit(state.get("messages_view_limit"), 40),
+        "conversation_view_limit": _resolve_limit(state.get("conversation_view_limit"), 25),
         "mode": state.get("mode", "NAME"),
         "name_to_id": name_to_id,
         "id_to_name": id_to_name,
