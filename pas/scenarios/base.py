@@ -84,7 +84,7 @@ def build_proactive_stack(
         logger=planner_logger,
     )
     decision_maker = LLMDecisionMaker(user_llm, logger=decision_logger)
-    plan_executor_cb = build_plan_executor(llm, (), system_prompt=None, logger=orchestrator_logger)
+    plan_executor_cb = build_plan_executor(llm, logger=orchestrator_logger)
 
     user_proxy = StatefulUserProxy(
         env, env.notification_system, max_user_turns=max_user_turns, logger=user_logger, planner=planner_cb

@@ -189,10 +189,7 @@ def _iter_user_tools_for_app(app: object, include_system: bool) -> typing.Iterab
         return
 
     if isinstance(app, StatefulApp):
-        state = app.current_state
-        if state is None:
-            raise RuntimeError(f"App '{app.name}' has no current state")
-        yield from state.get_available_actions()
+        yield from app.get_user_tools()
         return
 
     tool_getter = getattr(app, "get_user_tools", None)

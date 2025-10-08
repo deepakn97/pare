@@ -107,8 +107,8 @@ message.
 
 ## 6. Execution (`execute`)
 
-Execution must rely on the same tool descriptors supplied to
-`build_plan_executor`. A typical pattern is:
+Execution defers to the callable produced by `build_plan_executor`. A
+typical pattern is:
 
 ```python
 result = self._plan_executor(task_guess, env)
@@ -117,7 +117,9 @@ self._pending_summary = summary
 return result
 ```
 
-- `_plan_executor` is the callable returned by `pas.system.proactive.build_plan_executor`.
+- `_plan_executor` is the callable returned by
+  `pas.system.proactive.build_plan_executor`, which by default invokes the
+  Meta-ARE ReAct agent over the connected environment.
 - The summary builder converts an `InterventionResult` into the text you want
   to show the user.
 - Always log success/failure details for debugging.
@@ -154,13 +156,11 @@ To customise behaviour:
 
 - Swap the `_summary_builder` function to emit richer explanations or
   structured JSON.
-- Replace `_plan_executor` with a wrapper that enforces guardrails (rate
-  limiting, human approval, etc.) before calling into `LLMPlanExecutor`.
+- Replace `_plan_executor` with your own callable (for example one built
+  with `pas.proactive.orchestrator.LLMPlanExecutor`) if you need tighter
+  guardrails than the default ReAct executor.
 - Override `_build_goal_prompt` if you need additional metadata such as
   partial task progress or user profile attributes.
-- When you add new tools, make sure their descriptions and the system prompt
-  clearly spell out constraints (e.g. “provide real email addresses, not
-  contact names”) so the orchestrator produces valid arguments on the first try.
 
 Keep the public protocol intact and keep logging consistent so scenarios and
 tests can continue to introspect agent behaviour.

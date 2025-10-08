@@ -130,16 +130,7 @@ def build_components(llm_client, user_llm_client):
     )
 
     orchestrator_logger = get_pas_file_logger("pas.proactive.orchestrator", proactive_log)
-    plan_executor = build_plan_executor(
-        llm_client,
-        (),
-        system_prompt=(
-            "Choose the single best tool to satisfy the confirmed goal. Every email-related argument must be a "
-            "valid email address. If you cannot provide a proper address, leave optional fields empty instead of "
-            "guessing."
-        ),
-        logger=orchestrator_logger,
-    )
+    plan_executor = build_plan_executor(llm_client, logger=orchestrator_logger)
 
     agent_logger = get_pas_file_logger("pas.proactive.agent", proactive_log)
     proactive_agent = LLMBasedProactiveAgent(
@@ -166,6 +157,9 @@ def build_components(llm_client, user_llm_client):
 
     return env, user_proxy, proactive_agent, decision_maker, session
 ```
+
+`build_plan_executor` currently delegates to the Meta-ARE ReAct agent. Supply
+your own callable if you need tighter control over the execution flow.
 
 The helper returns all building blocks so your scenario can initialise data,
 launch an initial notification, and step through `session.run_cycle()`.

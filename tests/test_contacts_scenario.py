@@ -2,22 +2,28 @@ from __future__ import annotations
 
 import typing
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import logging
+
     from pytest import MonkeyPatch
 
-from pas.proactive import InterventionResult
+from pas.environment import StateAwareEnvironmentWrapper  # noqa: TC001
+from pas.proactive import InterventionResult, LLMClientProtocol
 from pas.scenarios import build_contacts_followup_components, build_contacts_followup_task
 from pas.tasks.types import TaskContext
 
 
 @dataclass
 class QueueLLM:
+    """Minimal LLM stub that returns queued responses."""
+
     responses: list[str]
     last_prompt: str | None = None
 
     def complete(self, prompt: str) -> str:
+        """Pop the next queued response, recording the prompt."""
         self.last_prompt = prompt
         if not self.responses:
             raise RuntimeError("QueueLLM received more prompts than stubbed responses")
@@ -25,6 +31,7 @@ class QueueLLM:
 
 
 def test_build_contacts_followup_components_sets_up_defaults(monkeypatch: MonkeyPatch) -> None:
+    """Contacts builder wires default components, but agent LLM can decline."""
     monkeypatch.setenv("OPENAI_API_KEY", "")
     agent_llm = QueueLLM(["none"])
     user_llm = QueueLLM(['{"actions": [{"tool": "contacts.list_contacts", "args": {"offset": 0}}]}'])
@@ -43,6 +50,7 @@ def test_build_contacts_followup_components_sets_up_defaults(monkeypatch: Monkey
 
 
 def test_llm_agent_uses_plan_executor_and_summary(monkeypatch: MonkeyPatch) -> None:
+    """Custom plan executor is invoked and summary forwarded."""
     monkeypatch.setenv("OPENAI_API_KEY", "")
     user_llm = QueueLLM(['{"actions": [{"tool": "contacts.list_contacts", "args": {"offset": 0}}]}'])
     llm = QueueLLM([
@@ -51,13 +59,14 @@ def test_llm_agent_uses_plan_executor_and_summary(monkeypatch: MonkeyPatch) -> N
     ])
     executed: list[str] = []
 
-    def executor(task: str, _env: Any) -> InterventionResult:
+    def executor(task: str, _env: StateAwareEnvironmentWrapper) -> InterventionResult:
         executed.append(task)
         return InterventionResult(success=True, notes=f"Executed: {task}")
 
     def plan_executor_factory(
-        _llm: Any, _specs: Any, *, system_prompt: str, logger: Any
-    ) -> typing.Callable[[str, Any], InterventionResult]:
+        _llm: LLMClientProtocol, *, logger: logging.Logger
+    ) -> typing.Callable[[str, StateAwareEnvironmentWrapper], InterventionResult]:
+        del logger, _llm
         return executor
 
     monkeypatch.setattr("pas.scenarios.base.build_plan_executor", plan_executor_factory)
@@ -84,6 +93,7 @@ def test_llm_agent_uses_plan_executor_and_summary(monkeypatch: MonkeyPatch) -> N
 
 
 def test_contacts_followup_task_definition(monkeypatch: MonkeyPatch) -> None:
+    """Task definition delegates to builder and exposes oracle actions."""
     monkeypatch.setenv("OPENAI_API_KEY", "")
     agent_llm = QueueLLM(["none"])
     user_llm = QueueLLM(['{"actions": []}'])

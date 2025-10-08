@@ -11,17 +11,13 @@ if TYPE_CHECKING:
     import logging
 
     from pas.environment import StateAwareEnvironmentWrapper
-    from pas.proactive import InterventionResult, LLMClientProtocol, ToolSpec
+    from pas.proactive import InterventionResult, LLMClientProtocol
 else:
     StateAwareEnvironmentWrapper = object  # type: ignore[assignment]
 
 
 def build_plan_executor(
-    llm_client: LLMClientProtocol,
-    tool_specs: typing.Sequence[ToolSpec],
-    *,
-    system_prompt: str | None = None,
-    logger: logging.Logger,
+    llm_client: LLMClientProtocol, *, logger: logging.Logger
 ) -> typing.Callable[[str, StateAwareEnvironmentWrapper], InterventionResult]:
     """Create a callable that runs a Meta ARE-style ReAct loop over PAS tools."""
 
