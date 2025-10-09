@@ -38,8 +38,8 @@ class LLMDecisionMaker(DecisionMakerProtocol):
         self._logger = logger
         self._system_prompt = system_prompt or (
             "You are the phone owner responding to a proactive assistant. "
-            "Read the prompt and output JSON with a single key 'decision'. "
-            "The value must be either 'accept' or 'decline'. Do not add prose."
+            'Reply with exactly one of: {"decision": "accept"} or {"decision": "decline"}. '
+            "Do not include extra text."
         )
 
     def decide(
@@ -54,16 +54,11 @@ class LLMDecisionMaker(DecisionMakerProtocol):
         accept = {token.strip().lower() for token in accept_tokens if token.strip()}
         decline = {token.strip().lower() for token in decline_tokens if token.strip()}
 
-        lines: list[str] = [self._system_prompt, "Context:", prompt.strip(), ""]
-        token_lines: list[str] = []
-        if accept:
-            token_lines.append(f"Acceptance tokens: {sorted(accept)}")
-        if decline:
-            token_lines.append(f"Decline tokens: {sorted(decline)}")
-        instruction = 'Respond with JSON, e.g. {"decision": "accept"}.'
-        if token_lines:
-            instruction = instruction + " Allowed tokens -> " + "; ".join(token_lines)
-        lines.append(instruction)
+        lines: list[str] = [self._system_prompt, "", "Context:", prompt.strip()]
+        allowed_tokens = sorted(accept | decline)
+        if allowed_tokens:
+            options = " or ".join(f'{{"decision": "{token}"}}' for token in allowed_tokens)
+            lines.extend(["", f"Respond with {options} only."])
         request = "\n".join(lines)
 
         self._logger.debug("Decision prompt:\n%s", request)

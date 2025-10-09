@@ -141,5 +141,4 @@ def format_agent_ui_prompt(event: CompletedEvent) -> str | None:
 
 
 # Register default pop-ups for apps we rely on
-register_popup_for_event("AgentUserInterface", "send_message_to_agent", builder=format_agent_ui_prompt)
 register_popup_for_event("AgentUserInterface", "send_message_to_user", builder=format_agent_ui_prompt)

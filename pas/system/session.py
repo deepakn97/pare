@@ -186,7 +186,6 @@ class ProactiveSession:
             sections.append(latest_system.strip())
         sections.append("Proactive assistant completed the request. Summary:")
         sections.append(summary.strip())
-        sections.append("Reply ACCEPT to acknowledge or DECLINE if something looks wrong.")
         prompt = "\n\n".join(sections)
         return self._prompt_user(prompt, accept_tokens={"accept"}, decline_tokens={"decline"}, capture_decision=True)
 

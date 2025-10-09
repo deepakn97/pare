@@ -160,7 +160,9 @@ class LLMBasedProactiveAgent(ProactiveAgentProtocol):
             )
         if self._last_task:
             lines.append(f"Previous hypothesis: {self._last_task}")
-        lines.append("Respond with the next user goal suggestion or 'none'.")
+        lines.append(
+            "Respond with the next user goal suggestion or 'none'. If you are not confident, answer 'none'—guessing wrong will frustrate the user."
+        )
         return "\n".join(lines)
 
     @staticmethod
