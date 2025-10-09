@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pas.scenarios import build_contacts_followup_components
 from pas.scripts.run_demo import run_proactive_demo
 

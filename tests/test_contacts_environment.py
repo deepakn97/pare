@@ -1,15 +1,20 @@
 """Integration-style tests for contacts navigation via the environment wrapper."""
 
-from collections.abc import Generator
-from typing import cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from are.simulation.apps.contacts import Contact
-from are.simulation.types import CompletedEvent
 
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.contacts.states import ContactDetail, ContactEdit, ContactsList
 from pas.environment import StateAwareEnvironmentWrapper
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from are.simulation.types import CompletedEvent
 
 
 def _last_event(env: StateAwareEnvironmentWrapper) -> CompletedEvent:
@@ -55,6 +60,7 @@ class TestEnvironmentTransitions:
     def test_get_contact_event_moves_to_detail(
         self, env_with_contacts: tuple[StateAwareEnvironmentWrapper, StatefulContactsApp]
     ) -> None:
+        """Accessing a contact transitions from list view to detail view."""
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
@@ -67,6 +73,7 @@ class TestEnvironmentTransitions:
     def test_start_edit_flow_enters_edit_state(
         self, env_with_contacts: tuple[StateAwareEnvironmentWrapper, StatefulContactsApp]
     ) -> None:
+        """Starting an edit flow navigates into the edit state and records history."""
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
@@ -82,6 +89,7 @@ class TestEnvironmentTransitions:
     def test_edit_contact_returns_to_detail(
         self, env_with_contacts: tuple[StateAwareEnvironmentWrapper, StatefulContactsApp]
     ) -> None:
+        """Saving edits returns the navigation stack to the detail view."""
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
@@ -100,6 +108,7 @@ class TestEnvironmentTransitions:
     def test_delete_contact_returns_to_list(
         self, env_with_contacts: tuple[StateAwareEnvironmentWrapper, StatefulContactsApp]
     ) -> None:
+        """Deleting a contact navigates back to the list view and removes the entry."""
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
@@ -115,6 +124,7 @@ class TestEnvironmentTransitions:
     def test_get_contacts_event_resets_to_list(
         self, env_with_contacts: tuple[StateAwareEnvironmentWrapper, StatefulContactsApp]
     ) -> None:
+        """Refreshing contacts from a nested state resets the app to the list view."""
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
@@ -127,6 +137,7 @@ class TestEnvironmentTransitions:
     def test_view_current_user_does_not_change_state(
         self, env_with_contacts: tuple[StateAwareEnvironmentWrapper, StatefulContactsApp]
     ) -> None:
+        """Viewing the user contact leaves the navigation state unchanged."""
         env, app = env_with_contacts
 
         _list_state(app).view_current_user()

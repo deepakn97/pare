@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from are.simulation.apps.app import App
 from are.simulation.tool_utils import AppTool, build_tool, user_tool
-from are.simulation.types import CompletedEvent
+
+if TYPE_CHECKING:
+    from are.simulation.types import CompletedEvent
 
 
 class AppState(ABC):

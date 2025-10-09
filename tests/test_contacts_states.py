@@ -1,6 +1,8 @@
 """Tests for the stateful contacts app navigation flow."""
 
-from collections.abc import Callable, Generator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 from are.simulation.apps.contacts import Contact
@@ -8,6 +10,9 @@ from are.simulation.types import Action, CompletedEvent, EventMetadata, EventTyp
 
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.contacts.states import ContactDetail, ContactEdit, ContactsList
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
 
 
 def _make_event(app: StatefulContactsApp, func: Callable[..., object], **kwargs: object) -> CompletedEvent:

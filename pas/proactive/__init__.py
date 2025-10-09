@@ -1,5 +1,7 @@
 """Proactive agent utilities."""
 
+from __future__ import annotations
+
 from .agent import (
     InterventionResult,
     LLMBasedProactiveAgent,

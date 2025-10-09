@@ -1,5 +1,7 @@
 """Scenario helpers for PAS."""
 
+from __future__ import annotations
+
 from .base import build_proactive_stack
 from .contacts_followup import build_contacts_followup_components
 from .types import OracleAction, ScenarioSetup

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from are.simulation.scenarios.scenario_tutorial.scenario import ScenarioTutorial
 
 from pas.meta_adapter import build_meta_scenario_components

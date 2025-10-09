@@ -1,11 +1,15 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from are.simulation.apps.messaging_v2 import MessagingAppV2
-from are.simulation.types import CompletedEvent
 
 from pas.apps.core import StatefulApp
 from pas.apps.messaging.states import ConversationList, ConversationOpened
 from pas.notifications import format_incoming_message, register_popup_for_event
+
+if TYPE_CHECKING:
+    from are.simulation.types import CompletedEvent
 
 
 class StatefulMessagingApp(StatefulApp, MessagingAppV2):

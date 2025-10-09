@@ -1,5 +1,7 @@
 """Core runtime utilities shared across PAS scenarios."""
 
+from __future__ import annotations
+
 from .proactive import build_plan_executor
 from .runtime import attach_event_logging, create_environment, create_notification_system, initialise_runtime
 from .session import ProactiveCycleResult, ProactiveSession
