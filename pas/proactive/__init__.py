@@ -7,17 +7,13 @@ from .agent import (
     ProactiveAgentProtocol,
     ProactiveInterventionError,
 )
-from .openai_client import OpenAILLMClient
-from .orchestrator import LLMPlanExecutor, ToolParameter, ToolSpec
+from .litellm_client import LiteLLMClient
 
 __all__ = [
     "InterventionResult",
     "LLMBasedProactiveAgent",
     "LLMClientProtocol",
-    "LLMPlanExecutor",
-    "OpenAILLMClient",
+    "LiteLLMClient",
     "ProactiveAgentProtocol",
     "ProactiveInterventionError",
-    "ToolParameter",
-    "ToolSpec",
 ]

@@ -21,7 +21,6 @@ from pas.apps.messaging.app import StatefulMessagingApp
 from pas.apps.system import HomeScreenSystemApp
 from pas.scenarios.base import build_proactive_stack
 from pas.scenarios.types import OracleAction, ScenarioSetup
-from pas.tasks.types import TaskContext, TaskDefinition
 
 LOGGER = logging.getLogger(__name__)
 
@@ -361,32 +360,3 @@ def build_meta_scenario_components(
         primary_app=primary_app,
         oracle_messages=oracle_messages,
     )
-
-
-def build_meta_task_from_scenario(
-    *,
-    scenario_factory: t.Callable[[], Scenario],
-    task_id: str,
-    description: str,
-    primary_app: str,
-    oracle_messages: t.Sequence[str] | None = None,
-) -> TaskDefinition:
-    """Wrap a Meta ARE scenario inside a PAS task definition."""
-
-    def _builder(context: TaskContext) -> ScenarioSetup:
-        scenario = scenario_factory()
-        scenario.initialize()
-        meta_apps = scenario.apps or []
-        meta_events = scenario.events or []
-        return build_components_from_meta(
-            meta_apps=meta_apps,
-            meta_events=meta_events,
-            llm=context.llm,
-            user_llm=context.user_llm,
-            max_user_turns=context.max_user_turns,
-            log_mode=context.log_mode,
-            primary_app=primary_app,
-            oracle_messages=oracle_messages,
-        )
-
-    return TaskDefinition(task_id=task_id, description=description, scenario_builder=_builder)

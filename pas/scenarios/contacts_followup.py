@@ -15,7 +15,6 @@ from pas.apps.messaging.app import StatefulMessagingApp
 from pas.apps.system import HomeScreenSystemApp
 from pas.scenarios.base import build_proactive_stack
 from pas.scenarios.types import OracleAction, ScenarioSetup
-from pas.tasks.types import TaskContext, TaskDefinition
 
 __all__ = ["build_contacts_followup_components", "build_pas_contacts_meta_components"]
 
@@ -81,25 +80,6 @@ def build_pas_contacts_meta_components(
     return build_contacts_followup_components(
         llm=llm, user_llm=user_llm, max_user_turns=max_user_turns, log_mode=log_mode, primary_app=primary_app
     )
-
-
-def build_contacts_followup_task(
-    *,
-    task_id: str = "contacts_followup",
-    description: str = "Follow up with Jordan Lee via email after receiving a manager's ping.",
-) -> TaskDefinition:
-    """Return a task definition that recreates the contacts follow-up scenario."""
-
-    def _builder(context: TaskContext) -> ScenarioSetup:
-        return build_contacts_followup_components(
-            llm=context.llm,
-            user_llm=context.user_llm,
-            max_user_turns=context.max_user_turns,
-            log_mode=context.log_mode,
-            primary_app=context.primary_app,
-        )
-
-    return TaskDefinition(task_id=task_id, description=description, scenario_builder=_builder)
 
 
 def _seed_contacts_app(app: ContactsApp) -> None:

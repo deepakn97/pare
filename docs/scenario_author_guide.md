@@ -129,8 +129,8 @@ def build_components(llm_client, user_llm_client):
         planner=planner,
     )
 
-    orchestrator_logger = get_pas_file_logger("pas.proactive.orchestrator", proactive_log)
-    plan_executor = build_plan_executor(llm_client, logger=orchestrator_logger)
+    plan_executor_logger = get_pas_file_logger("pas.proactive.plan_executor", proactive_log)
+    plan_executor = build_plan_executor(llm_client, logger=plan_executor_logger)
 
     agent_logger = get_pas_file_logger("pas.proactive.agent", proactive_log)
     proactive_agent = LLMBasedProactiveAgent(

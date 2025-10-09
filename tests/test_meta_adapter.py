@@ -7,9 +7,8 @@ from are.simulation.scenarios.scenario_tutorial.scenario import ScenarioTutorial
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
-from pas.meta_adapter import build_meta_scenario_components, build_meta_task_from_scenario
+from pas.meta_adapter import build_meta_scenario_components
 from pas.scenarios.contacts_followup import build_pas_contacts_meta_components
-from pas.tasks.types import TaskContext
 
 
 class StubLLM:
@@ -64,24 +63,3 @@ def test_meta_scenario_tutorial_conversion(monkeypatch: MonkeyPatch) -> None:
     assert oracle.app == "email"
     assert oracle.function == "forward_email"
     assert oracle.args.get("recipients") == ["johndoe@example.com"]
-
-
-def test_build_meta_task_from_scenario(monkeypatch: MonkeyPatch) -> None:
-    """Meta task factory should expose oracle actions when invoked via TaskDefinition."""
-    monkeypatch.setenv("OPENAI_API_KEY", "")
-    llm = StubLLM(["none"])
-    user_llm = StubLLM(['{"actions": []}'])
-
-    task = build_meta_task_from_scenario(
-        scenario_factory=ScenarioTutorial,
-        task_id="tutorial",
-        description="Transfer music list to John",
-        primary_app="contacts",
-    )
-
-    context = TaskContext(llm=llm, user_llm=user_llm, max_user_turns=1, log_mode="overwrite", primary_app="contacts")
-
-    setup = task.scenario_builder(context)
-    assert setup.oracle_actions
-    oracle = setup.oracle_actions[0]
-    assert oracle.function in {"forward_email", "send_email"}

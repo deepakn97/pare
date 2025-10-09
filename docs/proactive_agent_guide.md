@@ -156,8 +156,7 @@ To customise behaviour:
 
 - Swap the `_summary_builder` function to emit richer explanations or
   structured JSON.
-- Replace `_plan_executor` with your own callable (for example one built
-  with `pas.proactive.orchestrator.LLMPlanExecutor`) if you need tighter
+- Replace `_plan_executor` with your own callable if you need tighter
   guardrails than the default ReAct executor.
 - Override `_build_goal_prompt` if you need additional metadata such as
   partial task progress or user profile attributes.

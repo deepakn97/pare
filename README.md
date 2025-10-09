@@ -1,12 +1,17 @@
 # Proactive Agent Sandbox (PAS)
 
-This repository hosts the Proactive Agent Sandbox used to explore proactive goal
-inference on top of Meta-ARE. PAS layers stateful navigation, user proxies, and
-proactive agents on the simulated mobile apps shipped with Meta-ARE.
+[![Release](https://img.shields.io/github/v/release/deepakn97/proactiveGoalInference)](https://img.shields.io/github/v/release/deepakn97/proactiveGoalInference)
+[![Build status](https://img.shields.io/github/actions/workflow/status/deepakn97/proactiveGoalInference/main.yml?branch=main)](https://github.com/deepakn97/proactiveGoalInference/actions/workflows/main.yml?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/deepakn97/proactiveGoalInference/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/proactiveGoalInference)
+[![Commit activity](https://img.shields.io/github/commit-activity/m/deepakn97/proactiveGoalInference)](https://img.shields.io/github/commit-activity/m/deepakn97/proactiveGoalInference)
+[![License](https://img.shields.io/github/license/deepakn97/proactiveGoalInference)](https://img.shields.io/github/license/deepakn97/proactiveGoalInference)
 
-PAS extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based
-navigation architecture for mobile app simulation, enabling proactive agent
-research with context-aware action spaces.
+This repository contains code for the Proactive Goal Inference Agent project in collaboration with Apple.
+
+PAS extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based navigation architecture for mobile app simulation, enabling proactive agent research with context-aware action spaces.
+
+- **Github repository**: <https://github.com/deepakn97/proactiveGoalInference/>
+- **Documentation**: <https://deepakn97.github.io/proactiveGoalInference/>
 
 ## Setup
 
@@ -19,8 +24,8 @@ research with context-aware action spaces.
 
 1. Clone the repository:
 ```bash
-git clone <your-repository-url> scenario-setup
-cd scenario-setup
+git clone git@github.com:deepakn97/proactiveGoalInference.git
+cd proactiveGoalInference
 ```
 
 2. Install the environment and pre-commit hooks:

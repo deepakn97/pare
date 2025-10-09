@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, cast
 
 from dotenv import load_dotenv
 
-from pas.proactive import OpenAILLMClient
+from pas.proactive import LiteLLMClient
 from pas.system import ProactiveSession
 
 if TYPE_CHECKING:
@@ -52,8 +52,8 @@ def run_proactive_demo(
     log_dir = (Path("logs") / "pas").resolve()
     load_dotenv(override=False)
 
-    llm = OpenAILLMClient()
-    user_llm = OpenAILLMClient()
+    llm = LiteLLMClient()
+    user_llm = LiteLLMClient()
 
     kwargs: dict[str, object] = dict(builder_kwargs or {})
     kwargs.update({"llm": llm, "user_llm": user_llm, "max_user_turns": max_user_turns, "log_mode": log_mode})

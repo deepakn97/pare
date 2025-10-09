@@ -11,8 +11,7 @@ if TYPE_CHECKING:
 
 from pas.environment import StateAwareEnvironmentWrapper  # noqa: TC001
 from pas.proactive import InterventionResult, LLMClientProtocol
-from pas.scenarios import build_contacts_followup_components, build_contacts_followup_task
-from pas.tasks.types import TaskContext
+from pas.scenarios import build_contacts_followup_components
 
 
 @dataclass
@@ -90,19 +89,3 @@ def test_llm_agent_uses_plan_executor_and_summary(monkeypatch: MonkeyPatch) -> N
     assert setup.oracle_actions
     expected_recipient = setup.oracle_actions[0].args["recipients"][0]
     assert expected_recipient.endswith("@example.com")
-
-
-def test_contacts_followup_task_definition(monkeypatch: MonkeyPatch) -> None:
-    """Task definition delegates to builder and exposes oracle actions."""
-    monkeypatch.setenv("OPENAI_API_KEY", "")
-    agent_llm = QueueLLM(["none"])
-    user_llm = QueueLLM(['{"actions": []}'])
-
-    task = build_contacts_followup_task()
-    context = TaskContext(
-        llm=agent_llm, user_llm=user_llm, max_user_turns=3, log_mode="overwrite", primary_app="contacts"
-    )
-
-    setup = task.scenario_builder(context)
-    assert setup.oracle_actions
-    assert setup.env.get_app("contacts")
