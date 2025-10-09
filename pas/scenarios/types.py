@@ -6,7 +6,8 @@ import typing as t
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from are.simulation.types import EventType  # noqa: TC002 - runtime enum needed for matching
+if TYPE_CHECKING:  # pragma: no cover - hints only
+    from are.simulation.types import EventType
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from pas.environment import StateAwareEnvironmentWrapper

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
     from pytest import MonkeyPatch
 
-from pas.environment import StateAwareEnvironmentWrapper  # noqa: TC001
+    from pas.environment import StateAwareEnvironmentWrapper
 from pas.proactive import InterventionResult, LLMClientProtocol
 from pas.scenarios import build_contacts_followup_components
 

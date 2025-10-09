@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import types
-from collections.abc import Generator  # noqa: TC003
+from typing import TYPE_CHECKING
 
 import pytest
 from are.simulation.apps.email_client import Email, EmailFolderName
@@ -11,6 +11,9 @@ from are.simulation.types import Action, CompletedEvent, EventMetadata, EventTyp
 
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.email.states import ComposeEmail, EmailDetail, MailboxView
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class SampledEmailApp(StatefulEmailApp):
@@ -107,6 +110,7 @@ class TestStateTransitions:
     """State transition expectations once implementation lands."""
 
     def test_open_email_transitions_to_detail(self, email_app: StatefulEmailApp) -> None:
+        """Opening an email pushes the detail state onto the stack."""
         sample_email = _sample_inbox(email_app)
         mailbox_state = _mailbox(email_app)
         event = make_completed_event(
@@ -119,6 +123,7 @@ class TestStateTransitions:
         assert isinstance(email_app.navigation_stack[-1], MailboxView)
 
     def test_switch_folder_pushes_previous_state(self, email_app: StatefulEmailApp) -> None:
+        """Switching folders should push the previous mailbox view onto the stack."""
         mailbox_state = _mailbox(email_app)
         event = make_completed_event(email_app, mailbox_state, "switch_folder", {"folder_name": "SENT"})
         email_app.handle_state_transition(event)
@@ -130,6 +135,7 @@ class TestStateTransitions:
         assert email_app.navigation_stack[-1].folder == EmailFolderName.INBOX.value
 
     def test_go_back_returns_to_previous_folder(self, email_app: StatefulEmailApp) -> None:
+        """Calling go_back restores the prior mailbox view."""
         mailbox_state = _mailbox(email_app)
         email_app.handle_state_transition(
             make_completed_event(email_app, mailbox_state, "switch_folder", {"folder_name": "SENT"})
@@ -143,6 +149,7 @@ class TestStateTransitions:
         assert _mailbox(email_app).folder == EmailFolderName.INBOX.value
 
     def test_switch_folder_accepts_enum(self, email_app: StatefulEmailApp) -> None:
+        """Switching folders accepts EmailFolderName enum values."""
         mailbox_state = _mailbox(email_app)
         email_app.handle_state_transition(
             make_completed_event(email_app, mailbox_state, "switch_folder", {"folder_name": EmailFolderName.SENT})
@@ -154,6 +161,7 @@ class TestStateTransitions:
     def test_search_emails_filters_and_respects_limit(
         self, email_app: StatefulEmailApp, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Mailbox search filters results and honours the requested limit."""
         mailbox_state = _mailbox(email_app)
 
         sample_old = Email(
@@ -182,6 +190,7 @@ class TestStateTransitions:
         assert results == [sample_recent]
 
     def test_open_email_respects_current_folder(self, email_app: StatefulEmailApp) -> None:
+        """Opening an email respects the mailbox folder currently in focus."""
         mailbox_state = _mailbox(email_app)
         email_app.handle_state_transition(
             make_completed_event(email_app, mailbox_state, "switch_folder", {"folder_name": "SENT"})
@@ -208,6 +217,7 @@ class TestComposeFlow:
     """Compose state management expectations."""
 
     def test_start_compose_enters_compose_state(self, email_app: StatefulEmailApp) -> None:
+        """Starting compose transitions into the compose state."""
         mailbox_state = _mailbox(email_app)
         event = make_completed_event(email_app, mailbox_state, "start_compose")
         email_app.handle_state_transition(event)
@@ -216,6 +226,7 @@ class TestComposeFlow:
         assert email_app.current_state.draft.recipients == []
 
     def test_send_compose_returns_to_previous_state(self, email_app: StatefulEmailApp) -> None:
+        """Sending a draft returns to the previous state and appends to SENT."""
         mailbox_state = _mailbox(email_app)
         email_app.handle_state_transition(make_completed_event(email_app, mailbox_state, "start_compose"))
         compose_state = _compose(email_app)
@@ -237,6 +248,7 @@ class TestToolFiltering:
     """Confirm state-specific user tools after implementation."""
 
     def test_mailbox_view_user_tools(self, email_app: StatefulEmailApp) -> None:
+        """Mailbox view exposes the expected navigation and email tools."""
         tools = email_app.get_user_tools()
         names = {tool.name for tool in tools}
         assert any("list_emails" in name for name in names)
@@ -245,6 +257,7 @@ class TestToolFiltering:
         assert not any("send_composed_email" in name for name in names)
 
     def test_compose_user_tools(self, email_app: StatefulEmailApp) -> None:
+        """Compose view surfaces compose-specific tools and hides mailbox-only ones."""
         mailbox_state = _mailbox(email_app)
         email_app.handle_state_transition(make_completed_event(email_app, mailbox_state, "start_compose"))
         tools = email_app.get_user_tools()
@@ -254,6 +267,7 @@ class TestToolFiltering:
         assert any("go_back" in name for name in names)
 
     def test_reply_flow_preserves_custom_fields(self, email_app: StatefulEmailApp) -> None:
+        """Reply flow should keep any custom edits before sending."""
         mailbox_state = _mailbox(email_app)
         sample_email = _sample_inbox(email_app)
         email_app.handle_state_transition(
@@ -309,6 +323,7 @@ class TestToolFiltering:
         assert sent_email.parent_id == sample_email.email_id
 
     def test_reply_flow_repeat_after_back(self, email_app: StatefulEmailApp) -> None:
+        """After going back, another reply should reuse the draft template."""
         mailbox_state = _mailbox(email_app)
         sample_email = _sample_inbox(email_app)
         email_app.handle_state_transition(
@@ -371,6 +386,7 @@ class TestToolFiltering:
         assert second_compose_state.draft.reply_to == sample_email.email_id
 
     def test_forward_uses_supported_kwargs(self, email_app: StatefulEmailApp, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Forward helper should pass the correct keyword arguments downstream."""
         mailbox_state = _mailbox(email_app)
         sample_email = _sample_inbox(email_app)
         email_app.handle_state_transition(
@@ -404,6 +420,7 @@ class TestToolFiltering:
     def test_reply_flow_attachments_use_helper(
         self, email_app: StatefulEmailApp, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Reply flow should rely on helper utilities for attachment propagation."""
         mailbox_state = _mailbox(email_app)
         sample_email = _sample_inbox(email_app)
         email_app.handle_state_transition(

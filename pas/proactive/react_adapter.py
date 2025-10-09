@@ -17,12 +17,13 @@ from are.simulation.agents.default_agent.termination_methods.are_simulation impo
 from are.simulation.agents.default_agent.tools.json_action_executor import JsonActionExecutor
 from are.simulation.agents.llm.llm_engine import LLMEngine
 from are.simulation.tool_box import Toolbox
-from are.simulation.tool_utils import AppTool, AppToolArg  # noqa: TC002
 from are.simulation.tools import Tool
 
 from pas.proactive import InterventionResult, LLMClientProtocol
 
 if TYPE_CHECKING:
+    from are.simulation.tool_utils import AppTool, AppToolArg
+
     from pas.environment import StateAwareEnvironmentWrapper
 
 
