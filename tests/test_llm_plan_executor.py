@@ -9,11 +9,15 @@ from pas.scenarios import build_contacts_followup_components
 
 
 class QueueLLM:
+    """Mock LLM that returns pre-queued responses."""
+
     def __init__(self, responses: list[str]) -> None:
+        """Initialize with a list of canned responses."""
         self._responses = responses
         self.last_prompt: str | None = None
 
     def complete(self, prompt: str) -> str:
+        """Return the next queued response and record the prompt."""
         self.last_prompt = prompt
         if not self._responses:
             raise RuntimeError("QueueLLM received more prompts than responses")
@@ -25,6 +29,7 @@ if TYPE_CHECKING:
 
 
 def test_llm_plan_executor_sends_email(monkeypatch: MonkeyPatch) -> None:
+    """Test that the plan executor can send an email via the ReAct loop."""
     monkeypatch.setenv("OPENAI_API_KEY", "")
 
     user_llm = QueueLLM(['{"actions": [{"tool": "contacts.list_contacts", "args": {"offset": 0}}]}'])

@@ -12,13 +12,13 @@
 | `search_events(query: str)` | `CalendarV2.search_events(query=query)` then pruned to active window and filters | `list[CalendarEvent]` within current window/filter scope | Remains in `AgendaView` |
 | `open_event_by_id(event_id: str)` | `CalendarV2.get_calendar_event(event_id=event_id)` | `CalendarEvent` object | Completed event transitions to `EventDetail(event_id)` |
 | `open_event_by_index(index: int)` | Reads cached window (`_events_in_window()`), returns `events[index]` | `CalendarEvent` object (raises `IndexError` if out of range) | Completed event transitions to `EventDetail` for selected event |
-| `filter_by_tag(tag: str)` | Local filter over cached window | `list[CalendarEvent]` matching tag | Completed event replaces state with new `AgendaView(tag_filter=tag)` |
-| `filter_by_attendee(attendee: str)` | Local filter over cached window | `list[CalendarEvent]` containing attendee (case-insensitive) | Completed event replaces state with new `AgendaView(attendee_filter=attendee)` |
+| `filter_by_tag(tag: str)` | Local filter over cached window | `list[CalendarEvent]` matching tag | Completed event replaces state with new `AgendaView(tag_filter=tag)` while preserving `attendee_filter` |
+| `filter_by_attendee(attendee: str)` | Local filter over cached window | `list[CalendarEvent]` containing attendee (case-insensitive) | Completed event replaces state with new `AgendaView(attendee_filter=attendee)` while preserving `tag_filter` |
 | `add_calendar_event_by_attendee(who_add: str, title: str = "Event", start_datetime: Optional[str] = None, end_datetime: Optional[str] = None, tag: Optional[str] = None, description: Optional[str] = None, location: Optional[str] = None, attendees: Optional[list[str]] = None)` | `CalendarV2.add_calendar_event_by_attendee(...)` | Newly created event id | Remains in `AgendaView` |
 | `read_today_calendar_events()` | `CalendarV2.read_today_calendar_events()` | Dict of today's events | No navigation change |
 | `get_all_tags()` | `CalendarV2.get_all_tags()` | `list[str]` of tags | No navigation change |
 | `get_calendar_events_by_tag(tag: str)` | `CalendarV2.get_calendar_events_by_tag(tag=tag)` | `list[CalendarEvent]` | No navigation change |
-| `set_day(date: str)` | Local UTC range computation for supplied date | Dict with `start_datetime`/`end_datetime` strings | Completed event replaces state with new `AgendaView` over returned range |
+| `set_day(date: str)` | Local UTC range computation for supplied date | Dict with `start_datetime`/`end_datetime` strings | Completed event replaces state with new `AgendaView` over returned range while preserving both filters |
 | `start_create_event()` | Emits sentinel string; event metadata seeds draft | String `"draft_started"` | Completed event pushes `EditEvent` with blank draft |
 
 ### EventDetail

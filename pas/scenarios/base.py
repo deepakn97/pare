@@ -73,7 +73,7 @@ def build_proactive_stack(
     user_logger = get_pas_file_logger("pas.user_proxy", user_log, level=logging.DEBUG)
     planner_logger = get_pas_file_logger("pas.user_proxy.planner", user_log, level=logging.DEBUG)
     decision_logger = get_pas_file_logger("pas.user_proxy.decisions", user_log, level=logging.DEBUG)
-    orchestrator_logger = get_pas_file_logger("pas.proactive.orchestrator", proactive_log, level=logging.DEBUG)
+    executor_logger = get_pas_file_logger("pas.proactive.executor", proactive_log, level=logging.DEBUG)
     agent_logger = get_pas_file_logger("pas.proactive.agent", proactive_log, level=logging.DEBUG)
 
     planner_cb = build_stateful_user_planner(
@@ -84,7 +84,7 @@ def build_proactive_stack(
         logger=planner_logger,
     )
     decision_maker = LLMDecisionMaker(user_llm, logger=decision_logger)
-    plan_executor_cb = build_plan_executor(llm, logger=orchestrator_logger)
+    plan_executor_cb = build_plan_executor(llm, logger=executor_logger)
 
     user_proxy = StatefulUserProxy(
         env, env.notification_system, max_user_turns=max_user_turns, logger=user_logger, planner=planner_cb

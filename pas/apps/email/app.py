@@ -70,7 +70,7 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
 
     def _handle_detail_transition(self, function_name: str, event: CompletedEvent) -> None:
         """Handle transitions triggered from the email detail view."""
-        if function_name in {"start_compose_reply", "start_compose_forward"}:
+        if function_name == "start_compose_reply":
             draft = self._compose_draft_from_event(event)
             self.set_current_state(ComposeEmail(draft=draft))
 

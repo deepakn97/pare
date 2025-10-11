@@ -11,16 +11,21 @@ if TYPE_CHECKING:
 
 
 class QueueLLM:
+    """Mock LLM that returns pre-queued responses."""
+
     def __init__(self, responses: list[str]) -> None:
+        """Initialize with a list of canned responses."""
         self._responses = responses
 
     def complete(self, prompt: str) -> str:
+        """Return the next queued response."""
         if not self._responses:
             raise RuntimeError("QueueLLM ran out of responses")
         return self._responses.pop(0)
 
 
 def test_react_intervention_executes_multiple_steps(monkeypatch: MonkeyPatch) -> None:
+    """Test that the ReAct adapter executes multiple steps to complete a task."""
     monkeypatch.setenv("OPENAI_API_KEY", "dummy")
 
     # First response triggers contacts search, second finalises with final answer.
