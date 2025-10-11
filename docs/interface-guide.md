@@ -50,10 +50,12 @@ class StatefulUserProxy(UserProxy):
     def __init__(
         self,
         env: StateAwareEnvironmentWrapper,
-        notification_system: NotificationSystem,
+        notification_system: BaseNotificationSystem,
         *,
         max_user_turns: int = 40,
-        logger: logging.Logger | None = None,
+        logger: logging.Logger,
+        planner: PlannerCallable | None = None,
+        event_timeout: float = 2.0,
     ) -> None: ...
 
     def init_conversation(self) -> str: ...
@@ -65,7 +67,9 @@ class StatefulUserProxy(UserProxy):
 - `env`: shared environment wrapper. Proxy must only interact via exposed `@user_tool`s.
 - `notification_system`: subscribe to `CompletedEvent`s to update state.
 - `max_user_turns`: once reached, `reply()` raises `TurnLimitReached`.
-- `logger`: optional logger (default uses module-level logger).
+- `logger`: required logger instance for tracking proxy actions.
+- `planner`: optional callable that maps messages to tool invocations. If None, proxy behavior depends on implementation.
+- `event_timeout`: timeout in seconds when waiting for tool completion events (default 2.0).
 
 ### 3.2 Behaviour of `init_conversation()`
 
@@ -91,7 +95,7 @@ class ProactiveAgentProtocol(Protocol):
     def observe(self, event: CompletedEvent) -> None: ...
     def propose_goal(self) -> str | None: ...
     def record_decision(self, task_guess: str, accepted: bool) -> None: ...
-    def execute(self, task_guess: str, env: StateAwareEnvironmentWrapper) -> None: ...
+    def execute(self, task_guess: str, env: StateAwareEnvironmentWrapper) -> InterventionResult: ...
     def handoff(self, env: StateAwareEnvironmentWrapper) -> None: ...
 ```
 
@@ -103,6 +107,7 @@ class ProactiveAgentProtocol(Protocol):
 - `record_decision`: scenario calls this once the user has responded. Use it to log acceptance / rejection and tidy temporary state.
 - `execute`: performs the autonomous intervention (only called when the user accepted). Receives the same task guess string.
   - May call `@app_tool`s directly or orchestrate other helpers.
+  - Returns an `InterventionResult` containing success status, notes, and optional metadata.
   - Must raise `ProactiveInterventionError` on failure.
 - `handoff`: restore a safe state (e.g. return to a neutral screen) and optionally enqueue a summary message for the user proxy to send later.
 

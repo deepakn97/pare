@@ -207,7 +207,9 @@ logs/
 .cursorindexingignore
 .claude
 .gemini
+.serena
 AGENTS.md
+CLAUDE.md
 
 # Marimo
 marimo/_static/

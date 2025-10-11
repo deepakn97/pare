@@ -152,7 +152,7 @@ def build_components(llm_client, user_llm_client):
         decision_maker=decision_maker,
         confirm_goal=lambda goal: True,
         logger=session_logger,
-        oracle_actions=setup.oracle_actions,
+        oracle_actions=[],  # Add your OracleAction list here if needed
     )
 
     return env, user_proxy, proactive_agent, decision_maker, session
@@ -180,7 +180,16 @@ launch an initial notification, and step through `session.run_cycle()`.
 ## 4. User Planner Expectations
 
 `build_stateful_user_planner` dynamically inspects the current app state and
-exposes only the tools that are presently valid. The planner prompt contains:
+exposes only the tools that are presently valid.
+
+**Parameters**:
+- `llm_client`: The LLM client for generating user actions
+- `apps`: Sequence of stateful apps to make available
+- `initial_app_name`: Optional app name to start with. If None, starts on home screen
+- `include_system_tools`: Whether to include system navigation tools (go_home, open_app)
+- `logger`: Logger instance for tracking planner decisions
+
+The planner prompt contains:
 
 - Current app + view (derived from the active state's class name).
 - Most recent pop-up text (system notification).

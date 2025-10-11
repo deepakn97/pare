@@ -39,11 +39,12 @@ class StatefulUserProxy(UserProxy):
 - `env`: shared environment wrapper. Access apps via `env.get_app(...)`.
 - `notification_system`: provides pop-up notifications triggered by
   `pas.notifications` for the scenario.
+- `max_user_turns`: after this many replies, `TurnLimitReached` is raised.
+- `logger`: required logger instance for tracking proxy actions and decisions.
 - `planner`: callable that accepts the incoming message and the proxy instance,
   then returns a list of `(app_name, method_name, args)` tuples.
-- `max_user_turns`: after this many replies, `TurnLimitReached` is raised.
 - `event_timeout`: how long to wait for a matching `CompletedEvent` when a tool
-  is marked as a write operation.
+  is marked as a write operation (default 2.0 seconds).
 
 Upon construction, the proxy subscribes to the environment’s completed events
 and records user-originating events in `_recent_events` for later lookups.
