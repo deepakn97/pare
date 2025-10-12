@@ -64,14 +64,14 @@ def dispatch_popup(
     """Emit a pop-up message through the notification system if both system and message exist."""
     if notification_system is None or not message:
         return
+    if channel == "system":
+        message_type = MessageType.ENVIRONMENT_NOTIFICATION
+    else:
+        raise NotImplementedError("Non-default popup channels are not supported yet.")
 
     current = timestamp if timestamp is not None else notification_system.get_current_time()
     notification_system.message_queue.put(
-        Message(
-            message_type=MessageType.ENVIRONMENT_NOTIFICATION,
-            message=message,
-            timestamp=datetime.fromtimestamp(current, tz=UTC),
-        )
+        Message(message_type=message_type, message=message, timestamp=datetime.fromtimestamp(current, tz=UTC))
     )
 
 

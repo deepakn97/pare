@@ -46,13 +46,14 @@ def attach_event_logging(env: StateAwareEnvironmentWrapper, log_file: Path) -> N
     event_logger = get_pas_file_logger("pas.events", log_file)
 
     def _log_event(event: CompletedEvent) -> None:
-        action = event.action
+        action = getattr(event, "action", None)
+        args = getattr(action, "args", None) if action is not None else None
         event_logger.info(
             "CompletedEvent: type=%s app=%s function=%s args=%s",
             event.event_type,
             event.app_name(),
             event.function_name(),
-            action.args,
+            args,
         )
 
     env.subscribe_to_completed_events(_log_event)
