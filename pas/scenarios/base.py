@@ -61,7 +61,7 @@ def build_proactive_stack(
         if isinstance(app, HomeScreenSystemApp):
             app.attach_environment(env)
 
-    app_names = {getattr(app, "name", None) for app in apps}
+    app_names = set(env.apps.keys())
     stateful_apps = [app for app in apps if isinstance(app, StatefulApp)]
     if not stateful_apps:
         raise ValueError("build_proactive_stack requires at least one StatefulApp")

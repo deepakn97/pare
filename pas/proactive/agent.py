@@ -155,13 +155,16 @@ class LLMBasedProactiveAgent(ProactiveAgentProtocol):
         lines.append("Recent events:")
         for event in events:
             direction = "USER" if event.event_type is EventType.USER else event.event_type.value
+            return_value = event.metadata.return_value if event.metadata else None
             lines.append(
-                f"- [{direction}] {event.app_name()}.{event.function_name()} args={event.action.args} return={event.metadata.return_value if event.metadata else None}"
+                f"- [{direction}] {event.app_name()}.{event.function_name()} "
+                f"args={event.action.args} return={return_value}"
             )
         if self._last_task:
             lines.append(f"Previous hypothesis: {self._last_task}")
         lines.append(
-            "Respond with the next user goal suggestion or 'none'. If you are not confident, answer 'none'—guessing wrong will frustrate the user."
+            "Respond with the next user goal suggestion or 'none'. "
+            "If you are not confident, answer 'none'—guessing wrong will frustrate the user."
         )
         return "\n".join(lines)
 

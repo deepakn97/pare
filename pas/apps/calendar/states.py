@@ -205,10 +205,7 @@ class EventDetail(AppState):
 
     def on_enter(self) -> None:
         """Fetch the underlying event when entering the detail view."""
-        try:
-            self._event = self.app.get_calendar_event(self.event_id)
-        except Exception:  # pragma: no cover - defensive for missing fixtures
-            self._event = None
+        self._event = self.app.get_calendar_event(self.event_id)
 
     def on_exit(self) -> None:
         """No teardown required; keep cached copy for go_back."""
@@ -220,10 +217,7 @@ class EventDetail(AppState):
 
     def _ensure_event(self) -> CalendarEvent | None:
         if self._event is None:
-            try:
-                self._event = self.app.get_calendar_event(self.event_id)
-            except Exception:  # pragma: no cover - underlying data removed
-                self._event = None
+            self._event = self.app.get_calendar_event(self.event_id)
         return self._event
 
     @user_tool()

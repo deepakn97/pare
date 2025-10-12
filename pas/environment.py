@@ -81,7 +81,6 @@ class StateAwareEnvironmentWrapper(Environment):
             event.event_type,
         )
 
-        action = event.action
         spec = resolve_popup_spec(event)
         if spec is not None:
             message = spec.builder(event)

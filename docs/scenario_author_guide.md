@@ -59,15 +59,13 @@ the task is truly complete.
 
 ```python
 from pathlib import Path
-from typing import Sequence
 
 from are.simulation.notification_system import VerbosityLevel
-from are.simulation.validation.constants import APP_ALIAS
 
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
-from pas.logging_utils import get_pas_file_logger, initialise_pas_logs
+from pas.logging_utils import get_pas_file_logger
 from pas.notifications import register_popup_for_event, format_incoming_message
 from pas.proactive import LLMBasedProactiveAgent
 from pas.system import (
@@ -185,7 +183,7 @@ exposes only the tools that are presently valid.
 **Parameters**:
 - `llm_client`: The LLM client for generating user actions
 - `apps`: Sequence of stateful apps to make available
-- `initial_app_name`: Optional app name to start with. If None, starts on home screen
+- `initial_app_name`: Optional app name to start with. If None, no stateful app will be initially active, and the planner will use system tools (if `include_system_tools=True`) or agent UI tools as the initial tool set
 - `include_system_tools`: Whether to include system navigation tools (go_home, open_app)
 - `logger`: Logger instance for tracking planner decisions
 

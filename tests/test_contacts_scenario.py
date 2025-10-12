@@ -54,7 +54,8 @@ def test_llm_agent_uses_plan_executor_and_summary(monkeypatch: MonkeyPatch) -> N
     user_llm = QueueLLM(['{"actions": [{"tool": "contacts.list_contacts", "args": {"offset": 0}}]}'])
     llm = QueueLLM([
         "Follow up with Alex Smith",
-        '{"tool": "email.send_email", "args": {"recipients": ["alex.smith@example.com"], "subject": "Lunch follow-up", "content": "Shall we confirm the time?"}}',
+        '{"tool": "email.send_email", "args": {"recipients": ["alex.smith@example.com"], '
+        '"subject": "Lunch follow-up", "content": "Shall we confirm the time?"}}',
     ])
     executed: list[str] = []
 

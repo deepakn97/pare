@@ -57,14 +57,17 @@ class ConversationOpened(AppState):
     ) -> dict[str, object]:
         """Read the conversation with the given conversation_id.
 
-        Shows the last 'limit' messages after offset. Which means messages between offset and offset + limit will be shown.
-        Messages are sorted by timestamp, most recent first.
+        Shows the last 'limit' messages after offset. Which means messages between
+        offset and offset + limit will be shown. Messages are sorted by timestamp,
+        most recent first.
 
         Args:
             offset: Offset to shift the view window
             limit: Number of messages to show
-            min_date: Minimum date of the messages to be shown (YYYY-MM-DD %H:%M:%S format). Default is None, which means no minimum date.
-            max_date: Maximum date of the messages to be shown (YYYY-MM-DD %H:%M:%S format). Default is None, which means no maximum date.
+            min_date: Minimum date (YYYY-MM-DD %H:%M:%S format). Default is None,
+                which means no minimum date.
+            max_date: Maximum date (YYYY-MM-DD %H:%M:%S format). Default is None,
+                which means no maximum date.
 
         Returns:
             Dict with messages and additional info

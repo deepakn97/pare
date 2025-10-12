@@ -37,7 +37,11 @@ def build_stateful_user_planner(
     logger: logging.Logger,
 ) -> PlannerCallable:
     """Return a planner callable wired to the provided LLM client and per-app tools."""
-    app_map = {app.name: app for app in apps if getattr(app, "name", None)}
+    app_map: dict[str, StatefulApp | SystemApp] = {}
+    for app in apps:
+        app_name = getattr(app, "name", None)
+        if isinstance(app_name, str) and app_name:
+            app_map[app_name] = app
     stateful_apps = [app for app in apps if isinstance(app, StatefulApp)]
     agent_ui_apps = [app for app in apps if isinstance(app, AgentUserInterface)]
     if not stateful_apps:

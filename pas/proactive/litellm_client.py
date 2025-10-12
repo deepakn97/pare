@@ -31,7 +31,8 @@ class LiteLLMClient(LLMClientProtocol):
 
         if self._provider is None and api_base is not None:
             LOGGER.warning(
-                "Model %s is not in LiteLLM registry; context and cost checks may be inaccurate when using api_base=%s.",
+                "Model %s is not in LiteLLM registry; context and cost checks "
+                "may be inaccurate when using api_base=%s.",
                 model,
                 api_base,
             )

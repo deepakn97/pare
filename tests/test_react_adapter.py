@@ -30,8 +30,11 @@ def test_react_intervention_executes_multiple_steps(monkeypatch: MonkeyPatch) ->
 
     # First response triggers contacts search, second finalises with final answer.
     react_llm = QueueLLM([
-        'Thought: I should look up Jordan\'s email.\nAction:\n{"action": "contacts__search_contacts", "action_input": {"query": "Jordan Lee"}}<end_action>',
-        'Thought: I can now confirm completion.\nAction:\n{"action": "final_answer", "action_input": {"answer": "Email sent to jordan.lee@example.com"}}<end_action>',
+        "Thought: I should look up Jordan's email.\nAction:\n"
+        '{"action": "contacts__search_contacts", "action_input": {"query": "Jordan Lee"}}<end_action>',
+        "Thought: I can now confirm completion.\nAction:\n"
+        '{"action": "final_answer", "action_input": '
+        '{"answer": "Email sent to jordan.lee@example.com"}}<end_action>',
     ])
 
     agent_llm = QueueLLM(["none"])

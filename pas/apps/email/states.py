@@ -124,10 +124,7 @@ class EmailDetail(AppState):
 
     def on_enter(self) -> None:
         """Attempt to refresh cached email details on entry."""
-        try:
-            self._email = self.app.get_email_by_id(email_id=self.email_id, folder_name=self.folder_name)
-        except Exception:  # pragma: no cover - defensive against missing fixtures
-            self._email = None
+        self._email = self.app.get_email_by_id(email_id=self.email_id, folder_name=self.folder_name)
 
     def on_exit(self) -> None:
         """Clear cached email data when leaving the detail view."""

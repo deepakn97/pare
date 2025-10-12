@@ -34,8 +34,6 @@ def build_contacts_followup_components(
     contacts = StatefulContactsApp(name="contacts")
     email = StatefulEmailApp(name="email")
     messaging = StatefulMessagingApp(name="messaging")
-    messaging.name = "messaging"
-
     system_app = HomeScreenSystemApp(name="system")
     _seed_contacts_app(contacts)
     email_id = _seed_email_app(email)
