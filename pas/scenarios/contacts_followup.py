@@ -16,7 +16,7 @@ from pas.apps.system import HomeScreenSystemApp
 from pas.scenarios.base import build_proactive_stack
 from pas.scenarios.types import OracleAction, ScenarioSetup
 
-__all__ = ["build_contacts_followup_components", "build_pas_contacts_meta_components"]
+__all__ = ["build_contacts_followup_components"]
 
 if TYPE_CHECKING:
     from pas.proactive import LLMClientProtocol
@@ -64,20 +64,6 @@ def build_contacts_followup_components(
         _emit_initial_messages(messaging, **messaging_context)
 
     return setup
-
-
-def build_pas_contacts_meta_components(
-    *,
-    llm: LLMClientProtocol,
-    user_llm: LLMClientProtocol,
-    max_user_turns: int,
-    log_mode: Literal["overwrite", "append"],
-    primary_app: str | None = None,
-) -> ScenarioSetup:
-    """Reuse the base contacts follow-up components for meta-style scaffolding."""
-    return build_contacts_followup_components(
-        llm=llm, user_llm=user_llm, max_user_turns=max_user_turns, log_mode=log_mode, primary_app=primary_app
-    )
 
 
 def _seed_contacts_app(app: ContactsApp) -> None:

@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
 from pas.meta_adapter import build_meta_scenario_components
-from pas.scenarios.contacts_followup import build_pas_contacts_meta_components
 
 
 class StubLLM:
@@ -21,26 +20,6 @@ class StubLLM:
     def complete(self, prompt: str) -> str:
         """Return the next canned response or 'none' if the queue is empty."""
         return self._responses.pop(0) if self._responses else "none"
-
-
-def test_pas_contacts_meta_components_populates_message(monkeypatch: MonkeyPatch) -> None:
-    """Ensure PAS-flavoured scenario seeds messaging app and oracle correctly."""
-    monkeypatch.setenv("OPENAI_API_KEY", "")
-    llm = StubLLM(["none"])
-    user_llm = StubLLM(['{"actions": []}'])
-
-    setup = build_pas_contacts_meta_components(
-        llm=llm, user_llm=user_llm, max_user_turns=1, log_mode="overwrite", primary_app="messaging"
-    )
-    env, _proxy, _agent, _decision_maker = setup
-
-    messaging = env.get_app("messaging")
-    state = messaging.get_state()
-    assert state["conversations"], "Expected seeded messaging conversation"
-    assert setup.oracle_actions
-    contact_oracle = setup.oracle_actions[0]
-    assert contact_oracle.app == "email"
-    assert "jordan.lee@example.com" in contact_oracle.args.get("recipients", [])
 
 
 def test_meta_scenario_tutorial_conversion(monkeypatch: MonkeyPatch) -> None:

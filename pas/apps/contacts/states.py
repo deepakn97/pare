@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from are.simulation.apps.contacts import Contact  # noqa: TC002
 from are.simulation.tool_utils import AppTool, user_tool
 
 from pas.apps.core import AppState
 
 if TYPE_CHECKING:
-    from are.simulation.apps.contacts import Contact
-
     from pas.apps.contacts.app import StatefulContactsApp
 
 

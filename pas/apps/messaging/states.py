@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from are.simulation.apps.messaging_v2 import ConversationV2  # noqa: TC002
 from are.simulation.tool_utils import user_tool
 
 from pas.apps.core import AppState
-
-if TYPE_CHECKING:
-    from are.simulation.apps.messaging_v2 import ConversationV2
 
 
 class ConversationOpened(AppState):
