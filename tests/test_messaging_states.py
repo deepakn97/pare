@@ -1,11 +1,16 @@
 """Tests for StatefulMessagingApp and messaging states."""
 
-from collections.abc import Generator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pas.apps.messaging.app import StatefulMessagingApp
 from pas.apps.messaging.states import ConversationList, ConversationOpened
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @pytest.fixture
