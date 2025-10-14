@@ -57,8 +57,8 @@ context for later prompts.
 
 ## 3. Proposing a Goal (`propose_goal`)
 
-`ProactiveSession.run_cycle()` calls `propose_goal` after all pop-up
-notifications for the cycle have been processed. By then the event deque
+`ProactiveSession.run_cycle()` calls `propose_goal` after all notifications for
+the cycle have been processed. By then the event deque
 contains both the triggering environment event (e.g. a new message) and the
 user proxy’s response (e.g. opening the conversation). Build a prompt from that
 history and return a short goal string or `None`.

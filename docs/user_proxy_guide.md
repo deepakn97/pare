@@ -8,7 +8,7 @@ in alternative planners while keeping the public contract stable.
 `pas/user_proxy/stateful.py` exports `StatefulUserProxy`, a drop-in replacement
 for Meta-ARE’s default proxy. Its core responsibilities are:
 
-1. Translate free-form messages (from the agent or system pop-ups) into concrete
+1. Translate free-form messages (from the agent or system notifications) into concrete
    tool invocations.
 2. Execute those tools against the current navigation state while tracking
    recent events.
@@ -37,8 +37,8 @@ class StatefulUserProxy(UserProxy):
 ```
 
 - `env`: shared environment wrapper. Access apps via `env.get_app(...)`.
-- `notification_system`: provides pop-up notifications triggered by
-  `pas.notifications` for the scenario.
+- `notification_system`: provides notifications triggered by
+  `pas.system.notification` for the scenario.
 - `max_user_turns`: after this many replies, `TurnLimitReached` is raised.
 - `logger`: required logger instance for tracking proxy actions and decisions.
 - `planner`: callable that accepts the incoming message and the proxy instance,
@@ -51,9 +51,9 @@ and records user-originating events in `_recent_events` for later lookups.
 
 ## 3. Notification Handling
 
-Scenarios convert tool completions into pop-ups via
-`pas.notifications.register_popup_for_event` or `register_popup`. The proxy
-consumes them with:
+Scenarios convert tool completions into notifications through
+`pas.system.notification.PasNotificationSystem` (instantiated via
+`pas.system.runtime.create_notification_system`). The proxy consumes them with:
 
 ```python
 notifications = proxy.consume_notifications()
@@ -63,8 +63,8 @@ for text in notifications:
 
 The default implementation filters out noisy meta-events (e.g. raw
 conversation IDs) and logs a friendly summary (`Notification (app: messaging)`
-...). These pop-ups feed back into the planner so the user LLM receives the
-same context a human would see on a phone lock screen.
+...). These notifications feed back into the planner so the user LLM receives
+the same context a human would see on a phone lock screen.
 
 ## 4. Planner Contract
 
@@ -80,6 +80,16 @@ The built-in `LLMUserPlanner` prepares a prompt that includes:
 - The latest system notification.
 - A catalog of available tools, identified as `option_1`, `option_2`, ... with
   parameter metadata.
+
+The system instructions explicitly tell the planner to prioritise
+`accept_proposal` or `decline_proposal` whenever a notification starts with
+`"Proactive assistant proposal:"`. These tools are only exposed while the Agent
+UI has a pending proposal, ensuring proactive prompts are resolved without
+cluttering other notifications. Navigation-only actions such as
+`ProactiveAgentUserInterface.go_back` are intentionally hidden so the interface
+behaves like a persistent overlay. The instructions also remind the planner
+that the user would rather tap than type, so `ProactiveAgentUserInterface.send_message_to_agent`
+should be used sparingly and any manual reply kept brief.
 
 It expects the LLM to return JSON of the form:
 
@@ -147,7 +157,7 @@ tail them while developing new planners or scenarios.
   constructor. Keep the same return structure so execution stays intact.
 - Override `_format_reply` if you prefer structured JSON or richer
   explanations.
-- Adjust `consume_notifications` if your pop-up format differs from the default
+- Adjust `consume_notifications` if your notification format differs from the default
   `Notification (app: ...)` style.
 
 With these pieces in place, the user proxy will interoperate with the proactive

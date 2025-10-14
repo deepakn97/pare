@@ -13,9 +13,9 @@ Every scenario wires the following layers together:
 2. **Stateful apps** – register `Stateful*App` instances with
    `StateAwareEnvironmentWrapper`. Apps surface tools that the user proxy and
    proactive agent invoke.
-3. **Notification pop-ups** – use `pas.notifications.register_popup_for_event`
-   (or the decorator helper) so that completed events turn into human readable
-   system pop-ups. The user proxy consumes these via
+3. **Notifications** – configure `pas.system.notification.PasNotificationSystem`
+   (exposed through `create_notification_system`) so completed events become
+   human readable system notifications. The user proxy consumes these via
    `StatefulUserProxy.consume_notifications()`.
 4. **User planner** – `pas.system.user.build_stateful_user_planner` builds an
    LLM-backed planner that enumerates per-app tools and system navigation tools.
@@ -30,8 +30,8 @@ Every scenario wires the following layers together:
    events, proposes a goal, executes the confirmed plan via
    `pas.system.proactive.build_plan_executor`, then hands control back.
 7. **Session loop** – `pas.system.session.ProactiveSession` coordinates one
-   “proactive cycle”: drain pop-up notifications, ask the agent to propose a
-   goal, confirm with the user via the decision maker, execute, and surface a
+   “proactive cycle”: drain notifications, ask the agent to propose a goal,
+   confirm with the user via the decision maker, execute, and surface a
    completion summary.
 
 ### Meta-ARE or PAS-native?
@@ -66,7 +66,6 @@ from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
 from pas.logging_utils import get_pas_file_logger
-from pas.notifications import register_popup_for_event, format_incoming_message
 from pas.proactive import LLMBasedProactiveAgent
 from pas.system import (
     ProactiveSession,
@@ -98,13 +97,6 @@ def build_components(llm_client, user_llm_client):
     env.register_apps([contacts, messaging, email])
 
     attach_event_logging(env, events_log)
-
-    # Ensure Messaging pop-ups show human text
-    register_popup_for_event(
-        "StatefulMessagingApp",
-        "create_and_add_message",
-        builder=format_incoming_message,
-    )
 
     # Contacts is the default app when the conversation begins
     planner_logger = get_pas_file_logger("pas.user_proxy.planner", user_log)
@@ -169,11 +161,11 @@ launch an initial notification, and step through `session.run_cycle()`.
   sandbox.
 - Use `get_pas_file_logger` to attach file handlers once; the helper prevents
   duplicate handlers when tests run repeatedly.
-- Convert app events into pop-ups with `register_popup_for_event` or
-  `register_popup`. Builders receive a `CompletedEvent` and return the text that
-  the user LLM sees (for example, `format_incoming_message`). By default pop-ups
-  are posted on the "system" channel, matching the logs produced in
-  `logs/pas/user_proxy.log`.
+- `PasNotificationSystem` already formats Agent UI proposals and messaging
+  events into human-readable notifications. Provide `extra_notifications`
+  (see `build_proactive_stack`) to subscribe additional tools per app when a
+  scenario needs more surface area. Notifications are posted on the "system"
+  channel, matching the logs captured in `logs/pas/user_proxy.log`.
 
 ## 4. User Planner Expectations
 
@@ -190,13 +182,19 @@ exposes only the tools that are presently valid.
 The planner prompt contains:
 
 - Current app + view (derived from the active state's class name).
-- Most recent pop-up text (system notification).
+- Most recent notification text.
 - Option IDs (`option_1`, `option_2`, …) mapped to concrete
   `app_name.method_name` pairs plus parameter descriptions.
 
-The planner must be called for every agent/user message as well as for pop-up
-reactions (`StatefulUserProxy.react_to_event`). Planner outputs are JSON-encoded
-tool invocations that the proxy executes in order.
+Notifications that begin with `"Proactive assistant proposal:"` trigger a planner
+instruction bias toward the `accept_proposal`/`decline_proposal` tools, which are
+only surfaced when the Agent UI has a pending proposal. The same prompt notes
+that the simulated user prefers taps to typing, so flows should lean on
+button-like tools and keep any manual messages short.
+
+The planner must be called for every agent/user message as well as for
+notification reactions (`StatefulUserProxy.react_to_event`). Planner outputs are
+JSON-encoded tool invocations that the proxy executes in order.
 
 ## 5. Proactive Session Loop
 

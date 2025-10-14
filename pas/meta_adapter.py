@@ -66,7 +66,7 @@ ARG_TRANSFORMERS: dict[str, dict[str, t.Callable[[dict[str, object], object], di
 
 
 def _resolve_limit(value: object, fallback: int) -> int:
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         candidate = int(value)
         if candidate > 0:
             return max(candidate, fallback)

@@ -9,6 +9,7 @@ from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.system import SystemApp
 
 from pas.apps.core import StatefulApp
+from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
 from pas.user_proxy import LLMUserPlanner, UserToolParameter, UserToolSpec
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type hints only
@@ -24,7 +25,10 @@ else:
 
 DEFAULT_USER_SYSTEM_PROMPT = (
     "You are manually operating your phone. Choose actions that genuinely reflect what you want to do next. "
-    "You may interact with any available app; call the appropriate tool for that app when you need to switch contexts."
+    "You may interact with any available app; call the appropriate tool for that app when you need to switch contexts. "
+    "You prefer taps and menus over typing and generally keep replies brief. "
+    "When a notification begins with 'Proactive assistant proposal:' prioritise the available accept_proposal or "
+    "decline_proposal tools before doing anything else unless another action is absolutely required."
 )
 
 
@@ -169,6 +173,8 @@ def _collect_user_tool_specs(apps: typing.Sequence[object], *, include_system: b
 
     for app in apps:
         for tool in _iter_user_tools_for_app(app, include_system):
+            if not _should_include_tool(app, tool):
+                continue
             try:
                 candidate = _app_tool_to_user_spec(app, tool)
             except ValueError:
@@ -199,6 +205,19 @@ def _iter_user_tools_for_app(app: object, include_system: bool) -> typing.Iterab
     tool_getter = getattr(app, "get_user_tools", None)
     if callable(tool_getter):
         yield from tool_getter()
+
+
+def _should_include_tool(app: object, tool: AppTool) -> bool:
+    """Return True when the tool should be surfaced to the planner."""
+    if isinstance(app, ProactiveAgentUserInterface):
+        func_name = getattr(getattr(tool, "function", None), "__name__", "")
+        if func_name == "go_back":
+            return False
+        if func_name in {"accept_proposal", "decline_proposal"}:
+            pending = getattr(app, "pending_proposal", None)
+            if pending is None:
+                return False
+    return True
 
 
 def _app_tool_to_user_spec(app: object, tool: AppTool) -> UserToolSpec:

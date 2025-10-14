@@ -21,7 +21,7 @@ def _normalise_value(value: object) -> object:
         return {key: _normalise_value(val) for key, val in value.items()}
     if isinstance(value, list):
         return [_normalise_value(item) for item in value]
-    if hasattr(value, "value") and not isinstance(value, (str, bytes)):
+    if hasattr(value, "value") and not isinstance(value, str | bytes):
         enum_value = value.value
         if enum_value is not None:
             return enum_value
