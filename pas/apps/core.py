@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from are.simulation.apps.app import App
 from are.simulation.tool_utils import AppTool, build_tool, user_tool
-from are.simulation.types import CompletedEvent
+
+if TYPE_CHECKING:
+    from are.simulation.types import CompletedEvent
 
 
 class AppState(ABC):
@@ -33,15 +37,7 @@ class AppState(ABC):
 
     @property
     def app(self) -> App:
-        """Get the app this state is bound to.
-
-        Raises:
-            RuntimeError: If state not bound to app yet
-        """
-        # if self._app is None:
-        #     raise RuntimeError(
-        #         f"{self.__class__.__name__} not bound to app. States must be set via app.set_current_state()"
-        #     )
+        """Get the app this state is bound to."""
         return self._app
 
     def get_available_actions(self) -> list[AppTool]:
@@ -84,6 +80,8 @@ class StatefulApp(App):
     This class implements the basic functionality needed for a finite state machine based mobile app.
     """
 
+    name: str | None
+
     def __init__(self, name: str | None = None, *args: Any, **kwargs: Any) -> None:
         """Initialize the stateful app.
 
@@ -92,9 +90,17 @@ class StatefulApp(App):
             args: The arguments to pass to the app.
             kwargs: The keyword arguments to pass to the app.
         """
+        desired_name = name
         super().__init__(name, *args, **kwargs)
+        # Workaround for Meta-ARE dataclass apps with __post_init__ that call super().__init__(self.name)
+        # where self.name is None (dataclass default), causing App.__init__ to use class name as fallback.
+        # We restore the intended name after parent initialization completes.
+        actual_name = cast("str | None", getattr(self, "name", None))
+        if desired_name is not None and actual_name != desired_name:
+            self.name = desired_name
         self.current_state: AppState | None = None
-        # Navigation stack is used to track the history of the state transitions. The first state is always the initial state of the app.
+        # Navigation stack is used to track the history of the state transitions.
+        # The first state is always the initial state of the app.
         self.navigation_stack: list[AppState] = []
 
     def set_current_state(self, app_state: AppState) -> None:
@@ -120,6 +126,21 @@ class StatefulApp(App):
         app_state.on_enter()
         self.current_state = app_state
 
+    @abstractmethod
+    def create_root_state(self) -> AppState:
+        """Return a freshly constructed root navigation state."""
+
+    def load_root_state(self) -> None:
+        """Reset the app to its root navigation state."""
+        self.set_current_state(self.create_root_state())
+        self.navigation_stack.clear()
+
+    def reset_to_root(self) -> str:
+        """Reset to the root navigation state and report the new view."""
+        self.load_root_state()
+        state_name = type(self.current_state).__name__ if self.current_state else "UnknownState"
+        return f"Reset to {state_name}"
+
     @user_tool()
     def go_back(self) -> str:
         """Navigate back to the previous state of the app.
@@ -136,7 +157,8 @@ class StatefulApp(App):
     def get_user_tools(self) -> list[AppTool]:
         """Get user tools from the current state of the app.
 
-        User tools are state dependent and manage context. Each state will only enable some of the available actions in the app.
+        User tools are state dependent and manage context. Each state will only enable
+        some of the available actions in the app.
 
         Returns:
             list[AppTool]: A list of AppTool objects representing the available user tools.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from are.simulation.apps.email_client import Email, EmailFolderName, ReturnedEmails
 from are.simulation.tool_utils import user_tool
@@ -13,7 +13,6 @@ from pas.apps.core import AppState
 
 def _normalise_folder(folder: str | None) -> str:
     """Convert caller provided folder strings into canonical enum values."""
-
     if not folder:
         return EmailFolderName.INBOX.value
     try:
@@ -41,6 +40,7 @@ class MailboxView(AppState):
     """Mailbox listing state exposing folder-scoped navigation actions."""
 
     def __init__(self, folder: str = EmailFolderName.INBOX.value) -> None:
+        """Initialise the mailbox view with the provided folder."""
         super().__init__()
         self.folder = _normalise_folder(folder)
 
@@ -53,34 +53,24 @@ class MailboxView(AppState):
     @user_tool()
     def list_emails(self, offset: int = 0, limit: int = 10) -> ReturnedEmails:
         """List emails in the current folder with pagination support."""
-
         return self.app.list_emails(folder_name=self.folder, offset=offset, limit=limit)
 
     @user_tool()
     def search_emails(
-        self,
-        query: str,
-        min_date: str | None = None,
-        max_date: str | None = None,
-        limit: int | None = 10,
+        self, query: str, min_date: str | None = None, max_date: str | None = None, limit: int | None = 10
     ) -> list[Email]:
         """Search for emails within the current folder.
 
         min/max filters are applied client-side because the backend API does not
         expose them. Invalid date strings are ignored.
         """
-
         results = self.app.search_emails(query=query, folder_name=self.folder)
 
         def to_timestamp(date_str: str | None) -> float | None:
             if not date_str:
                 return None
             try:
-                return (
-                    datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-                    .replace(tzinfo=timezone.utc)
-                    .timestamp()
-                )
+                return datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC).timestamp()
             except ValueError:
                 return None
 
@@ -103,26 +93,22 @@ class MailboxView(AppState):
     @user_tool()
     def open_email_by_id(self, email_id: str) -> Email:
         """Open a specific email by id within the current folder."""
-
         return self.app.get_email_by_id(email_id=email_id, folder_name=self.folder)
 
     @user_tool()
     def open_email_by_index(self, index: int) -> Email:
         """Open a specific email by index within the current folder."""
-
         return self.app.get_email_by_index(idx=index, folder_name=self.folder)
 
     @user_tool()
     def switch_folder(self, folder_name: str) -> ReturnedEmails:
         """Switch to a different folder and return its contents."""
-
         target_folder = _normalise_folder(folder_name)
         return self.app.list_emails(folder_name=target_folder)
 
     @user_tool()
     def start_compose(self) -> str:
         """Begin a new compose flow originating from the mailbox view."""
-
         return "compose_started"
 
 
@@ -130,6 +116,7 @@ class EmailDetail(AppState):
     """Email detail state allowing follow-up actions on a single email."""
 
     def __init__(self, email_id: str, folder_name: str = EmailFolderName.INBOX.value) -> None:
+        """Bind the detail view to a specific email and folder."""
         super().__init__()
         self.email_id = email_id
         self.folder_name = _normalise_folder(folder_name)
@@ -137,13 +124,7 @@ class EmailDetail(AppState):
 
     def on_enter(self) -> None:
         """Attempt to refresh cached email details on entry."""
-
-        try:
-            self._email = self.app.get_email_by_id(
-                email_id=self.email_id, folder_name=self.folder_name
-            )
-        except Exception:  # pragma: no cover - defensive against missing fixtures
-            self._email = None
+        self._email = self.app.get_email_by_id(email_id=self.email_id, folder_name=self.folder_name)
 
     def on_exit(self) -> None:
         """Clear cached email data when leaving the detail view."""
@@ -153,47 +134,29 @@ class EmailDetail(AppState):
     @property
     def email(self) -> Email | None:
         """Return the cached email if available."""
-
         return self._email
 
     @user_tool()
     def refresh(self) -> Email:
         """Fetch the latest version of the current email."""
-
-        self._email = self.app.get_email_by_id(
-            email_id=self.email_id, folder_name=self.folder_name
-        )
+        self._email = self.app.get_email_by_id(email_id=self.email_id, folder_name=self.folder_name)
         return self._email
 
     @user_tool()
-    def reply(
-        self,
-        content: str = "",
-        attachment_paths: list[str] | None = None,
-    ) -> str:
+    def reply(self, content: str = "", attachment_paths: list[str] | None = None) -> str:
         """Send a reply to the current email."""
-
         return self.app.reply_to_email(
-            email_id=self.email_id,
-            folder_name=self.folder_name,
-            content=content,
-            attachment_paths=attachment_paths,
+            email_id=self.email_id, folder_name=self.folder_name, content=content, attachment_paths=attachment_paths
         )
 
     @user_tool()
     def forward(self, recipients: list[str]) -> str:
         """Forward the current email to new recipients."""
-
-        return self.app.forward_email(
-            email_id=self.email_id,
-            recipients=recipients,
-            folder_name=self.folder_name,
-        )
+        return self.app.forward_email(email_id=self.email_id, recipients=recipients, folder_name=self.folder_name)
 
     @user_tool()
     def move(self, destination_folder: str) -> str:
         """Move the current email to a different folder."""
-
         return self.app.move_email(
             email_id=self.email_id,
             source_folder_name=self.folder_name,
@@ -203,23 +166,18 @@ class EmailDetail(AppState):
     @user_tool()
     def delete(self) -> str:
         """Delete the current email (moves it to trash)."""
-
         return self.app.delete_email(email_id=self.email_id, folder_name=self.folder_name)
 
     @user_tool()
     def download_attachments(self, path_to_save: str) -> list[str]:
         """Download attachments from the current email to a path."""
-
         return self.app.download_attachments(
-            email_id=self.email_id,
-            folder_name=self.folder_name,
-            path_to_save=path_to_save,
+            email_id=self.email_id, folder_name=self.folder_name, path_to_save=path_to_save
         )
 
     @user_tool()
     def start_compose_reply(self) -> dict[str, object]:
         """Return metadata required to seed a reply draft in compose view."""
-
         email = self.email
         if email is None:
             return {"draft": None}
@@ -239,6 +197,7 @@ class ComposeEmail(AppState):
     """Compose state exposing draft editing and submission tools."""
 
     def __init__(self, draft: ComposeDraft | None = None) -> None:
+        """Initialise the compose state with an optional existing draft."""
         super().__init__()
         self.draft = draft or ComposeDraft()
         if not self.draft.default_recipients:
@@ -248,23 +207,19 @@ class ComposeEmail(AppState):
 
     def on_enter(self) -> None:
         """Reset cached tools to ensure latest draft mutations are reflected."""
-
         self._cached_tools = None
 
     def on_exit(self) -> None:
         """Clear cached tools and reset draft state."""
-
         self._cached_tools = None
 
     def _mark_dirty(self) -> None:
         """Utility to invalidate cached tools after draft mutation."""
-
         self._cached_tools = None
 
     @user_tool()
     def set_recipients(self, recipients: list[str]) -> dict[str, object]:
         """Replace the draft recipients list."""
-
         self.draft.recipients = recipients
         self._mark_dirty()
         return {"recipients": self.draft.recipients}
@@ -272,7 +227,6 @@ class ComposeEmail(AppState):
     @user_tool()
     def add_recipient(self, recipient: str) -> dict[str, object]:
         """Append a single recipient to the draft."""
-
         self.draft.recipients.append(recipient)
         self._mark_dirty()
         return {"recipients": self.draft.recipients}
@@ -280,7 +234,6 @@ class ComposeEmail(AppState):
     @user_tool()
     def set_cc(self, cc: list[str]) -> dict[str, object]:
         """Replace the CC list for the draft."""
-
         self.draft.cc = cc
         self._mark_dirty()
         return {"cc": self.draft.cc}
@@ -288,28 +241,24 @@ class ComposeEmail(AppState):
     @user_tool()
     def set_subject(self, subject: str) -> dict[str, object]:
         """Update the subject line for the draft."""
-
         self.draft.subject = subject
         return {"subject": self.draft.subject}
 
     @user_tool()
     def set_body(self, body: str) -> dict[str, object]:
         """Update the body content for the draft."""
-
         self.draft.body = body
         return {"body": self.draft.body}
 
     @user_tool()
     def attach_file(self, attachment_path: str) -> dict[str, object]:
         """Attach a file path to the draft."""
-
         self.draft.attachments.append(attachment_path)
         return {"attachments": list(self.draft.attachments)}
 
     @user_tool()
     def send_composed_email(self) -> str:
         """Send the draft using the underlying email client."""
-
         attachments = self.draft.attachments or None
 
         if self.draft.reply_to:
@@ -326,7 +275,6 @@ class ComposeEmail(AppState):
     @user_tool()
     def save_draft(self) -> str:
         """Persist the draft into the DRAFT folder."""
-
         return self.app.create_and_add_email(
             sender=self.app.user_email,
             recipients=self.draft.recipients,
@@ -338,6 +286,5 @@ class ComposeEmail(AppState):
     @user_tool()
     def discard_draft(self) -> str:
         """Discard the current draft without sending."""
-
         self.draft = ComposeDraft()
         return "draft_discarded"
