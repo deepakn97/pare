@@ -9,6 +9,7 @@ from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
 from are.simulation.scenarios import Scenario
 
 from pas.scenario_generator.agent.scenario_generating_agent import ScenarioGeneratingAgent
+from pas.scenario_generator.example_proactive_scenarios import scenario as _proactive_scenarios  # noqa: F401
 from pas.scenario_generator.utils.list_all_app_imports import make_import_instructions, scan_package
 
 logger = logging.getLogger(__name__)
