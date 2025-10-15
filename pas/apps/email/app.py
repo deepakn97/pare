@@ -2,82 +2,68 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from are.simulation.apps.email_client import Email, EmailClientV2, EmailFolderName
-from are.simulation.types import disable_events
+from are.simulation.types import CompletedEvent, disable_events
 from are.simulation.utils import uuid_hex
 
 from pas.apps.core import StatefulApp
 from pas.apps.email.states import ComposeDraft, ComposeEmail, EmailDetail, MailboxView
-
-if TYPE_CHECKING:
-    from are.simulation.types import CompletedEvent
 
 
 class StatefulEmailApp(StatefulApp, EmailClientV2):
     """Email client with navigation state management for user tool filtering."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialise the email app with the inbox as the starting state."""
         super().__init__(*args, **kwargs)
-        self.load_root_state()
+        self.set_current_state(MailboxView(folder=EmailFolderName.INBOX.value))
 
+    # pylint: disable=too-many-return-statements
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Update navigation state in response to completed tool events."""
+
         current_state = self.current_state
         function_name = event.function_name()
 
         if current_state is None or function_name is None:  # pragma: no cover - defensive
             return
 
-        action = event.action
-        args = action.resolved_args or action.args
-        if isinstance(current_state, MailboxView):
-            self._handle_mailbox_transition(current_state, function_name, args, event)
-            return
+        args = event.action.resolved_args or event.action.args
 
-        if isinstance(current_state, EmailDetail):
-            self._handle_detail_transition(function_name, event)
-            if function_name in {"delete", "move"} and self.navigation_stack:
-                self.go_back()
-            return
-
-        if isinstance(current_state, ComposeEmail):
-            self._handle_compose_transition(function_name)
-
-    def _handle_mailbox_transition(
-        self, current_state: MailboxView, function_name: str, args: dict[str, Any], event: CompletedEvent
-    ) -> None:
-        """Handle transitions triggered from the mailbox view."""
-        if function_name in {"open_email_by_id", "open_email_by_index"}:
+        if isinstance(current_state, MailboxView) and function_name in {"open_email_by_id", "open_email_by_index"}:
             folder = self._resolve_folder_from_args(args, current_state.folder)
             email_id = args.get("email_id")
             if email_id is None:
                 email_id = self._email_id_from_event(event)
+
             if email_id is not None:
                 self.set_current_state(EmailDetail(email_id=email_id, folder_name=folder))
             return
 
-        if function_name == "switch_folder":
+        if isinstance(current_state, MailboxView) and function_name == "switch_folder":
             folder = self._resolve_folder_from_args(args, current_state.folder)
             self.set_current_state(MailboxView(folder=folder))
             return
 
-        if function_name == "start_compose":
+        if isinstance(current_state, MailboxView) and function_name == "start_compose":
             draft = self._compose_draft_from_event(event)
             self.set_current_state(ComposeEmail(draft=draft))
+            return
 
-    def _handle_detail_transition(self, function_name: str, event: CompletedEvent) -> None:
-        """Handle transitions triggered from the email detail view."""
-        if function_name == "start_compose_reply":
+        if isinstance(current_state, EmailDetail) and function_name in {"start_compose_reply", "start_compose_forward"}:
             draft = self._compose_draft_from_event(event)
             self.set_current_state(ComposeEmail(draft=draft))
+            return
 
-    def _handle_compose_transition(self, function_name: str) -> None:
-        """Handle transitions triggered from the compose view."""
-        if function_name in {"send_composed_email", "save_draft", "discard_draft"} and self.navigation_stack:
-            self.go_back()
+        if isinstance(current_state, ComposeEmail) and function_name in {"send_composed_email", "save_draft", "discard_draft"}:
+            if self.navigation_stack:
+                self.go_back()
+            return
+
+        if isinstance(current_state, EmailDetail) and function_name in {"delete", "move"}:
+            if self.navigation_stack:
+                self.go_back()
 
     @staticmethod
     def _resolve_folder_from_args(args: dict[str, Any], default_folder: str) -> str:
@@ -124,6 +110,7 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
 
     def send_reply_from_draft(self, draft: ComposeDraft) -> str:
         """Send a reply using the draft metadata, preserving user edits."""
+
         if not draft.reply_to:
             raise ValueError("Draft does not reference a reply target")
 
@@ -172,7 +159,7 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
                         email = self.folders[folder].get_email_by_id(email.parent_id)
                         email_found = True
                         break
-                    except (KeyError, ValueError):
+                    except Exception:
                         continue
                 if not email_found:
                     raise ValueError(f"Email with id {email.parent_id} not found")
@@ -203,7 +190,3 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
             self.add_email(email=email, folder_name=EmailFolderName.SENT)
 
         return email.email_id
-
-    def create_root_state(self) -> MailboxView:
-        """Return the mailbox view rooted in the inbox."""
-        return MailboxView(folder=EmailFolderName.INBOX.value)

@@ -1754,9 +1754,7 @@ name = "proactiveagentsandbox"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "litellm" },
     { name = "meta-agents-research-environments" },
-    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -1774,11 +1772,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "litellm", specifier = ">=1.0.0" },
-    { name = "meta-agents-research-environments", git = "ssh://git@github.com/deepakn97/meta-are.git" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-]
+requires-dist = [{ name = "meta-agents-research-environments", git = "ssh://git@github.com/deepakn97/meta-are.git" }]
 
 [package.metadata.requires-dev]
 dev = [

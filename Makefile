@@ -38,10 +38,6 @@ docs-test: ## Test if documentation can be built without warnings or errors
 docs: ## Build and serve the documentation
 	@uv run mkdocs serve
 
-.PHONY: demo
-demo: ## Run a sample scenario interaction and show log locations
-	@uv run python -m pas.scripts.run_contacts_demo
-
 .PHONY: help
 help:
 	@uv run python -c "import re; \

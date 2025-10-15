@@ -564,7 +564,7 @@ class SystemApp(App):  # Extend existing SystemApp
         return list(self.open_apps.keys())
 ```
 
-## Implementation Plan
+## Implementation Plan Overview
 
 See **[Detailed Implementation Todo](#detailed-implementation-todo)** section below for complete step-by-step instructions.
 

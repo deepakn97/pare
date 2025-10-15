@@ -16,8 +16,6 @@ classifiers = [
 ]
 dependencies = [
     "meta-agents-research-environments",
-    "litellm>=1.0.0",
-    "python-dotenv>=1.0.0",
 ]
 
 [project.urls]
@@ -195,11 +193,3 @@ ignore = ["*"]
 
 [tool.uv.sources]
 meta-agents-research-environments = { git = "ssh://git@github.com/deepakn97/meta-are.git" }
-
-[[tool.mypy.overrides]]
-module = "pytest"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "dotenv"
-ignore_missing_imports = true
