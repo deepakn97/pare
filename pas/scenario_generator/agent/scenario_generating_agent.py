@@ -1,10 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the terms described in the LICENSE file in
-# the root directory of this source tree.
-
-
 import logging
 import re
 import time
@@ -25,6 +18,12 @@ from are.simulation.tool_box import DEFAULT_TOOL_DESCRIPTION_TEMPLATE, Toolbox
 from are.simulation.tool_utils import AppTool, AppToolAdapter
 
 from pas.scenario_generator.prompt import DEFAULT_ARE_SIMULATION_SCENARIO_GENERATOR_AGENT_REACT_JSON_SYSTEM_PROMPT
+from pas.scenario_generator.prompt.scenario_generator_prompts import (
+    DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT,
+    DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT_WITH_INSTRUCTIONS,
+    SEED_TASK_WITH_EXAMPLES_BASE,
+    create_repair_note,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -148,12 +147,7 @@ class ScenarioGeneratingAgent:
                 src = ""
             code_blocks.append(f"Example {i}:\n```python\n{src}\n```")
 
-        return (
-            "Reference scenario(s) (generate a new .py scenario file inspired by these, "
-            "following the Scenario API, be sure to import the tools at the beginning of the file, "
-            "following the INSTRUSTIONS TO IMPORT AVAILABLE TOOLS). Return only a single fenced python code "
-            "block for the new scenario class.\n\n" + "\n\n".join(code_blocks)
-        )
+        return SEED_TASK_WITH_EXAMPLES_BASE.format(example_code_blocks="\n\n".join(code_blocks))
 
     def _create_initial_messages(self, system_prompt: str, seed_task: str) -> list[dict[str, str]]:
         """Create the initial messages for the LLM."""
@@ -173,25 +167,15 @@ class ScenarioGeneratingAgent:
                 adjusted_messages = list(self.messages)
             else:
                 # Use a concise repair system prompt to avoid creation-time distractions
-                repair_system_prompt = (
-                    "You are fixing Python imports in a generated scenario file. "
-                    "Your goal is to correct ONLY import statements so they compile, without changing the scenario's logic or behavior.\n"
-                    "Return a single COMPLETE fenced python code block that includes corrected imports and the full file.\n"
-                )
                 if self.import_instructions:
-                    repair_system_prompt += (
-                        "Use ONLY the following allowed imports list. If something is missing, prefer equivalents from this list or keep existing working imports.\n"
-                        "INSTRUCTIONS TO IMPORT AVAILABLE TOOLS:\n" + self.import_instructions
+                    repair_system_prompt = DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT_WITH_INSTRUCTIONS.format(
+                        import_instructions=self.import_instructions
                     )
+                else:
+                    repair_system_prompt = DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT
 
                 repair_messages = [{"role": "system", "content": repair_system_prompt}]
-                repair_note = (
-                    "The previous attempt had import issues. Here are the problems to fix:\n"
-                    + "\n".join(f"- {s}" for s in issues)
-                    + "\nHere is the previous code to fix (do not change scenario behavior):\n```python\n"
-                    + (previous_code or "")
-                    + "\n```\nReturn a single fenced python code block containing the FULL corrected file."
-                )
+                repair_note = create_repair_note(issues, previous_code)
                 repair_messages.append({"role": "user", "content": repair_note})
                 adjusted_messages = repair_messages
 
