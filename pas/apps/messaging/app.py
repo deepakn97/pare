@@ -6,7 +6,6 @@ from are.simulation.apps.messaging_v2 import MessagingAppV2
 
 from pas.apps.core import StatefulApp
 from pas.apps.messaging.states import ConversationList, ConversationOpened
-from pas.notifications import format_incoming_message, register_popup_for_event
 
 if TYPE_CHECKING:
     from are.simulation.types import CompletedEvent
@@ -57,7 +56,3 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
     def create_root_state(self) -> ConversationList:
         """Return the conversation list root state."""
         return ConversationList()
-
-
-register_popup_for_event("StatefulMessagingApp", "create_and_add_message", builder=format_incoming_message)
-register_popup_for_event("MessagingApp", "add_message", builder=format_incoming_message)

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal
 from are.simulation.notification_system import VerbosityLevel
 
 from pas.apps.core import StatefulApp
+from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
 from pas.apps.system import HomeScreenSystemApp
 from pas.logging_utils import get_pas_file_logger
 from pas.proactive import LLMBasedProactiveAgent
@@ -23,7 +24,6 @@ from pas.system import (
     initialise_runtime,
 )
 from pas.user_proxy import StatefulUserProxy
-from pas.user_proxy.decision_maker import LLMDecisionMaker
 
 if TYPE_CHECKING:
     from pas.proactive import LLMClientProtocol
@@ -50,8 +50,13 @@ def build_proactive_stack(
 
     initialise_runtime(log_paths=[user_log, proactive_log, events_log], clear_existing=log_mode == "overwrite")
 
+    merged_notifications = dict(extra_notifications or {})
+    agent_ui_notifications = merged_notifications.get("ProactiveAgentUserInterface", [])
+    if "send_proposal_to_user" not in agent_ui_notifications:
+        merged_notifications["ProactiveAgentUserInterface"] = [*agent_ui_notifications, "send_proposal_to_user"]
+
     notification_system = create_notification_system(
-        verbosity=notification_verbosity, extra_notifications=extra_notifications
+        verbosity=notification_verbosity, extra_notifications=merged_notifications
     )
 
     env = create_environment(notification_system)
@@ -72,9 +77,15 @@ def build_proactive_stack(
 
     user_logger = get_pas_file_logger("pas.user_proxy", user_log, level=logging.DEBUG)
     planner_logger = get_pas_file_logger("pas.user_proxy.planner", user_log, level=logging.DEBUG)
-    decision_logger = get_pas_file_logger("pas.user_proxy.decisions", user_log, level=logging.DEBUG)
     executor_logger = get_pas_file_logger("pas.proactive.executor", proactive_log, level=logging.DEBUG)
     agent_logger = get_pas_file_logger("pas.proactive.agent", proactive_log, level=logging.DEBUG)
+
+    user_proxy = StatefulUserProxy(
+        env, env.notification_system, max_user_turns=max_user_turns, logger=user_logger, planner=None
+    )
+
+    agent_ui = ProactiveAgentUserInterface(user_proxy=user_proxy)
+    env.register_apps([agent_ui])
 
     planner_cb = build_stateful_user_planner(
         user_llm,
@@ -83,12 +94,8 @@ def build_proactive_stack(
         include_system_tools=True,
         logger=planner_logger,
     )
-    decision_maker = LLMDecisionMaker(user_llm, logger=decision_logger)
+    user_proxy._planner = planner_cb
     plan_executor_cb = build_plan_executor(llm, logger=executor_logger)
-
-    user_proxy = StatefulUserProxy(
-        env, env.notification_system, max_user_turns=max_user_turns, logger=user_logger, planner=planner_cb
-    )
 
     agent = LLMBasedProactiveAgent(
         llm,
@@ -106,7 +113,7 @@ def build_proactive_stack(
         env=env,
         proxy=user_proxy,
         agent=agent,
-        decision_maker=decision_maker,
+        agent_ui=agent_ui,
         oracle_actions=list(oracle_actions) if oracle_actions else [],
     )
 

@@ -145,9 +145,9 @@ class LLMUserPlanner:
         message_lines = message.splitlines() or [""]
         app_hint = self._extract_app_hint(message_lines[0] if message_lines else "")
         header = (
-            f"Observation (system pop-up from app: {app_hint}):"
+            f"Observation (system notification from app: {app_hint}):"
             if app_hint
-            else "Observation (system pop-up notification):"
+            else "Observation (system notification):"
         )
         lines = [header]
         lines.extend(self._indent_message_lines(message_lines))

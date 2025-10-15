@@ -79,6 +79,8 @@ class StatefulUserProxy(UserProxy):
 
 1. Append agent message to transcript (used for context).
 2. Plan and execute one or more `@user_tool` calls. For MVP this can be a hard-coded flow; future logic must stay internal.
+   - The default planner assumes the user prefers taps to typing. `ProactiveAgentUserInterface.send_message_to_agent` should be used sparingly, and any reply must remain brief.
+   - When the latest notification starts with `"Proactive assistant proposal:"`, the planner is expected to respond via `accept_proposal` or `decline_proposal` before pursuing other actions.
 3. After each tool call, wait for a `CompletedEvent` from the notification system. Use it to update navigation state (`env.get_app(...).current_state`).
 4. If a tool fails, raise `UserActionFailed` with an explanatory message.
 5. Compose a short textual reply summarising the outcome (success or failure).

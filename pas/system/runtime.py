@@ -5,10 +5,12 @@ from __future__ import annotations
 import typing
 from typing import TYPE_CHECKING
 
-from are.simulation.notification_system import VerboseNotificationSystem, VerbosityLevel
-
 from pas.environment import StateAwareEnvironmentWrapper
 from pas.logging_utils import get_pas_file_logger, initialise_pas_logs
+from pas.system.notification import PasNotificationSystem
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from are.simulation.notification_system import VerbosityLevel
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,18 +27,12 @@ def initialise_runtime(*, log_paths: typing.Iterable[Path] | None = None, clear_
 
 def create_notification_system(
     *, verbosity: VerbosityLevel, extra_notifications: typing.Mapping[str, typing.Iterable[str]] | None = None
-) -> VerboseNotificationSystem:
+) -> PasNotificationSystem:
     """Instantiate the runtime notification system with optional extra tool subscriptions."""
-    system = VerboseNotificationSystem(verbosity_level=verbosity)
-
-    if extra_notifications is not None:
-        for app_name, tool_names in extra_notifications.items():
-            system.config.notified_tools[app_name] = list(tool_names)
-
-    return system
+    return PasNotificationSystem(verbosity=verbosity, extra_notifications=extra_notifications or {})
 
 
-def create_environment(notification_system: VerboseNotificationSystem) -> StateAwareEnvironmentWrapper:
+def create_environment(notification_system: PasNotificationSystem) -> StateAwareEnvironmentWrapper:
     """Create a PAS environment wired with the supplied notification system."""
     return StateAwareEnvironmentWrapper(notification_system=notification_system)
 

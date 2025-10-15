@@ -10,10 +10,10 @@ if TYPE_CHECKING:  # pragma: no cover - hints only
     from are.simulation.types import EventType
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
+    from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
     from pas.environment import StateAwareEnvironmentWrapper
     from pas.proactive import ProactiveAgentProtocol
     from pas.user_proxy import StatefulUserProxy
-    from pas.user_proxy.decision_maker import LLMDecisionMaker
 
 
 @dataclass(slots=True)
@@ -35,14 +35,14 @@ class ScenarioSetup:
     env: StateAwareEnvironmentWrapper
     proxy: StatefulUserProxy
     agent: ProactiveAgentProtocol
-    decision_maker: LLMDecisionMaker
+    agent_ui: ProactiveAgentUserInterface
     oracle_actions: list[OracleAction] = field(default_factory=list)
 
     def __iter__(self) -> t.Iterator[Any]:  # pragma: no cover - convenient tuple-unpack
         yield self.env
         yield self.proxy
         yield self.agent
-        yield self.decision_maker
+        yield self.agent_ui
 
 
 __all__ = ["OracleAction", "ScenarioSetup"]

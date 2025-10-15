@@ -6,18 +6,16 @@ import typing
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from are.simulation.apps.agent_user_interface import AgentUserInterface
-
 from pas.oracles import OracleTracker
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from logging import Logger
 
+    from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
     from pas.environment import StateAwareEnvironmentWrapper
     from pas.proactive import InterventionResult, ProactiveAgentProtocol
     from pas.scenarios.types import OracleAction
     from pas.user_proxy import StatefulUserProxy
-    from pas.user_proxy.decision_maker import DecisionMakerProtocol
 
 
 @dataclass(slots=True)
@@ -42,8 +40,8 @@ class ProactiveSession:
         env: StateAwareEnvironmentWrapper,
         proxy: StatefulUserProxy,
         agent: ProactiveAgentProtocol,
+        agent_ui: ProactiveAgentUserInterface,
         *,
-        decision_maker: DecisionMakerProtocol,
         confirm_goal: typing.Callable[[str], bool],
         logger: Logger,
         oracle_actions: list[OracleAction] | None = None,
@@ -52,25 +50,24 @@ class ProactiveSession:
         self._env = env
         self._proxy = proxy
         self._agent = agent
-        self._decision_maker = decision_maker
+        self._agent_ui = agent_ui
         self._confirm_goal = confirm_goal
         self._logger = logger
         self._oracle_tracker = OracleTracker(env, oracle_actions or [])
         self._has_oracles = bool(oracle_actions)
 
-        for app in env.apps.values():
-            if isinstance(app, AgentUserInterface):
-                app.user_proxy = proxy
+        # Connect AgentUserInterface to proxy
+        self._agent_ui.user_proxy = proxy
 
     def run_cycle(self) -> ProactiveCycleResult:
         """Drain notifications, allow the agent to act, and repeat until idle."""
-        handled_notifications = self._handle_notifications()
-
+        handled_notifications: list[tuple[str, str]] = []
         last_goal: str | None = None
         last_result: InterventionResult | None = None
         last_summary: str | None = None
         accepted = False
         attempted_goals: set[str] = set()
+        pending_notifications = self._proxy.consume_notifications()
 
         for _ in range(MAX_PROACTIVE_ITERATIONS):
             if self._has_oracles and self._oracle_tracker.is_satisfied():
@@ -79,6 +76,7 @@ class ProactiveSession:
 
             goal = self._agent.propose_goal()
             if goal is None:
+                handled_notifications.extend(self._handle_notifications(pending_notifications))
                 break
 
             if goal in attempted_goals:
@@ -86,7 +84,9 @@ class ProactiveSession:
             attempted_goals.add(goal)
             last_goal = goal
 
-            decision = self._prompt_goal_confirmation(goal)
+            decision, newly_handled = self._prompt_goal_confirmation(goal, pending_notifications)
+            handled_notifications.extend(newly_handled)
+            pending_notifications.extend(self._proxy.consume_notifications())
             if decision is None:
                 raise RuntimeError(f"User decision was not captured for goal: {goal}")
             confirmed = decision and self._confirm_goal(goal)
@@ -110,6 +110,8 @@ class ProactiveSession:
                 break
         else:
             raise RuntimeError("Proactive session exceeded iteration budget without satisfying oracles")
+
+        handled_notifications.extend(self._handle_notifications(pending_notifications))
 
         cycle = ProactiveCycleResult(handled_notifications, last_goal, accepted, last_result, last_summary)
         self._validate_cycle_outcome(cycle)
@@ -155,61 +157,49 @@ class ProactiveSession:
         if not cycle.result.success:
             raise RuntimeError(f"Proactive intervention reported failure: {cycle.result.notes}")
 
-    def _handle_notifications(self) -> list[tuple[str, str]]:
+    def _handle_notifications(self, prefetched: list[str] | None = None) -> list[tuple[str, str]]:
         handled: list[tuple[str, str]] = []
-        notifications = self._proxy.consume_notifications()
+        if prefetched is not None:
+            notifications = list(prefetched)
+            prefetched.clear()
+        else:
+            notifications = self._proxy.consume_notifications()
         for notification in notifications:
             reply = self._proxy.react_to_event(notification)
             handled.append((notification, reply))
             self._logger.info("Notification handled: %s -> %s", notification, reply)
         return handled
 
-    def _prompt_goal_confirmation(self, goal: str) -> bool | None:
-        latest_system = self._latest_system_message()
-        sections: list[str] = []
-        if latest_system:
-            sections.append("Latest notification:")
-            sections.append(latest_system.strip())
-        sections.append("Proposed proactive action:")
-        sections.append(goal.strip())
-        sections.append("Do you want the assistant to proceed?")
-        prompt = "\n\n".join(sections)
-        return self._prompt_user(prompt, accept_tokens={"accept"}, decline_tokens={"decline"})
+    def _prompt_goal_confirmation(
+        self, goal: str, pending_notifications: list[str]
+    ) -> tuple[bool | None, list[tuple[str, str]]]:
+        """Send proposal to user through AgentUI and wait for response."""
+        # Send proposal as a notification
+        self._agent_ui.send_proposal_to_user(goal)
+        self._logger.info("Sent proposal to user: %s", goal)
+
+        # Ensure any pending notifications (existing or new) are processed by the user proxy
+        pending_notifications.extend(self._proxy.consume_notifications())
+        handled = self._handle_notifications(pending_notifications)
+
+        # Check if user accepted or declined
+        if self._agent_ui.pending_proposal is None and self._agent_ui.proposal_history:
+            # Proposal was handled (accepted or declined)
+            # Check the last action in proposal_history
+            last_proposal, was_accepted = self._agent_ui.proposal_history[-1]
+            if last_proposal.goal == goal:
+                return was_accepted, handled
+
+        # No decision yet - user might have ignored it or done something else
+        return None, handled
 
     def _notify_user_completion(self, summary: str | None) -> bool | None:
+        """Notify user of completion - for now just log it."""
         if not summary:
             return None
-        latest_system = self._latest_system_message()
-        sections: list[str] = []
-        if latest_system:
-            sections.append("Latest notification:")
-            sections.append(latest_system.strip())
-        sections.append("Proactive assistant completed the request. Summary:")
-        sections.append(summary.strip())
-        prompt = "\n\n".join(sections)
-        return self._prompt_user(prompt, accept_tokens={"accept"}, decline_tokens={"decline"}, capture_decision=True)
-
-    def _prompt_user(
-        self,
-        message: str,
-        *,
-        accept_tokens: typing.Iterable[str],
-        decline_tokens: typing.Iterable[str],
-        capture_decision: bool = True,
-    ) -> bool | None:
-        decision, raw = self._decision_maker.decide(
-            message, accept_tokens=accept_tokens, decline_tokens=decline_tokens, capture_decision=capture_decision
-        )
-
-        self._logger.info("System prompt response: %s", raw)
-        return decision
-
-    def _latest_system_message(self) -> str | None:
-        transcript = getattr(self._proxy, "transcript", ())
-        for entry in reversed(transcript):
-            if entry.get("role") == "system":
-                return entry.get("content")
-        return None
+        self._logger.info("Proactive action completed: %s", summary)
+        # User doesn't need to explicitly acknowledge completion
+        return True
 
 
 __all__ = ["ProactiveCycleResult", "ProactiveSession"]

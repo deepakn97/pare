@@ -63,7 +63,7 @@ def run_proactive_demo(
 
     setup = builder(scenario_factory(), **kwargs) if scenario_factory is not None else builder(**kwargs)
 
-    env, proxy, agent, decision_maker = setup
+    env, proxy, agent, agent_ui = setup
 
     session_logger = logging.getLogger("pas.session.demo")
     session_logger.setLevel(logging.INFO)
@@ -71,7 +71,7 @@ def run_proactive_demo(
         env,
         proxy,
         agent,
-        decision_maker=decision_maker,
+        agent_ui,
         confirm_goal=lambda goal: True,
         logger=session_logger,
         oracle_actions=setup.oracle_actions,
