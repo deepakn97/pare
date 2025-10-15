@@ -40,9 +40,8 @@ def generate_scenarios_from_example(
     logger.info(f"Import instructions: {import_instructions}")
 
     # Create LLM engine
-    engine = LLMEngineBuilder().create_engine(
-        engine_config=LLMEngineConfig(model_name=model, provider=provider, endpoint=endpoint)
-    )
+    config = LLMEngineConfig(model_name=model, provider=provider, endpoint=endpoint)
+    engine = LLMEngineBuilder().create_engine(engine_config=config)
 
     # Create a minimal BaseAgent configured for scenario generation (no repo config types)
     system_prompt = ""  # ScenarioGeneratingAgent will populate tools/time placeholders
@@ -83,6 +82,9 @@ def main() -> None:
     # Use the same loading path as are-run
     # Build config for MultiScenarioRunner but with single ID
     # This ensures discovery/registration side effects happen
+
+    # Import our custom scenarios to register them
+
     # Now fetch the scenario class from registry
     from are.simulation.scenarios.utils.constants import ALL_SCENARIOS
 
@@ -95,6 +97,7 @@ def main() -> None:
         # logger.info(f"9999scenario: {scenario}")
         logger.info(f"scenario_type: {scenario_type}")
     logger.info("generate_scenarios_from_example started")
+    print(f"scenario_list: {scenario_list}")
 
     output = generate_scenarios_from_example(
         scenario_list=scenario_list, model=args.model, provider=args.provider, endpoint=args.endpoint
@@ -167,3 +170,7 @@ def _extract_imports_from_scenarios(scenarios: list[Scenario]) -> list[str]:
         all_imports.update(imports)
 
     return list(all_imports)
+
+
+if __name__ == "__main__":
+    main()
