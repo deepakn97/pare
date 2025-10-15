@@ -18,13 +18,15 @@
         <link rel="prev" href="../apps/calendar/">
       
       
+        <link rel="next" href="../api/system/">
+      
       
       <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.19">
     
     
       
-        <title>API Reference - Proactive Agent Sandbox</title>
+        <title>Overview - Proactive Agent Sandbox</title>
       
     
     
@@ -78,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#key-pas-modules" class="md-skip">
+        <a href="#api-reference-overview" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              API Reference
+              Overview
             
           </span>
         </div>
@@ -648,16 +650,20 @@
   
   
   
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
         
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -666,7 +672,431 @@
   </span>
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Modules
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Modules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#system-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      System &amp; Session
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      Environment
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stateful-apps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Stateful Apps
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      Agent Components
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#user-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      User Proxy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proactive-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      Proactive Agent
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scenario-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario System
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scenario System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenarios
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenario-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario Generator
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      Utilities
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adapters-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adapters &amp; Validation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      Logging
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    System & Session
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Environment
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/apps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Stateful Apps
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/user_proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    User Proxy
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/proactive_agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Proactive Agent
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scenarios
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scenario_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generator
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Adapters & Validation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Logging
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
       
     </li>
   
@@ -692,6 +1122,155 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Modules
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Modules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#system-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      System &amp; Session
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      Environment
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stateful-apps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Stateful Apps
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      Agent Components
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#user-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      User Proxy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proactive-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      Proactive Agent
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scenario-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario System
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scenario System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenarios
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenario-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario Generator
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      Utilities
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adapters-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adapters &amp; Validation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      Logging
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -709,22 +1288,72 @@
   
 
 
-<h1 id="key-pas-modules">Key PAS Modules<a class="headerlink" href="#key-pas-modules" title="Permanent link">&para;</a></h1>
+<h1 id="api-reference-overview">API Reference Overview<a class="headerlink" href="#api-reference-overview" title="Permanent link">&para;</a></h1>
+<p>This section provides comprehensive API documentation for all PAS modules, automatically generated from the codebase.</p>
+<h2 id="core-modules">Core Modules<a class="headerlink" href="#core-modules" title="Permanent link">&para;</a></h2>
+<h3 id="system-session"><a href="../api/system/">System &amp; Session</a><a class="headerlink" href="#system-session" title="Permanent link">&para;</a></h3>
+<p>Runtime orchestration, session management, and proactive execution helpers.</p>
 <ul>
-<li><code>pas.apps</code> – Stateful wrappers around Meta-ARE mobile apps (contacts,
-  messaging, email, calendar) and their navigation states.</li>
-<li><code>pas.environment.StateAwareEnvironmentWrapper</code> – monitors completed events
-  and triggers navigation transitions while broadcasting notifications.</li>
-<li><code>pas.user_proxy</code> – user proxy implementation plus planners and decision
-  maker utilities.</li>
-<li><code>pas.proactive</code> – proactive agent, OpenAI client wrapper, and plan executor
-  bridge to Meta-ARE ReAct agents.</li>
-<li><code>pas.apps.system</code> – PAS extension of the Meta system app providing home-screen
-  user tools.</li>
-<li><code>pas.scenarios</code> – factories that assemble environments, agents, and oracle
-  expectations for demos or imported Meta scenarios.</li>
-<li><code>pas.system</code> – runtime helpers to initialise logging, build planners, and run
-  <code>ProactiveSession</code> cycles end-to-end.</li>
+<li><code>ProactiveSession</code> – Main orchestration loop</li>
+<li><code>Runtime</code> – Stack initialization helpers</li>
+<li><code>NotificationSystem</code> – Event broadcasting</li>
+<li><code>User</code> – User simulation components</li>
+<li><code>Proactive</code> – Proactive execution helpers</li>
+</ul>
+<h3 id="environment"><a href="../api/environment/">Environment</a><a class="headerlink" href="#environment" title="Permanent link">&para;</a></h3>
+<p>State-aware environment wrapper that monitors events and triggers navigation transitions.</p>
+<ul>
+<li><code>StateAwareEnvironmentWrapper</code> – Core environment wrapper</li>
+</ul>
+<h3 id="stateful-apps"><a href="../api/apps/">Stateful Apps</a><a class="headerlink" href="#stateful-apps" title="Permanent link">&para;</a></h3>
+<p>Stateful wrappers around Meta-ARE mobile apps with navigation state machines.</p>
+<ul>
+<li><code>core</code> – Base classes (<code>AppState</code>, <code>StatefulApp</code>)</li>
+<li><code>contacts</code> – Contacts app and states</li>
+<li><code>email</code> – Email app and states</li>
+<li><code>calendar</code> – Calendar app and states</li>
+<li><code>messaging</code> – Messaging app and states</li>
+<li><code>proactive_agent_ui</code> – Proactive agent user interface</li>
+<li><code>system</code> – System-level apps</li>
+</ul>
+<h2 id="agent-components">Agent Components<a class="headerlink" href="#agent-components" title="Permanent link">&para;</a></h2>
+<h3 id="user-proxy"><a href="../api/user_proxy/">User Proxy</a><a class="headerlink" href="#user-proxy" title="Permanent link">&para;</a></h3>
+<p>User simulation with LLM-based action planning.</p>
+<ul>
+<li><code>StatefulUserProxy</code> – User proxy implementation</li>
+<li><code>LLMPlanner</code> – LLM-based action planner</li>
+</ul>
+<h3 id="proactive-agent"><a href="../api/proactive_agent/">Proactive Agent</a><a class="headerlink" href="#proactive-agent" title="Permanent link">&para;</a></h3>
+<p>Proactive goal inference and autonomous task execution.</p>
+<ul>
+<li><code>LLMBasedProactiveAgent</code> – Core proactive agent</li>
+<li><code>LiteLLMClient</code> – LLM client wrapper</li>
+<li><code>ReActAdapter</code> – ReAct planning adapter</li>
+</ul>
+<h2 id="scenario-system">Scenario System<a class="headerlink" href="#scenario-system" title="Permanent link">&para;</a></h2>
+<h3 id="scenarios"><a href="../api/scenarios/">Scenarios</a><a class="headerlink" href="#scenarios" title="Permanent link">&para;</a></h3>
+<p>Scenario builders and configuration for proactive experiments.</p>
+<ul>
+<li><code>base</code> – Base scenario builder (<code>build_proactive_stack</code>)</li>
+<li><code>types</code> – Type definitions (<code>OracleAction</code>, etc.)</li>
+<li><code>contacts_followup</code> – Example scenario</li>
+</ul>
+<h3 id="scenario-generator"><a href="../api/scenario_generator/">Scenario Generator</a><a class="headerlink" href="#scenario-generator" title="Permanent link">&para;</a></h3>
+<p>Automated scenario generation pipeline.</p>
+<ul>
+<li><code>ScenarioGenerator</code> – Main generator class</li>
+</ul>
+<h2 id="utilities">Utilities<a class="headerlink" href="#utilities" title="Permanent link">&para;</a></h2>
+<h3 id="adapters-validation"><a href="../api/adapters/">Adapters &amp; Validation</a><a class="headerlink" href="#adapters-validation" title="Permanent link">&para;</a></h3>
+<p>Meta-ARE adapter and oracle-based validation.</p>
+<ul>
+<li><code>meta_adapter</code> – Convert Meta-ARE scenarios to PAS</li>
+<li><code>oracles</code> – Oracle tracking for validation</li>
+</ul>
+<h3 id="logging"><a href="../api/logging/">Logging</a><a class="headerlink" href="#logging" title="Permanent link">&para;</a></h3>
+<p>Logging utilities and configuration.</p>
+<ul>
+<li><code>logging_utils</code> – Logging configuration helpers</li>
 </ul>
 
 

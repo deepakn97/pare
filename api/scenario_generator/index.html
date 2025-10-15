@@ -12,13 +12,13 @@
         <meta name="author" content="Deepak Nathani">
       
       
-        <link rel="canonical" href="https://deepakn97.github.io/pas/apps/email/">
+        <link rel="canonical" href="https://deepakn97.github.io/pas/api/scenario_generator/">
       
       
-        <link rel="prev" href="../messaging/">
+        <link rel="prev" href="../scenarios/">
       
       
-        <link rel="next" href="../calendar/">
+        <link rel="next" href="../adapters/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -26,7 +26,7 @@
     
     
       
-        <title>Email App - Proactive Agent Sandbox</title>
+        <title>Scenario Generator - Proactive Agent Sandbox</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#stateful-email-app" class="md-skip">
+        <a href="#scenario-generator-api" class="md-skip">
           Skip to content
         </a>
       
@@ -116,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Email App
+              Scenario Generator
             
           </span>
         </div>
@@ -486,20 +486,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
@@ -515,7 +513,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             Apps
@@ -529,7 +527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../apps/" class="md-nav__link">
         
   
   
@@ -552,7 +550,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contacts/" class="md-nav__link">
+      <a href="../../apps/contacts/" class="md-nav__link">
         
   
   
@@ -575,7 +573,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../messaging/" class="md-nav__link">
+      <a href="../../apps/messaging/" class="md-nav__link">
         
   
   
@@ -595,32 +593,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Email App
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../apps/email/" class="md-nav__link">
         
   
   
@@ -631,77 +607,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#navigation-states" class="md-nav__link">
-    <span class="md-ellipsis">
-      Navigation States
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Navigation States">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#mailboxview" class="md-nav__link">
-    <span class="md-ellipsis">
-      MailboxView
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#emaildetail" class="md-nav__link">
-    <span class="md-ellipsis">
-      EmailDetail
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#composeemail" class="md-nav__link">
-    <span class="md-ellipsis">
-      ComposeEmail
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#navigation-helpers" class="md-nav__link">
-    <span class="md-ellipsis">
-      Navigation Helpers
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -714,7 +619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../calendar/" class="md-nav__link">
+      <a href="../../apps/calendar/" class="md-nav__link">
         
   
   
@@ -741,18 +646,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
@@ -768,7 +675,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             API Reference
@@ -805,7 +712,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/system/" class="md-nav__link">
+      <a href="../system/" class="md-nav__link">
         
   
   
@@ -828,7 +735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/environment/" class="md-nav__link">
+      <a href="../environment/" class="md-nav__link">
         
   
   
@@ -851,7 +758,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/apps/" class="md-nav__link">
+      <a href="../apps/" class="md-nav__link">
         
   
   
@@ -874,7 +781,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/user_proxy/" class="md-nav__link">
+      <a href="../user_proxy/" class="md-nav__link">
         
   
   
@@ -897,7 +804,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/proactive_agent/" class="md-nav__link">
+      <a href="../proactive_agent/" class="md-nav__link">
         
   
   
@@ -920,7 +827,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/scenarios/" class="md-nav__link">
+      <a href="../scenarios/" class="md-nav__link">
         
   
   
@@ -940,10 +847,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../api/scenario_generator/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generator
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -954,6 +883,53 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#scenario-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario Generator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pas.scenario_generator.scenario_generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      scenario_generator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pas.scenario_generator.scenario_generator.generate_scenarios_from_example" class="md-nav__link">
+    <span class="md-ellipsis">
+      generate_scenarios_from_example
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -966,7 +942,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/adapters/" class="md-nav__link">
+      <a href="../adapters/" class="md-nav__link">
         
   
   
@@ -989,7 +965,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/logging/" class="md-nav__link">
+      <a href="../logging/" class="md-nav__link">
         
   
   
@@ -1039,51 +1015,27 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#navigation-states" class="md-nav__link">
+  <a href="#scenario-generator" class="md-nav__link">
     <span class="md-ellipsis">
-      Navigation States
+      Scenario Generator
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Navigation States">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#mailboxview" class="md-nav__link">
-    <span class="md-ellipsis">
-      MailboxView
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#emaildetail" class="md-nav__link">
-    <span class="md-ellipsis">
-      EmailDetail
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#composeemail" class="md-nav__link">
-    <span class="md-ellipsis">
-      ComposeEmail
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#navigation-helpers" class="md-nav__link">
+  <a href="#pas.scenario_generator.scenario_generator" class="md-nav__link">
     <span class="md-ellipsis">
-      Navigation Helpers
+      scenario_generator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pas.scenario_generator.scenario_generator.generate_scenarios_from_example" class="md-nav__link">
+    <span class="md-ellipsis">
+      generate_scenarios_from_example
     </span>
   </a>
   
@@ -1108,185 +1060,157 @@
   
 
 
-<h1 id="stateful-email-app">Stateful Email App<a class="headerlink" href="#stateful-email-app" title="Permanent link">&para;</a></h1>
-<p><code>pas.apps.email.app.StatefulEmailApp</code> pairs PAS navigation with the Meta-ARE <code>EmailClientV2</code>. It starts in <code>MailboxView("INBOX")</code> and pushes additional states for email detail and compose flows.</p>
-<h2 id="navigation-states">Navigation States<a class="headerlink" href="#navigation-states" title="Permanent link">&para;</a></h2>
-<h3 id="mailboxview">MailboxView<a class="headerlink" href="#mailboxview" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Tool</th>
-<th>Backend call(s)</th>
-<th>Returns</th>
-<th>Navigation effect</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>list_emails(offset: int = 0, limit: int = 10)</code></td>
-<td><code>EmailClientV2.list_emails(folder_name=current_folder, offset=offset, limit=limit)</code></td>
-<td><code>ReturnedEmails</code> dict with items and counts</td>
-<td>Remains in <code>MailboxView</code></td>
-</tr>
-<tr>
-<td><code>search_emails(query: str, min_date: Optional[str] = None, max_date: Optional[str] = None, limit: Optional[int] = 10)</code></td>
-<td><code>EmailClientV2.search_emails(query=query, folder_name=current_folder)</code> followed by local UTC filtering</td>
-<td><code>list[Email]</code> obeying provided bounds</td>
-<td>Remains in <code>MailboxView</code></td>
-</tr>
-<tr>
-<td><code>open_email_by_id(email_id: str)</code></td>
-<td><code>EmailClientV2.get_email_by_id(email_id=email_id, folder_name=current_folder)</code></td>
-<td><code>Email</code> object</td>
-<td>Completed event transitions to <code>EmailDetail(email_id, current_folder)</code></td>
-</tr>
-<tr>
-<td><code>open_email_by_index(index: int)</code></td>
-<td><code>EmailClientV2.get_email_by_index(idx=index, folder_name=current_folder)</code></td>
-<td><code>Email</code> object</td>
-<td>Completed event transitions to <code>EmailDetail</code> for the resolved id</td>
-</tr>
-<tr>
-<td><code>switch_folder(folder_name: str)</code></td>
-<td>Normalises folder, then <code>EmailClientV2.list_emails(folder_name=resolved)</code></td>
-<td><code>ReturnedEmails</code> for target folder</td>
-<td>Replaces current state with <code>MailboxView(folder_name)</code></td>
-</tr>
-<tr>
-<td><code>start_compose()</code></td>
-<td>Emits sentinel string; event metadata carries <code>draft</code> payload</td>
-<td>Literal string <code>"compose_started"</code></td>
-<td>Completed event pushes <code>ComposeEmail</code> on the stack</td>
-</tr>
-</tbody>
-</table>
-<h3 id="emaildetail">EmailDetail<a class="headerlink" href="#emaildetail" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Tool</th>
-<th>Backend call(s)</th>
-<th>Returns</th>
-<th>Navigation effect</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>refresh()</code></td>
-<td><code>EmailClientV2.get_email_by_id(email_id=current, folder_name=current_folder)</code></td>
-<td>Updated <code>Email</code> object</td>
-<td>Remains in <code>EmailDetail</code></td>
-</tr>
-<tr>
-<td><code>reply(content: str = "", attachment_paths: Optional[list[str]] = None)</code></td>
-<td><code>EmailClientV2.reply_to_email(...)</code></td>
-<td>New email id created by the reply</td>
-<td>Remains in <code>EmailDetail</code></td>
-</tr>
-<tr>
-<td><code>forward(recipients: list[str])</code></td>
-<td><code>EmailClientV2.forward_email(email_id=current, recipients=recipients, folder_name=current_folder)</code></td>
-<td>New forwarded email id</td>
-<td>Remains in <code>EmailDetail</code></td>
-</tr>
-<tr>
-<td><code>move(destination_folder: str)</code></td>
-<td><code>EmailClientV2.move_email(email_id=current, source_folder_name=current_folder, dest_folder_name=resolved)</code></td>
-<td>Backend status string</td>
-<td>On success pops back to previous state</td>
-</tr>
-<tr>
-<td><code>delete()</code></td>
-<td><code>EmailClientV2.delete_email(email_id=current, folder_name=current_folder)</code></td>
-<td>Backend status string</td>
-<td>On success pops back to previous state</td>
-</tr>
-<tr>
-<td><code>download_attachments(path_to_save: str)</code></td>
-<td><code>EmailClientV2.download_attachments(email_id=current, folder_name=current_folder, path_to_save=path_to_save)</code></td>
-<td><code>list[str]</code> of saved file paths</td>
-<td>Remains in <code>EmailDetail</code></td>
-</tr>
-<tr>
-<td><code>start_compose_reply()</code></td>
-<td>Uses cached email to build metadata</td>
-<td>Dict with <code>draft</code> describing reply context</td>
-<td>Completed event transitions to <code>ComposeEmail</code></td>
-</tr>
-</tbody>
-</table>
-<h3 id="composeemail">ComposeEmail<a class="headerlink" href="#composeemail" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Tool</th>
-<th>Backend call(s)</th>
-<th>Returns</th>
-<th>Navigation effect</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>set_recipients(recipients: list[str])</code></td>
-<td>Draft mutation only</td>
-<td>Dict <code>{"recipients": updated_list}</code></td>
-<td>Remains in <code>ComposeEmail</code></td>
-</tr>
-<tr>
-<td><code>add_recipient(recipient: str)</code></td>
-<td>Draft mutation only (append)</td>
-<td>Dict <code>{"recipients": updated_list}</code></td>
-<td>Remains in <code>ComposeEmail</code></td>
-</tr>
-<tr>
-<td><code>set_cc(cc: list[str])</code></td>
-<td>Draft mutation only</td>
-<td>Dict <code>{"cc": updated_list}</code></td>
-<td>Remains in <code>ComposeEmail</code></td>
-</tr>
-<tr>
-<td><code>set_subject(subject: str)</code></td>
-<td>Draft mutation only</td>
-<td>Dict <code>{"subject": subject}</code></td>
-<td>Remains in <code>ComposeEmail</code></td>
-</tr>
-<tr>
-<td><code>set_body(body: str)</code></td>
-<td>Draft mutation only</td>
-<td>Dict <code>{"body": body}</code></td>
-<td>Remains in <code>ComposeEmail</code></td>
-</tr>
-<tr>
-<td><code>attach_file(attachment_path: str)</code></td>
-<td>Draft mutation only (append path)</td>
-<td>Dict <code>{"attachments": updated_list}</code></td>
-<td>Remains in <code>ComposeEmail</code></td>
-</tr>
-<tr>
-<td><code>send_composed_email()</code></td>
-<td>Reply drafts call <code>StatefulEmailApp.send_reply_from_draft</code>; new drafts call <code>EmailClientV2.send_email(...)</code></td>
-<td>Sent email id</td>
-<td>Pops compose state and returns to previous view</td>
-</tr>
-<tr>
-<td><code>save_draft()</code></td>
-<td><code>EmailClientV2.create_and_add_email(..., folder_name="DRAFT")</code></td>
-<td>Draft email id</td>
-<td>Pops back to previous state</td>
-</tr>
-<tr>
-<td><code>discard_draft()</code></td>
-<td>Resets in-memory draft</td>
-<td>String <code>"draft_discarded"</code></td>
-<td>Pops back to previous state</td>
-</tr>
-</tbody>
-</table>
-<h2 id="navigation-helpers">Navigation Helpers<a class="headerlink" href="#navigation-helpers" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>go_back()</code> pops to the previous view when the navigation stack has history (e.g., from detail back to mailbox).</li>
-<li>Compose completion (<code>send_composed_email</code>, <code>save_draft</code>, <code>discard_draft</code>) and destructive detail operations (<code>delete</code>, <code>move</code>) automatically invoke the back stack so the caller lands on the prior screen.</li>
-</ul>
+<h1 id="scenario-generator-api">Scenario Generator API<a class="headerlink" href="#scenario-generator-api" title="Permanent link">&para;</a></h1>
+<p>Automated scenario generation pipeline.</p>
+<h2 id="scenario-generator">Scenario Generator<a class="headerlink" href="#scenario-generator" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="pas.scenario_generator.scenario_generator"></a>
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pas.scenario_generator.scenario_generator.generate_scenarios_from_example" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">generate_scenarios_from_example</span><span class="p">(</span><span class="n">scenario_list</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#pas.scenario_generator.scenario_generator.generate_scenarios_from_example" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Minimal runner that builds the "scenario_generator" agent and runs it once to.</p>
+<p>write new scenario .py files based on the provided scenario class.</p>
+<p>This mirrors the special-case in ScenarioRunner._run_with_agent for
+agent == "scenario_generator", but is provided as a standalone utility.</p>
+
+
+            <details class="quote">
+              <summary>Source code in <code>pas/scenario_generator/scenario_generator.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_scenarios_from_example</span><span class="p">(</span>
+    <span class="n">scenario_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Scenario</span><span class="p">],</span> <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Minimal runner that builds the &quot;scenario_generator&quot; agent and runs it once to.</span>
+
+<span class="sd">    write new scenario .py files based on the provided scenario class.</span>
+
+<span class="sd">    This mirrors the special-case in ScenarioRunner._run_with_agent for</span>
+<span class="sd">    agent == &quot;scenario_generator&quot;, but is provided as a standalone utility.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># scan the apps package and make the import instructions</span>
+    <span class="c1"># 1) Build catalog once per run (fast; static; safe)</span>
+    <span class="n">catalog</span> <span class="o">=</span> <span class="n">scan_package</span><span class="p">(</span><span class="s2">&quot;are.simulation.apps&quot;</span><span class="p">,</span> <span class="n">include_sigs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">doclen</span><span class="o">=</span><span class="mi">140</span><span class="p">)</span>
+    <span class="c1"># 2) Create import instructions text (token-bounded)</span>
+    <span class="n">import_instructions</span> <span class="o">=</span> <span class="n">make_import_instructions</span><span class="p">(</span><span class="n">catalog</span><span class="p">,</span> <span class="n">max_mods</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">max_per_mod</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">include_sigs</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># 3) Augment with imports extracted from the input scenario modules</span>
+    <span class="n">extracted</span> <span class="o">=</span> <span class="n">_extract_imports_from_scenarios</span><span class="p">(</span><span class="n">scenario_list</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;==== Extracted imports: </span><span class="si">{</span><span class="n">extracted</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">extracted</span><span class="p">:</span>
+        <span class="n">import_instructions</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">import_instructions</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2"># Additional imports found in input scenarios</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">extracted</span><span class="p">))</span>
+        <span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Import instructions: </span><span class="si">{</span><span class="n">import_instructions</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create LLM engine</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">LLMEngineConfig</span><span class="p">(</span><span class="n">model_name</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">provider</span><span class="o">=</span><span class="n">provider</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="n">endpoint</span><span class="p">)</span>
+    <span class="n">engine</span> <span class="o">=</span> <span class="n">LLMEngineBuilder</span><span class="p">()</span><span class="o">.</span><span class="n">create_engine</span><span class="p">(</span><span class="n">engine_config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="c1"># Create a minimal BaseAgent configured for scenario generation (no repo config types)</span>
+    <span class="n">system_prompt</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>  <span class="c1"># ScenarioGeneratingAgent will populate tools/time placeholders</span>
+    <span class="c1"># Wire minimal generator (no BaseAgent needed)</span>
+    <span class="n">gen_agent</span> <span class="o">=</span> <span class="n">ScenarioGeneratingAgent</span><span class="p">(</span>
+        <span class="n">llm_engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span> <span class="n">tools</span><span class="o">=</span><span class="p">[],</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">import_instructions</span><span class="o">=</span><span class="n">import_instructions</span>
+    <span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running minimal scenario generator agent&quot;</span><span class="p">)</span>
+    <span class="c1"># result = None</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">gen_agent</span><span class="o">.</span><span class="n">scenario_generation_run</span><span class="p">(</span><span class="n">scenario_list</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Scenario generation completed&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 
 
