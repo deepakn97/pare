@@ -15,7 +15,7 @@ if TYPE_CHECKING:  # pragma: no cover - hints only
     from pas.environment import StateAwareEnvironmentWrapper
     from pas.proactive import InterventionResult, ProactiveAgentProtocol
     from pas.scenarios.types import OracleAction
-    from pas.user_proxy import StatefulUserProxy
+    from pas.user_proxy import StatefulUserAgentRuntime
 
 
 @dataclass(slots=True)
@@ -38,7 +38,7 @@ class ProactiveSession:
     def __init__(
         self,
         env: StateAwareEnvironmentWrapper,
-        proxy: StatefulUserProxy,
+        proxy: StatefulUserAgentRuntime,
         agent: ProactiveAgentProtocol,
         agent_ui: ProactiveAgentUserInterface,
         *,

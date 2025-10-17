@@ -7,23 +7,24 @@ import typing as t
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from are.simulation.agents.default_agent.default_tools import FinalAnswerTool
 from are.simulation.notification_system import VerbosityLevel
 
 from pas.apps.core import StatefulApp
 from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
 from pas.apps.system import HomeScreenSystemApp
+from pas.llm_adapter import PasLLMEngine
 from pas.logging_utils import get_pas_file_logger
 from pas.proactive import LLMBasedProactiveAgent
 from pas.scenarios.types import OracleAction, ScenarioSetup
 from pas.system import (
     attach_event_logging,
     build_plan_executor,
-    build_stateful_user_planner,
     create_environment,
     create_notification_system,
     initialise_runtime,
 )
-from pas.user_proxy import StatefulUserProxy
+from pas.user_proxy import StatefulUserAgent, StatefulUserAgentRuntime
 
 if TYPE_CHECKING:
     from pas.proactive import LLMClientProtocol
@@ -76,28 +77,50 @@ def build_proactive_stack(
         raise ValueError(f"Unknown primary_app '{resolved_primary}'")
 
     user_logger = get_pas_file_logger("pas.user_proxy", user_log, level=logging.DEBUG)
-    planner_logger = get_pas_file_logger("pas.user_proxy.planner", user_log, level=logging.DEBUG)
     executor_logger = get_pas_file_logger("pas.proactive.executor", proactive_log, level=logging.DEBUG)
     agent_logger = get_pas_file_logger("pas.proactive.agent", proactive_log, level=logging.DEBUG)
 
-    user_proxy = StatefulUserProxy(
-        env, env.notification_system, max_user_turns=max_user_turns, logger=user_logger, planner=None
+    # Create user tools from all registered apps (including stateful and system apps)
+    user_tools = {}
+    for app in env.apps.values():
+        # Get user tools from both StatefulApp and SystemApp instances
+        if hasattr(app, "get_meta_are_user_tools"):
+            app_user_tools = app.get_meta_are_user_tools()
+        elif hasattr(app, "get_user_tools"):
+            app_user_tools = app.get_user_tools()
+        else:
+            continue
+
+        for tool in app_user_tools:
+            user_tools[tool.name] = tool
+
+    # Add native Meta ARE control-flow tool for task termination
+    user_tools["final_answer"] = FinalAnswerTool()
+
+    llm_engine = PasLLMEngine(user_llm, logger=user_logger)
+
+    user_agent = StatefulUserAgent(llm_engine=llm_engine, tools=user_tools, max_turns=max_user_turns, wait_timeout=2.0)
+
+    user_proxy = StatefulUserAgentRuntime(
+        agent=user_agent,
+        notification_system=notification_system,
+        logger=user_logger,
+        max_user_turns=max_user_turns,
+        event_timeout=2.0,
     )
+
+    # Register agent with environment for dynamic tool updates
+    env.register_user_agent(user_agent)
+
+    # Subscribe to environment events
+    env.subscribe_to_completed_events(user_proxy._on_event)
 
     agent_ui = ProactiveAgentUserInterface(user_proxy=user_proxy)
     env.register_apps([agent_ui])
 
-    planner_cb = build_stateful_user_planner(
-        user_llm,
-        list(env.apps.values()),
-        initial_app_name=resolved_primary,
-        include_system_tools=True,
-        logger=planner_logger,
-    )
-    user_proxy._planner = planner_cb
     plan_executor_cb = build_plan_executor(llm, logger=executor_logger)
 
-    agent = LLMBasedProactiveAgent(
+    proactive_agent = LLMBasedProactiveAgent(
         llm,
         system_prompt=goal_prompt or "",
         max_context_events=200,
@@ -106,13 +129,13 @@ def build_proactive_stack(
         logger=agent_logger,
     )
 
-    env.subscribe_to_completed_events(agent.observe)
+    env.subscribe_to_completed_events(proactive_agent.observe)
     attach_event_logging(env, events_log)
 
     return ScenarioSetup(
         env=env,
         proxy=user_proxy,
-        agent=agent,
+        agent=proactive_agent,
         agent_ui=agent_ui,
         oracle_actions=list(oracle_actions) if oracle_actions else [],
     )

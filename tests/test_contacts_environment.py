@@ -64,7 +64,7 @@ class TestEnvironmentTransitions:
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         assert isinstance(app.current_state, ContactDetail)
         assert app.current_state.contact_id == "contact-ada"
@@ -77,10 +77,10 @@ class TestEnvironmentTransitions:
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         _detail_state(app).start_edit_contact()
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         assert isinstance(app.current_state, ContactEdit)
         assert app.current_state.contact_id == "contact-ada"
@@ -93,13 +93,13 @@ class TestEnvironmentTransitions:
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         _detail_state(app).start_edit_contact()
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         _edit_state(app).update_contact({"phone": "999"})
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         assert isinstance(app.current_state, ContactDetail)
         assert app.current_state.contact_id == "contact-ada"
@@ -112,10 +112,10 @@ class TestEnvironmentTransitions:
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         _detail_state(app).delete_contact()
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         assert isinstance(app.current_state, ContactsList)
         assert len(app.navigation_stack) == 0
@@ -128,9 +128,9 @@ class TestEnvironmentTransitions:
         env, app = env_with_contacts
 
         _list_state(app).open_contact("contact-ada")
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
         app.get_contacts()
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         assert isinstance(app.current_state, ContactsList)
 
@@ -141,7 +141,7 @@ class TestEnvironmentTransitions:
         env, app = env_with_contacts
 
         _list_state(app).view_current_user()
-        env.handle_completed_event(_last_event(env))
+        env.add_to_log(_last_event(env))
 
         assert isinstance(app.current_state, ContactsList)
         assert len(app.navigation_stack) == 0

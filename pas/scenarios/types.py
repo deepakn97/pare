@@ -13,7 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover - hints only
     from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
     from pas.environment import StateAwareEnvironmentWrapper
     from pas.proactive import ProactiveAgentProtocol
-    from pas.user_proxy import StatefulUserProxy
+    from pas.user_proxy import StatefulUserAgentRuntime
 
 
 @dataclass(slots=True)
@@ -33,7 +33,7 @@ class ScenarioSetup:
     """Bundle of runtime components together with oracle expectations."""
 
     env: StateAwareEnvironmentWrapper
-    proxy: StatefulUserProxy
+    proxy: StatefulUserAgentRuntime
     agent: ProactiveAgentProtocol
     agent_ui: ProactiveAgentUserInterface
     oracle_actions: list[OracleAction] = field(default_factory=list)

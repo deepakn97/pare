@@ -6,9 +6,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from are.simulation.apps.email_client import Email, EmailFolderName, ReturnedEmails
-from are.simulation.tool_utils import user_tool
+from are.simulation.types import OperationType, disable_events
 
 from pas.apps.core import AppState
+from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 
 def _normalise_folder(folder: str | None) -> str:
@@ -51,11 +52,14 @@ class MailboxView(AppState):
         """No-op hook for symmetry with on_enter."""
 
     @user_tool()
+    @pas_event_registered()
     def list_emails(self, offset: int = 0, limit: int = 10) -> ReturnedEmails:
         """List emails in the current folder with pagination support."""
-        return self.app.list_emails(folder_name=self.folder, offset=offset, limit=limit)
+        with disable_events():
+            return self.app.list_emails(folder_name=self.folder, offset=offset, limit=limit)
 
     @user_tool()
+    @pas_event_registered()
     def search_emails(
         self, query: str, min_date: str | None = None, max_date: str | None = None, limit: int | None = 10
     ) -> list[Email]:
@@ -91,22 +95,29 @@ class MailboxView(AppState):
         return filtered
 
     @user_tool()
+    @pas_event_registered()
     def open_email_by_id(self, email_id: str) -> Email:
         """Open a specific email by id within the current folder."""
-        return self.app.get_email_by_id(email_id=email_id, folder_name=self.folder)
+        with disable_events():
+            return self.app.get_email_by_id(email_id=email_id, folder_name=self.folder)
 
     @user_tool()
+    @pas_event_registered()
     def open_email_by_index(self, index: int) -> Email:
         """Open a specific email by index within the current folder."""
-        return self.app.get_email_by_index(idx=index, folder_name=self.folder)
+        with disable_events():
+            return self.app.get_email_by_index(idx=index, folder_name=self.folder)
 
     @user_tool()
+    @pas_event_registered()
     def switch_folder(self, folder_name: str) -> ReturnedEmails:
         """Switch to a different folder and return its contents."""
         target_folder = _normalise_folder(folder_name)
-        return self.app.list_emails(folder_name=target_folder)
+        with disable_events():
+            return self.app.list_emails(folder_name=target_folder)
 
     @user_tool()
+    @pas_event_registered()
     def start_compose(self) -> str:
         """Begin a new compose flow originating from the mailbox view."""
         return "compose_started"
@@ -137,45 +148,57 @@ class EmailDetail(AppState):
         return self._email
 
     @user_tool()
+    @pas_event_registered()
     def refresh(self) -> Email:
         """Fetch the latest version of the current email."""
         self._email = self.app.get_email_by_id(email_id=self.email_id, folder_name=self.folder_name)
         return self._email
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def reply(self, content: str = "", attachment_paths: list[str] | None = None) -> str:
         """Send a reply to the current email."""
-        return self.app.reply_to_email(
-            email_id=self.email_id, folder_name=self.folder_name, content=content, attachment_paths=attachment_paths
-        )
+        with disable_events():
+            return self.app.reply_to_email(
+                email_id=self.email_id, folder_name=self.folder_name, content=content, attachment_paths=attachment_paths
+            )
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def forward(self, recipients: list[str]) -> str:
         """Forward the current email to new recipients."""
-        return self.app.forward_email(email_id=self.email_id, recipients=recipients, folder_name=self.folder_name)
+        with disable_events():
+            return self.app.forward_email(email_id=self.email_id, recipients=recipients, folder_name=self.folder_name)
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def move(self, destination_folder: str) -> str:
         """Move the current email to a different folder."""
-        return self.app.move_email(
-            email_id=self.email_id,
-            source_folder_name=self.folder_name,
-            dest_folder_name=_normalise_folder(destination_folder),
-        )
+        with disable_events():
+            return self.app.move_email(
+                email_id=self.email_id,
+                source_folder_name=self.folder_name,
+                dest_folder_name=_normalise_folder(destination_folder),
+            )
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def delete(self) -> str:
         """Delete the current email (moves it to trash)."""
-        return self.app.delete_email(email_id=self.email_id, folder_name=self.folder_name)
+        with disable_events():
+            return self.app.delete_email(email_id=self.email_id, folder_name=self.folder_name)
 
     @user_tool()
+    @pas_event_registered()
     def download_attachments(self, path_to_save: str) -> list[str]:
         """Download attachments from the current email to a path."""
-        return self.app.download_attachments(
-            email_id=self.email_id, folder_name=self.folder_name, path_to_save=path_to_save
-        )
+        with disable_events():
+            return self.app.download_attachments(
+                email_id=self.email_id, folder_name=self.folder_name, path_to_save=path_to_save
+            )
 
     @user_tool()
+    @pas_event_registered()
     def start_compose_reply(self) -> dict[str, object]:
         """Return metadata required to seed a reply draft in compose view."""
         email = self.email
@@ -218,6 +241,7 @@ class ComposeEmail(AppState):
         self._cached_tools = None
 
     @user_tool()
+    @pas_event_registered()
     def set_recipients(self, recipients: list[str]) -> dict[str, object]:
         """Replace the draft recipients list."""
         self.draft.recipients = recipients
@@ -225,6 +249,7 @@ class ComposeEmail(AppState):
         return {"recipients": self.draft.recipients}
 
     @user_tool()
+    @pas_event_registered()
     def add_recipient(self, recipient: str) -> dict[str, object]:
         """Append a single recipient to the draft."""
         self.draft.recipients.append(recipient)
@@ -232,6 +257,7 @@ class ComposeEmail(AppState):
         return {"recipients": self.draft.recipients}
 
     @user_tool()
+    @pas_event_registered()
     def set_cc(self, cc: list[str]) -> dict[str, object]:
         """Replace the CC list for the draft."""
         self.draft.cc = cc
@@ -239,24 +265,28 @@ class ComposeEmail(AppState):
         return {"cc": self.draft.cc}
 
     @user_tool()
+    @pas_event_registered()
     def set_subject(self, subject: str) -> dict[str, object]:
         """Update the subject line for the draft."""
         self.draft.subject = subject
         return {"subject": self.draft.subject}
 
     @user_tool()
+    @pas_event_registered()
     def set_body(self, body: str) -> dict[str, object]:
         """Update the body content for the draft."""
         self.draft.body = body
         return {"body": self.draft.body}
 
     @user_tool()
+    @pas_event_registered()
     def attach_file(self, attachment_path: str) -> dict[str, object]:
         """Attach a file path to the draft."""
         self.draft.attachments.append(attachment_path)
         return {"attachments": list(self.draft.attachments)}
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def send_composed_email(self) -> str:
         """Send the draft using the underlying email client."""
         attachments = self.draft.attachments or None
@@ -273,6 +303,7 @@ class ComposeEmail(AppState):
         )
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def save_draft(self) -> str:
         """Persist the draft into the DRAFT folder."""
         return self.app.create_and_add_email(
@@ -284,6 +315,7 @@ class ComposeEmail(AppState):
         )
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def discard_draft(self) -> str:
         """Discard the current draft without sending."""
         self.draft = ComposeDraft()

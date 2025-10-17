@@ -6,7 +6,7 @@ import json
 import logging
 from dataclasses import dataclass
 from types import UnionType
-from typing import TYPE_CHECKING, Any, ClassVar, Union, cast, get_origin
+from typing import TYPE_CHECKING, Any, Union, cast, get_origin
 
 from are.simulation.agents.are_simulation_agent_config import ARESimulationReactBaseAgentConfig
 from are.simulation.agents.default_agent.agent_factory import are_simulation_react_json_agent
@@ -15,11 +15,12 @@ from are.simulation.agents.default_agent.termination_methods.are_simulation impo
     termination_step_are_simulation_final_answer,
 )
 from are.simulation.agents.default_agent.tools.json_action_executor import JsonActionExecutor
-from are.simulation.agents.llm.llm_engine import LLMEngine
 from are.simulation.tool_box import Toolbox
 from are.simulation.tools import Tool
 
-from pas.proactive import InterventionResult, LLMClientProtocol
+from pas.llm_adapter import LLMClientProtocol
+from pas.llm_adapter import PasLLMEngine as _PasLLMEngine
+from pas.proactive import InterventionResult
 
 if TYPE_CHECKING:
     from are.simulation.tool_utils import AppTool, AppToolArg
@@ -107,78 +108,8 @@ class PasToolAdapter(Tool):
             return str(result)
 
 
-class FinalAnswerTool(Tool):
-    """Meta ARE convention tool to terminate a ReAct loop with a final answer."""
-
-    name: ClassVar[str] = "final_answer"
-    description: ClassVar[str] = "Return the final response once the task is complete."
-    inputs: ClassVar[dict[str, dict[str, str]]] = {
-        "answer": {"type": "string", "description": "User-facing summary of the completed task."}
-    }
-    output_type: ClassVar[str] = "string"
-
-    def forward(self, answer: str) -> str:
-        """Return the final response unchanged."""
-        return answer
-
-
-class PasLLMEngine(LLMEngine):
-    """Adapter turning a PAS LLM client into Meta ARE's LLMEngine protocol."""
-
-    def __init__(self, llm: LLMClientProtocol, logger: logging.Logger | None = None) -> None:
-        """Store the PAS LLM client for subsequent chat completions."""
-        super().__init__(model_name="pas-llm-client")
-        self._llm = llm
-        self._logger = logger or logging.getLogger(__name__)
-
-    @staticmethod
-    def _format_messages(messages: list[dict[str, Any]]) -> str:
-        parts: list[str] = []
-        for message in messages:
-            role = message.get("role", "assistant").upper()
-            content = message.get("content", "")
-            parts.append(f"{role}: {content}")
-        return "\n\n".join(parts)
-
-    def chat_completion(
-        self, messages: list[dict[str, Any]], stop_sequences: list[str] | None = None, **kwargs: Any
-    ) -> tuple[str, dict[str, Any] | None]:
-        """Format messages for the PAS client and relay the response."""
-        prompt = self._format_messages(messages)
-        stop_tokens: tuple[str, ...] = tuple(stop_sequences or ())
-
-        response: str
-        metadata: dict[str, Any]
-        completion_with_metadata = getattr(self._llm, "complete_with_metadata", None)
-        temperature = kwargs.get("temperature")
-        if callable(completion_with_metadata):
-            response, metadata = completion_with_metadata(prompt, temperature=temperature)
-        else:
-            response = self._llm.complete(prompt)
-            metadata = {}
-
-        if stop_tokens:
-            response = self._truncate_at_stop(response, stop_tokens)
-
-        self._logger.debug("Meta ARE bridge prompt:\n%s", prompt)
-        self._logger.debug("Meta ARE bridge response: %s", response)
-        return response, metadata or {}
-
-    def simple_call(self, prompt: str) -> str:
-        """Proxy simple prompts directly to the PAS client."""
-        return self._llm.complete(prompt)
-
-    @staticmethod
-    def _truncate_at_stop(text: str, stop_tokens: tuple[str, ...]) -> str:
-        """Trim text at the first occurrence of any stop token."""
-        end_index = len(text)
-        for token in stop_tokens:
-            if not token:
-                continue
-            index = text.find(token)
-            if index != -1:
-                end_index = min(end_index, index + len(token))
-        return text[:end_index]
+# PasLLMEngine moved to pas.llm_adapter to avoid circular dependencies
+PasLLMEngine = _PasLLMEngine
 
 
 @dataclass
@@ -191,9 +122,11 @@ class ReactExecutionResult:
 
 
 def build_toolbox(env: StateAwareEnvironmentWrapper) -> Toolbox:
-    """Construct a Meta ARE toolbox from PAS environment tools."""
+    """Construct a Meta ARE toolbox from PAS environment tools.
+
+    Note: final_answer is a control-flow tool added in scenarios, not from apps.
+    """
     adapters = [PasToolAdapter(tool) for tool in env.get_tools()]
-    adapters.append(FinalAnswerTool())
     return Toolbox(adapters)
 
 

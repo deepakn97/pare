@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from are.simulation.apps.messaging_v2 import ConversationV2  # noqa: TC002
-from are.simulation.tool_utils import user_tool
 
 from pas.apps.core import AppState
+from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 
 class ConversationOpened(AppState):
@@ -33,6 +33,7 @@ class ConversationOpened(AppState):
         pass
 
     @user_tool()
+    @pas_event_registered()
     def send_message(self, content: str, attachment_path: str | None = None) -> str:
         """Send message in current conversation (context-aware).
 
@@ -48,6 +49,7 @@ class ConversationOpened(AppState):
         )
 
     @user_tool()
+    @pas_event_registered()
     def read_messages(
         self, offset: int = 0, limit: int = 10, min_date: str | None = None, max_date: str | None = None
     ) -> dict[str, object]:
@@ -95,6 +97,7 @@ class ConversationList(AppState):
         pass
 
     @user_tool()
+    @pas_event_registered()
     def list_recent_conversations(
         self,
         offset: int = 0,
@@ -121,6 +124,7 @@ class ConversationList(AppState):
         )
 
     @user_tool()
+    @pas_event_registered()
     def search_conversations(
         self, query: str, min_date: str | None = None, max_date: str | None = None, limit: int = 10
     ) -> list[str]:
@@ -141,6 +145,7 @@ class ConversationList(AppState):
         return results
 
     @user_tool()
+    @pas_event_registered()
     def open_conversation(self, conversation_id: str, offset: int = 0, limit: int = 20) -> dict[str, object]:
         """Open specific conversation (triggers state transition).
 

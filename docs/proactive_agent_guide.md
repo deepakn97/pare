@@ -84,7 +84,7 @@ Guidelines:
 
 `ProactiveSession` (see `docs/scenario_author_guide.md`) manages the flow:
 
-1. Drain notifications → `StatefulUserProxy` reacts → new events arrive.
+1. Drain notifications → `StatefulUserAgentRuntime` reacts → new events arrive.
 2. Call `agent.propose_goal()` once.
 3. Use the decision maker (e.g. `LLMDecisionMaker`) to collect a system-level
    confirmation without invoking messaging tools.

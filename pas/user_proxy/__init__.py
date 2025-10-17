@@ -1,18 +1,5 @@
 """User proxy implementations for PAS."""
 
-from __future__ import annotations
+from .agent import StatefulUserAgent, StatefulUserAgentRuntime, ToolInvocation, TurnLimitReached, UserAgentProtocol
 
-from .llm_planner import LLMUserPlanner, UserPlannerCallable, UserToolParameter, UserToolSpec
-from .stateful import PlannerCallable, StatefulUserProxy, ToolInvocation, TurnLimitReached, UserActionFailed
-
-__all__ = [
-    "LLMUserPlanner",
-    "PlannerCallable",
-    "StatefulUserProxy",
-    "ToolInvocation",
-    "TurnLimitReached",
-    "UserActionFailed",
-    "UserPlannerCallable",
-    "UserToolParameter",
-    "UserToolSpec",
-]
+__all__ = ["StatefulUserAgent", "StatefulUserAgentRuntime", "ToolInvocation", "TurnLimitReached", "UserAgentProtocol"]

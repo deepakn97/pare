@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-from .agent import (
-    InterventionResult,
-    LLMBasedProactiveAgent,
-    LLMClientProtocol,
-    ProactiveAgentProtocol,
-    ProactiveInterventionError,
-)
+from pas.llm_adapter import LLMClientProtocol
+
+from .agent import InterventionResult, LLMBasedProactiveAgent, ProactiveAgentProtocol, ProactiveInterventionError
 from .litellm_client import LiteLLMClient
 
 __all__ = [
