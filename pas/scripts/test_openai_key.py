@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 
 def main() -> None:
+    """Test OpenAI API key by making a simple chat completion request."""
     # Load .env so OPENAI_API_KEY etc. are available.
     load_dotenv()
 

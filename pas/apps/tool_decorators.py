@@ -49,7 +49,7 @@ def pas_event_registered(
         func.__operation_type__ = operation_type  # type: ignore[attr-defined]
 
         @wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
             # Only apply event registration if EventRegisterer is active
             if not EventRegisterer.is_active():
                 return func(self, *args, **kwargs)
@@ -109,7 +109,7 @@ def pas_event_registered(
             setattr(wrapper, APPTOOL_ATTR_NAME, apptool)
 
         # Add function to set AppTool metadata on both wrapper and original
-        def set_apptool(app_tool_instance: Any) -> None:
+        def set_apptool(app_tool_instance: Any) -> None:  # noqa: ANN401
             setattr(wrapper, APPTOOL_ATTR_NAME, app_tool_instance)
             setattr(func, APPTOOL_ATTR_NAME, app_tool_instance)
 

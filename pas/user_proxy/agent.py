@@ -5,11 +5,10 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import Condition
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from are.simulation.agents.default_agent.base_agent import BaseAgent, BaseAgentLog
 from are.simulation.agents.default_agent.termination_methods.are_simulation import (
@@ -18,11 +17,15 @@ from are.simulation.agents.default_agent.termination_methods.are_simulation impo
 from are.simulation.agents.default_agent.tools.json_action_executor import JsonActionExecutor, ParsedAction
 from are.simulation.agents.llm.llm_engine import LLMEngine
 from are.simulation.agents.user_proxy import UserProxy
-from are.simulation.notification_system import BaseNotificationSystem
-from are.simulation.tools import Tool
-from are.simulation.types import CompletedEvent
 
 from pas.llm_adapter import LLMClientProtocol, PasLLMEngine
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from are.simulation.notification_system import BaseNotificationSystem
+    from are.simulation.tools import Tool
+    from are.simulation.types import CompletedEvent
 
 
 @dataclass(slots=True)
@@ -39,19 +42,25 @@ class ToolInvocation:
 class UserAgentProtocol(Protocol):
     """Public contract for user-agent implementations consumed by higher layers."""
 
-    def init_conversation(self) -> str: ...
+    def init_conversation(self) -> str:
+        """Initialize or reset the conversation state."""
 
-    def reply(self, message: str) -> str: ...
+    def reply(self, message: str) -> str:
+        """Process a user message and return the agent's response."""
 
-    def react_to_event(self, message: str) -> str: ...
+    def react_to_event(self, message: str) -> str:
+        """React to a system event and return the agent's response."""
 
-    def consume_notifications(self) -> list[str]: ...
+    def consume_notifications(self) -> list[str]:
+        """Consume pending notifications from the notification system."""
 
     @property
-    def transcript(self) -> list[dict[str, str]]: ...
+    def transcript(self) -> list[dict[str, str]]:
+        """Get the conversation transcript."""
 
     @property
-    def last_tool_invocations(self) -> tuple[ToolInvocation, ...]: ...
+    def last_tool_invocations(self) -> tuple[ToolInvocation, ...]:
+        """Get tool invocations from the last turn."""
 
 
 class _CallableLLMWrapper(LLMClientProtocol):
@@ -101,7 +110,7 @@ class PasJsonActionExecutor(JsonActionExecutor):
         parsed_action: ParsedAction,
         append_agent_log: Callable[[BaseAgentLog], None],
         make_timestamp: Callable[[], float],
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401
         runtime = self.runtime
         previous_count = runtime.event_count if runtime is not None else 0
         observation = super().execute_tool_call(parsed_action, append_agent_log, make_timestamp)
@@ -142,6 +151,17 @@ class StatefulUserAgent(BaseAgent):
         wait_timeout: float = 2.0,
         **kwargs: Any,
     ) -> None:
+        """Initialize the stateful user agent.
+
+        Args:
+            llm_engine: LLM engine or client for generating responses.
+            tools: Dictionary of available tools indexed by name.
+            system_prompts: System prompts for the agent.
+            max_iterations: Maximum iterations per turn.
+            max_turns: Maximum number of conversation turns.
+            wait_timeout: Timeout for waiting on completed events.
+            **kwargs: Additional arguments passed to BaseAgent.
+        """
         self.logger = logging.getLogger(__name__)
         prepared_prompts = dict(system_prompts or {"system_prompt": self._default_system_prompt()})
         llm_engine = self._wrap_llm_engine(llm_engine)
@@ -185,17 +205,22 @@ class StatefulUserAgent(BaseAgent):
     # --------------------------------------------------------------------- #
     @property
     def transcript(self) -> list[dict[str, str]]:
+        """Get a copy of the conversation transcript."""
         return list(self.transcript_history)
 
     @property
     def tool_history(self) -> list[ToolInvocation]:
+        """Get a copy of the complete tool invocation history."""
         return list(self.tool_history_list)
 
     @property
     def last_tool_invocations(self) -> tuple[ToolInvocation, ...]:
+        """Get tool invocations from the last turn."""
         return self.last_tool_invocations_tuple
 
     def init_conversation(self) -> str:
+        """Initialize or reset the conversation state."""
+        """Initialize or reset the conversation state."""
         self.turns_taken = 0
         self.transcript_history.clear()
         self.tool_history_list.clear()
@@ -203,6 +228,8 @@ class StatefulUserAgent(BaseAgent):
         return ""
 
     def consume_notifications(self) -> list[str]:
+        """Consume pending notifications from the notification system."""
+        """Consume pending notifications from the notification system."""
         if self.notification_system is None:
             return []
         queue = self.notification_system.message_queue
@@ -217,9 +244,13 @@ class StatefulUserAgent(BaseAgent):
         return payloads
 
     def react_to_event(self, message: str) -> str:
+        """React to a system event and return the agent's response."""
+        """React to a system event and return the agent's response."""
         return self._handle_turn(message, source="system")
 
     def reply(self, message: str) -> str:
+        """Process a user message and return the agent's response."""
+        """Process a user message and return the agent's response."""
         return self._handle_turn(message, source="agent")
 
     # ------------------------------------------------------------------ #
@@ -250,6 +281,7 @@ class StatefulUserAgent(BaseAgent):
         self.tool_history_list.extend(self.current_turn_invocations)
 
     def record_tool_invocation(self, invocation: ToolInvocation) -> None:
+        """Record a tool invocation for the current turn."""
         self.current_turn_invocations.append(invocation)
 
     def update_tools_for_app(self, app_name: str, new_tools: list[Tool]) -> None:
@@ -364,6 +396,15 @@ class StatefulUserAgentRuntime(UserProxy):
         max_user_turns: int = 40,
         event_timeout: float = 2.0,
     ) -> None:
+        """Initialize the user agent runtime.
+
+        Args:
+            agent: The underlying StatefulUserAgent.
+            notification_system: Notification system for the agent.
+            logger: Logger for the runtime.
+            max_user_turns: Maximum number of conversation turns.
+            event_timeout: Timeout for waiting on completed events.
+        """
         self.agent = agent
         self.notification_system = notification_system
         self.logger = logger
@@ -378,33 +419,40 @@ class StatefulUserAgentRuntime(UserProxy):
     # Public facade
     # ------------------------------------------------------------------ #
     def init_conversation(self) -> str:
+        """Initialize or reset the conversation state."""
         with self.event_condition:
             self.recent_events.clear()
         return self.agent.init_conversation()
 
     def reply(self, message: str) -> str:
+        """Process a user message and return the agent's response."""
         self._enforce_turn_budget()
         self._prepare_prompt(message, source="agent")
         return self.agent.reply(message)
 
     def react_to_event(self, message: str) -> str:
+        """React to a system event and return the agent's response."""
         self._enforce_turn_budget()
         self._prepare_prompt(message, source="system")
         return self.agent.react_to_event(message)
 
     def consume_notifications(self) -> list[str]:
+        """Consume pending notifications from the notification system."""
         return self.agent.consume_notifications()
 
     @property
     def last_tool_invocations(self) -> tuple[ToolInvocation, ...]:
+        """Get tool invocations from the last turn."""
         return self.agent.last_tool_invocations
 
     @property
     def transcript(self) -> list[dict[str, str]]:
+        """Get the conversation transcript."""
         return self.agent.transcript
 
     @property
     def event_count(self) -> int:
+        """Get the number of recent events."""
         with self.event_condition:
             return len(self.recent_events)
 
@@ -420,6 +468,7 @@ class StatefulUserAgentRuntime(UserProxy):
             return self.recent_events[-1]
 
     def reset(self) -> None:
+        """Reset the event queue."""
         with self.event_condition:
             self.recent_events.clear()
 

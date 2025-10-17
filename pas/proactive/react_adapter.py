@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 from dataclasses import dataclass
 from types import UnionType
 from typing import TYPE_CHECKING, Any, Union, cast, get_origin
@@ -23,6 +22,8 @@ from pas.llm_adapter import PasLLMEngine as _PasLLMEngine
 from pas.proactive import InterventionResult
 
 if TYPE_CHECKING:
+    import logging
+
     from are.simulation.tool_utils import AppTool, AppToolArg
 
     from pas.environment import StateAwareEnvironmentWrapper

@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from are.simulation.apps.contacts import Contact  # noqa: TC002
-from are.simulation.tool_utils import AppTool
 from are.simulation.types import OperationType, disable_events
 
 from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
+    from are.simulation.tool_utils import AppTool
+
     from pas.apps.contacts.app import StatefulContactsApp
 
 
