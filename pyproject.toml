@@ -193,6 +193,9 @@ known_first_party = ["pas"]
 typeCheckingMode = "off"
 ignore = ["*"]
 
+[project.entry-points."are.simulation.scenarios"]
+proactive-agent-sandbox = "pas.scenario_generator:register_custom_scenarios"
+
 [tool.uv.sources]
 meta-agents-research-environments = { git = "ssh://git@github.com/deepakn97/meta-are.git" }
 
