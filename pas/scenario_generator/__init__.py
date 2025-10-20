@@ -28,6 +28,12 @@ def register_custom_scenarios(registry: "ScenarioRegistry") -> None:
         # Add other custom scenario modules here as needed
     ]
 
+    # Import individual generated scenario files (since generated_scenarios is not a package)
+    generated_scenario_files = [
+        "pas.scenarios.generated_scenarios.scenario_tutorial_schedule_meeting_scenario",
+        "pas.scenarios.generated_scenarios.scenario_tutorial_task_from_message_scenario",
+    ]
+
     imported_count = 0
     for module_name in custom_scenario_modules:
         try:
@@ -37,12 +43,13 @@ def register_custom_scenarios(registry: "ScenarioRegistry") -> None:
         except Exception as e:
             logger.warning(f"Failed to import custom scenario module {module_name}: {e}", exc_info=True)
 
-    # Also import any generated scenarios if they exist
-    try:
-        importlib.import_module("pas.scenarios.generated_scenarios")
-        imported_count += 1
-        logger.debug("Imported generated scenarios module")
-    except Exception as e:
-        logger.debug(f"Generated scenarios module not found or failed to import: {e}")
+    # Import generated scenario files
+    for scenario_file in generated_scenario_files:
+        try:
+            importlib.import_module(scenario_file)
+            imported_count += 1
+            logger.debug(f"Imported generated scenario file: {scenario_file}")
+        except Exception as e:
+            logger.warning(f"Failed to import generated scenario file {scenario_file}: {e}", exc_info=True)
 
     logger.info(f"Registered custom scenarios from {imported_count} modules")
