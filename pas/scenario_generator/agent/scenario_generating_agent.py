@@ -1,7 +1,13 @@
 import logging
 import re
 import time
-from datetime import UTC, datetime
+
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime
+
+    UTC = UTC
 from inspect import getsource
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -41,7 +47,7 @@ class ScenarioGeneratingAgent:
         self,
         llm_engine: LLMEngine,
         tools: list[Tool] | None = None,
-        max_iterations: int = 1,
+        max_iterations: int = 3,
         import_instructions: str = "",
     ) -> None:
         """Initialize the scenario generating agent.
@@ -153,12 +159,11 @@ class ScenarioGeneratingAgent:
         """Create the initial messages for the LLM."""
         return [{"role": "system", "content": system_prompt}, {"role": "user", "content": seed_task}]
 
-    def _run_generation_iterations(self) -> tuple[str | None, Path | None]:
+    def _run_generation_iterations(self) -> tuple[str | None, Path | None]:  # noqa: C901
         """Run the iterative generation process and return (code_text, written_path)."""
         previous_code: str | None = None
         issues: list[str] = []
         written_path: Path | None = None
-
         for it in range(max(1, self.max_iterations)):
             logger.info(f"==== Iteration {it} began ====")
 
@@ -192,20 +197,32 @@ class ScenarioGeneratingAgent:
                 m = re.search(r"```(?:python)?\s*([\s\S]*?)```", llm_output)
                 if m:
                     code_text = m.group(1).strip()
-
             if not code_text:
                 previous_code = llm_output if isinstance(llm_output, str) else None
                 issues = ["Model did not return a fenced python block. Return a single fenced python code block only."]
                 continue
 
+            # Fix common linting issues first
+            logger.info("==== Fixing linting issues ====")
+            code_text = self._fix_generated_file_linting_issues(code_text)
+
             # Validate imports against provided instructions
             issues = self._validate_imports(code_text)
+
+            # Validate generated file for syntax and other issues
+            logger.info("==== Validating generated file ====")
+            validation_issues = self._validate_generated_file(code_text)
+            issues.extend(validation_issues)
+
             if not issues or it == self.max_iterations - 1:
+                if issues:
+                    logger.info(f"==== Issues: {issues} ====")
                 logger.info("==== Writing file ====")
-                logger.info("==== max iterations reached ====")
                 try:
                     written_path = self._write_generated_scenario(code_text)
+                    logger.info("==== File written and validation passed ====")
                     break
+
                 except Exception as e:
                     issues = [f"Failed to write file: {e}"]
                     previous_code = code_text
@@ -308,6 +325,53 @@ class ScenarioGeneratingAgent:
             token = f"import {mod}"
             if token not in instructions:
                 problems.append(f"Missing allowed import in instructions: '{token}'")
+        return problems
+
+    def _fix_generated_file_linting_issues(self, code_text: str) -> str:
+        """Fix common linting issues in generated code, specifically 'true'/'false' vs 'True'/'False'."""
+        lines = code_text.split("\n")
+        fixed_lines = []
+
+        for line in lines:
+            # Skip import lines entirely
+            if line.strip().startswith("import ") or line.strip().startswith("from "):
+                fixed_lines.append(line)
+                continue
+
+            # For non-import lines, replace 'true' and 'false' with 'True' and 'False'
+            # But be careful not to replace them in comments or strings
+            if "true" in line.lower() or "false" in line.lower():
+                # Simple approach: replace 'false' with 'False' and 'true' with 'True'
+                # This is safe for most cases since these are boolean literals
+                fixed_line = line.replace("false", "False").replace("true", "True")
+                fixed_lines.append(fixed_line)
+            else:
+                fixed_lines.append(line)
+
+        return "\n".join(fixed_lines)
+
+    def _validate_syntax(self, code_text: str) -> list[str]:
+        """Validate Python syntax by attempting to compile the code."""
+        problems: list[str] = []
+
+        try:
+            # Try to compile the code to catch syntax errors
+            compile(code_text, "<generated_scenario>", "exec")
+        except SyntaxError as e:
+            problems.append(f"Syntax error at line {e.lineno}: {e.msg}")
+        except Exception as e:
+            # Catch other compilation errors
+            problems.append(f"Compilation error: {e}")
+
+        return problems
+
+    def _validate_generated_file(self, code_text: str) -> list[str]:
+        """Validate the generated file content for various issues."""
+        problems: list[str] = []
+
+        # Validate syntax
+        problems.extend(self._validate_syntax(code_text))
+
         return problems
 
     def _validate_imports(self, code_text: str) -> list[str]:

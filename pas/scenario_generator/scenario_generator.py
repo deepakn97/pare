@@ -48,7 +48,7 @@ def generate_scenarios_from_example(
     system_prompt = ""  # ScenarioGeneratingAgent will populate tools/time placeholders
     # Wire minimal generator (no BaseAgent needed)
     gen_agent = ScenarioGeneratingAgent(
-        llm_engine=engine, tools=[], max_iterations=3, import_instructions=import_instructions
+        llm_engine=engine, tools=[], max_iterations=5, import_instructions=import_instructions
     )
 
     logger.info("Running minimal scenario generator agent")
