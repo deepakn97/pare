@@ -7,9 +7,9 @@ from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from are.simulation.apps.calendar import DATETIME_FORMAT, CalendarEvent
-from are.simulation.tool_utils import user_tool
 
 from pas.apps.core import AppState
+from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 
 def _utc_datetime_from_str(value: str | None) -> datetime | None:
@@ -80,6 +80,7 @@ class AgendaView(AppState):
         return events
 
     @user_tool()
+    @pas_event_registered()
     def list_events(self, offset: int = 0, limit: int = 10) -> dict[str, object]:
         """List events within the active time window respecting current filters."""
         result = self.app.get_calendar_events_from_to(
@@ -98,6 +99,7 @@ class AgendaView(AppState):
         return {"events": filtered, "range": result.get("range"), "total": len(filtered)}
 
     @user_tool()
+    @pas_event_registered()
     def search_events(self, query: str) -> list[CalendarEvent]:
         """Search events, applying local filters and window constraints."""
         matches = self.app.search_events(query=query)
@@ -117,11 +119,13 @@ class AgendaView(AppState):
         return filtered
 
     @user_tool()
+    @pas_event_registered()
     def open_event_by_id(self, event_id: str) -> CalendarEvent:
         """Open an event by identifier within the current window."""
         return self.app.get_calendar_event(event_id=event_id)
 
     @user_tool()
+    @pas_event_registered()
     def open_event_by_index(self, index: int) -> CalendarEvent:
         """Open the n-th event in the current window according to ordering."""
         events = self._events_in_window()
@@ -130,11 +134,13 @@ class AgendaView(AppState):
         return events[index]
 
     @user_tool()
+    @pas_event_registered()
     def filter_by_tag(self, tag: str) -> list[CalendarEvent]:
         """Preview events with a specific tag."""
         return [event for event in self._events_in_window() if event.tag == tag]
 
     @user_tool()
+    @pas_event_registered()
     def filter_by_attendee(self, attendee: str) -> list[CalendarEvent]:
         """Preview events containing a specific attendee."""
         attendee_lower = attendee.lower()
@@ -143,6 +149,7 @@ class AgendaView(AppState):
         ]
 
     @user_tool()
+    @pas_event_registered()
     def add_calendar_event_by_attendee(
         self,
         who_add: str,
@@ -167,21 +174,25 @@ class AgendaView(AppState):
         )
 
     @user_tool()
+    @pas_event_registered()
     def read_today_calendar_events(self) -> dict[str, object]:
         """Return today's events via the backend helper."""
         return self.app.read_today_calendar_events()
 
     @user_tool()
+    @pas_event_registered()
     def get_all_tags(self) -> list[str]:
         """List all tags present in the calendar."""
         return self.app.get_all_tags()
 
     @user_tool()
+    @pas_event_registered()
     def get_calendar_events_by_tag(self, tag: str) -> list[CalendarEvent]:
         """Fetch events associated with a specific tag directly from the backend."""
         return self.app.get_calendar_events_by_tag(tag=tag)
 
     @user_tool()
+    @pas_event_registered()
     def set_day(self, date: str) -> dict[str, str]:
         """Switch the agenda view to the supplied UTC date string (YYYY-MM-DD)."""
         day = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=UTC)
@@ -189,6 +200,7 @@ class AgendaView(AppState):
         return {"start_datetime": start, "end_datetime": end}
 
     @user_tool()
+    @pas_event_registered()
     def start_create_event(self) -> str:
         """Begin a new event creation flow."""
         return "draft_started"
@@ -221,28 +233,33 @@ class EventDetail(AppState):
         return self._event
 
     @user_tool()
+    @pas_event_registered()
     def refresh(self) -> CalendarEvent:
         """Reload event data from the backend."""
         self._event = self.app.get_calendar_event(self.event_id)
         return self._event
 
     @user_tool()
+    @pas_event_registered()
     def delete(self) -> str:
         """Delete this event from the calendar."""
         return self.app.delete_calendar_event(event_id=self.event_id)
 
     @user_tool()
+    @pas_event_registered()
     def delete_by_attendee(self, who_delete: str) -> str:
         """Delete the event as a particular attendee."""
         return self.app.delete_calendar_event_by_attendee(event_id=self.event_id, who_delete=who_delete)
 
     @user_tool()
+    @pas_event_registered()
     def list_attendees(self) -> list[str]:
         """Return the attendee list for this event."""
         event = self._ensure_event()
         return list(event.attendees) if event else []
 
     @user_tool()
+    @pas_event_registered()
     def edit_event(self) -> dict[str, object]:
         """Prepare a draft payload for editing this event."""
         event = self._ensure_event()
@@ -289,6 +306,7 @@ class EditEvent(AppState):
         self._cached_tools = None
 
     @user_tool()
+    @pas_event_registered()
     def set_title(self, title: str) -> dict[str, object]:
         """Update the draft title."""
         self.draft.title = title
@@ -296,6 +314,7 @@ class EditEvent(AppState):
         return {"title": self.draft.title}
 
     @user_tool()
+    @pas_event_registered()
     def set_time_range(self, start_datetime: str, end_datetime: str) -> dict[str, object]:
         """Set the draft start/end datetimes."""
         self.draft.start_datetime = start_datetime
@@ -304,6 +323,7 @@ class EditEvent(AppState):
         return {"start_datetime": self.draft.start_datetime, "end_datetime": self.draft.end_datetime}
 
     @user_tool()
+    @pas_event_registered()
     def set_tag(self, tag: str | None) -> dict[str, object]:
         """Assign a label/tag to the draft."""
         self.draft.tag = tag
@@ -311,18 +331,21 @@ class EditEvent(AppState):
         return {"tag": self.draft.tag}
 
     @user_tool()
+    @pas_event_registered()
     def set_description(self, description: str | None) -> dict[str, object]:
         """Replace the draft description."""
         self.draft.description = description
         return {"description": self.draft.description}
 
     @user_tool()
+    @pas_event_registered()
     def set_location(self, location: str | None) -> dict[str, object]:
         """Update the draft location."""
         self.draft.location = location
         return {"location": self.draft.location}
 
     @user_tool()
+    @pas_event_registered()
     def set_attendees(self, attendees: list[str]) -> dict[str, object]:
         """Overwrite the current attendee list."""
         self.draft.attendees = attendees
@@ -330,6 +353,7 @@ class EditEvent(AppState):
         return {"attendees": list(self.draft.attendees)}
 
     @user_tool()
+    @pas_event_registered()
     def add_attendee(self, attendee: str) -> dict[str, object]:
         """Append an attendee to the draft if not already present."""
         if attendee not in self.draft.attendees:
@@ -338,6 +362,7 @@ class EditEvent(AppState):
         return {"attendees": list(self.draft.attendees)}
 
     @user_tool()
+    @pas_event_registered()
     def remove_attendee(self, attendee: str) -> dict[str, object]:
         """Remove an attendee from the draft if included."""
         self.draft.attendees = [a for a in self.draft.attendees if a != attendee]
@@ -345,6 +370,7 @@ class EditEvent(AppState):
         return {"attendees": list(self.draft.attendees)}
 
     @user_tool()
+    @pas_event_registered()
     def save(self) -> str:
         """Persist current draft to backend, returning the event id."""
         if self.draft.event_id:
@@ -373,6 +399,7 @@ class EditEvent(AppState):
         return event_id
 
     @user_tool()
+    @pas_event_registered()
     def discard(self) -> str:
         """Discard current draft and stay within compose state."""
         self.draft = EditDraft()

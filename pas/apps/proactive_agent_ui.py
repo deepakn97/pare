@@ -7,10 +7,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from are.simulation.apps.agent_user_interface import AgentUserInterface
-from are.simulation.tool_utils import AppTool, OperationType, app_tool, data_tool, user_tool
+from are.simulation.tool_utils import AppTool, OperationType, app_tool, data_tool
 from are.simulation.types import event_registered
 
 from pas.apps.core import StatefulApp
+from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
     from are.simulation.agents.user_proxy import UserProxy
@@ -79,6 +80,7 @@ class ProactiveAgentUserInterface(AgentUserInterface, StatefulApp):
         return f"Proposed to user: {goal}"
 
     @user_tool()
+    @pas_event_registered()
     def accept_proposal(self) -> str:
         """User accepts the pending proactive proposal.
 
@@ -93,6 +95,7 @@ class ProactiveAgentUserInterface(AgentUserInterface, StatefulApp):
         return f"Accepted proposal: {proposal.goal}"
 
     @user_tool()
+    @pas_event_registered()
     def decline_proposal(self, reason: str = "") -> str:
         """User declines the pending proactive proposal.
 

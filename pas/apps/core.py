@@ -5,10 +5,15 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, cast
 
 from are.simulation.apps.app import App
-from are.simulation.tool_utils import AppTool, build_tool, user_tool
+from are.simulation.tool_utils import AppTool, build_tool
+
+from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
+    from are.simulation.tools import Tool
     from are.simulation.types import CompletedEvent
+else:  # pragma: no cover - runtime fallback for typing-only imports
+    Tool = object  # type: ignore[misc,assignment]
 
 
 class AppState(ABC):
@@ -52,7 +57,15 @@ class AppState(ABC):
             tools = []
             for _, method in inspect.getmembers(self, predicate=inspect.ismethod):
                 if hasattr(method, "_is_user_tool"):  # check for user tool decorator
-                    tools.append(build_tool(self._app, method))
+                    # IMPORTANT: For state-bound methods, extract the unbound function
+                    # and explicitly set class_instance to the state instance.
+                    # `method` is a bound method, but AppTool expects an unbound function
+                    # so it can pass class_instance as the first argument.
+                    unbound_func = method.__func__
+                    tool = build_tool(self._app, unbound_func)
+                    # Override class_instance to be the state instance, not the app
+                    tool.class_instance = self
+                    tools.append(tool)
             self._cached_tools = tools
 
         return self._cached_tools
@@ -142,6 +155,7 @@ class StatefulApp(App):
         return f"Reset to {state_name}"
 
     @user_tool()
+    @pas_event_registered()
     def go_back(self) -> str:
         """Navigate back to the previous state of the app.
 
@@ -170,6 +184,19 @@ class StatefulApp(App):
         if self.navigation_stack:
             tools.append(build_tool(self, self.go_back))
         return tools
+
+    def get_meta_are_user_tools(self) -> list[Tool]:
+        """Return Meta ARE-compatible tool adapters for the current navigation state."""
+        from are.simulation.tool_utils import AppToolAdapter  # Use native Meta ARE adapter
+
+        adapters: list[Tool] = []
+        if self.current_state is not None:
+            for app_tool in self.current_state.get_available_actions():
+                adapters.append(AppToolAdapter(app_tool))
+
+        if self.navigation_stack:
+            adapters.append(AppToolAdapter(build_tool(self, self.go_back)))
+        return adapters
 
     def get_tools(self) -> list[AppTool]:
         """Get the tools of the app."""

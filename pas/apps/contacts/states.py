@@ -5,11 +5,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from are.simulation.apps.contacts import Contact  # noqa: TC002
-from are.simulation.tool_utils import AppTool, user_tool
+from are.simulation.types import OperationType, disable_events
 
 from pas.apps.core import AppState
+from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
+    from are.simulation.tool_utils import AppTool
+
     from pas.apps.contacts.app import StatefulContactsApp
 
 
@@ -49,18 +52,21 @@ class ContactsList(AppState):
         """No-op hook for exiting the contacts list."""
 
     @user_tool()
+    @pas_event_registered()
     def list_contacts(self, offset: int = 0) -> dict[str, object]:
         """List contacts using the native paginated API."""
         app = cast("StatefulContactsApp", self.app)
         return app.get_contacts(offset=offset)
 
     @user_tool()
+    @pas_event_registered()
     def search_contacts(self, query: str) -> list[Contact]:
         """Search contacts by name, phone or email."""
         app = cast("StatefulContactsApp", self.app)
         return app.search_contacts(query=query)
 
     @user_tool()
+    @pas_event_registered()
     def open_contact(self, contact_id: str) -> Contact:
         """Open a contact from the list, queuing a transition to the detail view."""
         app = cast("StatefulContactsApp", self.app)
@@ -68,6 +74,7 @@ class ContactsList(AppState):
         return app.get_contact(contact_id=contact_id)
 
     @user_tool()
+    @pas_event_registered()
     def view_current_user(self) -> Contact:
         """View the contact card for the current user persona."""
         app = cast("StatefulContactsApp", self.app)
@@ -87,6 +94,7 @@ class ContactsList(AppState):
         return actions
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def create_contact(
         self,
         first_name: str,
@@ -139,12 +147,14 @@ class ContactDetail(AppState):
         app.clear_contact_transition()
 
     @user_tool()
+    @pas_event_registered()
     def view_contact(self) -> Contact:
         """Retrieve the currently opened contact."""
         app = cast("StatefulContactsApp", self.app)
         return app.get_contact(contact_id=self.contact_id)
 
     @user_tool()
+    @pas_event_registered()
     def start_edit_contact(self) -> Contact:
         """Queue an edit transition and return the latest contact data."""
         app = cast("StatefulContactsApp", self.app)
@@ -152,10 +162,12 @@ class ContactDetail(AppState):
         return app.get_contact(contact_id=self.contact_id)
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def delete_contact(self) -> str:
         """Delete the currently opened contact."""
         app = cast("StatefulContactsApp", self.app)
-        return app.delete_contact(contact_id=self.contact_id)
+        with disable_events():
+            return app.delete_contact(contact_id=self.contact_id)
 
 
 class ContactEdit(AppState):
@@ -175,12 +187,14 @@ class ContactEdit(AppState):
         app.clear_contact_transition()
 
     @user_tool()
+    @pas_event_registered()
     def view_contact(self) -> Contact:
         """Read the contact being edited without leaving edit mode."""
         app = cast("StatefulContactsApp", self.app)
         return app.get_contact(contact_id=self.contact_id)
 
     @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def update_contact(self, updates: dict[str, object]) -> str | None:
         """Persist updates to the contact and stay in edit mode until a transition occurs."""
         app = cast("StatefulContactsApp", self.app)

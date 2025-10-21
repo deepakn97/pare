@@ -1,5 +1,8 @@
 docs/source
 
+# Personal notes (not for version control)
+personal_notes/
+
 # From https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore
 
 # Byte-compiled / optimized / DLL files
@@ -215,3 +218,6 @@ CLAUDE.md
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# YoYo AI version control directory
+.yoyo/

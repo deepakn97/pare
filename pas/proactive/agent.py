@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Protocol
 
 from are.simulation.types import CompletedEvent, EventType
 
+from pas.llm_adapter import LLMClientProtocol
+
 if TYPE_CHECKING:
     from logging import Logger
 
@@ -16,13 +18,6 @@ if TYPE_CHECKING:
 else:
     Logger = object  # type: ignore[assignment]
     StateAwareEnvironmentWrapper = object  # type: ignore[assignment]
-
-
-class LLMClientProtocol(Protocol):
-    """Minimal protocol for LLM clients used by :class:`LLMBasedProactiveAgent`."""
-
-    def complete(self, prompt: str) -> str:
-        """Return a string completion for the provided prompt."""
 
 
 @dataclass(slots=True)

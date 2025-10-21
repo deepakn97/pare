@@ -36,7 +36,7 @@ All interfaces assume Meta-ARE 2024.10.* and the PAS stateful apps checked into 
 
 | File / Class                                   | Responsibility                                         |
 |------------------------------------------------|-------------------------------------------------------|
-| `pas/user_proxy/stateful.py`                    | Stateful proxy plus `UserActionFailed`/`TurnLimitReached` guards |
+| `pas/user_proxy/agent.py`                    | Stateful proxy plus `UserActionFailed`/`TurnLimitReached` guards |
 | `pas/proactive/agent.py`                        | Reference proactive agent + `ProactiveAgentProtocol`  |
 | `pas/oracles.py`                                | Oracle matching and tracking helpers                  |
 | `pas/scenarios/base.py`                         | Utilities to assemble PAS runtime stacks              |
@@ -46,20 +46,16 @@ Teams may add additional files, but the interfaces exposed here must remain unch
 ## 3. User Proxy Contract
 
 ```python
-class StatefulUserProxy(UserProxy):
+class StatefulUserAgentProxy(UserProxy):
     def __init__(
         self,
-        env: StateAwareEnvironmentWrapper,
-        notification_system: BaseNotificationSystem,
-        *,
-        max_user_turns: int = 40,
-        logger: logging.Logger,
-        planner: PlannerCallable | None = None,
-        event_timeout: float = 2.0,
+        runtime: StatefulUserAgentRuntime,
     ) -> None: ...
 
     def init_conversation(self) -> str: ...
     def reply(self, message: str) -> str: ...
+    def react_to_event(self, message: str) -> str: ...
+    def consume_notifications(self) -> list[str]: ...
 ```
 
 ### 3.1 Constructor arguments
@@ -88,7 +84,7 @@ class StatefulUserProxy(UserProxy):
 
 ### 3.4 Transcript + helpers
 
-`StatefulUserProxy` keeps an internal list of dicts with `role` (`agent` / `user`) and `content`. Optionally store the raw tool log (`List[ToolInvocation]`) for debugging or export.
+`StatefulUserAgentProxy` keeps an internal list of dicts with `role` (`agent` / `user`) and `content`. Optionally store the raw tool log (`List[ToolInvocation]`) for debugging or export.
 
 ## 4. Proactive Agent Contract
 
@@ -122,7 +118,7 @@ For full constructor options and exception semantics of
 ## 5. Scenario Authoring Responsibilities
 
 1. **Environment setup** – instantiate `StateAwareEnvironmentWrapper`, register stateful apps.
-2. **Instantiate components** – create `StatefulUserProxy` and a `ProactiveAgentProtocol` implementation.
+2. **Instantiate components** – create `StatefulUserAgentProxy` and a `ProactiveAgentProtocol` implementation.
 3. **Wire event flow** – subscribe `proactive.observe` to all events:
    ```python
    env.notification_system.subscribe(EventType.ANY, proactive.observe)
@@ -133,7 +129,7 @@ For full constructor options and exception semantics of
 ### 5.1 Constructor example
 
 ```python
-proxy = StatefulUserProxy(env, env.notification_system, summary_style="structured")
+proxy = StatefulUserAgentProxy(env, env.notification_system, summary_style="structured")
 proactive = LLMBasedProactiveAgent()  # see docs/proactive_agent_guide.md for constructor details
 aui = AgentUserInterface(user_proxy=proxy, ...)
 ```
@@ -167,7 +163,7 @@ Rules:
 env = StateAwareEnvironmentWrapper()
 env.register_apps([StatefulContactsApp(name="contacts"), StatefulEmailApp(name="email")])
 
-proxy = StatefulUserProxy(env, env.notification_system)
+proxy = StatefulUserAgentProxy(env, env.notification_system)
 llm_client = build_llm_client()  # your LLM factory
 proactive = LLMBasedProactiveAgent(llm=llm_client, system_prompt="...")
 

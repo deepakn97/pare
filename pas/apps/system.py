@@ -5,11 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from are.simulation.apps.system import SystemApp
-from are.simulation.tool_utils import AppTool, user_tool
 
 from pas.apps.core import StatefulApp
+from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
+    from are.simulation.tool_utils import AppTool
+
     from pas.environment import StateAwareEnvironmentWrapper
 
 
@@ -26,11 +28,13 @@ class HomeScreenSystemApp(SystemApp):
         self._environment = env
 
     @user_tool()
+    @pas_event_registered()
     def go_home(self) -> str:
         """Return to the home screen without changing app state."""
         return "Returned to home screen"
 
     @user_tool()
+    @pas_event_registered()
     def open_app(self, app_name: str) -> str:
         """Switch to the requested app's root view."""
         if self._environment is None:

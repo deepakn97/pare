@@ -16,7 +16,7 @@ Every scenario wires the following layers together:
 3. **Notifications** – configure `pas.system.notification.PasNotificationSystem`
    (exposed through `create_notification_system`) so completed events become
    human readable system notifications. The user proxy consumes these via
-   `StatefulUserProxy.consume_notifications()`.
+   `StatefulUserAgentRuntime.consume_notifications()`.
 4. **User planner** – `pas.system.user.build_stateful_user_planner` builds an
    LLM-backed planner that enumerates per-app tools and system navigation tools.
    When no initial app is specified the planner starts on a synthetic home
@@ -76,7 +76,7 @@ from pas.system import (
     create_notification_system,
     initialise_runtime,
 )
-from pas.user_proxy import StatefulUserProxy
+from pas.user_proxy import build_stateful_user_agent
 from pas.user_proxy.decision_maker import LLMDecisionMaker
 
 
@@ -111,7 +111,7 @@ def build_components(llm_client, user_llm_client):
     decision_maker = LLMDecisionMaker(user_llm_client, logger=decision_logger)
 
     user_logger = get_pas_file_logger("pas.user_proxy", user_log)
-    user_proxy = StatefulUserProxy(
+    user_proxy = build_stateful_user_agent(config,
         env,
         notification_system,
         max_user_turns=25,
@@ -193,14 +193,14 @@ that the simulated user prefers taps to typing, so flows should lean on
 button-like tools and keep any manual messages short.
 
 The planner must be called for every agent/user message as well as for
-notification reactions (`StatefulUserProxy.react_to_event`). Planner outputs are
+notification reactions (`StatefulUserAgentRuntime.react_to_event`). Planner outputs are
 JSON-encoded tool invocations that the proxy executes in order.
 
 ## 5. Proactive Session Loop
 
 `ProactiveSession.run_cycle()` performs the end-to-end proactive flow:
 
-1. Drain notification queue (`StatefulUserProxy.consume_notifications()`)
+1. Drain notification queue (`StatefulUserAgentRuntime.consume_notifications()`)
    and let the user proxy respond.
 2. Call `agent.propose_goal()` once, using all events collected so far.
 3. Prompt the user via the messaging app to accept or decline.

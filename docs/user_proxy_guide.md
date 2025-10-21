@@ -5,7 +5,7 @@ in alternative planners while keeping the public contract stable.
 
 ## 1. Overview
 
-`pas/user_proxy/stateful.py` exports `StatefulUserProxy`, a drop-in replacement
+`pas/user_proxy/stateful.py` exports `StatefulUserAgentProxy`, a drop-in replacement
 for Meta-ARE’s default proxy. Its core responsibilities are:
 
 1. Translate free-form messages (from the agent or system notifications) into concrete
@@ -22,7 +22,7 @@ rule-based or human planner as long as it matches the callable signature.
 ## 2. Constructor
 
 ```python
-class StatefulUserProxy(UserProxy):
+class StatefulUserAgentProxy(UserProxy):
     def __init__(
         self,
         env: StateAwareEnvironmentWrapper,
@@ -71,7 +71,7 @@ the same context a human would see on a phone lock screen.
 `PlannerCallable` is defined as:
 
 ```python
-PlannerCallable = Callable[[str, StatefulUserProxy], Sequence[tuple[str, str, dict[str, object]]]]
+PlannerCallable = Callable[[str, StatefulUserAgentProxy], Sequence[tuple[str, str, dict[str, object]]]]
 ```
 
 The built-in `LLMUserPlanner` prepares a prompt that includes:
@@ -97,7 +97,7 @@ It expects the LLM to return JSON of the form:
 {"actions": [{"tool": "option_1", "args": {"conversation_id": "..."}}]}
 ```
 
-`StatefulUserProxy` executes each action in order, collecting `ToolInvocation`
+`StatefulUserAgentProxy` executes each action in order, collecting `ToolInvocation`
 dataclasses that capture the name, arguments, return value, and corresponding
 event (if any).
 
