@@ -1,17 +1,17 @@
 # Proactive Agent Sandbox (PAS)
 
-[![Release](https://img.shields.io/github/v/release/deepakn97/proactiveGoalInference)](https://img.shields.io/github/v/release/deepakn97/proactiveGoalInference)
-[![Build status](https://img.shields.io/github/actions/workflow/status/deepakn97/proactiveGoalInference/main.yml?branch=main)](https://github.com/deepakn97/proactiveGoalInference/actions/workflows/main.yml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/deepakn97/proactiveGoalInference/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/proactiveGoalInference)
-[![Commit activity](https://img.shields.io/github/commit-activity/m/deepakn97/proactiveGoalInference)](https://img.shields.io/github/commit-activity/m/deepakn97/proactiveGoalInference)
-[![License](https://img.shields.io/github/license/deepakn97/proactiveGoalInference)](https://img.shields.io/github/license/deepakn97/proactiveGoalInference)
+[![Release](https://img.shields.io/github/v/release/deepakn97/pas)](https://img.shields.io/github/v/release/deepakn97/pas)
+[![Build status](https://img.shields.io/github/actions/workflow/status/deepakn97/pas/main.yml?branch=main)](https://github.com/deepakn97/pas/actions/workflows/main.yml?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/deepakn97/proactiveGoalInference/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/pas)
+[![Commit activity](https://img.shields.io/github/commit-activity/m/deepakn97/pas)](https://img.shields.io/github/commit-activity/m/deepakn97/pas)
+[![License](https://img.shields.io/github/license/deepakn97/pas)](https://img.shields.io/github/license/deepakn97/pas)
 
 This repository contains code for the Proactive Goal Inference Agent project in collaboration with Apple.
 
 PAS extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based navigation architecture for mobile app simulation, enabling proactive agent research with context-aware action spaces.
 
-- **Github repository**: <https://github.com/deepakn97/proactiveGoalInference/>
-- **Documentation**: <https://deepakn97.github.io/proactiveGoalInference/>
+- **Github repository**: <https://github.com/deepakn97/pas/>
+- **Documentation**: <https://deepakn97.github.io/pas/>
 
 ## Setup
 
