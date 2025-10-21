@@ -2,7 +2,9 @@
 name = "ProactiveAgentSandbox"
 version = "0.0.1"
 description = "This repository contains code for the Proactive Goal Inference and Sandbox project in collaboration with Apple."
-authors = [{ name = "Deepak Nathani", email = "dnathani@ucsb.edu" }]
+authors = [
+    { name = "Deepak Nathani", email = "dnathani@ucsb.edu" },
+]
 readme = "README.md"
 keywords = ['python']
 requires-python = ">=3.12,<4.0"
@@ -21,9 +23,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://deepakn97.github.io/proactiveGoalInference/"
-Repository = "https://github.com/deepakn97/proactiveGoalInference"
-Documentation = "https://deepakn97.github.io/proactiveGoalInference/"
+Homepage = "https://deepakn97.github.io/pas/"
+Repository = "https://github.com/deepakn97/pas"
+Documentation = "https://deepakn97.github.io/pas/"
 
 [dependency-groups]
 dev = [

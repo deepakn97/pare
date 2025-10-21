@@ -1,16 +1,72 @@
-# Key PAS Modules
+# API Reference Overview
 
-- `pas.apps` – Stateful wrappers around Meta-ARE mobile apps (contacts,
-  messaging, email, calendar) and their navigation states.
-- `pas.environment.StateAwareEnvironmentWrapper` – monitors completed events
-  and triggers navigation transitions while broadcasting notifications.
-- `pas.user_proxy` – user proxy implementation plus planners and decision
-  maker utilities.
-- `pas.proactive` – proactive agent, OpenAI client wrapper, and plan executor
-  bridge to Meta-ARE ReAct agents.
-- `pas.apps.system` – PAS extension of the Meta system app providing home-screen
-  user tools.
-- `pas.scenarios` – factories that assemble environments, agents, and oracle
-  expectations for demos or imported Meta scenarios.
-- `pas.system` – runtime helpers to initialise logging, build planners, and run
-  `ProactiveSession` cycles end-to-end.
+This section provides comprehensive API documentation for all PAS modules, automatically generated from the codebase.
+
+## Core Modules
+
+### [System & Session](api/system.md)
+Runtime orchestration, session management, and proactive execution helpers.
+
+- `ProactiveSession` – Main orchestration loop
+- `Runtime` – Stack initialization helpers
+- `NotificationSystem` – Event broadcasting
+- `User` – User simulation components
+- `Proactive` – Proactive execution helpers
+
+### [Environment](api/environment.md)
+State-aware environment wrapper that monitors events and triggers navigation transitions.
+
+- `StateAwareEnvironmentWrapper` – Core environment wrapper
+
+### [Stateful Apps](api/apps.md)
+Stateful wrappers around Meta-ARE mobile apps with navigation state machines.
+
+- `core` – Base classes (`AppState`, `StatefulApp`)
+- `contacts` – Contacts app and states
+- `email` – Email app and states
+- `calendar` – Calendar app and states
+- `messaging` – Messaging app and states
+- `proactive_agent_ui` – Proactive agent user interface
+- `system` – System-level apps
+
+## Agent Components
+
+### [User Proxy](api/user_proxy.md)
+User simulation with LLM-based action planning.
+
+- `StatefulUserProxy` – User proxy implementation
+- `LLMPlanner` – LLM-based action planner
+
+### [Proactive Agent](api/proactive_agent.md)
+Proactive goal inference and autonomous task execution.
+
+- `LLMBasedProactiveAgent` – Core proactive agent
+- `LiteLLMClient` – LLM client wrapper
+- `ReActAdapter` – ReAct planning adapter
+
+## Scenario System
+
+### [Scenarios](api/scenarios.md)
+Scenario builders and configuration for proactive experiments.
+
+- `base` – Base scenario builder (`build_proactive_stack`)
+- `types` – Type definitions (`OracleAction`, etc.)
+- `contacts_followup` – Example scenario
+
+### [Scenario Generator](api/scenario_generator.md)
+Automated scenario generation pipeline.
+
+- `ScenarioGenerator` – Main generator class
+
+## Utilities
+
+### [Adapters & Validation](api/adapters.md)
+Meta-ARE adapter and oracle-based validation.
+
+- `meta_adapter` – Convert Meta-ARE scenarios to PAS
+- `oracles` – Oracle tracking for validation
+
+### [Logging](api/logging.md)
+Logging utilities and configuration.
+
+- `logging_utils` – Logging configuration helpers

@@ -34,9 +34,15 @@ clean-build: ## Clean build artifacts
 docs-test: ## Test if documentation can be built without warnings or errors
 	@uv run mkdocs build -s
 
-.PHONY: docs
-docs: ## Build and serve the documentation
+.PHONY: docs-serve
+docs-serve: ## Build and serve the documentation
 	@uv run mkdocs serve
+
+.PHONY: docs-deploy
+docs-deploy: ## Deploy the documentation to GitHub Pages
+	@echo "🚀 Deploying documentation to GitHub Pages at https://deepakn97.github.io/pas/"
+	@uv run mkdocs build -s
+	@uv run mkdocs gh-deploy
 
 .PHONY: demo
 demo: ## Run a sample scenario interaction and show log locations

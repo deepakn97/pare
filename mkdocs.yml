@@ -1,21 +1,48 @@
-site_name: proactiveGoalInference
-repo_url: https://github.com/deepakn97/proactiveGoalInference
-site_url: https://deepakn97.github.io/proactiveGoalInference
+site_name: Proactive Agent Sandbox
+repo_url: https://github.com/deepakn97/pas
+site_url: https://deepakn97.github.io/pas
 site_description: This repository contains code for the Proactive Goal Inference Agent project in collaboration with Apple.
 site_author: Deepak Nathani
 edit_uri: edit/main/docs/
-repo_name: deepakn97/proactiveGoalInference
+repo_name: deepakn97/pas
 copyright: Maintained by <a href="https://deepakn97.com">deepakn97</a>.
 
 nav:
   - Home: index.md
-  - Modules: modules.md
+  - Getting Started:
+      - Integration Guide: interface-guide.md
+      - User Proxy Guide: user_proxy_guide.md
+      - Proactive Agent Guide: proactive_agent_guide.md
+      - Scenario Authoring Guide: scenario_author_guide.md
+  - Architecture:
+      - Visual Overview: architecture_visual.md
+  - Apps:
+      - App APIs Overview: apps/index.md
+      - Contacts App: apps/contacts.md
+      - Messaging App: apps/messaging.md
+      - Email App: apps/email.md
+      - Calendar App: apps/calendar.md
+  - API Reference:
+      - Overview: modules.md
+      - System & Session: api/system.md
+      - Environment: api/environment.md
+      - Stateful Apps: api/apps.md
+      - User Proxy: api/user_proxy.md
+      - Proactive Agent: api/proactive_agent.md
+      - Scenarios: api/scenarios.md
+      - Scenario Generator: api/scenario_generator.md
+      - Adapters & Validation: api/adapters.md
+      - Logging: api/logging.md
+
+exclude_docs: |
+  _plans/
+
 plugins:
   - search
   - mkdocstrings:
       handlers:
         python:
-          paths: ["src/proactivegoalinference"]
+          paths: ["pas"]
 theme:
   name: material
   feature:
@@ -41,9 +68,9 @@ theme:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/deepakn97/proactiveGoalInference
+      link: https://github.com/deepakn97/pas
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/proactiveGoalInference
+      link: https://pypi.org/project/pas
 
 markdown_extensions:
   - toc:

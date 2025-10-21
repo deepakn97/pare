@@ -2,10 +2,10 @@
 
 Use these pages to explore the current user-facing tool surface for each PAS stateful app. Every document lists all `@user_tool` methods, the Meta-ARE calls they wrap, return values, and navigation effects.
 
-- [Stateful Contacts App](./apps/contacts.md)
-- [Stateful Messaging App](./apps/messaging.md)
-- [Stateful Email App](./apps/email.md)
-- [Stateful Calendar App](./apps/calendar.md)
+- [Stateful Contacts App](./contacts.md)
+- [Stateful Messaging App](./messaging.md)
+- [Stateful Email App](./email.md)
+- [Stateful Calendar App](./calendar.md)
 
 ## Navigation Framework Recap
 - Every stateful app inherits from `pas.apps.core.StatefulApp`, which binds a navigation state (`AppState`) before surfacing its tools.
