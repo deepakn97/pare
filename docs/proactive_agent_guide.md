@@ -84,15 +84,14 @@ Guidelines:
 
 `ProactiveSession` (see `docs/scenario_author_guide.md`) manages the flow:
 
-1. Drain notifications → `StatefulUserAgentRuntime` reacts → new events arrive.
+1. Drain notifications → `StatefulUserAgentRuntime` uses ReAct reasoning to respond → new events arrive.
 2. Call `agent.propose_goal()` once.
-3. Use the decision maker (e.g. `LLMDecisionMaker`) to collect a system-level
-   confirmation without invoking messaging tools.
+3. Collect user confirmation for the proposed goal.
 4. Call `agent.record_decision(goal, accepted)`.
 5. If accepted, run `agent.execute(...)`, fetch `agent.pop_summary()`, and call
    `agent.handoff(...)`.
 
-Thus the agent does **not** decide when to run; it reacts inside the session’s
+Thus the agent does **not** decide when to run; it reacts inside the session's
 `run_cycle()`.
 
 ## 5. Recording User Decisions
