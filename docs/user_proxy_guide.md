@@ -1,165 +1,178 @@
 # User Proxy Guide
 
-This guide explains how the PAS user proxy is structured today and how to plug
-in alternative planners while keeping the public contract stable.
+This guide explains how the PAS user proxy is structured and how it integrates with Meta ARE's BaseAgent pattern.
 
 ## 1. Overview
 
-`pas/user_proxy/stateful.py` exports `StatefulUserAgentProxy`, a drop-in replacement
-for Meta-ARE’s default proxy. Its core responsibilities are:
+`pas/user_proxy/agent.py` exports `StatefulUserAgent`, a Meta ARE BaseAgent that uses ReAct reasoning to interact with stateful apps. Its core responsibilities are:
 
-1. Translate free-form messages (from the agent or system notifications) into concrete
-   tool invocations.
-2. Execute those tools against the current navigation state while tracking
-   recent events.
-3. Surface structured replies and maintain a transcript for logging/debugging.
+1. Use ReAct-style reasoning to decide which tools to call based on agent messages and system notifications.
+2. Execute tools against the current navigation state while tracking recent events.
+3. Automatically wait for CompletedEvents after tool calls to keep state synchronized.
 4. Enforce turn limits to keep conversations bounded.
+5. Terminate conversations using the native Meta ARE final_answer tool.
 
-The proxy is planner-agnostic. Today we ship `pas/user_proxy/llm_planner.py`
-which generates tool calls via the OpenAI Responses API, but you can swap in a
-rule-based or human planner as long as it matches the callable signature.
+The agent uses Meta ARE's native ReAct reasoning framework, eliminating the need for a separate planner layer.
 
-## 2. Constructor
+## 2. Architecture
+
+### StatefulUserAgent
+
+The core agent that extends Meta ARE's BaseAgent:
 
 ```python
-class StatefulUserAgentProxy(UserProxy):
+class StatefulUserAgent(BaseAgent):
     def __init__(
         self,
-        env: StateAwareEnvironmentWrapper,
-        notification_system: BaseNotificationSystem,
+        llm_client: LiteLLMClient,
+        tools: dict[str, object],
         *,
-        max_user_turns: int = 40,
-        logger: logging.Logger,
-        planner: PlannerCallable | None = None,
-        event_timeout: float = 2.0,
+        max_turns: int = 40,
+        logger: logging.Logger | None = None,
     ) -> None:
         ...
 ```
 
-- `env`: shared environment wrapper. Access apps via `env.get_app(...)`.
-- `notification_system`: provides notifications triggered by
-  `pas.system.notification` for the scenario.
-- `max_user_turns`: after this many replies, `TurnLimitReached` is raised.
-- `logger`: required logger instance for tracking proxy actions and decisions.
-- `planner`: callable that accepts the incoming message and the proxy instance,
-  then returns a list of `(app_name, method_name, args)` tuples.
-- `event_timeout`: how long to wait for a matching `CompletedEvent` when a tool
-  is marked as a write operation (default 2.0 seconds).
+- `llm_client`: LiteLLM client for ReAct reasoning
+- `tools`: Dictionary of available tools (user_tools from apps + final_answer)
+- `max_turns`: Maximum conversation turns before termination (default 40)
+- `logger`: Optional logger for tracking agent decisions
 
-Upon construction, the proxy subscribes to the environment’s completed events
-and records user-originating events in `_recent_events` for later lookups.
+The agent uses a custom PasJsonActionExecutor that:
+1. Records PAS-specific metadata (app name, method name, raw arguments)
+2. Waits for CompletedEvents after tool calls (except for final_answer)
+3. Provides detailed error messages when tools fail
 
-## 3. Notification Handling
+### StatefulUserAgentRuntime
 
-Scenarios convert tool completions into notifications through
-`pas.system.notification.PasNotificationSystem` (instantiated via
-`pas.system.runtime.create_notification_system`). The proxy consumes them with:
+Wraps the agent and manages dynamic tool updates:
 
 ```python
-notifications = proxy.consume_notifications()
-for text in notifications:
-    proxy.react_to_event(text)
+class StatefulUserAgentRuntime:
+    def __init__(
+        self,
+        agent: StatefulUserAgent,
+        env: StateAwareEnvironmentWrapper,
+    ) -> None:
+        ...
 ```
 
-The default implementation filters out noisy meta-events (e.g. raw
-conversation IDs) and logs a friendly summary (`Notification (app: messaging)`
-...). These notifications feed back into the planner so the user LLM receives
-the same context a human would see on a phone lock screen.
+- `agent`: The StatefulUserAgent instance
+- `env`: StateAwareEnvironmentWrapper for accessing apps and managing state
 
-## 4. Planner Contract
+The runtime exposes the same `reply()` interface as Meta ARE's Runtime but adds tool refresh logic when the current app/state changes.
 
-`PlannerCallable` is defined as:
+## 3. Tool Execution and Event Synchronization
+
+The PasJsonActionExecutor handles tool execution with PAS-specific requirements:
 
 ```python
-PlannerCallable = Callable[[str, StatefulUserAgentProxy], Sequence[tuple[str, str, dict[str, object]]]]
+class PasJsonActionExecutor(JsonActionExecutor):
+    def execute_tool_call(
+        self,
+        tool_name: str,
+        tool_input: dict[str, Any],
+        tools: dict[str, Any],
+    ) -> tuple[bool, str]:
+        ...
 ```
 
-The built-in `LLMUserPlanner` prepares a prompt that includes:
+After each tool call (except final_answer), the executor:
+1. Parses the tool name to extract app and method (e.g., "contacts__add_contact")
+2. Records metadata (app_name, method_name, raw_args) for PAS-specific logging
+3. Waits for a CompletedEvent from the environment to ensure state consistency
+4. Returns success/failure status with detailed error messages
 
-- Instructions + current app/view (e.g. `messaging` / `ConversationOpened`).
-- The latest system notification.
-- A catalog of available tools, identified as `option_1`, `option_2`, ... with
-  parameter metadata.
+This automatic event waiting ensures that the agent's view of app state stays synchronized with actual state transitions.
 
-The system instructions explicitly tell the planner to prioritise
-`accept_proposal` or `decline_proposal` whenever a notification starts with
-`"Proactive assistant proposal:"`. These tools are only exposed while the Agent
-UI has a pending proposal, ensuring proactive prompts are resolved without
-cluttering other notifications. Navigation-only actions such as
-`ProactiveAgentUserInterface.go_back` are intentionally hidden so the interface
-behaves like a persistent overlay. The instructions also remind the planner
-that the user would rather tap than type, so `ProactiveAgentUserInterface.send_message_to_agent`
-should be used sparingly and any manual reply kept brief.
+## 4. ReAct Reasoning
 
-It expects the LLM to return JSON of the form:
+The agent uses Meta ARE's native ReAct (Reasoning + Acting) framework. Each turn follows the pattern:
 
-```json
-{"actions": [{"tool": "option_1", "args": {"conversation_id": "..."}}]}
+```
+Thought: [Agent's reasoning about what to do]
+Action:
+{"action": "tool_name", "action_input": {...}}<end_action>
 ```
 
-`StatefulUserAgentProxy` executes each action in order, collecting `ToolInvocation`
-dataclasses that capture the name, arguments, return value, and corresponding
-event (if any).
+The system prompt instructs the agent to:
+- Think step-by-step about which tools to use
+- Prefer tapping/clicking over typing when possible
+- Use the final_answer tool when the task is complete
+- Keep messages brief when using send_message_to_agent
 
-### System-level confirmations
+Example ReAct trace:
+```
+Thought: The user wants to add a new contact. I should use the contacts app's add_contact tool.
+Action:
+{"action": "contacts__add_contact", "action_input": {"name": "John Doe", "email": "john@example.com"}}<end_action>
+Observation: Contact added successfully
 
-Scenarios now ask the user to confirm proactive assistance through a dedicated
-decision maker (`pas.user_proxy.decision_maker.LLMDecisionMaker`). This keeps
-YES/NO prompts out of Messaging threads. The decision maker talks directly to
-the user LLM and returns `True`/`False`/`None`; `ProactiveSession` records the
-raw text for auditing. The user proxy itself does not send confirmation
-messages anymore—it continues to focus on app navigation and tool execution.
+Thought: The task is complete. I'll summarize what was done.
+Action:
+{"action": "final_answer", "action_input": {"answer": "Added contact John Doe with email john@example.com"}}<end_action>
+```
+
+The agent automatically receives tool descriptions and available tools based on the current app state. When navigating between apps, the runtime refreshes the toolbox to show only relevant tools.
 
 ## 5. Reply Workflow
 
-`reply(message: str)` handles both agent prompts and direct user LLM outputs:
+`StatefulUserAgentRuntime.reply(message: str)` orchestrates the interaction:
 
-1. Guard the turn limit.
-2. Append the incoming message to the transcript (`role="agent"` or
-   `role="system"` for notifications).
-3. Call the planner to produce tool invocations. Empty plans raise
-   `UserActionFailed`.
-4. Execute tools, waiting for write events when required. `UserActionFailed`
-   propagates immediately and does not increment the turn counter.
-5. Format a short reply summarising the completed tool calls
-   (`Completed: app.tool -> {...}`) and log it.
-6. Append the reply to the transcript with `role="user"` and increment
-   `_turns_taken`.
+1. Check if the current app or state has changed since the last turn
+2. If changed, refresh the agent's toolbox with tools for the new state
+3. Delegate to the underlying agent's `reply()` method
+4. The agent uses ReAct reasoning to decide which tools to call
+5. PasJsonActionExecutor executes each tool and waits for CompletedEvents
+6. Continue until the agent calls final_answer or hits the turn limit
+7. Return the final answer or error message
 
-`react_to_event` simply marks the source as `system` but otherwise shares the
-same path as `reply`.
+The runtime ensures that:
+- Tools are always up-to-date with the current navigation state
+- State transitions are properly synchronized via CompletedEvents
+- Turn limits are enforced (raises `MaxTurnsReached` after max_turns)
+- Termination is handled via native Meta ARE mechanisms
 
 ## 6. Turn Limits and Errors
 
-- `TurnLimitReached`: raised when the proxy has already produced
-  `max_user_turns` successful replies. Scenarios should catch it and hand control
-  back to the main agent.
-- `UserActionFailed`: indicates the planner or execution path could not fulfil
-  the request (missing tool, invalid arguments, event timeout, etc.). The caller
-  decides how to recover.
+The agent uses Meta ARE's native error handling:
+
+- `MaxTurnsReached`: raised when the agent has executed `max_turns` without calling final_answer. Scenarios should catch this and handle gracefully.
+- `InvalidActionAgentError`: raised when the LLM produces malformed action JSON. This indicates a prompt engineering issue or LLM confusion.
+- Tool execution errors: captured by PasJsonActionExecutor and returned as observation strings, allowing the agent to retry or adjust its approach.
 
 ## 7. Logging
 
-Use `pas.logging_utils.get_pas_file_logger` to create dedicated loggers:
+The agent uses standard Meta ARE logging plus PAS-specific extensions:
 
-- `pas.user_proxy` – high-level transcripts (`Agent message received ...`,
-  `User reply ...`).
-- `pas.user_proxy.planner` – full planner prompts and LLM responses.
-- `pas.events` (from `attach_event_logging`) – canonical view of all completed
-  events for audit.
+- Agent reasoning is logged via the LiteLLM client
+- Tool execution details (app_name, method_name, args) are logged by PasJsonActionExecutor
+- CompletedEvents are logged by the environment's event logging system
+- Use `pas.logging_utils.get_pas_file_logger` to create dedicated loggers for PAS components
 
-Running `pas/scripts/run_contacts_demo.py` prints the log locations so you can
-tail them while developing new planners or scenarios.
+Running `pas/scripts/run_contacts_demo.py` prints log locations for monitoring agent behavior during development.
 
-## 8. Extending the Proxy
+## 8. Integration with Scenarios
 
-- Swap in an alternative planner by passing a different callable to the
-  constructor. Keep the same return structure so execution stays intact.
-- Override `_format_reply` if you prefer structured JSON or richer
-  explanations.
-- Adjust `consume_notifications` if your notification format differs from the default
-  `Notification (app: ...)` style.
+To use the agent in a scenario:
 
-With these pieces in place, the user proxy will interoperate with the proactive
-session loop, logging utilities, and Meta-ARE agent interface without further
-changes.
+```python
+from pas.user_proxy.agent import StatefulUserAgent, StatefulUserAgentRuntime
+from pas.proactive.litellm_client import build_llm_client
+
+# Build the agent
+llm_client = build_llm_client(model_name="gpt-4")
+user_agent = StatefulUserAgent(
+    llm_client=llm_client,
+    tools=user_tools,  # From apps + final_answer
+    max_turns=40,
+)
+
+# Wrap in runtime
+runtime = StatefulUserAgentRuntime(agent=user_agent, env=env)
+
+# Use in scenario
+response = runtime.reply("Add a contact named John Doe")
+```
+
+The runtime is compatible with Meta ARE's agent interface, allowing seamless integration with proactive agents and scenarios.
