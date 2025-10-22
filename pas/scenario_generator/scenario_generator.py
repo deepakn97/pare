@@ -18,13 +18,7 @@ logger = logging.getLogger(__name__)
 def generate_scenarios_from_example(
     scenario_list: list[Scenario], model: str, provider: str | None = None, endpoint: str | None = None
 ) -> str | None:
-    """Minimal runner that builds the "scenario_generator" agent and runs it once to.
-
-    write new scenario .py files based on the provided scenario class.
-
-    This mirrors the special-case in ScenarioRunner._run_with_agent for
-    agent == "scenario_generator", but is provided as a standalone utility.
-    """
+    """Runner that builds the "scenario_generator" agent and runs it once to write new scenario.py files based on the provided scenario class."""
     # scan the apps package and make the import instructions
     # 1) Build catalog once per run (fast; static; safe)
     catalog = scan_package("are.simulation.apps", include_sigs=True, doclen=140)
@@ -69,10 +63,12 @@ def main() -> None:
     parser = argparse.ArgumentParser("generate-scenario")
     # parser.add_argument("-s", "--scenario", dest="scenario_id_list", required=True)
     # are/simulation/scenario_generator.py
-    parser.add_argument("-s", "--scenario", dest="scenario_id_list", nargs="+", required=True)
+    parser.add_argument(
+        "-s", "--scenario", dest="scenario_id_list", nargs="+", default=["scenario_tutorial_proactive_confirm"]
+    )
     parser.add_argument("-a", "--agent", dest="agent", default="scenario_generator")
-    parser.add_argument("--model", dest="model", required=True)
-    parser.add_argument("--provider", dest="provider", default=None)
+    parser.add_argument("--model", dest="model", default="gpt-5-chat-latest")
+    parser.add_argument("--provider", dest="provider", default="openai")
     parser.add_argument("--endpoint", dest="endpoint", default=None)
     parser.add_argument("--max_turns", dest="max_turns", type=int, default=None)
     parser.add_argument(
