@@ -15,6 +15,7 @@ nav:
       - Proactive Agent Guide: proactive_agent_guide.md
       - Scenario Authoring Guide: scenario_author_guide.md
       - Running Local LLM Models Guide: run_local_llm_model.md
+      - Scenario Generation: scenario_generator.md
   - Architecture:
       - Visual Overview: architecture_visual.md
   - Apps:

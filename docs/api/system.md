@@ -14,10 +14,6 @@ Runtime orchestration, session management, and proactive execution helpers.
 
 ::: pas.system.notification
 
-## User Simulation
-
-::: pas.system.user
-
 ## Proactive Helpers
 
 ::: pas.system.proactive
