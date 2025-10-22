@@ -100,14 +100,19 @@ def build_components(llm_client, user_llm_client):
         user_tools.update(app.get_user_tools())
     user_tools["final_answer"] = FinalAnswerTool()
 
-    user_logger = get_pas_file_logger("pas.user_proxy", user_log)
     user_agent = StatefulUserAgent(
-        llm_client=user_llm_client,
+        llm_engine=user_llm_client,
         tools=user_tools,
         max_turns=25,
-        logger=user_logger,
     )
-    runtime = StatefulUserAgentRuntime(agent=user_agent, env=env)
+
+    user_logger = get_pas_file_logger("pas.user_proxy", user_log)
+    runtime = StatefulUserAgentRuntime(
+        agent=user_agent,
+        notification_system=notification_system,
+        logger=user_logger,
+        max_user_turns=25,
+    )
 
     plan_executor_logger = get_pas_file_logger("pas.proactive.plan_executor", proactive_log)
     plan_executor = build_plan_executor(llm_client, logger=plan_executor_logger)

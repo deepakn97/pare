@@ -49,18 +49,25 @@ Teams may add additional files, but the interfaces exposed here must remain unch
 class StatefulUserAgent(BaseAgent):
     def __init__(
         self,
-        llm_client: LiteLLMClient,
-        tools: dict[str, object],
+        llm_engine: LLMClientProtocol | LLMEngine | Callable[..., Any],
+        tools: dict[str, Tool] | None = None,
+        system_prompts: dict[str, str] | None = None,
         *,
+        max_iterations: int = 10,
         max_turns: int = 40,
-        logger: logging.Logger | None = None,
+        wait_timeout: float = 2.0,
+        **kwargs: Any,
     ) -> None: ...
 
-class StatefulUserAgentRuntime:
+class StatefulUserAgentRuntime(UserProxy):
     def __init__(
         self,
+        *,
         agent: StatefulUserAgent,
-        env: StateAwareEnvironmentWrapper,
+        notification_system: BaseNotificationSystem,
+        logger: logging.Logger,
+        max_user_turns: int = 40,
+        event_timeout: float = 2.0,
     ) -> None: ...
 
     def reply(self, message: str) -> str: ...
@@ -69,31 +76,40 @@ class StatefulUserAgentRuntime:
 ### 3.1 Constructor arguments
 
 **StatefulUserAgent:**
-- `llm_client`: LiteLLM client for ReAct reasoning
+- `llm_engine`: LLM engine or client compatible with Meta ARE
 - `tools`: Dictionary mapping tool names to tool objects (includes user_tools from apps + final_answer)
-- `max_turns`: Maximum conversation turns before raising MaxTurnsReached (default 40)
-- `logger`: Optional logger for tracking agent decisions
+- `system_prompts`: Dictionary of system prompts (default includes ReAct prompt)
+- `max_iterations`: Maximum iterations per turn (default 10)
+- `max_turns`: Maximum conversation turns before runtime raises TurnLimitReached (default 40)
+- `wait_timeout`: Timeout for waiting on completed events (default 2.0 seconds)
+- `**kwargs`: Additional arguments passed to Meta ARE's BaseAgent
 
 **StatefulUserAgentRuntime:**
 - `agent`: The StatefulUserAgent instance
-- `env`: StateAwareEnvironmentWrapper for managing app state and tool updates
+- `notification_system`: Notification system for observing environment events
+- `logger`: Logger for tracking runtime operations
+- `max_user_turns`: Maximum number of conversation turns before raising TurnLimitReached (default 40)
+- `event_timeout`: Timeout for waiting on completed events (default 2.0 seconds)
 
 ### 3.2 Behaviour of `reply(message)`
 
 The runtime's `reply()` method:
-1. Checks if the current app or state has changed
-2. If changed, refreshes the agent's toolbox with state-appropriate tools
-3. Delegates to the agent's native `reply()` method
-4. The agent uses ReAct reasoning to decide which tools to call
-5. PasJsonActionExecutor executes tools and waits for CompletedEvents
-6. Returns the final answer when the agent calls final_answer
-7. Raises MaxTurnsReached if turn limit is exceeded
+1. Enforces turn budget (raises `TurnLimitReached` if exceeded)
+2. Infers the active app from recent tool invocations
+3. Updates the agent's system context with active app information
+4. Delegates to the agent's native `reply()` method
+5. The agent uses ReAct reasoning to decide which tools to call
+6. PasJsonActionExecutor executes tools and waits for CompletedEvents
+7. Returns the final answer when the agent calls final_answer
+8. Raises `TurnLimitReached` if turn limit is exceeded
 
 The agent automatically:
 - Uses only tools marked as `@user_tool` (cannot call `@app_tool`s)
 - Waits for CompletedEvents after each tool call (except final_answer)
-- Updates internal state based on tool execution results
+- Records tool invocations with metadata for debugging
 - Prefers tapping/clicking over typing per system prompt instructions
+
+Tool updates are pushed from the Environment to the agent via `agent.update_tools_for_app()` when state transitions occur, not pulled by the runtime on every reply.
 
 ### 3.3 Tool execution flow
 
@@ -155,11 +171,18 @@ for app in env.apps.values():
 user_tools["final_answer"] = FinalAnswerTool()
 
 user_agent = StatefulUserAgent(
-    llm_client=llm_client,
+    llm_engine=llm_client,
     tools=user_tools,
     max_turns=40,
 )
-runtime = StatefulUserAgentRuntime(agent=user_agent, env=env)
+
+logger = logging.getLogger("pas.user_proxy")
+runtime = StatefulUserAgentRuntime(
+    agent=user_agent,
+    notification_system=env.notification_system,
+    logger=logger,
+    max_user_turns=40,
+)
 
 # Build proactive agent
 proactive = LLMBasedProactiveAgent()  # see docs/proactive_agent_guide.md for constructor details
@@ -167,8 +190,8 @@ proactive = LLMBasedProactiveAgent()  # see docs/proactive_agent_guide.md for co
 
 ### 5.2 Error handling
 
-- If `MaxTurnsReached` is raised from the agent, the scenario should conclude the conversation gracefully.
-- If `InvalidActionAgentError` is raised, this indicates malformed LLM output; log it and potentially retry.
+- If `TurnLimitReached` is raised from the runtime, the scenario should conclude the conversation gracefully.
+- If `InvalidActionAgentError` is raised by Meta ARE, this indicates malformed LLM output; log it and potentially retry.
 - If `ProactiveInterventionError` is raised, log it and hand control back to the user.
 
 ## 6. Reply Format Guide
@@ -209,11 +232,18 @@ for app in env.apps.values():
 user_tools["final_answer"] = FinalAnswerTool()
 
 user_agent = StatefulUserAgent(
-    llm_client=llm_client,
+    llm_engine=llm_client,
     tools=user_tools,
     max_turns=40,
 )
-runtime = StatefulUserAgentRuntime(agent=user_agent, env=env)
+
+logger = logging.getLogger("pas.user_proxy")
+runtime = StatefulUserAgentRuntime(
+    agent=user_agent,
+    notification_system=env.notification_system,
+    logger=logger,
+    max_user_turns=40,
+)
 
 # Build proactive agent
 proactive = LLMBasedProactiveAgent(llm=llm_client, system_prompt="...")

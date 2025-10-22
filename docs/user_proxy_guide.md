@@ -24,19 +24,25 @@ The core agent that extends Meta ARE's BaseAgent:
 class StatefulUserAgent(BaseAgent):
     def __init__(
         self,
-        llm_client: LiteLLMClient,
-        tools: dict[str, object],
+        llm_engine: LLMClientProtocol | LLMEngine | Callable[..., Any],
+        tools: dict[str, Tool] | None = None,
+        system_prompts: dict[str, str] | None = None,
         *,
+        max_iterations: int = 10,
         max_turns: int = 40,
-        logger: logging.Logger | None = None,
+        wait_timeout: float = 2.0,
+        **kwargs: Any,
     ) -> None:
         ...
 ```
 
-- `llm_client`: LiteLLM client for ReAct reasoning
-- `tools`: Dictionary of available tools (user_tools from apps + final_answer)
+- `llm_engine`: LLM engine or client for generating responses (compatible with Meta ARE)
+- `tools`: Dictionary of available tools indexed by name (user_tools from apps + final_answer)
+- `system_prompts`: Dictionary of system prompts (default includes ReAct prompt)
+- `max_iterations`: Maximum iterations per turn (default 10)
 - `max_turns`: Maximum conversation turns before termination (default 40)
-- `logger`: Optional logger for tracking agent decisions
+- `wait_timeout`: Timeout for waiting on completed events (default 2.0 seconds)
+- `**kwargs`: Additional arguments passed to Meta ARE's BaseAgent
 
 The agent uses a custom PasJsonActionExecutor that:
 1. Records PAS-specific metadata (app name, method name, raw arguments)
@@ -45,45 +51,53 @@ The agent uses a custom PasJsonActionExecutor that:
 
 ### StatefulUserAgentRuntime
 
-Wraps the agent and manages dynamic tool updates:
+Wraps the agent and coordinates with the environment and notification system:
 
 ```python
-class StatefulUserAgentRuntime:
+class StatefulUserAgentRuntime(UserProxy):
     def __init__(
         self,
+        *,
         agent: StatefulUserAgent,
-        env: StateAwareEnvironmentWrapper,
+        notification_system: BaseNotificationSystem,
+        logger: logging.Logger,
+        max_user_turns: int = 40,
+        event_timeout: float = 2.0,
     ) -> None:
         ...
 ```
 
 - `agent`: The StatefulUserAgent instance
-- `env`: StateAwareEnvironmentWrapper for accessing apps and managing state
+- `notification_system`: Notification system for observing environment events
+- `logger`: Logger for tracking runtime operations
+- `max_user_turns`: Maximum number of conversation turns (default 40)
+- `event_timeout`: Timeout for waiting on completed events (default 2.0 seconds)
 
-The runtime exposes the same `reply()` interface as Meta ARE's Runtime but adds tool refresh logic when the current app/state changes.
+The runtime exposes the same `reply()` interface as Meta ARE's UserProxy and manages event synchronization.
 
 ## 3. Tool Execution and Event Synchronization
 
-The PasJsonActionExecutor handles tool execution with PAS-specific requirements:
+The PasJsonActionExecutor extends Meta ARE's JsonActionExecutor with PAS-specific requirements:
 
 ```python
 class PasJsonActionExecutor(JsonActionExecutor):
     def execute_tool_call(
         self,
-        tool_name: str,
-        tool_input: dict[str, Any],
-        tools: dict[str, Any],
-    ) -> tuple[bool, str]:
+        parsed_action: ParsedAction,
+        append_agent_log: Callable[[BaseAgentLog], None],
+        make_timestamp: Callable[[], float],
+    ) -> Any:
         ...
 ```
 
 After each tool call (except final_answer), the executor:
-1. Parses the tool name to extract app and method (e.g., "contacts__add_contact")
-2. Records metadata (app_name, method_name, raw_args) for PAS-specific logging
-3. Waits for a CompletedEvent from the environment to ensure state consistency
-4. Returns success/failure status with detailed error messages
+1. Delegates to Meta ARE's base executor to execute the tool
+2. Parses the tool name to extract app and method (e.g., "contacts__add_contact")
+3. Waits for a CompletedEvent from the runtime to ensure state consistency
+4. Records a ToolInvocation with metadata (app_name, method_name, args, result, event)
+5. Returns the observation string for the agent's next reasoning step
 
-This automatic event waiting ensures that the agent's view of app state stays synchronized with actual state transitions.
+This automatic event waiting ensures that the agent's view of app state stays synchronized with actual state transitions. The runtime manages the event queue and notifies the executor when new CompletedEvents arrive.
 
 ## 4. ReAct Reasoning
 
@@ -113,32 +127,34 @@ Action:
 {"action": "final_answer", "action_input": {"answer": "Added contact John Doe with email john@example.com"}}<end_action>
 ```
 
-The agent automatically receives tool descriptions and available tools based on the current app state. When navigating between apps, the runtime refreshes the toolbox to show only relevant tools.
+The agent automatically receives tool descriptions and available tools based on the current app state. Tool updates are pushed from the Environment when state transitions occur.
 
 ## 5. Reply Workflow
 
 `StatefulUserAgentRuntime.reply(message: str)` orchestrates the interaction:
 
-1. Check if the current app or state has changed since the last turn
-2. If changed, refresh the agent's toolbox with tools for the new state
-3. Delegate to the underlying agent's `reply()` method
-4. The agent uses ReAct reasoning to decide which tools to call
-5. PasJsonActionExecutor executes each tool and waits for CompletedEvents
-6. Continue until the agent calls final_answer or hits the turn limit
-7. Return the final answer or error message
+1. Enforce turn budget (raises `TurnLimitReached` if exceeded)
+2. Infer the active app from recent tool invocations
+3. Update the agent's system context with the active app information
+4. Delegate to the underlying agent's `reply()` method
+5. The agent uses ReAct reasoning to decide which tools to call
+6. PasJsonActionExecutor executes each tool and waits for CompletedEvents
+7. Continue until the agent calls final_answer or hits the turn limit
+8. Return the final answer or error message
 
 The runtime ensures that:
-- Tools are always up-to-date with the current navigation state
 - State transitions are properly synchronized via CompletedEvents
-- Turn limits are enforced (raises `MaxTurnsReached` after max_turns)
+- Turn limits are enforced (raises `TurnLimitReached` after `max_user_turns`)
 - Termination is handled via native Meta ARE mechanisms
+
+Tool updates are pushed from the Environment to the agent via `agent.update_tools_for_app()` when state transitions occur, rather than being pulled by the runtime on every turn.
 
 ## 6. Turn Limits and Errors
 
-The agent uses Meta ARE's native error handling:
+The runtime uses PAS-specific error handling with Meta ARE integration:
 
-- `MaxTurnsReached`: raised when the agent has executed `max_turns` without calling final_answer. Scenarios should catch this and handle gracefully.
-- `InvalidActionAgentError`: raised when the LLM produces malformed action JSON. This indicates a prompt engineering issue or LLM confusion.
+- `TurnLimitReached`: raised by the runtime when `max_user_turns` is exceeded. Scenarios should catch this and handle gracefully.
+- `InvalidActionAgentError`: raised by Meta ARE when the LLM produces malformed action JSON. This indicates a prompt engineering issue or LLM confusion.
 - Tool execution errors: captured by PasJsonActionExecutor and returned as observation strings, allowing the agent to retry or adjust its approach.
 
 ## 7. Logging
@@ -157,22 +173,29 @@ Running `pas/scripts/run_contacts_demo.py` prints log locations for monitoring a
 To use the agent in a scenario:
 
 ```python
+import logging
 from pas.user_proxy.agent import StatefulUserAgent, StatefulUserAgentRuntime
 from pas.proactive.litellm_client import build_llm_client
 
 # Build the agent
 llm_client = build_llm_client(model_name="gpt-4")
 user_agent = StatefulUserAgent(
-    llm_client=llm_client,
+    llm_engine=llm_client,
     tools=user_tools,  # From apps + final_answer
     max_turns=40,
 )
 
 # Wrap in runtime
-runtime = StatefulUserAgentRuntime(agent=user_agent, env=env)
+logger = logging.getLogger("pas.user_proxy")
+runtime = StatefulUserAgentRuntime(
+    agent=user_agent,
+    notification_system=env.notification_system,
+    logger=logger,
+    max_user_turns=40,
+)
 
 # Use in scenario
 response = runtime.reply("Add a contact named John Doe")
 ```
 
-The runtime is compatible with Meta ARE's agent interface, allowing seamless integration with proactive agents and scenarios.
+The runtime is compatible with Meta ARE's UserProxy interface, allowing seamless integration with proactive agents and scenarios.
