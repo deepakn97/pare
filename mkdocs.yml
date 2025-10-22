@@ -14,6 +14,7 @@ nav:
       - User Proxy Guide: user_proxy_guide.md
       - Proactive Agent Guide: proactive_agent_guide.md
       - Scenario Authoring Guide: scenario_author_guide.md
+      - Running Local LLM Models Guide: run_local_llm_model.md
   - Architecture:
       - Visual Overview: architecture_visual.md
   - Apps:
