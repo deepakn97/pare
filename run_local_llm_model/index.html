@@ -12,26 +12,28 @@
         <meta name="author" content="Deepak Nathani">
       
       
-        <link rel="canonical" href="https://deepakn97.github.io/pas/api/logging/">
+        <link rel="canonical" href="https://deepakn97.github.io/pas/run_local_llm_model/">
       
       
-        <link rel="prev" href="../adapters/">
+        <link rel="prev" href="../scenario_author_guide/">
       
       
+        <link rel="next" href="../scenario_generator/">
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.19">
     
     
       
-        <title>Logging - Proactive Agent Sandbox</title>
+        <title>Running Local LLM Models Guide - Proactive Agent Sandbox</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -50,9 +52,9 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#logging-api" class="md-skip">
+        <a href="#using-local-llm-models-with-meta-are" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +96,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Proactive Agent Sandbox" class="md-header__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
+    <a href=".." title="Proactive Agent Sandbox" class="md-header__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -114,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Logging
+              Running Local LLM Models Guide
             
           </span>
         </div>
@@ -230,7 +232,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Proactive Agent Sandbox" class="md-nav__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
+    <a href=".." title="Proactive Agent Sandbox" class="md-nav__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -260,7 +262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -279,18 +281,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -306,7 +310,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Getting Started
@@ -320,7 +324,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface-guide/" class="md-nav__link">
+      <a href="../interface-guide/" class="md-nav__link">
         
   
   
@@ -343,7 +347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_proxy_guide/" class="md-nav__link">
+      <a href="../user_proxy_guide/" class="md-nav__link">
         
   
   
@@ -366,7 +370,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../proactive_agent_guide/" class="md-nav__link">
+      <a href="../proactive_agent_guide/" class="md-nav__link">
         
   
   
@@ -389,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../scenario_author_guide/" class="md-nav__link">
+      <a href="../scenario_author_guide/" class="md-nav__link">
         
   
   
@@ -409,10 +413,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../run_local_llm_model/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Running Local LLM Models Guide
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -423,6 +449,203 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation Setup
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-environment-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Environment Setup
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-install-ollama" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Install Ollama
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#managing-ollama-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      Managing Ollama Models
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Managing Ollama Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-start-ollama-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Start Ollama Server
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-download-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Download Models
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-verify-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Verify Installation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-test-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Test Model
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-meta-are-with-local-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Meta-ARE with Local Models
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using Meta-ARE with Local Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-command-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Command Structure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-with-gemma3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example with Gemma3
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-with-qwen25" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example with Qwen2.5
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#port-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Port Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Notes
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -435,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../scenario_generator/" class="md-nav__link">
+      <a href="../scenario_generator/" class="md-nav__link">
         
   
   
@@ -503,7 +726,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../architecture_visual/" class="md-nav__link">
+      <a href="../architecture_visual/" class="md-nav__link">
         
   
   
@@ -571,7 +794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/" class="md-nav__link">
+      <a href="../apps/" class="md-nav__link">
         
   
   
@@ -594,7 +817,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/contacts/" class="md-nav__link">
+      <a href="../apps/contacts/" class="md-nav__link">
         
   
   
@@ -617,7 +840,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/messaging/" class="md-nav__link">
+      <a href="../apps/messaging/" class="md-nav__link">
         
   
   
@@ -640,7 +863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/email/" class="md-nav__link">
+      <a href="../apps/email/" class="md-nav__link">
         
   
   
@@ -663,7 +886,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/calendar/" class="md-nav__link">
+      <a href="../apps/calendar/" class="md-nav__link">
         
   
   
@@ -690,20 +913,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
@@ -719,7 +940,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             API Reference
@@ -733,7 +954,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../modules/" class="md-nav__link">
+      <a href="../modules/" class="md-nav__link">
         
   
   
@@ -756,7 +977,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../system/" class="md-nav__link">
+      <a href="../api/system/" class="md-nav__link">
         
   
   
@@ -779,7 +1000,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../environment/" class="md-nav__link">
+      <a href="../api/environment/" class="md-nav__link">
         
   
   
@@ -802,7 +1023,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apps/" class="md-nav__link">
+      <a href="../api/apps/" class="md-nav__link">
         
   
   
@@ -825,7 +1046,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user_proxy/" class="md-nav__link">
+      <a href="../api/user_proxy/" class="md-nav__link">
         
   
   
@@ -848,7 +1069,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../proactive_agent/" class="md-nav__link">
+      <a href="../api/proactive_agent/" class="md-nav__link">
         
   
   
@@ -871,7 +1092,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/" class="md-nav__link">
+      <a href="../api/scenarios/" class="md-nav__link">
         
   
   
@@ -894,7 +1115,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenario_generator/" class="md-nav__link">
+      <a href="../api/scenario_generator/" class="md-nav__link">
         
   
   
@@ -917,7 +1138,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adapters/" class="md-nav__link">
+      <a href="../api/adapters/" class="md-nav__link">
         
   
   
@@ -937,32 +1158,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Logging
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../api/logging/" class="md-nav__link">
         
   
   
@@ -973,62 +1172,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#logging-utilities" class="md-nav__link">
-    <span class="md-ellipsis">
-      Logging Utilities
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pas.logging_utils" class="md-nav__link">
-    <span class="md-ellipsis">
-      logging_utils
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pas.logging_utils.get_pas_file_logger" class="md-nav__link">
-    <span class="md-ellipsis">
-      get_pas_file_logger
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pas.logging_utils.initialise_pas_logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      initialise_pas_logs
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1068,36 +1211,177 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#logging-utilities" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
-      Logging Utilities
+      Prerequisites
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#pas.logging_utils" class="md-nav__link">
+  <a href="#installation-setup" class="md-nav__link">
     <span class="md-ellipsis">
-      logging_utils
+      Installation Setup
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-environment-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Environment Setup
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#pas.logging_utils.get_pas_file_logger" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#2-install-ollama" class="md-nav__link">
     <span class="md-ellipsis">
-      get_pas_file_logger
+      2. Install Ollama
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#pas.logging_utils.initialise_pas_logs" class="md-nav__link">
+  <a href="#managing-ollama-models" class="md-nav__link">
     <span class="md-ellipsis">
-      initialise_pas_logs
+      Managing Ollama Models
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Managing Ollama Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-start-ollama-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Start Ollama Server
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-download-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Download Models
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-verify-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Verify Installation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-test-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Test Model
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-meta-are-with-local-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Meta-ARE with Local Models
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using Meta-ARE with Local Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-command-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Command Structure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-with-gemma3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example with Gemma3
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-with-qwen25" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example with Qwen2.5
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#port-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Port Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Notes
     </span>
   </a>
   
@@ -1122,147 +1406,94 @@
   
 
 
-<h1 id="logging-api">Logging API<a class="headerlink" href="#logging-api" title="Permanent link">&para;</a></h1>
-<p>Logging utilities and configuration.</p>
-<h2 id="logging-utilities">Logging Utilities<a class="headerlink" href="#logging-utilities" title="Permanent link">&para;</a></h2>
+<h1 id="using-local-llm-models-with-meta-are">Using Local LLM Models with Meta-ARE<a class="headerlink" href="#using-local-llm-models-with-meta-are" title="Permanent link">&para;</a></h1>
+<p>This guide explains how to set up and use local Large Language Models (LLMs) with the Meta-ARE framework using Ollama.</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Python 3.10 or higher</li>
+<li><code>uv</code> package manager installed</li>
+<li>Homebrew (for macOS/Linux)</li>
+</ul>
+<h2 id="installation-setup">Installation Setup<a class="headerlink" href="#installation-setup" title="Permanent link">&para;</a></h2>
+<h3 id="1-environment-setup">1. Environment Setup<a class="headerlink" href="#1-environment-setup" title="Permanent link">&para;</a></h3>
+<p>First, ensure your project dependencies are installed:</p>
+<pre><code class="language-bash"># Enter the project directory if needed, then sync dependencies
+uv -v sync
+</code></pre>
+<p>The project uses Python 3.10. Make sure <code>uv</code> is configured to use this version:</p>
+<pre><code class="language-bash"># Install uv and configure Python version
+uv --version  # Verify installation
+uvx --python 3.10  # Pin Python 3.10 for uvx commands
+</code></pre>
+<h3 id="2-install-ollama">2. Install Ollama<a class="headerlink" href="#2-install-ollama" title="Permanent link">&para;</a></h3>
+<p>Install Ollama, a local LLM server:</p>
+<pre><code class="language-bash"># Install Ollama using Homebrew
+brew install ollama
+</code></pre>
+<p>After installation, you can run a model directly with below cmd:</p>
+<h2 id="managing-ollama-models">Managing Ollama Models<a class="headerlink" href="#managing-ollama-models" title="Permanent link">&para;</a></h2>
+<h3 id="1-start-ollama-server">1. Start Ollama Server<a class="headerlink" href="#1-start-ollama-server" title="Permanent link">&para;</a></h3>
+<p>Start the Ollama server in the background:</p>
+<pre><code class="language-bash">ollama serve
+</code></pre>
+<h3 id="2-download-models">2. Download Models<a class="headerlink" href="#2-download-models" title="Permanent link">&para;</a></h3>
+<p>Choose and download one of the supported models:</p>
+<pre><code class="language-bash"># Lightweight models for testing
+ollama pull llama3.2:1b-instruct
+ollama pull phi3:mini-4k-instruct
+ollama pull qwen2.5:1.5b-instruct
+ollama pull gemma3:1b
+</code></pre>
+<h3 id="3-verify-installation">3. Verify Installation<a class="headerlink" href="#3-verify-installation" title="Permanent link">&para;</a></h3>
+<p>Check that Ollama is running and list installed models:</p>
+<pre><code class="language-bash"># Check version and server status
+ollama --version &amp;&amp; curl -sS http://127.0.0.1:11434/api/version || true
 
+echo &quot;--- Installed models ---&quot;
+ollama list || true
 
-<div class="doc doc-object doc-module">
-
-
-
-<a id="pas.logging_utils"></a>
-    <div class="doc doc-contents first">
-
-        <p>Utilities for configuring PAS logging.</p>
-
-
-
-
-
-
-
-
-
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="pas.logging_utils.get_pas_file_logger" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">get_pas_file_logger</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">log_path</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span></code>
-
-<a href="#pas.logging_utils.get_pas_file_logger" class="headerlink" title="Permanent link">&para;</a></h2>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Return a logger writing to <code>log_path</code> without duplicating handlers.</p>
-
-
-            <details class="quote">
-              <summary>Source code in <code>pas/logging_utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_pas_file_logger</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">log_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a logger writing to ``log_path`` without duplicating handlers.&quot;&quot;&quot;</span>
-    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
-    <span class="n">log_path</span> <span class="o">=</span> <span class="n">log_path</span> <span class="k">if</span> <span class="n">log_path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">()</span> <span class="k">else</span> <span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span> <span class="o">/</span> <span class="n">log_path</span><span class="p">)</span>
-    <span class="n">log_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">_has_handler</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">,</span> <span class="n">log_path</span><span class="p">):</span>
-        <span class="n">file_handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">(</span><span class="n">log_path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
-        <span class="n">formatter</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> </span><span class="si">%(levelname)s</span><span class="s2"> </span><span class="si">%(name)s</span><span class="s2"> - </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="n">file_handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
-        <span class="n">file_handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">file_handler</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">existing_handler</span> <span class="ow">in</span> <span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="nb">isinstance</span><span class="p">(</span><span class="n">existing_handler</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="n">Path</span><span class="p">(</span><span class="n">existing_handler</span><span class="o">.</span><span class="n">baseFilename</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span> <span class="o">==</span> <span class="n">log_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
-            <span class="p">):</span>
-                <span class="n">existing_handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">propagate</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="k">return</span> <span class="n">logger</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="pas.logging_utils.initialise_pas_logs" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">initialise_pas_logs</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">clear_existing</span><span class="p">,</span> <span class="n">log_paths</span><span class="p">)</span></code>
-
-<a href="#pas.logging_utils.initialise_pas_logs" class="headerlink" title="Permanent link">&para;</a></h2>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Prepare PAS log files, optionally clearing previous runs before logging.</p>
-
-
-            <details class="quote">
-              <summary>Source code in <code>pas/logging_utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">10</span>
-<span class="normal">11</span>
-<span class="normal">12</span>
-<span class="normal">13</span>
-<span class="normal">14</span>
-<span class="normal">15</span>
-<span class="normal">16</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialise_pas_logs</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">clear_existing</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">log_paths</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Prepare PAS log files, optionally clearing previous runs before logging.&quot;&quot;&quot;</span>
-    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">log_paths</span><span class="p">:</span>
-        <span class="n">resolved</span> <span class="o">=</span> <span class="n">path</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">()</span> <span class="k">else</span> <span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span> <span class="o">/</span> <span class="n">path</span><span class="p">)</span>
-        <span class="n">resolved</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">clear_existing</span> <span class="ow">and</span> <span class="n">resolved</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-            <span class="n">resolved</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div>
+echo &quot;--- Pulling qwen2.5:1.5b-instruct ---&quot;
+ollama pull qwen2.5:1.5b-instruct
+</code></pre>
+<h3 id="4-test-model">4. Test Model<a class="headerlink" href="#4-test-model" title="Permanent link">&para;</a></h3>
+<p>Test your model with a simple prompt:</p>
+<pre><code class="language-bash">ollama run qwen2.5:1.5b-instruct &quot;test&quot;
+</code></pre>
+<h2 id="using-meta-are-with-local-models">Using Meta-ARE with Local Models<a class="headerlink" href="#using-meta-are-with-local-models" title="Permanent link">&para;</a></h2>
+<h3 id="basic-command-structure">Basic Command Structure<a class="headerlink" href="#basic-command-structure" title="Permanent link">&para;</a></h3>
+<p>Use the <code>are-run</code> command with the <code>local</code> provider to run scenarios with local models:</p>
+<pre><code class="language-bash">are-run -s scenario_name -a agent_name \
+ --provider local \
+ --model ollama/model_name \
+ --endpoint http://127.0.0.1:11434 \
+</code></pre>
+<h3 id="example-with-gemma3">Example with Gemma3<a class="headerlink" href="#example-with-gemma3" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash">are-run -s scenario_find_image_file -a default \
+ --provider local \
+ --model ollama/gemma3:1b \
+ --endpoint http://127.0.0.1:11434 \
+</code></pre>
+<h3 id="example-with-qwen25">Example with Qwen2.5<a class="headerlink" href="#example-with-qwen25" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash">are-run -s scenario_find_image_file -a default \
+ --provider local \
+ --model ollama/qwen2.5:1.5b-instruct \
+ --endpoint http://127.0.0.1:11434
+</code></pre>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Connection refused</strong>: Ensure Ollama server is running (<code>ollama serve</code>)</li>
+<li><strong>Model not found</strong>: Make sure the model is downloaded (<code>ollama pull model_name</code>)</li>
+<li><strong>Python version mismatch</strong>: Ensure you're using Python 3.10+</li>
+</ol>
+<h3 id="port-configuration">Port Configuration<a class="headerlink" href="#port-configuration" title="Permanent link">&para;</a></h3>
+<p>The default Ollama endpoint is <code>http://127.0.0.1:11434</code>. If you need to use a different port, update the <code>--endpoint</code> parameter in your <code>are-run</code> commands.</p>
+<h2 id="performance-notes">Performance Notes<a class="headerlink" href="#performance-notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Smaller models (1B-1.5B parameters) are recommended for local development</li>
+<li>These models provide good performance for testing while keeping resource usage manageable</li>
+<li>For production use, consider more powerful models or cloud-based solutions</li>
+</ul>
 
 
 
@@ -1342,10 +1573,10 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
       
     
   </body>

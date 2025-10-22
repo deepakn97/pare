@@ -547,6 +547,52 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../run_local_llm_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Running Local LLM Models Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenario_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1265,7 +1311,7 @@ goal = self._parse_goal(response)
 <h2 id="4-session-loop">4. Session Loop<a class="headerlink" href="#4-session-loop" title="Permanent link">&para;</a></h2>
 <p><code>ProactiveSession</code> (see <code>docs/scenario_author_guide.md</code>) manages the flow:</p>
 <ol>
-<li>Drain notifications → <code>StatefulUserProxy</code> reacts → new events arrive.</li>
+<li>Drain notifications → <code>StatefulUserAgentRuntime</code> reacts → new events arrive.</li>
 <li>Call <code>agent.propose_goal()</code> once.</li>
 <li>Use the decision maker (e.g. <code>LLMDecisionMaker</code>) to collect a system-level
    confirmation without invoking messaging tools.</li>

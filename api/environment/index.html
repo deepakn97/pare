@@ -407,6 +407,52 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../run_local_llm_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Running Local LLM Models Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenario_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -831,9 +877,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pas.environment.StateAwareEnvironmentWrapper.handle_completed_event" class="md-nav__link">
+  <a href="#pas.environment.StateAwareEnvironmentWrapper.register_user_agent" class="md-nav__link">
     <span class="md-ellipsis">
-      handle_completed_event
+      register_user_agent
     </span>
   </a>
   
@@ -1112,9 +1158,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pas.environment.StateAwareEnvironmentWrapper.handle_completed_event" class="md-nav__link">
+  <a href="#pas.environment.StateAwareEnvironmentWrapper.register_user_agent" class="md-nav__link">
     <span class="md-ellipsis">
-      handle_completed_event
+      register_user_agent
     </span>
   </a>
   
@@ -1222,81 +1268,104 @@
 
               <details class="quote">
                 <summary>Source code in <code>pas/environment.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StateAwareEnvironmentWrapper</span><span class="p">(</span><span class="n">Environment</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 27</span>
+<span class="normal"> 28</span>
+<span class="normal"> 29</span>
+<span class="normal"> 30</span>
+<span class="normal"> 31</span>
+<span class="normal"> 32</span>
+<span class="normal"> 33</span>
+<span class="normal"> 34</span>
+<span class="normal"> 35</span>
+<span class="normal"> 36</span>
+<span class="normal"> 37</span>
+<span class="normal"> 38</span>
+<span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StateAwareEnvironmentWrapper</span><span class="p">(</span><span class="n">Environment</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Environment wrapper that triggers state transitions in StatefulApps.</span>
 
 <span class="sd">    // RL NOTE: This is the environment in the RL sense - manages state transitions and</span>
@@ -1317,60 +1386,83 @@
             <span class="n">notification_system</span><span class="o">=</span><span class="n">notification_system</span><span class="p">,</span>
             <span class="n">add_event_to_agent_log</span><span class="o">=</span><span class="n">add_event_to_agent_log</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_processed_event_ids</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="c1"># PAS extensions (follow Meta ARE naming: no underscores for public attributes)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">processed_event_ids</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span><span class="p">:</span> <span class="n">_UserAgentProtocol</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_user_agent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">agent</span><span class="p">:</span> <span class="n">_UserAgentProtocol</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register the user agent for dynamic tool updates.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            agent: The user agent (typically StatefulUserAgent) that needs tool updates</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span> <span class="o">=</span> <span class="n">agent</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Registered user agent for dynamic tool updates&quot;</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">subscribe_to_completed_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a callback that will receive every completed event.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">callback</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">callback</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">unsubscribe_from_completed_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove a previously registered completed-event subscriber.&quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="n">suppress</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>  <span class="c1"># pragma: no cover - defensive guard</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">add_to_log</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">:</span> <span class="n">CompletedEvent</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">CompletedEvent</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Route logged events through the PAS state layer and subscriber hooks.&quot;&quot;&quot;</span>
-        <span class="n">event_list</span> <span class="o">=</span> <span class="n">events</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">events</span><span class="p">]</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">add_to_log</span><span class="p">(</span><span class="n">event_list</span><span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">event_list</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_process_completed_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_process_completed_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">CompletedEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Intercept events to trigger navigation state transitions in StatefulApps.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Override to add PAS state transition handling.</span>
 
 <span class="sd">        // RL NOTE: This is where the environment processes actions and transitions to next state.</span>
 <span class="sd">        // Log (s, a, r, s&#39;) tuples here for RL dataset generation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">event_list</span> <span class="o">=</span> <span class="n">events</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">events</span><span class="p">]</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">add_to_log</span><span class="p">(</span><span class="n">event_list</span><span class="p">)</span>  <span class="c1"># Call Meta ARE&#39;s native event processing</span>
+
+        <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">event_list</span><span class="p">:</span>
+            <span class="c1"># Skip already processed events</span>
+            <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">event_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">processed_event_ids</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;StateAwareEnvironmentWrapper observed event: app=</span><span class="si">%s</span><span class="s2"> function=</span><span class="si">%s</span><span class="s2"> type=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">event</span><span class="o">.</span><span class="n">app_name</span><span class="p">(),</span>
+                <span class="n">event</span><span class="o">.</span><span class="n">function_name</span><span class="p">(),</span>
+                <span class="n">event</span><span class="o">.</span><span class="n">event_type</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Handle state transitions for StatefulApps</span>
+            <span class="n">app</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">app_name</span><span class="p">())</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">StatefulApp</span><span class="p">):</span>
+                <span class="n">app</span><span class="o">.</span><span class="n">handle_state_transition</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_user_agent_tools</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">app_name</span><span class="p">(),</span> <span class="n">app</span><span class="p">)</span>
+
+            <span class="c1"># Notify subscribers (used by UserProxy, ProactiveAgent, event logging, and oracles)</span>
+            <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="p">):</span>
+                <span class="n">callback</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">processed_event_ids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">event_id</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_refresh_user_agent_tools</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">app</span><span class="p">:</span> <span class="n">StatefulApp</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Refresh user agent tools after a stateful app transitions state.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            event: Completed event from tool execution</span>
+<span class="sd">            app_name: Name of the app that transitioned</span>
+<span class="sd">            app: The StatefulApp instance</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">event_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_processed_event_ids</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;StateAwareEnvironmentWrapper observed event: app=</span><span class="si">%s</span><span class="s2"> function=</span><span class="si">%s</span><span class="s2"> type=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">event</span><span class="o">.</span><span class="n">app_name</span><span class="p">(),</span>
-            <span class="n">event</span><span class="o">.</span><span class="n">function_name</span><span class="p">(),</span>
-            <span class="n">event</span><span class="o">.</span><span class="n">event_type</span><span class="p">,</span>
-        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span><span class="p">,</span> <span class="s2">&quot;update_tools_for_app&quot;</span><span class="p">):</span>
+            <span class="k">return</span>
 
-        <span class="n">app</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">app_name</span><span class="p">())</span>
-
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">StatefulApp</span><span class="p">):</span>
-            <span class="n">app</span><span class="o">.</span><span class="n">handle_state_transition</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="p">):</span>
-            <span class="n">callback</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_processed_event_ids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">event_id</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">handle_completed_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">CompletedEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># pragma: no cover - legacy hook</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Maintain compatibility with tests invoking the legacy hook directly.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_process_completed_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">new_tools</span> <span class="o">=</span> <span class="n">app</span><span class="o">.</span><span class="n">get_meta_are_user_tools</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span><span class="o">.</span><span class="n">update_tools_for_app</span><span class="p">(</span><span class="n">app_name</span><span class="p">,</span> <span class="n">new_tools</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Refreshed tools for app </span><span class="si">%s</span><span class="s2">: </span><span class="si">%d</span><span class="s2"> tools now available&quot;</span><span class="p">,</span> <span class="n">app_name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_tools</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to refresh tools for app </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">app_name</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -1403,23 +1495,25 @@
 
             <details class="quote">
               <summary>Source code in <code>pas/environment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
 <span class="normal">35</span>
 <span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
 <span class="normal">40</span>
-<span class="normal">41</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">EnvironmentConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">environment_type</span><span class="p">:</span> <span class="n">EnvironmentType</span> <span class="o">=</span> <span class="n">EnvironmentType</span><span class="o">.</span><span class="n">UNKNOWN</span><span class="p">,</span>
@@ -1433,9 +1527,11 @@
         <span class="n">notification_system</span><span class="o">=</span><span class="n">notification_system</span><span class="p">,</span>
         <span class="n">add_event_to_agent_log</span><span class="o">=</span><span class="n">add_event_to_agent_log</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_processed_event_ids</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="c1"># PAS extensions (follow Meta ARE naming: no underscores for public attributes)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">processed_event_ids</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span><span class="p">:</span> <span class="n">_UserAgentProtocol</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1453,24 +1549,76 @@
 
     <div class="doc doc-contents ">
 
-        <p>Route logged events through the PAS state layer and subscriber hooks.</p>
+        <p>Override to add PAS state transition handling.</p>
+<p>// RL NOTE: This is where the environment processes actions and transitions to next state.
+// Log (s, a, r, s') tuples here for RL dataset generation.</p>
 
 
             <details class="quote">
               <summary>Source code in <code>pas/environment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_to_log</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">:</span> <span class="n">CompletedEvent</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">CompletedEvent</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Route logged events through the PAS state layer and subscriber hooks.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_to_log</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">:</span> <span class="n">CompletedEvent</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">CompletedEvent</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Override to add PAS state transition handling.</span>
+
+<span class="sd">    // RL NOTE: This is where the environment processes actions and transitions to next state.</span>
+<span class="sd">    // Log (s, a, r, s&#39;) tuples here for RL dataset generation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">event_list</span> <span class="o">=</span> <span class="n">events</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">events</span><span class="p">]</span>
-    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">add_to_log</span><span class="p">(</span><span class="n">event_list</span><span class="p">)</span>
+    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">add_to_log</span><span class="p">(</span><span class="n">event_list</span><span class="p">)</span>  <span class="c1"># Call Meta ARE&#39;s native event processing</span>
 
     <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">event_list</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_process_completed_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+        <span class="c1"># Skip already processed events</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">event_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">processed_event_ids</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;StateAwareEnvironmentWrapper observed event: app=</span><span class="si">%s</span><span class="s2"> function=</span><span class="si">%s</span><span class="s2"> type=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">event</span><span class="o">.</span><span class="n">app_name</span><span class="p">(),</span>
+            <span class="n">event</span><span class="o">.</span><span class="n">function_name</span><span class="p">(),</span>
+            <span class="n">event</span><span class="o">.</span><span class="n">event_type</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Handle state transitions for StatefulApps</span>
+        <span class="n">app</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">app_name</span><span class="p">())</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">StatefulApp</span><span class="p">):</span>
+            <span class="n">app</span><span class="o">.</span><span class="n">handle_state_transition</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_user_agent_tools</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">app_name</span><span class="p">(),</span> <span class="n">app</span><span class="p">)</span>
+
+        <span class="c1"># Notify subscribers (used by UserProxy, ProactiveAgent, event logging, and oracles)</span>
+        <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="p">):</span>
+            <span class="n">callback</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">processed_event_ids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">event_id</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1480,24 +1628,65 @@
 <div class="doc doc-object doc-function">
 
 
-<h3 id="pas.environment.StateAwareEnvironmentWrapper.handle_completed_event" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">handle_completed_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span></code>
+<h3 id="pas.environment.StateAwareEnvironmentWrapper.register_user_agent" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">register_user_agent</span><span class="p">(</span><span class="n">agent</span><span class="p">)</span></code>
 
-<a href="#pas.environment.StateAwareEnvironmentWrapper.handle_completed_event" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#pas.environment.StateAwareEnvironmentWrapper.register_user_agent" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Maintain compatibility with tests invoking the legacy hook directly.</p>
+        <p>Register the user agent for dynamic tool updates.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>agent</code>
+            </td>
+            <td>
+                  <code><span title="pas.environment._UserAgentProtocol">_UserAgentProtocol</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The user agent (typically StatefulUserAgent) that needs tool updates</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
             <details class="quote">
               <summary>Source code in <code>pas/environment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">handle_completed_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">CompletedEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># pragma: no cover - legacy hook</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Maintain compatibility with tests invoking the legacy hook directly.&quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_process_completed_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">register_user_agent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">agent</span><span class="p">:</span> <span class="n">_UserAgentProtocol</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register the user agent for dynamic tool updates.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        agent: The user agent (typically StatefulUserAgent) that needs tool updates</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span> <span class="o">=</span> <span class="n">agent</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Registered user agent for dynamic tool updates&quot;</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1520,13 +1709,13 @@
 
             <details class="quote">
               <summary>Source code in <code>pas/environment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">subscribe_to_completed_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">subscribe_to_completed_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Register a callback that will receive every completed event.&quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">callback</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">callback</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1549,13 +1738,13 @@
 
             <details class="quote">
               <summary>Source code in <code>pas/environment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unsubscribe_from_completed_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unsubscribe_from_completed_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">CompletedEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove a previously registered completed-event subscriber.&quot;&quot;&quot;</span>
     <span class="k">with</span> <span class="n">suppress</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>  <span class="c1"># pragma: no cover - defensive guard</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_completed_event_subscribers</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">completed_event_subscribers</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

@@ -12,26 +12,28 @@
         <meta name="author" content="Deepak Nathani">
       
       
-        <link rel="canonical" href="https://deepakn97.github.io/pas/api/logging/">
+        <link rel="canonical" href="https://deepakn97.github.io/pas/scenario_generator/">
       
       
-        <link rel="prev" href="../adapters/">
+        <link rel="prev" href="../run_local_llm_model/">
       
       
+        <link rel="next" href="../architecture_visual/">
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.19">
     
     
       
-        <title>Logging - Proactive Agent Sandbox</title>
+        <title>Scenario Generation - Proactive Agent Sandbox</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -50,9 +52,9 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#logging-api" class="md-skip">
+        <a href="#automated-scenario-generation" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +96,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Proactive Agent Sandbox" class="md-header__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
+    <a href=".." title="Proactive Agent Sandbox" class="md-header__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -114,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Logging
+              Scenario Generation
             
           </span>
         </div>
@@ -230,7 +232,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Proactive Agent Sandbox" class="md-nav__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
+    <a href=".." title="Proactive Agent Sandbox" class="md-nav__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -260,7 +262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -279,18 +281,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -306,7 +310,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Getting Started
@@ -320,7 +324,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface-guide/" class="md-nav__link">
+      <a href="../interface-guide/" class="md-nav__link">
         
   
   
@@ -343,7 +347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_proxy_guide/" class="md-nav__link">
+      <a href="../user_proxy_guide/" class="md-nav__link">
         
   
   
@@ -366,7 +370,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../proactive_agent_guide/" class="md-nav__link">
+      <a href="../proactive_agent_guide/" class="md-nav__link">
         
   
   
@@ -389,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../scenario_author_guide/" class="md-nav__link">
+      <a href="../scenario_author_guide/" class="md-nav__link">
         
   
   
@@ -412,7 +416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../run_local_llm_model/" class="md-nav__link">
+      <a href="../run_local_llm_model/" class="md-nav__link">
         
   
   
@@ -432,10 +436,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../scenario_generator/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generation
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -446,6 +472,227 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-iteration-generation-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multi-Iteration Generation Process
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#built-in-validation-repair" class="md-nav__link">
+    <span class="md-ellipsis">
+      Built-in Validation &amp; Repair
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Import Management
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-line-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      Command Line Interface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Command Line Interface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      All Parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#utility-scripts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Utility Scripts
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Utility Scripts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scenario-deduplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario Deduplication
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Import Analysis
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      Architecture
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Components
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scenariogeneratingagent" class="md-nav__link">
+    <span class="md-ellipsis">
+      ScenarioGeneratingAgent
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Validation Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-management_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Import Management
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -503,7 +750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../architecture_visual/" class="md-nav__link">
+      <a href="../architecture_visual/" class="md-nav__link">
         
   
   
@@ -571,7 +818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/" class="md-nav__link">
+      <a href="../apps/" class="md-nav__link">
         
   
   
@@ -594,7 +841,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/contacts/" class="md-nav__link">
+      <a href="../apps/contacts/" class="md-nav__link">
         
   
   
@@ -617,7 +864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/messaging/" class="md-nav__link">
+      <a href="../apps/messaging/" class="md-nav__link">
         
   
   
@@ -640,7 +887,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/email/" class="md-nav__link">
+      <a href="../apps/email/" class="md-nav__link">
         
   
   
@@ -663,7 +910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apps/calendar/" class="md-nav__link">
+      <a href="../apps/calendar/" class="md-nav__link">
         
   
   
@@ -690,20 +937,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
@@ -719,7 +964,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             API Reference
@@ -733,7 +978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../modules/" class="md-nav__link">
+      <a href="../modules/" class="md-nav__link">
         
   
   
@@ -756,7 +1001,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../system/" class="md-nav__link">
+      <a href="../api/system/" class="md-nav__link">
         
   
   
@@ -779,7 +1024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../environment/" class="md-nav__link">
+      <a href="../api/environment/" class="md-nav__link">
         
   
   
@@ -802,7 +1047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apps/" class="md-nav__link">
+      <a href="../api/apps/" class="md-nav__link">
         
   
   
@@ -825,7 +1070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user_proxy/" class="md-nav__link">
+      <a href="../api/user_proxy/" class="md-nav__link">
         
   
   
@@ -848,7 +1093,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../proactive_agent/" class="md-nav__link">
+      <a href="../api/proactive_agent/" class="md-nav__link">
         
   
   
@@ -871,7 +1116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/" class="md-nav__link">
+      <a href="../api/scenarios/" class="md-nav__link">
         
   
   
@@ -894,7 +1139,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenario_generator/" class="md-nav__link">
+      <a href="../api/scenario_generator/" class="md-nav__link">
         
   
   
@@ -917,7 +1162,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adapters/" class="md-nav__link">
+      <a href="../api/adapters/" class="md-nav__link">
         
   
   
@@ -937,32 +1182,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Logging
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../api/logging/" class="md-nav__link">
         
   
   
@@ -973,62 +1196,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#logging-utilities" class="md-nav__link">
-    <span class="md-ellipsis">
-      Logging Utilities
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pas.logging_utils" class="md-nav__link">
-    <span class="md-ellipsis">
-      logging_utils
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pas.logging_utils.get_pas_file_logger" class="md-nav__link">
-    <span class="md-ellipsis">
-      get_pas_file_logger
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pas.logging_utils.initialise_pas_logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      initialise_pas_logs
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1068,36 +1235,201 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#logging-utilities" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
-      Logging Utilities
+      Overview
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#pas.logging_utils" class="md-nav__link">
+  <a href="#key-features" class="md-nav__link">
     <span class="md-ellipsis">
-      logging_utils
+      Key Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-iteration-generation-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multi-Iteration Generation Process
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#built-in-validation-repair" class="md-nav__link">
+    <span class="md-ellipsis">
+      Built-in Validation &amp; Repair
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Import Management
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-line-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      Command Line Interface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Command Line Interface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      All Parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#pas.logging_utils.get_pas_file_logger" class="md-nav__link">
+  <a href="#utility-scripts" class="md-nav__link">
     <span class="md-ellipsis">
-      get_pas_file_logger
+      Utility Scripts
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Utility Scripts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scenario-deduplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario Deduplication
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#import-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Import Analysis
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#pas.logging_utils.initialise_pas_logs" class="md-nav__link">
+  <a href="#architecture" class="md-nav__link">
     <span class="md-ellipsis">
-      initialise_pas_logs
+      Architecture
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Components
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scenariogeneratingagent" class="md-nav__link">
+    <span class="md-ellipsis">
+      ScenarioGeneratingAgent
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Validation Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-management_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Import Management
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
     </span>
   </a>
   
@@ -1122,147 +1454,116 @@
   
 
 
-<h1 id="logging-api">Logging API<a class="headerlink" href="#logging-api" title="Permanent link">&para;</a></h1>
-<p>Logging utilities and configuration.</p>
-<h2 id="logging-utilities">Logging Utilities<a class="headerlink" href="#logging-utilities" title="Permanent link">&para;</a></h2>
+<h1 id="automated-scenario-generation">Automated Scenario Generation<a class="headerlink" href="#automated-scenario-generation" title="Permanent link">&para;</a></h1>
+<p>Automated scenario generation pipeline that creates new scenarios by analyzing existing examples and using LLM agents to generate, validate, and repair scenario code.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>The Scenario Generator is a sophisticated pipeline that leverages Large Language Models (LLMs) to automatically generate new proactive scenarios based on existing examples. It includes multiple validation and repair mechanisms to ensure generated scenarios are syntactically correct and properly structured.</p>
+<h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
+<h3 id="multi-iteration-generation-process">Multi-Iteration Generation Process<a class="headerlink" href="#multi-iteration-generation-process" title="Permanent link">&para;</a></h3>
+<p>The generator uses a <strong>multi-iteration approach</strong>:
+1. <strong>First iteration</strong>: Generate the initial scenario code
+2. <strong>Subsequent iterations</strong>: Validate, detect issues, and repair problems
+3. <strong>Final output</strong>: Clean, validated scenario ready for use</p>
+<h3 id="built-in-validation-repair">Built-in Validation &amp; Repair<a class="headerlink" href="#built-in-validation-repair" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Syntax validation</strong>: Automatic Python syntax checking with compile-time error detection</li>
+<li><strong>Import validation</strong>: Ensures all required imports are available and correctly formatted</li>
+<li><strong>Linting fixes</strong>: Automatic correction of common formatting issues (e.g., <code>true</code>/<code>false</code> vs <code>True</code>/<code>False</code>)</li>
+<li><strong>Error recovery</strong>: Failed generations are automatically sent back to the LLM for repair</li>
+</ul>
+<h3 id="import-management">Import Management<a class="headerlink" href="#import-management" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Automatic import discovery</strong>: Scans the entire codebase to build comprehensive import instructions</li>
+<li><strong>Context-aware imports</strong>: Extracts imports from example scenarios to ensure proper context</li>
+<li><strong>Dynamic import validation</strong>: Verifies all imports in generated scenarios are valid and accessible</li>
+</ul>
+<h2 id="command-line-interface">Command Line Interface<a class="headerlink" href="#command-line-interface" title="Permanent link">&para;</a></h2>
+<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash">python pas/scenario_generator/scenario_generator.py \
+    -s scenario_tutorial_proactive_confirm \
+    --model gpt-5-chat-latest \
+    --provider openai
+</code></pre>
+<h3 id="all-parameters">All Parameters<a class="headerlink" href="#all-parameters" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash">python pas/scenario_generator/scenario_generator.py \
+    -s &lt;scenario_id&gt; \
+    -a &lt;agent_name&gt; \
+    --model &lt;model_name&gt; \
+    --provider &lt;provider_name&gt; \
+    --endpoint &lt;endpoint_url&gt; \
+    --max_turns &lt;number&gt; \
+    --simulated_generation_time_mode &lt;measured|fixed&gt;
+</code></pre>
+<h3 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>-s, --scenario</code></strong>: Scenario IDs to use as examples (can add multiple example scenarios)</li>
+<li><strong><code>-a, --agent</code></strong>: Agent type to use (default: "scenario_generator")</li>
+<li>** <code>--model</code>**: LLM model name (default: "gpt-5-chat-latest")</li>
+<li>** <code>--provider</code>**: LLM provider (default: "openai")</li>
+<li>** <code>--endpoint</code>**: Custom API endpoint (optional)</li>
+<li>** <code>--max_turns</code>**: Maximum conversation turns (optional)</li>
+<li>** <code>--simulated_generation_time_mode</code>**: Time simulation mode ("measured" or "fixed")</li>
+</ul>
+<h2 id="output">Output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h2>
+<p>Generated scenarios are saved to:</p>
+<pre><code>/pas/scenarios/generated_scenarios/
+</code></pre>
+<h2 id="utility-scripts">Utility Scripts<a class="headerlink" href="#utility-scripts" title="Permanent link">&para;</a></h2>
+<h3 id="scenario-deduplication">Scenario Deduplication<a class="headerlink" href="#scenario-deduplication" title="Permanent link">&para;</a></h3>
+<p>Compare similarity between scenarios using multiple algorithms:</p>
+<pre><code class="language-bash">python pas/scenario_generator/utils/deduplicate_scenarios.py \
+    pas/scenarios/base.py \
+    pas/scenarios/contacts_followup.py \
+    --threshold 0.88 \
+    --metric max \
+    --k 3
+</code></pre>
+<p><strong>Metrics Available:</strong>
+- <code>difflib_ratio</code>: Text similarity ratio
+- <code>jaccard_shingles</code>: Jaccard similarity using k-shingles
+- <code>cosine_tokens</code>: Cosine similarity of token vectors</p>
+<p><strong>Output Example:</strong></p>
+<pre><code>=== Similarity Scores ===
+difflib_ratio   : 0.2482
+jaccard_shingles: 0.0675 (k=3)
+cosine_tokens   : 0.5174
+len(tokens)     : 317 vs 397
 
-
-<div class="doc doc-object doc-module">
-
-
-
-<a id="pas.logging_utils"></a>
-    <div class="doc doc-contents first">
-
-        <p>Utilities for configuring PAS logging.</p>
-
-
-
-
-
-
-
-
-
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="pas.logging_utils.get_pas_file_logger" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">get_pas_file_logger</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">log_path</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span></code>
-
-<a href="#pas.logging_utils.get_pas_file_logger" class="headerlink" title="Permanent link">&para;</a></h2>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Return a logger writing to <code>log_path</code> without duplicating handlers.</p>
-
-
-            <details class="quote">
-              <summary>Source code in <code>pas/logging_utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_pas_file_logger</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">log_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a logger writing to ``log_path`` without duplicating handlers.&quot;&quot;&quot;</span>
-    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
-    <span class="n">log_path</span> <span class="o">=</span> <span class="n">log_path</span> <span class="k">if</span> <span class="n">log_path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">()</span> <span class="k">else</span> <span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span> <span class="o">/</span> <span class="n">log_path</span><span class="p">)</span>
-    <span class="n">log_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">_has_handler</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">,</span> <span class="n">log_path</span><span class="p">):</span>
-        <span class="n">file_handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">(</span><span class="n">log_path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
-        <span class="n">formatter</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> </span><span class="si">%(levelname)s</span><span class="s2"> </span><span class="si">%(name)s</span><span class="s2"> - </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="n">file_handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
-        <span class="n">file_handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">file_handler</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">existing_handler</span> <span class="ow">in</span> <span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="nb">isinstance</span><span class="p">(</span><span class="n">existing_handler</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="n">Path</span><span class="p">(</span><span class="n">existing_handler</span><span class="o">.</span><span class="n">baseFilename</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span> <span class="o">==</span> <span class="n">log_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
-            <span class="p">):</span>
-                <span class="n">existing_handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">propagate</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="k">return</span> <span class="n">logger</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="pas.logging_utils.initialise_pas_logs" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">initialise_pas_logs</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">clear_existing</span><span class="p">,</span> <span class="n">log_paths</span><span class="p">)</span></code>
-
-<a href="#pas.logging_utils.initialise_pas_logs" class="headerlink" title="Permanent link">&para;</a></h2>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Prepare PAS log files, optionally clearing previous runs before logging.</p>
-
-
-            <details class="quote">
-              <summary>Source code in <code>pas/logging_utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">10</span>
-<span class="normal">11</span>
-<span class="normal">12</span>
-<span class="normal">13</span>
-<span class="normal">14</span>
-<span class="normal">15</span>
-<span class="normal">16</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialise_pas_logs</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">clear_existing</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">log_paths</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Prepare PAS log files, optionally clearing previous runs before logging.&quot;&quot;&quot;</span>
-    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">log_paths</span><span class="p">:</span>
-        <span class="n">resolved</span> <span class="o">=</span> <span class="n">path</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">()</span> <span class="k">else</span> <span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span> <span class="o">/</span> <span class="n">path</span><span class="p">)</span>
-        <span class="n">resolved</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">clear_existing</span> <span class="ow">and</span> <span class="n">resolved</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-            <span class="n">resolved</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div>
+Decision:
+metric=max score=0.5174 threshold=0.88
+=&gt; Different enough ❌
+</code></pre>
+<h3 id="import-analysis">Import Analysis<a class="headerlink" href="#import-analysis" title="Permanent link">&para;</a></h3>
+<p>List all available app imports for agent instructions:</p>
+<pre><code class="language-bash">python pas/scenario_generator/utils/list_all_app_imports.py
+</code></pre>
+<p>This utility scans the entire <code>are.simulation.apps</code> package and generates comprehensive import instructions that help the LLM agent understand what APIs and classes are available.</p>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<h3 id="core-components">Core Components<a class="headerlink" href="#core-components" title="Permanent link">&para;</a></h3>
+<h4 id="scenariogeneratingagent">ScenarioGeneratingAgent<a class="headerlink" href="#scenariogeneratingagent" title="Permanent link">&para;</a></h4>
+<p>The main agent responsible for:
+- Analyzing example scenarios
+- Generating new scenario code
+- Validating syntax and imports
+- Repairing detected issues</p>
+<h4 id="validation-functions">Validation Functions<a class="headerlink" href="#validation-functions" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>_validate_syntax()</code>: Compile-time Python syntax validation</li>
+<li><code>_validate_imports()</code>: Import statement validation against available modules</li>
+<li><code>_fix_generated_file_linting_issues()</code>: Common formatting issue fixes</li>
+</ul>
+<h4 id="import-management_1">Import Management<a class="headerlink" href="#import-management_1" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>_extract_imports_from_scenarios()</code>: Extract imports from example scenarios</li>
+<li><code>list_all_app_imports.py</code>: Build comprehensive import catalogs</li>
+<li>Dynamic import resolution and validation</li>
+</ul>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<p>The system is highly configurable through the LLM engine configuration:
+- Multiple model providers (OpenAI, local models via Ollama, etc.)
+- Custom endpoints for different API services
+- Adjustable iteration limits and validation thresholds
+- Simulated time modes for testing and development</p>
 
 
 
@@ -1342,10 +1643,10 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
       
     
   </body>

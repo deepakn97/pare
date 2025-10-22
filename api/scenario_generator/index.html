@@ -407,6 +407,52 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../run_local_llm_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Running Local LLM Models Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenario_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -900,15 +946,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#scenario-generator" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scenario Generator
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#pas.scenario_generator.scenario_generator" class="md-nav__link">
     <span class="md-ellipsis">
       scenario_generator
@@ -1015,15 +1052,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#scenario-generator" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scenario Generator
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#pas.scenario_generator.scenario_generator" class="md-nav__link">
     <span class="md-ellipsis">
       scenario_generator
@@ -1061,8 +1089,6 @@
 
 
 <h1 id="scenario-generator-api">Scenario Generator API<a class="headerlink" href="#scenario-generator-api" title="Permanent link">&para;</a></h1>
-<p>Automated scenario generation pipeline.</p>
-<h2 id="scenario-generator">Scenario Generator<a class="headerlink" href="#scenario-generator" title="Permanent link">&para;</a></h2>
 
 
 <div class="doc doc-object doc-module">
@@ -1103,10 +1129,7 @@
 
     <div class="doc doc-contents ">
 
-        <p>Minimal runner that builds the "scenario_generator" agent and runs it once to.</p>
-<p>write new scenario .py files based on the provided scenario class.</p>
-<p>This mirrors the special-case in ScenarioRunner._run_with_agent for
-agent == "scenario_generator", but is provided as a standalone utility.</p>
+        <p>Runner that builds the "scenario_generator" agent and runs it once to write new scenario.py files based on the provided scenario class.</p>
 
 
             <details class="quote">
@@ -1148,22 +1171,10 @@ agent == "scenario_generator", but is provided as a standalone utility.</p>
 <span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_scenarios_from_example</span><span class="p">(</span>
+<span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_scenarios_from_example</span><span class="p">(</span>
     <span class="n">scenario_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Scenario</span><span class="p">],</span> <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Minimal runner that builds the &quot;scenario_generator&quot; agent and runs it once to.</span>
-
-<span class="sd">    write new scenario .py files based on the provided scenario class.</span>
-
-<span class="sd">    This mirrors the special-case in ScenarioRunner._run_with_agent for</span>
-<span class="sd">    agent == &quot;scenario_generator&quot;, but is provided as a standalone utility.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Runner that builds the &quot;scenario_generator&quot; agent and runs it once to write new scenario.py files based on the provided scenario class.&quot;&quot;&quot;</span>
     <span class="c1"># scan the apps package and make the import instructions</span>
     <span class="c1"># 1) Build catalog once per run (fast; static; safe)</span>
     <span class="n">catalog</span> <span class="o">=</span> <span class="n">scan_package</span><span class="p">(</span><span class="s2">&quot;are.simulation.apps&quot;</span><span class="p">,</span> <span class="n">include_sigs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">doclen</span><span class="o">=</span><span class="mi">140</span><span class="p">)</span>
@@ -1187,7 +1198,7 @@ agent == "scenario_generator", but is provided as a standalone utility.</p>
     <span class="n">system_prompt</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>  <span class="c1"># ScenarioGeneratingAgent will populate tools/time placeholders</span>
     <span class="c1"># Wire minimal generator (no BaseAgent needed)</span>
     <span class="n">gen_agent</span> <span class="o">=</span> <span class="n">ScenarioGeneratingAgent</span><span class="p">(</span>
-        <span class="n">llm_engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span> <span class="n">tools</span><span class="o">=</span><span class="p">[],</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">import_instructions</span><span class="o">=</span><span class="n">import_instructions</span>
+        <span class="n">llm_engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span> <span class="n">tools</span><span class="o">=</span><span class="p">[],</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">import_instructions</span><span class="o">=</span><span class="n">import_instructions</span>
     <span class="p">)</span>
 
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running minimal scenario generator agent&quot;</span><span class="p">)</span>

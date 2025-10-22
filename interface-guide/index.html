@@ -613,6 +613,52 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../run_local_llm_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Running Local LLM Models Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenario_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1390,7 +1436,7 @@ provided the public APIs remain unchanged.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>pas/user_proxy/stateful.py</code></td>
+<td><code>pas/user_proxy/agent.py</code></td>
 <td>Stateful proxy plus <code>UserActionFailed</code>/<code>TurnLimitReached</code> guards</td>
 </tr>
 <tr>
@@ -1409,20 +1455,16 @@ provided the public APIs remain unchanged.</p>
 </table>
 <p>Teams may add additional files, but the interfaces exposed here must remain unchanged.</p>
 <h2 id="3-user-proxy-contract">3. User Proxy Contract<a class="headerlink" href="#3-user-proxy-contract" title="Permanent link">&para;</a></h2>
-<pre><code class="language-python">class StatefulUserProxy(UserProxy):
+<pre><code class="language-python">class StatefulUserAgentProxy(UserProxy):
     def __init__(
         self,
-        env: StateAwareEnvironmentWrapper,
-        notification_system: BaseNotificationSystem,
-        *,
-        max_user_turns: int = 40,
-        logger: logging.Logger,
-        planner: PlannerCallable | None = None,
-        event_timeout: float = 2.0,
+        runtime: StatefulUserAgentRuntime,
     ) -&gt; None: ...
 
     def init_conversation(self) -&gt; str: ...
     def reply(self, message: str) -&gt; str: ...
+    def react_to_event(self, message: str) -&gt; str: ...
+    def consume_notifications(self) -&gt; list[str]: ...
 </code></pre>
 <h3 id="31-constructor-arguments">3.1 Constructor arguments<a class="headerlink" href="#31-constructor-arguments" title="Permanent link">&para;</a></h3>
 <ul>
@@ -1450,7 +1492,7 @@ provided the public APIs remain unchanged.</p>
 <li>Record the reply in the transcript and return it.</li>
 </ol>
 <h3 id="34-transcript-helpers">3.4 Transcript + helpers<a class="headerlink" href="#34-transcript-helpers" title="Permanent link">&para;</a></h3>
-<p><code>StatefulUserProxy</code> keeps an internal list of dicts with <code>role</code> (<code>agent</code> / <code>user</code>) and <code>content</code>. Optionally store the raw tool log (<code>List[ToolInvocation]</code>) for debugging or export.</p>
+<p><code>StatefulUserAgentProxy</code> keeps an internal list of dicts with <code>role</code> (<code>agent</code> / <code>user</code>) and <code>content</code>. Optionally store the raw tool log (<code>List[ToolInvocation]</code>) for debugging or export.</p>
 <h2 id="4-proactive-agent-contract">4. Proactive Agent Contract<a class="headerlink" href="#4-proactive-agent-contract" title="Permanent link">&para;</a></h2>
 <pre><code class="language-python">class ProactiveAgentProtocol(Protocol):
     def observe(self, event: CompletedEvent) -&gt; None: ...
@@ -1477,7 +1519,7 @@ provided the public APIs remain unchanged.</p>
 <h2 id="5-scenario-authoring-responsibilities">5. Scenario Authoring Responsibilities<a class="headerlink" href="#5-scenario-authoring-responsibilities" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Environment setup</strong> – instantiate <code>StateAwareEnvironmentWrapper</code>, register stateful apps.</li>
-<li><strong>Instantiate components</strong> – create <code>StatefulUserProxy</code> and a <code>ProactiveAgentProtocol</code> implementation.</li>
+<li><strong>Instantiate components</strong> – create <code>StatefulUserAgentProxy</code> and a <code>ProactiveAgentProtocol</code> implementation.</li>
 <li><strong>Wire event flow</strong> – subscribe <code>proactive.observe</code> to all events:
    <code>python
    env.notification_system.subscribe(EventType.ANY, proactive.observe)</code></li>
@@ -1485,7 +1527,7 @@ provided the public APIs remain unchanged.</p>
 <li><strong>Pass user proxy to <code>AgentUserInterface</code></strong> – this is still the only object Meta-ARE touches.</li>
 </ol>
 <h3 id="51-constructor-example">5.1 Constructor example<a class="headerlink" href="#51-constructor-example" title="Permanent link">&para;</a></h3>
-<pre><code class="language-python">proxy = StatefulUserProxy(env, env.notification_system, summary_style=&quot;structured&quot;)
+<pre><code class="language-python">proxy = StatefulUserAgentProxy(env, env.notification_system, summary_style=&quot;structured&quot;)
 proactive = LLMBasedProactiveAgent()  # see docs/proactive_agent_guide.md for constructor details
 aui = AgentUserInterface(user_proxy=proxy, ...)
 </code></pre>
@@ -1526,7 +1568,7 @@ result: success
 <pre><code class="language-python">env = StateAwareEnvironmentWrapper()
 env.register_apps([StatefulContactsApp(name=&quot;contacts&quot;), StatefulEmailApp(name=&quot;email&quot;)])
 
-proxy = StatefulUserProxy(env, env.notification_system)
+proxy = StatefulUserAgentProxy(env, env.notification_system)
 llm_client = build_llm_client()  # your LLM factory
 proactive = LLMBasedProactiveAgent(llm=llm_client, system_prompt=&quot;...&quot;)
 

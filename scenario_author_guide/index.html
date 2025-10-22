@@ -18,7 +18,7 @@
         <link rel="prev" href="../proactive_agent_guide/">
       
       
-        <link rel="next" href="../architecture_visual/">
+        <link rel="next" href="../run_local_llm_model/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -515,6 +515,52 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../run_local_llm_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Running Local LLM Models Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenario_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generation
+    
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -1159,7 +1205,7 @@ reflects the current implementation shipped in <code>pas/scenarios/contacts_foll
 <li><strong>Notifications</strong> – configure <code>pas.system.notification.PasNotificationSystem</code>
    (exposed through <code>create_notification_system</code>) so completed events become
    human readable system notifications. The user proxy consumes these via
-   <code>StatefulUserProxy.consume_notifications()</code>.</li>
+   <code>StatefulUserAgentRuntime.consume_notifications()</code>.</li>
 <li><strong>User planner</strong> – <code>pas.system.user.build_stateful_user_planner</code> builds an
    LLM-backed planner that enumerates per-app tools and system navigation tools.
    When no initial app is specified the planner starts on a synthetic home
@@ -1215,7 +1261,7 @@ from pas.system import (
     create_notification_system,
     initialise_runtime,
 )
-from pas.user_proxy import StatefulUserProxy
+from pas.user_proxy import build_stateful_user_agent
 from pas.user_proxy.decision_maker import LLMDecisionMaker
 
 
@@ -1250,7 +1296,7 @@ def build_components(llm_client, user_llm_client):
     decision_maker = LLMDecisionMaker(user_llm_client, logger=decision_logger)
 
     user_logger = get_pas_file_logger(&quot;pas.user_proxy&quot;, user_log)
-    user_proxy = StatefulUserProxy(
+    user_proxy = build_stateful_user_agent(config,
         env,
         notification_system,
         max_user_turns=25,
@@ -1325,12 +1371,12 @@ only surfaced when the Agent UI has a pending proposal. The same prompt notes
 that the simulated user prefers taps to typing, so flows should lean on
 button-like tools and keep any manual messages short.</p>
 <p>The planner must be called for every agent/user message as well as for
-notification reactions (<code>StatefulUserProxy.react_to_event</code>). Planner outputs are
+notification reactions (<code>StatefulUserAgentRuntime.react_to_event</code>). Planner outputs are
 JSON-encoded tool invocations that the proxy executes in order.</p>
 <h2 id="5-proactive-session-loop">5. Proactive Session Loop<a class="headerlink" href="#5-proactive-session-loop" title="Permanent link">&para;</a></h2>
 <p><code>ProactiveSession.run_cycle()</code> performs the end-to-end proactive flow:</p>
 <ol>
-<li>Drain notification queue (<code>StatefulUserProxy.consume_notifications()</code>)
+<li>Drain notification queue (<code>StatefulUserAgentRuntime.consume_notifications()</code>)
    and let the user proxy respond.</li>
 <li>Call <code>agent.propose_goal()</code> once, using all events collected so far.</li>
 <li>Prompt the user via the messaging app to accept or decline.</li>

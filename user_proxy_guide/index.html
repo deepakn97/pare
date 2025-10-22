@@ -538,6 +538,52 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../run_local_llm_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Running Local LLM Models Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenario_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scenario Generation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1184,7 +1230,7 @@
 <p>This guide explains how the PAS user proxy is structured today and how to plug
 in alternative planners while keeping the public contract stable.</p>
 <h2 id="1-overview">1. Overview<a class="headerlink" href="#1-overview" title="Permanent link">&para;</a></h2>
-<p><code>pas/user_proxy/stateful.py</code> exports <code>StatefulUserProxy</code>, a drop-in replacement
+<p><code>pas/user_proxy/stateful.py</code> exports <code>StatefulUserAgentProxy</code>, a drop-in replacement
 for Meta-ARE’s default proxy. Its core responsibilities are:</p>
 <ol>
 <li>Translate free-form messages (from the agent or system notifications) into concrete
@@ -1198,7 +1244,7 @@ for Meta-ARE’s default proxy. Its core responsibilities are:</p>
 which generates tool calls via the OpenAI Responses API, but you can swap in a
 rule-based or human planner as long as it matches the callable signature.</p>
 <h2 id="2-constructor">2. Constructor<a class="headerlink" href="#2-constructor" title="Permanent link">&para;</a></h2>
-<pre><code class="language-python">class StatefulUserProxy(UserProxy):
+<pre><code class="language-python">class StatefulUserAgentProxy(UserProxy):
     def __init__(
         self,
         env: StateAwareEnvironmentWrapper,
@@ -1238,7 +1284,7 @@ conversation IDs) and logs a friendly summary (<code>Notification (app: messagin
 the same context a human would see on a phone lock screen.</p>
 <h2 id="4-planner-contract">4. Planner Contract<a class="headerlink" href="#4-planner-contract" title="Permanent link">&para;</a></h2>
 <p><code>PlannerCallable</code> is defined as:</p>
-<pre><code class="language-python">PlannerCallable = Callable[[str, StatefulUserProxy], Sequence[tuple[str, str, dict[str, object]]]]
+<pre><code class="language-python">PlannerCallable = Callable[[str, StatefulUserAgentProxy], Sequence[tuple[str, str, dict[str, object]]]]
 </code></pre>
 <p>The built-in <code>LLMUserPlanner</code> prepares a prompt that includes:</p>
 <ul>
@@ -1259,7 +1305,7 @@ should be used sparingly and any manual reply kept brief.</p>
 <p>It expects the LLM to return JSON of the form:</p>
 <pre><code class="language-json">{&quot;actions&quot;: [{&quot;tool&quot;: &quot;option_1&quot;, &quot;args&quot;: {&quot;conversation_id&quot;: &quot;...&quot;}}]}
 </code></pre>
-<p><code>StatefulUserProxy</code> executes each action in order, collecting <code>ToolInvocation</code>
+<p><code>StatefulUserAgentProxy</code> executes each action in order, collecting <code>ToolInvocation</code>
 dataclasses that capture the name, arguments, return value, and corresponding
 event (if any).</p>
 <h3 id="system-level-confirmations">System-level confirmations<a class="headerlink" href="#system-level-confirmations" title="Permanent link">&para;</a></h3>
