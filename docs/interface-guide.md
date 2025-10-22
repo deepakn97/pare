@@ -152,10 +152,10 @@ For full constructor options and exception semantics of
 ## 5. Scenario Authoring Responsibilities
 
 1. **Environment setup** – instantiate `StateAwareEnvironmentWrapper`, register stateful apps.
-2. **Instantiate components** – create `StatefulUserAgentProxy` and a `ProactiveAgentProtocol` implementation.
-3. **Wire event flow** – subscribe `proactive.observe` to all events:
+2. **Instantiate components** – create `StatefulUserAgent` and `StatefulUserAgentRuntime`, plus a `ProactiveAgentProtocol` implementation.
+3. **Wire event flow** – subscribe `proactive.observe` to all completed events:
    ```python
-   env.notification_system.subscribe(EventType.ANY, proactive.observe)
+   env.subscribe_to_completed_events(proactive.observe)
    ```
 4. **Hook into scenario loop** – when `propose_goal()` returns a hypothesis, prompt the user via the proxy, call `record_decision(goal, accepted)`, and only if `accepted` is `True` continue with `execute()` / `handoff()`.
 5. **Pass user proxy to `AgentUserInterface`** – this is still the only object Meta-ARE touches.

@@ -4,7 +4,7 @@ This guide explains how to set up and use local Large Language Models (LLMs) wit
 
 ## Prerequisites
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 - `uv` package manager installed
 - Homebrew (for macOS/Linux)
 
@@ -16,15 +16,15 @@ First, ensure your project dependencies are installed:
 
 ```bash
 # Enter the project directory if needed, then sync dependencies
-uv -v sync
+uv sync
 ```
 
-The project uses Python 3.10. Make sure `uv` is configured to use this version:
+The project requires Python 3.12+. Make sure `uv` is using a compatible version:
 
 ```bash
-# Install uv and configure Python version
-uv --version  # Verify installation
-uvx --python 3.10  # Pin Python 3.10 for uvx commands
+# Verify uv installation and Python version
+uv --version
+uv run python --version  # Should show Python 3.12 or higher
 ```
 
 ### 2. Install Ollama

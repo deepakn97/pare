@@ -172,7 +172,7 @@ and navigation state.
 - Automatically waits for CompletedEvents after each tool call
 - Dynamically updates available tools when navigating between apps/states
 - Terminates conversations using the `final_answer` tool
-- Enforces turn limits (raises `MaxTurnsReached` after `max_turns`)
+- Enforces turn limits (runtime raises `TurnLimitReached` after `max_user_turns`)
 
 The system prompt instructs the agent to:
 

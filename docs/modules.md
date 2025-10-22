@@ -32,10 +32,11 @@ Stateful wrappers around Meta-ARE mobile apps with navigation state machines.
 ## Agent Components
 
 ### [User Proxy](api/user_proxy.md)
-User simulation with LLM-based action planning.
+User simulation with ReAct-based reasoning.
 
-- `StatefulUserProxy` – User proxy implementation
-- `LLMPlanner` – LLM-based action planner
+- `StatefulUserAgent` – ReAct agent implementation built on Meta ARE's BaseAgent
+- `StatefulUserAgentRuntime` – Runtime coordinator for the user agent
+- `PasJsonActionExecutor` – Custom action executor with event synchronization
 
 ### [Proactive Agent](api/proactive_agent.md)
 Proactive goal inference and autonomous task execution.
