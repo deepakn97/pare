@@ -57,11 +57,12 @@ context for later prompts.
 
 ## 3. Proposing a Goal (`propose_goal`)
 
-`ProactiveSession.run_cycle()` calls `propose_goal` after all notifications for
-the cycle have been processed. By then the event deque
-contains both the triggering environment event (e.g. a new message) and the
-user proxy’s response (e.g. opening the conversation). Build a prompt from that
-history and return a short goal string or `None`.
+`ProactiveSession.run_cycle()` invokes `propose_goal` *before* draining queued
+notifications so the agent works off the freshest environment events (including
+the user's most recent tool calls) from the previous turn. Build a prompt from
+that history and return a short goal string or `None`. If new notifications are
+still pending, the session will route them through the user proxy after the
+proposal step.
 
 The reference implementation:
 
@@ -84,26 +85,24 @@ Guidelines:
 
 `ProactiveSession` (see `docs/scenario_author_guide.md`) manages the flow:
 
-1. Drain notifications → `StatefulUserAgentRuntime` reacts → new events arrive.
-2. Call `agent.propose_goal()` once.
-3. Use the decision maker (e.g. `LLMDecisionMaker`) to collect a system-level
-   confirmation without invoking messaging tools.
-4. Call `agent.record_decision(goal, accepted)`.
-5. If accepted, run `agent.execute(...)`, fetch `agent.pop_summary()`, and call
+1. Call `agent.propose_goal()` before draining queued notifications so the agent evaluates the freshest event history.
+2. If a goal is produced, surface it through `ProactiveAgentUserInterface` and collect the user's decision.
+3. Call `agent.record_decision(goal, accepted)`.
+4. On acceptance, run `agent.execute(...)`, fetch `agent.pop_summary()`, and call
    `agent.handoff(...)`.
+5. After each pass (including when the agent returns `None`), drain pending notifications via the user proxy so the environment advances.
 
-Thus the agent does **not** decide when to run; it reacts inside the session’s
+Thus the agent does **not** decide when to run; it reacts inside the session's
 `run_cycle()`.
 
 ## 5. Recording User Decisions
 
 `record_decision` is invoked for every hypothesis, whether or not it was
 executed. Use it to reset cached prompts and stash a default summary if the
-user declined. The decision maker already returns the parsed boolean, but you
-should still log the raw string for traceability. In the reference agent, a
-declined decision sets `_pending_summary`
-to “User declined proactive assistance.” so the session can surface a clear
-message.
+user declined. `ProactiveSession` pulls the acceptance flag from the
+`ProactiveAgentUserInterface`, but you should still log the raw string for
+traceability. In the reference agent, a declined decision sets `_pending_summary`
+to “User declined proactive assistance.” so the session can surface a clear message.
 
 ## 6. Execution (`execute`)
 

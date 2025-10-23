@@ -15,8 +15,8 @@ user-proxy orchestration, and proactive planning layers.
 
 1. Clone the repository:
 ```bash
-git clone git@github.com:deepakn97/proactiveGoalInference.git
-cd proactiveGoalInference
+git clone git@github.com:deepakn97/pas.git
+cd pas
 ```
 
 2. Install the environment and pre-commit hooks:

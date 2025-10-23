@@ -13,7 +13,7 @@
 | `open_email_by_id(email_id: str)` | `EmailClientV2.get_email_by_id(email_id=email_id, folder_name=current_folder)` | `Email` object | Completed event transitions to `EmailDetail(email_id, current_folder)` |
 | `open_email_by_index(index: int)` | `EmailClientV2.get_email_by_index(idx=index, folder_name=current_folder)` | `Email` object | Completed event transitions to `EmailDetail` for the resolved id |
 | `switch_folder(folder_name: str)` | Normalises folder, then `EmailClientV2.list_emails(folder_name=resolved)` | `ReturnedEmails` for target folder | Replaces current state with `MailboxView(folder_name)` |
-| `start_compose()` | Emits sentinel string; event metadata carries `draft` payload | Literal string `"compose_started"` | Completed event pushes `ComposeEmail` on the stack |
+| `start_compose()` | Emits sentinel string (metadata may include an optional `draft`) | Literal string `"compose_started"` | Completed event pushes `ComposeEmail` (blank draft when metadata absent) |
 
 ### EmailDetail
 

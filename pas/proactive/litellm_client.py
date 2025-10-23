@@ -82,4 +82,11 @@ class LiteLLMClient(LLMClientProtocol):
         return content, metadata
 
 
-__all__ = ["LiteLLMClient"]
+def build_llm_client(
+    *, model_name: str = "gpt-5-mini", api_base: str | None = None, request_kwargs: dict[str, object] | None = None
+) -> LiteLLMClient:
+    """Return a LiteLLM-backed client matching the documentation examples."""
+    return LiteLLMClient(model=model_name, api_base=api_base, request_kwargs=request_kwargs)
+
+
+__all__ = ["LiteLLMClient", "build_llm_client"]

@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/deepakn97/pas)](https://img.shields.io/github/v/release/deepakn97/pas)
 [![Build status](https://img.shields.io/github/actions/workflow/status/deepakn97/pas/main.yml?branch=main)](https://github.com/deepakn97/pas/actions/workflows/main.yml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/deepakn97/proactiveGoalInference/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/pas)
+[![codecov](https://codecov.io/gh/deepakn97/pas/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/pas)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/deepakn97/pas)](https://img.shields.io/github/commit-activity/m/deepakn97/pas)
 [![License](https://img.shields.io/github/license/deepakn97/pas)](https://img.shields.io/github/license/deepakn97/pas)
 
@@ -24,8 +24,8 @@ PAS extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based n
 
 1. Clone the repository:
 ```bash
-git clone git@github.com:deepakn97/proactiveGoalInference.git
-cd proactiveGoalInference
+git clone git@github.com:deepakn97/pas.git
+cd pas
 ```
 
 2. Install the environment and pre-commit hooks:
@@ -85,22 +85,52 @@ For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Running The Demos
 
-Two runnable scripts exercise the sandbox end-to-end. They require a valid
-`OPENAI_API_KEY` (loaded automatically via `dotenv`).
+PAS includes demo scenarios that showcase the proactive agent system. All demos require a valid `OPENAI_API_KEY` in your environment (loaded automatically via `dotenv`).
+
+#### Quick Start: Contacts Follow-up Demo
+
+The contacts demo simulates a proactive assistant that monitors user activity and suggests helpful actions:
 
 ```bash
+# Create a .env file with your API key
+echo "OPENAI_API_KEY=your-key-here" > .env
+
+# Run the contacts follow-up scenario
 uv run python -m pas.scripts.run_contacts_demo
+```
+
+**What happens in this demo:**
+1. The user agent receives a notification about a new message
+2. The user agent interacts with the messaging app using ReAct reasoning
+3. The proactive agent observes the interaction and proposes a helpful goal
+4. If accepted, the proactive agent executes the task (e.g., forwarding an email)
+5. Control returns to the user with a summary
+
+#### Other Demos
+
+```bash
+# Meta ARE tutorial scenario
 uv run python -m pas.scripts.run_meta_tutorial_demo
-# generic runner example
+
+# Generic runner with custom scenario
 uv run python -m pas.scripts.run_demo \
   --builder pas.scenarios.contacts_followup.build_contacts_followup_components
 ```
 
-Each script prints the proposed goal, execution summary, and the locations of
-the generated logs under `logs/pas/`. Both demos rely on oracle expectations to
-ensure the agent truly forwards the target email; if a run completes without
-meeting the oracle criteria the session raises an error instead of silently
-accepting a partial result.
+#### Output and Logs
+
+Each demo prints:
+- The initial user action (e.g., reading a message)
+- The proposed proactive goal
+- Execution result and summary
+- Log file locations
+
+Logs are written to `logs/pas/`:
+- `user_proxy.log` – User agent ReAct reasoning and tool executions
+- `proactive_agent.log` – Proactive agent observations and decisions
+- `events.log` – Complete event stream for audit
+
+All demos use oracle expectations to validate that the proactive agent correctly completes the intended task. If oracle criteria aren't met, the session raises an error rather than silently accepting a partial result.
 
 ### Scenario Integration Options
 

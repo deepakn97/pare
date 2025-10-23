@@ -36,55 +36,89 @@ All interfaces assume Meta-ARE 2024.10.* and the PAS stateful apps checked into 
 
 | File / Class                                   | Responsibility                                         |
 |------------------------------------------------|-------------------------------------------------------|
-| `pas/user_proxy/agent.py`                    | Stateful proxy plus `UserActionFailed`/`TurnLimitReached` guards |
+| `pas/user_proxy/agent.py`                    | Stateful proxy plus turn-limit (`TurnLimitReached`) guards |
 | `pas/proactive/agent.py`                        | Reference proactive agent + `ProactiveAgentProtocol`  |
 | `pas/oracles.py`                                | Oracle matching and tracking helpers                  |
 | `pas/scenarios/base.py`                         | Utilities to assemble PAS runtime stacks              |
 
 Teams may add additional files, but the interfaces exposed here must remain unchanged.
 
-## 3. User Proxy Contract
+## 3. User Agent Contract
 
 ```python
-class StatefulUserAgentProxy(UserProxy):
+class StatefulUserAgent(BaseAgent):
     def __init__(
         self,
-        runtime: StatefulUserAgentRuntime,
+        llm_engine: LLMClientProtocol | LLMEngine | Callable[..., Any],
+        tools: dict[str, Tool] | None = None,
+        system_prompts: dict[str, str] | None = None,
+        *,
+        max_iterations: int = 10,
+        max_turns: int = 40,
+        wait_timeout: float = 2.0,
+        **kwargs: Any,
     ) -> None: ...
 
-    def init_conversation(self) -> str: ...
+class StatefulUserAgentRuntime(UserProxy):
+    def __init__(
+        self,
+        *,
+        agent: StatefulUserAgent,
+        notification_system: BaseNotificationSystem,
+        logger: logging.Logger,
+        max_user_turns: int = 40,
+        event_timeout: float = 2.0,
+    ) -> None: ...
+
     def reply(self, message: str) -> str: ...
-    def react_to_event(self, message: str) -> str: ...
-    def consume_notifications(self) -> list[str]: ...
 ```
 
 ### 3.1 Constructor arguments
 
-- `env`: shared environment wrapper. Proxy must only interact via exposed `@user_tool`s.
-- `notification_system`: subscribe to `CompletedEvent`s to update state.
-- `max_user_turns`: once reached, `reply()` raises `TurnLimitReached`.
-- `logger`: required logger instance for tracking proxy actions.
-- `planner`: optional callable that maps messages to tool invocations. If None, proxy behavior depends on implementation.
-- `event_timeout`: timeout in seconds when waiting for tool completion events (default 2.0).
+**StatefulUserAgent:**
+- `llm_engine`: LLM engine or client compatible with Meta ARE
+- `tools`: Dictionary mapping tool names to tool objects (includes user_tools from apps + final_answer)
+- `system_prompts`: Dictionary of system prompts (default includes ReAct prompt)
+- `max_iterations`: Maximum iterations per turn (default 10)
+- `max_turns`: Maximum conversation turns before runtime raises TurnLimitReached (default 40)
+- `wait_timeout`: Timeout for waiting on completed events (default 2.0 seconds)
+- `**kwargs`: Additional arguments passed to Meta ARE's BaseAgent
 
-### 3.2 Behaviour of `init_conversation()`
+**StatefulUserAgentRuntime:**
+- `agent`: The StatefulUserAgent instance
+- `notification_system`: Notification system for observing environment events
+- `logger`: Logger for tracking runtime operations
+- `max_user_turns`: Maximum number of conversation turns before raising TurnLimitReached (default 40)
+- `event_timeout`: Timeout for waiting on completed events (default 2.0 seconds)
 
-- Returns an empty string and must not trigger any tool calls.
-- Scenarios may immediately call `reply()` with their preferred greeting.
-### 3.3 Behaviour of `reply(message)`
+### 3.2 Behaviour of `reply(message)`
 
-1. Append agent message to transcript (used for context).
-2. Plan and execute one or more `@user_tool` calls. For MVP this can be a hard-coded flow; future logic must stay internal.
-   - The default planner assumes the user prefers taps to typing. `ProactiveAgentUserInterface.send_message_to_agent` should be used sparingly, and any reply must remain brief.
-   - When the latest notification starts with `"Proactive assistant proposal:"`, the planner is expected to respond via `accept_proposal` or `decline_proposal` before pursuing other actions.
-3. After each tool call, wait for a `CompletedEvent` from the notification system. Use it to update navigation state (`env.get_app(...).current_state`).
-4. If a tool fails, raise `UserActionFailed` with an explanatory message.
-5. Compose a short textual reply summarising the outcome (success or failure).
-6. Record the reply in the transcript and return it.
+The runtime's `reply()` method:
+1. Enforces turn budget (raises `TurnLimitReached` if exceeded)
+2. Infers the active app from recent tool invocations
+3. Updates the agent's system context with active app information
+4. Delegates to the agent's native `reply()` method
+5. The agent uses ReAct reasoning to decide which tools to call
+6. PasJsonActionExecutor executes tools and waits for CompletedEvents
+7. Returns the final answer when the agent calls final_answer
+8. Raises `TurnLimitReached` if turn limit is exceeded
 
-### 3.4 Transcript + helpers
+The agent automatically:
+- Uses only tools marked as `@user_tool` (cannot call `@app_tool`s)
+- Waits for CompletedEvents after each tool call (except final_answer)
+- Records tool invocations with metadata for debugging
+- Prefers tapping/clicking over typing per system prompt instructions
 
-`StatefulUserAgentProxy` keeps an internal list of dicts with `role` (`agent` / `user`) and `content`. Optionally store the raw tool log (`List[ToolInvocation]`) for debugging or export.
+Tool updates are pushed from the Environment to the agent via `agent.update_tools_for_app()` when state transitions occur, not pulled by the runtime on every reply.
+
+### 3.3 Tool execution flow
+
+Each tool call follows this flow:
+1. Agent outputs: `Action: {"action": "tool_name", "action_input": {...}}`
+2. PasJsonActionExecutor parses and executes the tool
+3. Executor waits for CompletedEvent from environment
+4. Observation is returned to agent: `"Tool succeeded: {result}"` or `"Tool failed: {error}"`
+5. Agent continues reasoning based on the observation
 
 ## 4. Proactive Agent Contract
 
@@ -106,7 +140,7 @@ class ProactiveAgentProtocol(Protocol):
 - `execute`: performs the autonomous intervention (only called when the user accepted). Receives the same task guess string.
   - May call `@app_tool`s directly or orchestrate other helpers.
   - Returns an `InterventionResult` containing success status, notes, and optional metadata.
-  - Must raise `ProactiveInterventionError` on failure.
+  - Set `success=False` in the returned result to indicate failure; the session will surface this as an error. Implementations may raise `ProactiveInterventionError` if execution cannot produce an `InterventionResult`.
 - `handoff`: restore a safe state (e.g. return to a neutral screen) and optionally enqueue a summary message for the user proxy to send later.
 
 The proactive agent never calls user tools and never interacts with `AgentUserInterface` directly.
@@ -118,25 +152,81 @@ For full constructor options and exception semantics of
 ## 5. Scenario Authoring Responsibilities
 
 1. **Environment setup** – instantiate `StateAwareEnvironmentWrapper`, register stateful apps.
-2. **Instantiate components** – create `StatefulUserAgentProxy` and a `ProactiveAgentProtocol` implementation.
-3. **Wire event flow** – subscribe `proactive.observe` to all events:
+2. **Instantiate user components** – create `StatefulUserAgent` and `StatefulUserAgentRuntime`, register the agent with the environment, and subscribe `runtime._on_event` so tool updates stay in sync.
+3. **Expose proactive UI** – create `ProactiveAgentUserInterface(user_proxy=runtime)` and register it with the environment, ensuring the notification system subscribes to `send_proposal_to_user` so proposals surface as notifications.
+4. **Build the proactive agent** – construct a `ProactiveAgentProtocol` implementation and subscribe it to completed events:
    ```python
-   env.notification_system.subscribe(EventType.ANY, proactive.observe)
+   env.subscribe_to_completed_events(proactive.observe)
    ```
-4. **Hook into scenario loop** – when `propose_goal()` returns a hypothesis, prompt the user via the proxy, call `record_decision(goal, accepted)`, and only if `accepted` is `True` continue with `execute()` / `handoff()`.
-5. **Pass user proxy to `AgentUserInterface`** – this is still the only object Meta-ARE touches.
+5. **Hook into the session loop** – instantiate `ProactiveSession(env, runtime, proactive, agent_ui, ...)`. The session automatically sends proposals through the Agent UI, reads the acceptance flag from `proposal_history`, and calls `record_decision` / `execute` / `handoff` accordingly.
 
 ### 5.1 Constructor example
 
 ```python
-proxy = StatefulUserAgentProxy(env, env.notification_system, summary_style="structured")
-proactive = LLMBasedProactiveAgent()  # see docs/proactive_agent_guide.md for constructor details
-aui = AgentUserInterface(user_proxy=proxy, ...)
+import logging
+
+from are.simulation.agents.default_agent.default_tools import FinalAnswerTool
+from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
+from pas.proactive import LLMBasedProactiveAgent
+from pas.proactive.litellm_client import build_llm_client
+from pas.system import ProactiveSession, build_plan_executor
+from pas.user_proxy.agent import StatefulUserAgent, StatefulUserAgentRuntime
+
+# Build user agent
+llm_client = build_llm_client(model_name="gpt-4")
+user_tools = {}  # Collect from apps
+for app in env.apps.values():
+    user_tools.update(app.get_user_tools())
+user_tools["final_answer"] = FinalAnswerTool()
+
+user_agent = StatefulUserAgent(
+    llm_engine=llm_client,
+    tools=user_tools,
+    max_turns=40,
+)
+
+logger = logging.getLogger("pas.user_proxy")
+runtime = StatefulUserAgentRuntime(
+    agent=user_agent,
+    notification_system=env.notification_system,
+    logger=logger,
+    max_user_turns=40,
+)
+
+env.register_user_agent(user_agent)
+env.subscribe_to_completed_events(runtime._on_event)
+
+agent_ui = ProactiveAgentUserInterface(user_proxy=runtime)
+env.register_apps([agent_ui])
+
+# Build proactive agent
+plan_executor = build_plan_executor(llm_client, logger=logging.getLogger("pas.proactive.executor"))
+proactive = LLMBasedProactiveAgent(
+    llm=llm_client,
+    system_prompt="You are a proactive assistant.",
+    max_context_events=200,
+    plan_executor=plan_executor,
+    summary_builder=lambda result: result.notes,
+    logger=logging.getLogger("pas.proactive.agent"),
+)
+
+env.subscribe_to_completed_events(proactive.observe)
+
+session = ProactiveSession(
+    env,
+    runtime,
+    proactive,
+    agent_ui,
+    confirm_goal=lambda goal: True,
+    logger=logging.getLogger("pas.session"),
+    oracle_actions=[],
+)
 ```
 
 ### 5.2 Error handling
 
-- If `UserActionFailed` propagates from the proxy, the scenario should decide whether to retry or end the turn gracefully.
+- If `TurnLimitReached` is raised from the runtime, the scenario should conclude the conversation gracefully.
+- If `InvalidActionAgentError` is raised by Meta ARE, this indicates malformed LLM output; log it and potentially retry.
 - If `ProactiveInterventionError` is raised, log it and hand control back to the user.
 
 ## 6. Reply Format Guide
@@ -160,31 +250,90 @@ Rules:
 ## 7. Minimal Working Example
 
 ```python
-env = StateAwareEnvironmentWrapper()
+import logging
+
+from pas.apps.contacts.app import StatefulContactsApp
+from pas.apps.email.app import StatefulEmailApp
+from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
+from pas.environment import StateAwareEnvironmentWrapper
+from pas.proactive import LLMBasedProactiveAgent
+from pas.proactive.litellm_client import build_llm_client
+from pas.system import ProactiveSession, build_plan_executor
+from pas.system.notification import PasNotificationSystem
+from pas.user_proxy.agent import StatefulUserAgent, StatefulUserAgentRuntime
+from are.simulation.agents.default_agent.default_tools import FinalAnswerTool
+from are.simulation.types import CompletedEvent
+
+# Setup environment
+notification_system = PasNotificationSystem(
+    extra_notifications={"ProactiveAgentUserInterface": ["send_proposal_to_user"]}
+)
+env = StateAwareEnvironmentWrapper(notification_system=notification_system)
 env.register_apps([StatefulContactsApp(name="contacts"), StatefulEmailApp(name="email")])
 
-proxy = StatefulUserAgentProxy(env, env.notification_system)
-llm_client = build_llm_client()  # your LLM factory
-proactive = LLMBasedProactiveAgent(llm=llm_client, system_prompt="...")
+# Build user agent
+llm_client = build_llm_client(model_name="gpt-4")
+user_tools = {}
+for app in env.apps.values():
+    user_tools.update(app.get_user_tools())
+user_tools["final_answer"] = FinalAnswerTool()
 
+user_agent = StatefulUserAgent(
+    llm_engine=llm_client,
+    tools=user_tools,
+    max_turns=40,
+)
+
+logger = logging.getLogger("pas.user_proxy")
+runtime = StatefulUserAgentRuntime(
+    agent=user_agent,
+    notification_system=notification_system,
+    logger=logger,
+    max_user_turns=40,
+)
+
+# Build proactive agent
+plan_executor = build_plan_executor(llm_client, logger=logging.getLogger("pas.proactive.executor"))
+proactive = LLMBasedProactiveAgent(
+    llm=llm_client,
+    system_prompt="You are a proactive assistant.",
+    max_context_events=200,
+    plan_executor=plan_executor,
+    summary_builder=lambda result: result.notes,
+    logger=logging.getLogger("pas.proactive.agent"),
+)
+
+# Wire event observation
 def on_event(event: CompletedEvent) -> None:
     proactive.observe(event)
 
-env.notification_system.subscribe(EventType.ANY, on_event)
+env.register_user_agent(user_agent)
+env.subscribe_to_completed_events(runtime._on_event)
+env.subscribe_to_completed_events(on_event)
 
-aui = AgentUserInterface(user_proxy=proxy)
-scenario = Scenario(scenario_id="demo", agent_user_interface=aui, ...)
+agent_ui = ProactiveAgentUserInterface(user_proxy=runtime)
+env.register_apps([agent_ui])
 
-if (goal := proactive.propose_goal()):
-    user_reply = proxy.reply(f"I can take care of this: {goal}. Should I proceed?")
-    accepted = user_reply.strip().lower() in {"yes", "y", "sure", "please do"}
-    proactive.record_decision(goal, accepted)
-    if accepted:
-        proactive.execute(goal, env)
-        proactive.handoff(env)
+runtime.init_conversation()
+# Run conversation
+response = runtime.reply("Add contact John Doe with email john@example.com")
+
+session = ProactiveSession(
+    env,
+    runtime,
+    proactive,
+    agent_ui,
+    confirm_goal=lambda goal: True,
+    logger=logging.getLogger("pas.session"),
+    oracle_actions=[],
+)
+
+# Trigger notifications or scripted events before running a proactive cycle.
+cycle = session.run_cycle()
+print(cycle.goal, cycle.accepted, cycle.summary)
 ```
 
-This example leaves the planning logic unspecified; teams fill it in using the interfaces above.
+This example shows how the ReAct agent integrates with the proactive flow.
 
 ## 7. Extensibility Guidelines
 

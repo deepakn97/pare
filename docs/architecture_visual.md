@@ -8,19 +8,19 @@
 │                    (Orchestrator/Controller)                             │
 │                                                                           │
 │  Methods: run_cycle() → ProactiveCycleResult                            │
-│  - Drains notifications                                                  │
-│  - Gets goal proposal from agent                                         │
-│  - Confirms with user via DecisionMaker                                  │
-│  - Executes intervention                                                 │
-│  - Validates with OracleTracker                                          │
+│  - Requests a goal proposal from the agent                               │
+│  - Surfaces proposal via runtime + Agent UI                              │
+│  - Executes accepted interventions                                       │
+│  - Drains remaining notifications                                        │
+│  - Validates completion with OracleTracker                               │
 └────┬─────────┬──────────┬───────────┬─────────────┬─────────────────────┘
      │         │          │           │             │
      │         │          │           │             │
      ▼         ▼          ▼           ▼             ▼
-┌─────────┐ ┌──────┐ ┌─────────┐ ┌────────┐ ┌──────────────┐
-│   ENV   │ │ USER │ │PROACTIVE│ │DECISION│ │    ORACLE    │
-│ WRAPPER │ │PROXY │ │  AGENT  │ │ MAKER  │ │   TRACKER    │
-└─────────┘ └──────┘ └─────────┘ └────────┘ └──────────────┘
+┌─────────┐ ┌──────┐ ┌─────────┐ ┌──────────────┐
+│   ENV   │ │ USER │ │PROACTIVE│ │    ORACLE    │
+│ WRAPPER │ │AGENT │ │  AGENT  │ │   TRACKER    │
+└─────────┘ └──────┘ └─────────┘ └──────────────┘
 ```
 
 ---
@@ -56,44 +56,46 @@
           │                    │                    │
           ▼                    ▼                    ▼
    ┌─────────────┐      ┌─────────────┐     ┌────────────┐
-   │  Stateful   │      │  Proactive  │     │Notification│
-   │ UserProxy   │      │    Agent    │     │   System   │
+   │   User      │      │  Proactive  │     │Notification│
+   │   Agent     │      │    Agent    │     │   System   │
+   │  Runtime    │      │             │     │            │
    └─────────────┘      └─────────────┘     └────────────┘
 ```
 
 ---
 
-## User Proxy Architecture
+## User Agent Architecture
 
 ```
-                           StatefulUserProxy
+                    StatefulUserAgentRuntime
                                   │
                                   │
         ┌─────────────────────────┼─────────────────────────┐
         │                         │                         │
         ▼                         ▼                         ▼
-  ┌──────────┐            ┌──────────────┐         ┌──────────────┐
-  │   ENV    │            │  LLMPlanner  │         │LLMDecision   │
-  │ WRAPPER  │            │              │         │    Maker     │
-  └──────────┘            └──────────────┘         └──────────────┘
+  ┌──────────┐            ┌─────────────────┐      ┌──────────────┐
+  │   ENV    │            │StatefulUserAgent│      │ Notification │
+  │ WRAPPER  │            │  (ReAct-based)  │      │    System    │
+  └──────────┘            └─────────────────┘      └──────────────┘
         │                         │                         │
         │                         │                         │
         │                         │                         │
-    calls                   builds tool                confirms
-  @user_tool                list from                  proposals
-   functions              current AppState           yes/no only
+    pushes                  reasons with              provides
+ tool updates               ReAct cycles            notifications
+to agent via               (Thought→Action)
+update_tools_for_app
         │                         │                         │
         ▼                         ▼                         ▼
    ┌────────────────────────────────────────────────────────────┐
    │                    Flow:                                    │
    │                                                              │
    │  1. receive message/notification                            │
-   │  2. LLMPlanner → inspect current AppState                   │
-   │  3. build list of available tools (only current screen)     │
-   │  4. LLM selects tools to call                               │
-   │  5. execute @user_tool calls                                │
-   │  6. CompletedEvent emitted                                  │
-   │  7. update transcript                                       │
+   │  2. Runtime infers active app from recent tools             │
+   │  3. Agent uses ReAct reasoning to select tools              │
+   │  4. PasJsonActionExecutor calls @user_tool                  │
+   │  5. Wait for CompletedEvent                                 │
+   │  6. Record ToolInvocation metadata                          │
+   │  7. Return observation to agent for next step               │
    └────────────────────────────────────────────────────────────┘
 ```
 
@@ -186,48 +188,49 @@ Navigation Pattern: Pushdown Automaton
 ```
 START run_cycle()
     │
-    ├─► [1] Handle Notifications
-    │       │
-    │       ├─► proxy.consume_notifications()
-    │       │       → returns list of notification strings
-    │       │
-    │       └─► For each notification:
-    │               proxy.react_to_event(notification)
-    │                   → calls LLMPlanner
-    │                   → executes @user_tool
-    │                   → returns reply string
-    │
-    ├─► [2] Propose Goal
-    │       │
-    │       └─► agent.propose_goal()
-    │               → LLM analyzes _events history
-    │               → returns hypothesis string or None
-    │               → Example: "Follow up with Alice about meeting"
-    │
-    ├─► [3] Confirm with User
-    │       │
-    │       ├─► Build prompt with latest notification + goal
-    │       │
-    │       └─► decision_maker.decide(prompt)
-    │               → LLM decides: accept/decline
-    │               → returns (bool, raw_response)
-    │
-    ├─► [4] Execute (if accepted)
-    │       │
-    │       ├─► agent.execute(goal, env)
-    │       │       → _plan_executor runs with @app_tool access
-    │       │       → returns InterventionResult(success, notes, metadata)
-    │       │
-    │       ├─► summary = agent.pop_summary()
-    │       │       → human-readable explanation of what was done
-    │       │
-    │       ├─► agent.handoff(env)
-    │       │       → cleanup, reset state
-    │       │
-    │       └─► prompt user to acknowledge completion
-    │               → decision_maker.decide(summary)
-    │
-    ├─► [5] Validate
+├─► [1] Propose Goal
+│       │
+│       └─► agent.propose_goal()
+│               → LLM analyzes _events history
+│               → returns hypothesis string or None
+│               → Example: "Follow up with Alice about meeting"
+│
+│       └─► if goal is None:
+│               ├─► pending notifications handled via runtime.react_to_event(...)
+│               └─► loop exits early
+│
+├─► [2] Confirm with User
+│       │
+│       ├─► Agent UI surfaces proposal notification to user proxy
+│       │
+│       └─► User proxy accepts/declines via `accept_proposal` / `decline_proposal`
+│               → decision recorded in `proposal_history`
+│
+├─► [3] Execute (if accepted)
+│       │
+│       ├─► agent.execute(goal, env)
+│       │       → _plan_executor runs with @app_tool access
+│       │       → returns InterventionResult(success, notes, metadata)
+│       │
+│       ├─► summary = agent.pop_summary()
+│       │       → human-readable explanation of what was done
+│       │
+│       ├─► agent.handoff(env)
+│       │       → cleanup, reset state
+│       │
+│       └─► Completion summary logged (no additional user acknowledgement)
+│
+├─► [4] Drain Notifications
+│       │
+│       ├─► proxy.consume_notifications()
+│       │       → fetches queued notifications after each decision/execution step
+│       │
+│       └─► runtime.react_to_event(notification)
+│               → uses ReAct reasoning
+│               → executes @user_tool
+│               → returns reply string
+│
+├─► [5] Validate
     │       │
     │       └─► oracle_tracker.is_satisfied()
     │               → checks if required OracleActions matched
@@ -253,10 +256,10 @@ START run_cycle()
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  2. STATEFUL USER PROXY                                                  │
-│     • LLMPlanner inspects current AppState                              │
-│     • Builds list of available @user_tool functions                     │
-│     • LLM selects tool(s) to call                                       │
+│  2. USER AGENT RUNTIME                                                   │
+│     • Agent uses ReAct reasoning (Thought → Action → Observation)       │
+│     • Infers active app from recent tool invocations                    │
+│     • Selects tool(s) to call based on current state                    │
 └────────────────────────────────┬────────────────────────────────────────┘
                                  │
                                  ▼
@@ -290,8 +293,8 @@ START run_cycle()
                      │
                      ▼
             ┌─────────────────┐
-            │  StatefulUser   │
-            │     Proxy       │
+            │  User Agent     │
+            │    Runtime      │
             │ • Receives      │
             │   notification  │
             │ • May react     │
@@ -311,7 +314,7 @@ START run_cycle()
 │ Limited by current AppState     │ Full access to all functions    │
 │ (only tools on current screen)  │ (any app, any function)         │
 │                                 │                                 │
-│ Used by: StatefulUserProxy      │ Used by: ProactiveAgent         │
+│ Used by: User Agent Runtime     │ Used by: ProactiveAgent         │
 │                                 │                                 │
 │ Examples:                       │ Examples:                       │
 │ • open_email(id)                │ • forward_email(id, to)         │
@@ -351,24 +354,19 @@ START run_cycle()
 └────────────────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────────────────┐
-│  DecisionMakerProtocol                                                  │
+│  UserAgentProtocol                                                      │
 ├────────────────────────────────────────────────────────────────────────┤
-│  • decide(message: str,                                                │
-│           accept_tokens: set[str],                                     │
-│           decline_tokens: set[str]) → tuple[bool, str]                 │
+│  • init_conversation() → str                                           │
+│      Initialize conversation state                                     │
 │                                                                         │
-│      System-level confirmations (yes/no)                               │
-│      Returns: (decision: bool, raw_response: str)                      │
-└────────────────────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────────────────────┐
-│  PlannerCallable                                                        │
-├────────────────────────────────────────────────────────────────────────┤
-│  • __call__(message: str, context: dict) → list[ToolInvocation]       │
+│  • reply(message: str) → str                                           │
+│      Process message using ReAct reasoning                             │
 │                                                                         │
-│      Inspects current AppState                                         │
-│      Builds available tool list                                        │
-│      Returns list of tools to execute                                  │
+│  • react_to_event(message: str) → str                                  │
+│      React to system notification                                      │
+│                                                                         │
+│  • consume_notifications() → list[str]                                 │
+│      Get pending notifications from system                             │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -426,9 +424,9 @@ Purpose: Ensures proactive interventions ACTUALLY complete required tasks
 [1] System sends notification:
     "New message from Alice: Can we reschedule our meeting?"
         ↓
-[2] StatefulUserProxy.consume_notifications()
+[2] User Agent Runtime.consume_notifications()
     • Receives notification from PasNotificationSystem
-    • LLMPlanner builds tool list from messaging app current state
+    • Agent uses ReAct reasoning to decide actions
     • Opens messaging app, views conversation
         ↓
 [3] CompletedEvent emitted → ProactiveAgent.observe()
@@ -438,7 +436,7 @@ Purpose: Ensures proactive interventions ACTUALLY complete required tasks
     • LLM analyzes: "User likely needs to follow up about rescheduling"
     • Returns: "Send calendar invite for alternative meeting time"
         ↓
-[5] DecisionMaker prompts user
+[5] Session prompts user for confirmation
     • "Proposed action: Send calendar invite... Proceed?"
     • User confirms: "accept"
         ↓
@@ -479,8 +477,8 @@ Purpose: Ensures proactive interventions ACTUALLY complete required tasks
 │ Implements:        │  │ Implements:        │  │ Implements:        │
 │ • StatefulUser     │  │ • LLMBased         │  │ • Scenario         │
 │   Proxy            │  │   ProactiveAgent   │  │   builders         │
-│ • LLMPlanner       │  │ • observe()        │  │ • Environment      │
-│ • LLMDecision      │  │ • propose_goal()   │  │   setup            │
+│ • ReAct reasoning  │  │ • observe()        │  │ • Environment      │
+│ • Tool execution   │  │ • propose_goal()   │  │   setup            │
 │   Maker            │  │ • execute()        │  │ • App wiring       │
 │                    │  │                    │  │ • Oracle           │
 │ Uses:              │  │ Uses:              │  │   definition       │
