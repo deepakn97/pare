@@ -1,23 +1,23 @@
-# Contributing to `proactiveGoalInference`
+# Contributing to `pas`
 
 # Get Started!
 
-Ready to contribute? Here's how to set up `proactiveGoalInference` for local development.
+Ready to contribute? Here's how to set up the Proactive Agent Sandbox (`pas`) for local development.
 Please note this documentation assumes you already have `uv` and `Git` installed and ready to go.
 
-1. Fork the `proactiveGoalInference` repo on GitHub.
+1. Fork the `pas` repo on GitHub.
 
 2. Clone your fork locally:
 
 ```bash
 cd <directory_in_which_repo_should_be_created>
-git clone git@github.com:YOUR_NAME/proactiveGoalInference.git
+git clone git@github.com:YOUR_NAME/pas.git
 ```
 
 3. Now we need to install the environment. Navigate into the directory
 
 ```bash
-cd proactiveGoalInference
+cd pas
 ```
 
 Then, install and activate the environment with:

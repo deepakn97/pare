@@ -8,11 +8,11 @@
 │                    (Orchestrator/Controller)                             │
 │                                                                           │
 │  Methods: run_cycle() → ProactiveCycleResult                            │
-│  - Drains notifications                                                  │
-│  - Gets goal proposal from agent                                         │
-│  - Confirms with user (via runtime)                                  │
-│  - Executes intervention                                                 │
-│  - Validates with OracleTracker                                          │
+│  - Requests a goal proposal from the agent                               │
+│  - Surfaces proposal via runtime + Agent UI                              │
+│  - Executes accepted interventions                                       │
+│  - Drains remaining notifications                                        │
+│  - Validates completion with OracleTracker                               │
 └────┬─────────┬──────────┬───────────┬─────────────┬─────────────────────┘
      │         │          │           │             │
      │         │          │           │             │
@@ -188,48 +188,49 @@ Navigation Pattern: Pushdown Automaton
 ```
 START run_cycle()
     │
-    ├─► [1] Handle Notifications
-    │       │
-    │       ├─► proxy.consume_notifications()
-    │       │       → returns list of notification strings
-    │       │
-    │       └─► For each notification:
-    │               runtime.react_to_event(notification)
-    │                   → uses ReAct reasoning
-    │                   → executes @user_tool
-    │                   → returns reply string
-    │
-    ├─► [2] Propose Goal
-    │       │
-    │       └─► agent.propose_goal()
-    │               → LLM analyzes _events history
-    │               → returns hypothesis string or None
-    │               → Example: "Follow up with Alice about meeting"
-    │
-    ├─► [3] Confirm with User
-    │       │
-    │       ├─► Build prompt with latest notification + goal
-    │       │
-    │       └─► decision_maker.decide(prompt)
-    │               → LLM decides: accept/decline
-    │               → returns (bool, raw_response)
-    │
-    ├─► [4] Execute (if accepted)
-    │       │
-    │       ├─► agent.execute(goal, env)
-    │       │       → _plan_executor runs with @app_tool access
-    │       │       → returns InterventionResult(success, notes, metadata)
-    │       │
-    │       ├─► summary = agent.pop_summary()
-    │       │       → human-readable explanation of what was done
-    │       │
-    │       ├─► agent.handoff(env)
-    │       │       → cleanup, reset state
-    │       │
-    │       └─► prompt user to acknowledge completion
-    │               → decision_maker.decide(summary)
-    │
-    ├─► [5] Validate
+├─► [1] Propose Goal
+│       │
+│       └─► agent.propose_goal()
+│               → LLM analyzes _events history
+│               → returns hypothesis string or None
+│               → Example: "Follow up with Alice about meeting"
+│
+│       └─► if goal is None:
+│               ├─► pending notifications handled via runtime.react_to_event(...)
+│               └─► loop exits early
+│
+├─► [2] Confirm with User
+│       │
+│       ├─► Agent UI surfaces proposal notification to user proxy
+│       │
+│       └─► User proxy accepts/declines via `accept_proposal` / `decline_proposal`
+│               → decision recorded in `proposal_history`
+│
+├─► [3] Execute (if accepted)
+│       │
+│       ├─► agent.execute(goal, env)
+│       │       → _plan_executor runs with @app_tool access
+│       │       → returns InterventionResult(success, notes, metadata)
+│       │
+│       ├─► summary = agent.pop_summary()
+│       │       → human-readable explanation of what was done
+│       │
+│       ├─► agent.handoff(env)
+│       │       → cleanup, reset state
+│       │
+│       └─► Completion summary logged (no additional user acknowledgement)
+│
+├─► [4] Drain Notifications
+│       │
+│       ├─► proxy.consume_notifications()
+│       │       → fetches queued notifications after each decision/execution step
+│       │
+│       └─► runtime.react_to_event(notification)
+│               → uses ReAct reasoning
+│               → executes @user_tool
+│               → returns reply string
+│
+├─► [5] Validate
     │       │
     │       └─► oracle_tracker.is_satisfied()
     │               → checks if required OracleActions matched

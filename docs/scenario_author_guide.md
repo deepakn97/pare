@@ -15,19 +15,22 @@ Every scenario wires the following layers together:
    proactive agent invoke.
 3. **Notifications** – configure `pas.system.notification.PasNotificationSystem`
    (exposed through `create_notification_system`) so completed events become
-   human readable system notifications.
+   human readable system notifications, subscribing to `send_proposal_to_user`
+   so proactive pitches appear in the user proxy.
 4. **User agent** – `StatefulUserAgent` uses Meta ARE's ReAct reasoning to
    interact with stateful apps. The agent automatically receives state-appropriate
    tools and uses ReAct-style thought/action cycles to decide which tools to call.
-5. **User agent runtime** – `StatefulUserAgentRuntime` wraps the agent and manages
-   dynamic tool updates as the user navigates between apps and states.
+5. **User agent runtime** – `StatefulUserAgentRuntime` wraps the agent, synchronises
+   completed events, and enforces turn limits while the environment pushes state-aware
+   tool updates.
 6. **Proactive agent** – `pas.proactive.LLMBasedProactiveAgent` stores recent
    events, proposes a goal, executes the confirmed plan via
    `pas.system.proactive.build_plan_executor`, then hands control back.
-7. **Session loop** – `pas.system.session.ProactiveSession` coordinates one
-   “proactive cycle”: drain notifications, ask the agent to propose a goal,
-   confirm with the user via the decision maker, execute, and surface a
-   completion summary.
+7. **Session loop + Agent UI** – `pas.apps.proactive_agent_ui.ProactiveAgentUserInterface`
+   surfaces proactive proposals to the user proxy, and `pas.system.session.ProactiveSession`
+   coordinates one “proactive cycle”: propose a goal, capture the user’s decision via
+   the Agent UI, execute when accepted, then drain any queued notifications while returning
+   the completion summary to the caller.
 
 ### Meta-ARE or PAS-native?
 
@@ -60,6 +63,7 @@ from are.simulation.notification_system import VerbosityLevel
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
+from pas.apps.proactive_agent_ui import ProactiveAgentUserInterface
 from pas.logging_utils import get_pas_file_logger
 from pas.proactive import LLMBasedProactiveAgent
 from are.simulation.agents.default_agent.default_tools import FinalAnswerTool
@@ -84,7 +88,10 @@ def build_components(llm_client, user_llm_client):
 
     initialise_runtime(log_paths=[user_log, proactive_log, events_log], clear_existing=True)
 
-    notification_system = create_notification_system(verbosity=VerbosityLevel.MEDIUM)
+    notification_system = create_notification_system(
+        verbosity=VerbosityLevel.MEDIUM,
+        extra_notifications={"ProactiveAgentUserInterface": ["send_proposal_to_user"]},
+    )
     env = create_environment(notification_system)
 
     contacts = StatefulContactsApp(name="contacts")
@@ -114,6 +121,13 @@ def build_components(llm_client, user_llm_client):
         max_user_turns=25,
     )
 
+    # Wire runtime updates so tool lists stay in sync
+    env.register_user_agent(user_agent)
+    env.subscribe_to_completed_events(runtime._on_event)
+
+    agent_ui = ProactiveAgentUserInterface(user_proxy=runtime)
+    env.register_apps([agent_ui])
+
     plan_executor_logger = get_pas_file_logger("pas.proactive.plan_executor", proactive_log)
     plan_executor = build_plan_executor(llm_client, logger=plan_executor_logger)
 
@@ -134,19 +148,21 @@ def build_components(llm_client, user_llm_client):
         env,
         runtime,
         proactive_agent,
+        agent_ui,
         confirm_goal=lambda goal: True,
         logger=session_logger,
         oracle_actions=[],  # Add your OracleAction list here if needed
     )
 
-    return env, runtime, proactive_agent, session
+    return env, runtime, proactive_agent, agent_ui, session
 ```
 
 `build_plan_executor` currently delegates to the Meta-ARE ReAct agent. Supply
 your own callable if you need tighter control over the execution flow.
 
-The helper returns all building blocks so your scenario can initialise data,
-launch an initial notification, and step through `session.run_cycle()`.
+The helper returns all building blocks (including the Agent UI) so your scenario
+can initialise data, launch an initial notification, and step through
+`session.run_cycle()`.
 
 ## 3. Logging & Notifications
 
@@ -182,7 +198,7 @@ The system prompt instructs the agent to:
 - Keep messages brief when using `send_message_to_agent`
 
 The runtime (`StatefulUserAgentRuntime`) wraps the agent and handles:
-- Dynamic tool refresh when app/state changes
+- Receiving stateful tool refreshes that the environment emits after transitions
 - Delegation to the underlying agent's `reply()` method
 - State synchronization via CompletedEvent waiting
 
@@ -190,11 +206,10 @@ The runtime (`StatefulUserAgentRuntime`) wraps the agent and handles:
 
 `ProactiveSession.run_cycle()` performs the end-to-end proactive flow:
 
-1. Drain notification queue and let the user agent runtime respond using ReAct reasoning.
-2. Call `agent.propose_goal()` once, using all events collected so far.
-3. Prompt the user to accept or decline the proposed goal.
-4. On approval, run `agent.execute(...)`, capture the `InterventionResult`, and
-   deliver the summary back to the user.
+1. Call `agent.propose_goal()` before draining notifications so the agent reasons over the latest event window.
+2. If a goal is produced, surface it through `ProactiveAgentUserInterface` so the user agent can accept or decline.
+3. When the user accepts, run `agent.execute(...)`, capture the `InterventionResult`, and record the returned summary (exposed to the caller for logging/UI).
+4. After each pass (including when no goal is proposed), drain pending notifications via the user proxy so scripted environment events continue to advance.
 
 Scenarios can run multiple cycles back-to-back if new notifications arrive.
 
@@ -203,12 +218,13 @@ Scenarios can run multiple cycles back-to-back if new notifications arrive.
 After `build_components`, the canonical integration is:
 
 ```python
-env, runtime, agent, session = build_components(agent_llm, user_llm)
+env, runtime, agent, agent_ui, session = build_components(agent_llm, user_llm)
 session.run_cycle()
 ```
 
 Key integration points:
 - The `runtime` (StatefulUserAgentRuntime) wraps the user agent and handles ReAct reasoning
+- The `agent_ui` app relays proactive proposals and completion summaries to the user proxy
 - Schedule additional cycles whenever external events enter the system
 - The proactive agent observes all CompletedEvents automatically via the subscription setup
 

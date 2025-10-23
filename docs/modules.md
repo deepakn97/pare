@@ -10,7 +10,6 @@ Runtime orchestration, session management, and proactive execution helpers.
 - `ProactiveSession` – Main orchestration loop
 - `Runtime` – Stack initialization helpers
 - `NotificationSystem` – Event broadcasting
-- `User` – User simulation components
 - `Proactive` – Proactive execution helpers
 
 ### [Environment](api/environment.md)
@@ -57,7 +56,7 @@ Scenario builders and configuration for proactive experiments.
 ### [Scenario Generator](api/scenario_generator.md)
 Automated scenario generation pipeline.
 
-- `ScenarioGenerator` – Main generator class
+- `ScenarioGeneratingAgent` – Main generator class
 
 ## Utilities
 

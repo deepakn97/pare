@@ -194,6 +194,10 @@ runtime = StatefulUserAgentRuntime(
     max_user_turns=40,
 )
 
+# Keep tool listings in sync with environment state changes
+env.register_user_agent(user_agent)
+env.subscribe_to_completed_events(runtime._on_event)
+
 # Use in scenario
 response = runtime.reply("Add a contact named John Doe")
 ```

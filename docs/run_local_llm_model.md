@@ -121,7 +121,7 @@ are-run -s scenario_find_image_file -a default \
 
 1. **Connection refused**: Ensure Ollama server is running (`ollama serve`)
 2. **Model not found**: Make sure the model is downloaded (`ollama pull model_name`)
-3. **Python version mismatch**: Ensure you're using Python 3.10+
+3. **Python version mismatch**: Ensure you're using Python 3.12+
 
 ### Port Configuration
 

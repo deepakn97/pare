@@ -63,7 +63,7 @@ python pas/scenario_generator/scenario_generator.py \
 
 Generated scenarios are saved to:
 ```
-/pas/scenarios/generated_scenarios/
+pas/scenarios/generated_scenarios/
 ```
 
 ## Utility Scripts

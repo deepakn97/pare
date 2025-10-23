@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/deepakn97/pas)](https://img.shields.io/github/v/release/deepakn97/pas)
 [![Build status](https://img.shields.io/github/actions/workflow/status/deepakn97/pas/main.yml?branch=main)](https://github.com/deepakn97/pas/actions/workflows/main.yml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/deepakn97/proactiveGoalInference/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/pas)
+[![codecov](https://codecov.io/gh/deepakn97/pas/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/pas)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/deepakn97/pas)](https://img.shields.io/github/commit-activity/m/deepakn97/pas)
 [![License](https://img.shields.io/github/license/deepakn97/pas)](https://img.shields.io/github/license/deepakn97/pas)
 
