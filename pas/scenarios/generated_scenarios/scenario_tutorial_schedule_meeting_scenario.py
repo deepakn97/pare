@@ -99,11 +99,11 @@ class ScenarioTutorialScheduleMeeting(Scenario):
 
             # Oracle event: agent schedules a meeting in the calendar app
             oracle_schedule = (
-                calendar.create_event(
+                calendar.add_calendar_event(
                     title="Project Update Meeting",
-                    participants=["Alice Foster", "Bob King"],
-                    start_time=3.0,
-                    duration=1.0,
+                    start_datetime="1970-01-01 00:00:03",
+                    end_datetime="1970-01-01 00:00:04",
+                    attendees=["Alice Foster", "Bob King"],
                     description="Discuss project updates and next steps.",
                 )
                 .oracle()
@@ -120,7 +120,7 @@ class ScenarioTutorialScheduleMeeting(Scenario):
                 event.event_type == EventType.AGENT
                 and isinstance(event.action, Action)
                 and event.action.class_name == "CalendarApp"
-                and event.action.function_name == "create_event"
+                and event.action.function_name == "add_calendar_event"
                 and "Project Update Meeting" in event.action.args.get("title", "")
                 for event in events
             )
