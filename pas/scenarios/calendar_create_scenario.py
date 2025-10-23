@@ -64,7 +64,7 @@ class ScheduleEventScenario(Scenario):
         
         agui = AgentUserInterface()
         system = SystemApp()
-        calendar = StatefulCalendarApp()  # ✅ 回到 StatefulCalendarApp
+        calendar = StatefulCalendarApp()  
 
         self.apps = [agui, system, calendar]
         
@@ -182,4 +182,5 @@ class ScheduleEventScenario(Scenario):
             print(f"[ERROR] Cal001: Validation failed with exception: {e}")
             import traceback
             traceback.print_exc()
+
             return ScenarioValidationResult(success=False, exception=e)
