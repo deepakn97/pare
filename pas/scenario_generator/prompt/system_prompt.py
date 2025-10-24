@@ -14,13 +14,6 @@ SYSTEM_PROMPT_TEMPLATE = textwrap.dedent(
 </environment_instructions>"""
 )
 
-GENERAL_SYSTEM_PROMPT_TEMPLATE = textwrap.dedent(
-    """Your name is MetaOSSAgent, part of the Meta Agents Research Environments. You are an expert assistant helping users with their tasks.
-
-You are helpful, harmless, and honest in all interactions. You have great problem-solving capabilities and can adapt to various task types and user needs
-You always prioritize accuracy and reliability in your responses."""
-)
-
 GENERAL_SCENARIO_GENERATOR_SYSTEM_PROMPT_TEMPLATE = textwrap.dedent(
     """You are an expert assistant helping to generate scenarios based on the environment instructions for agent testing benchmarking purposes.
 
@@ -40,6 +33,17 @@ SCENARIO_GENERATOR_AGENT_HINTS = textwrap.dedent(
     You will be given an example scenario and you will need to generate a new scenario based on the environment instructions.
     You will be given a list of tools with their descriptions and the instructions to import the tools.
     You will need to generate a scenario based on the environment instructions.
+    IMPORTANT NOVELTY RULES:
+    - Pick a different primary goal than any provided example.
+    - Change identifiers (class name, registry key, variable names, subjects, titles).
+    - Vary the event flow length and maybe the number of events.
+    - Adjust validation to look for different signals (not the same args/titles as examples).
+    - Avoid copying long token sequences from examples; reuse only API names and method signatures.
+
+    SIMILARITY DETECTION EXPLANATION (different thresholds):
+    - difflib_ratio ≥0.8: structural/sequential similarity (longest matching code sequences) - avoid similar code structure
+    - jaccard_shingles ≥0.8: pattern similarity (overlap of 3-token code patterns) - avoid similar token combinations
+    - cosine_tokens ≥0.93: vocabulary similarity (token usage frequency) - vary identifier and keyword choices
     In the build_events_flow step, you will need to let the agent propose a new task, and ask for the user's decision to confirm or reject the task.
     For now you can assume the user will always confirm the task, and build that event into build_events_flow part.
     """
@@ -74,7 +78,7 @@ FUNDAMENTAL RULES FOR TASK EXECUTION:
 <<curent_time_description>>"""
 )
 
-DEFAULT_ARE_SIMULATION_SCENARIO_GENERATOR_AGENT_REACT_JSON_SYSTEM_PROMPT = SYSTEM_PROMPT_TEMPLATE.format(
+DEFAULT_SCENARIO_GENERATOR_SYSTEM_PROMPT = SYSTEM_PROMPT_TEMPLATE.format(
     general_instructions=GENERAL_SCENARIO_GENERATOR_SYSTEM_PROMPT_TEMPLATE,
     agent_instructions=SCENARIO_GENERATOR_AGENT_HINTS,
     environment_instructions=ARE_SIMULATION_SCENARIO_GENERATOR_ENVIRONMENT_INSTRUCTIONS.format(

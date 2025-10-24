@@ -1,5 +1,10 @@
+import glob
+import importlib.util
 import logging
+import os
 import re
+import subprocess
+import tempfile
 import time
 
 try:
@@ -23,7 +28,7 @@ if TYPE_CHECKING:
 from are.simulation.tool_box import DEFAULT_TOOL_DESCRIPTION_TEMPLATE, Toolbox
 from are.simulation.tool_utils import AppTool, AppToolAdapter
 
-from pas.scenario_generator.prompt import DEFAULT_ARE_SIMULATION_SCENARIO_GENERATOR_AGENT_REACT_JSON_SYSTEM_PROMPT
+from pas.scenario_generator.prompt import DEFAULT_SCENARIO_GENERATOR_SYSTEM_PROMPT
 from pas.scenario_generator.prompt.scenario_generator_prompts import (
     DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT,
     DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT_WITH_INSTRUCTIONS,
@@ -106,7 +111,7 @@ class ScenarioGeneratingAgent:
         except Exception:
             date_str = datetime.fromtimestamp(0, tz=UTC).strftime("%Y-%m-%d %H")
 
-        self.system_prompt = str(DEFAULT_ARE_SIMULATION_SCENARIO_GENERATOR_AGENT_REACT_JSON_SYSTEM_PROMPT)
+        self.system_prompt = str(DEFAULT_SCENARIO_GENERATOR_SYSTEM_PROMPT)
         self.system_prompt = self.system_prompt.replace(
             "<<curent_time_description>>", f"Today's date in 'YYYY-MM-DD HH' format is {date_str}"
         ).replace("<<agent_reminder_description>>", "")
@@ -122,7 +127,7 @@ class ScenarioGeneratingAgent:
 
     def _setup_system_prompt(self, first_scenario: Scenario) -> str:
         """Build and return the system prompt with tool descriptions and import instructions."""
-        system_prompt = getattr(self, "system_prompt", "")
+        system_prompt = str(DEFAULT_SCENARIO_GENERATOR_SYSTEM_PROMPT)
         toolbox = Toolbox(tools=self.tools)
         tool_descriptions = toolbox.show_tool_descriptions(DEFAULT_TOOL_DESCRIPTION_TEMPLATE)
         if isinstance(system_prompt, str):
@@ -183,6 +188,7 @@ class ScenarioGeneratingAgent:
                 repair_note = create_repair_note(issues, previous_code)
                 repair_messages.append({"role": "user", "content": repair_note})
                 adjusted_messages = repair_messages
+            # logger.info(f"==== Adjusted messages: {adjusted_messages} ====")
 
             llm_output_tuple = self.llm_engine(
                 adjusted_messages, stop_sequences=[], additional_trace_tags=["scenario_generation"], schema=None
@@ -214,7 +220,21 @@ class ScenarioGeneratingAgent:
             validation_issues = self._validate_generated_file(code_text)
             issues.extend(validation_issues)
 
-            if not issues or it == self.max_iterations - 1:
+            # Validate similarity against existing scenarios if no other issues
+            if not issues:
+                logger.info("==== Validating similarity against existing scenarios ====")
+                similarity_issues = self._validate_similarity_against_existing(code_text)
+                issues.extend(similarity_issues)
+
+            # # Validate mock run if no other issues
+            # if not issues:
+            #     logger.info("==== Validating mock run ====")
+            #     mock_validation_issues = self._validate_mock_run(code_text)
+            #     issues.extend(mock_validation_issues)
+            #     if issues:
+            #         logger.info(f"==== Mock run validation issues: {issues} ====")
+
+            if not issues:
                 if issues:
                     logger.info(f"==== Issues: {issues} ====")
                 logger.info("==== Writing file ====")
@@ -228,7 +248,7 @@ class ScenarioGeneratingAgent:
                     previous_code = code_text
                     continue
             else:
-                logger.info(f"==== Iteration {it} has issues, continue and try again ====")
+                logger.info(f"==== Iteration {it} has issues {issues}, continue and try again ====")
                 previous_code = code_text
                 continue
 
@@ -374,6 +394,324 @@ class ScenarioGeneratingAgent:
 
         return problems
 
+    def _validate_mock_run(self, code_text: str) -> list[str]:  # noqa: C901
+        """Validate that the generated scenario passes mock run validation."""
+        problems: list[str] = []
+
+        # Extract scenario ID from the generated code
+        sid_match = re.search(r"@register_scenario\(\s*['\"]([^'\"]+)['\"]\s*\)", code_text)
+        if not sid_match:
+            problems.append("Could not find scenario ID in generated code")
+            return problems
+
+        scenario_id = sid_match.group(1).strip()
+        logger.info(f"Starting mock run validation for scenario: {scenario_id}")
+        logger.info(f"Full regex match: {sid_match.group(0)}")
+        logger.info(f"Extracted scenario_id: '{scenario_id}'")
+
+        # Log the scenario ID that was generated
+        logger.info(f"Generated scenario_id: '{scenario_id}'")
+
+        try:
+            # Write the code to a temporary file for testing
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+                f.write(code_text)
+                temp_file_path = f.name
+            logger.info(f"Created temporary file for validation: {temp_file_path}")
+
+            try:
+                # Import the temporary file to register the scenario class
+                logger.info("Creating module spec for temporary scenario file")
+                spec = importlib.util.spec_from_file_location("temp_scenario", temp_file_path)
+
+                if spec is None:
+                    problems.append(f"spec_from_file_location returned None for file: {temp_file_path}")
+                    logger.error(f"spec_from_file_location returned None for file: {temp_file_path}")
+                    return problems
+
+                if spec.loader is None:
+                    problems.append(f"spec.loader is None for file: {temp_file_path}")
+                    logger.error(f"spec.loader is None for file: {temp_file_path}")
+                    return problems
+
+                logger.info(f"Module spec created successfully: {spec.name}")
+
+                # Create and execute the module to trigger @register_scenario decorators
+                logger.info("Creating module from spec")
+                temp_module = importlib.util.module_from_spec(spec)
+
+                # Ensure the module has a proper __name__ attribute
+                temp_module.__name__ = spec.name
+                logger.info(f"Module name set to: {temp_module.__name__}")
+
+                # Ensure the module is registered in sys.modules before execution
+                import sys
+
+                sys.modules[spec.name] = temp_module
+                logger.info(f"Module registered in sys.modules: {spec.name}")
+
+                logger.info("Executing module to register scenario")
+                try:
+                    spec.loader.exec_module(temp_module)
+                    logger.info(f"Successfully imported and registered temporary scenario: {scenario_id}")
+
+                    # Log module info after execution
+                    logger.info(f"Module __name__ after execution: {getattr(temp_module, '__name__', 'MISSING')}")
+                    logger.info(f"Module __file__ after execution: {getattr(temp_module, '__file__', 'MISSING')}")
+
+                    # Check if scenario class was created and has proper module
+                    scenario_class_name = f"Scenario{scenario_id.replace('_', '').title()}"
+                    if hasattr(temp_module, scenario_class_name):
+                        scenario_class = getattr(temp_module, scenario_class_name)
+                        logger.info(f"Scenario class found: {scenario_class}")
+                        logger.info(f"Scenario class __module__: {getattr(scenario_class, '__module__', 'MISSING')}")
+                        logger.info(f"Scenario class MRO: {[cls.__name__ for cls in scenario_class.__mro__]}")
+
+                except AttributeError as e:
+                    if "'NoneType' object has no attribute '__dict__'" in str(e):
+                        logger.exception("Module execution failed with NoneType __dict__ error")
+                        logger.exception(f"Module __name__: {getattr(temp_module, '__name__', 'MISSING')}")
+                        logger.exception(
+                            f"sys.modules keys around temp_scenario: {[k for k in sys.modules if 'temp' in k.lower()]}"
+                        )
+
+                        # Try to identify which class is causing the issue
+                        import inspect
+
+                        source_lines = inspect.getsourcelines(temp_module)
+                        logger.exception(f"Module source (first 50 lines):\n{''.join(source_lines[0][:50])}")
+
+                        raise  # Re-raise to maintain original error
+                    else:
+                        raise  # Re-raise other AttributeErrors
+
+                # Run the mock scenario command with temporary file
+                cmd = [
+                    "python",
+                    "pas/scenario_generator/utils/run_scenario.py",
+                    "-s",
+                    scenario_id,
+                    "-a",
+                    "default",
+                    "--provider",
+                    "mock",
+                    "--temp-file",
+                    temp_file_path,
+                ]
+                logger.info(f"Running mock scenario command: {' '.join(cmd)}")
+                logger.info(
+                    f"Command breakdown: script={cmd[0]}, scenario_id={cmd[2]}, agent={cmd[4]}, provider={cmd[6]}, temp_file={cmd[8]}"
+                )
+
+                try:
+                    logger.info("Starting subprocess for mock run")
+                    result = subprocess.run(  # noqa: S603
+                        cmd,
+                        cwd=os.getcwd(),
+                        capture_output=True,
+                        text=True,
+                        timeout=30,  # 60 second timeout
+                    )
+
+                    logger.info(f"Subprocess completed with return code: {result.returncode}")
+
+                    # Log detailed subprocess output for debugging
+                    if result.returncode != 0:
+                        logger.error("Mock run subprocess failed - detailed output:")
+                        logger.error(f"STDOUT: {result.stdout}")
+                        logger.error(f"STDERR: {result.stderr}")
+
+                        # Parse error type from output
+                        error_type = self._parse_error_type(result.stdout)
+                        if error_type:
+                            logger.error(f"Detected error type: {error_type}")
+
+                        # Add detailed error information to problems
+                        if result.stderr:
+                            problems.append(f"Subprocess error: {result.stderr}")
+                        if "ERROR_TYPE:" in result.stdout:
+                            problems.append(f"Error type detected in output: {result.stdout}")
+                    else:
+                        logger.info("Mock run subprocess succeeded")
+
+                    # Safely access stdout and stderr
+                    stdout = result.stdout if result.stdout is not None else ""
+                    stderr = result.stderr if result.stderr is not None else ""
+                    output = stdout + stderr
+
+                    logger.info(f"Mock run output length: {len(output)} characters")
+                    if result.returncode != 0:
+                        logger.warning(f"Mock run failed with return code {result.returncode}")
+                    if stderr:
+                        logger.warning(f"Mock run stderr: {stderr[:]}...")  # First 200 chars
+
+                except Exception as e:
+                    logger.error(f"Mock run subprocess failed: {e}", exc_info=True)
+
+                    # Try to read error details from runtime_error files
+                    error_dir = "/Users/jasonz/Projects/ucsb/proactiveGoalInference/runtime_error"
+                    if os.path.exists(error_dir):
+                        # Find the most recent error file
+                        error_files = glob.glob(os.path.join(error_dir, "scenario_error_*.txt"))
+                        if error_files:
+                            # Sort by modification time (newest first)
+                            error_files.sort(key=os.path.getmtime, reverse=True)
+                            latest_error_file = error_files[0]
+
+                            try:
+                                with open(latest_error_file) as f:
+                                    error_content = f.read()
+
+                                logger.info(f"Found error file: {latest_error_file}")
+                                logger.info(f"Error content:\n{error_content}")
+
+                                # Parse the error content to extract useful information
+                                parsed_issues = self._parse_error_log_file(error_content)
+
+                                # Add all parsed issues to problems for the agent to use
+                                problems.extend(parsed_issues)
+
+                                # Clean up the error file after reading
+                                try:
+                                    os.remove(latest_error_file)
+                                    logger.info(f"Cleaned up error file: {latest_error_file}")
+                                except OSError:
+                                    pass  # File might already be deleted
+
+                            except Exception as file_error:
+                                logger.warning(f"Could not read error file {latest_error_file}: {file_error}")
+
+                    return problems
+
+                # Check for required validation strings
+                has_validation_result = "Result: ScenarioValidationResult" in output
+                has_mock_response = (
+                    "Good choice, this is a mock, so I can't do anything. Let's return the result." in output
+                )
+
+                logger.info(
+                    f"Validation check - has_validation_result: {has_validation_result}, has_mock_response: {has_mock_response}"
+                )
+
+                # If both validation strings are present, mock run was successful
+                if has_validation_result and has_mock_response:
+                    logger.info(f"Mock run validation passed for scenario: {scenario_id}")
+                    return []  # Return empty problems list - validation passed
+
+                # If either validation string is missing, validation failed
+                if not has_validation_result:
+                    problems.append("Mock run did not produce 'Result: ScenarioValidationResult' in output")
+                    logger.error("Mock run did not produce 'Result: ScenarioValidationResult' in output")
+                    # Include first 500 chars of output for debugging
+                    problems.append(f"Mock run output (first 500 chars): {output[:500]}...")
+
+                if not has_mock_response:
+                    problems.append("Mock run did not produce expected mock response")
+                    logger.error("Mock run did not produce expected mock response")
+                    # Include first 500 chars of output for debugging
+                    problems.append(f"Mock run output (first 500 chars): {output[:500]}...")
+
+                if result.returncode != 0:
+                    problems.append(f"Mock run failed with return code {result.returncode}")
+                    logger.error(f"Mock run failed with return code {result.returncode}")
+                    if stderr:  # Use stderr variable instead of result.stderr
+                        problems.append(f"Mock run stderr: {stderr}")
+
+            finally:
+                # Clean up temporary file
+                logger.info(f"Cleaning up temporary file: {temp_file_path}")
+                try:
+                    os.unlink(temp_file_path)
+                    logger.info("Temporary file cleaned up successfully")
+                except OSError as e:
+                    logger.warning(f"Failed to clean up temporary file {temp_file_path}: {e}")
+
+        except Exception as e:
+            import traceback
+
+            error_details = f"Failed to validate mock run: {e}"
+            error_traceback = traceback.format_exc()
+            problems.append(error_details)
+            logger.exception(f"{error_details}\nFull traceback:\n{error_traceback}")
+
+        return problems
+
+    def _parse_error_log_file(self, error_content: str) -> list[str]:
+        """Parse error log file content and extract useful information for the agent.
+
+        Args:
+            error_content: The full content of the error log file
+
+        Returns:
+            List of formatted issue strings that can be used in repair prompts
+        """
+        issues = []
+
+        # Extract the main error details
+        error_details_match = re.search(r"Error Details:\s*(.+?)(?=\n\n|$)", error_content, re.DOTALL)
+        if error_details_match:
+            error_details = error_details_match.group(1).strip()
+            issues.append(f"Runtime Error: {error_details}")
+
+        # Extract error type
+        error_type_match = re.search(r"Error Type:\s*(.+)", error_content)
+        if error_type_match:
+            error_type = error_type_match.group(1).strip()
+            issues.append(f"Error Type: {error_type}")
+
+        # Extract scenario name
+        scenario_match = re.search(r"Scenario:\s*(.+)", error_content)
+        if scenario_match:
+            scenario_name = scenario_match.group(1).strip()
+            issues.append(f"Scenario: {scenario_name}")
+
+        # Extract the specific AttributeError details
+        attribute_error_match = re.search(r"'(.+?)' object has no attribute '(.+?)'", error_content)
+        if attribute_error_match:
+            object_type = attribute_error_match.group(1)
+            missing_method = attribute_error_match.group(2)
+            issues.append(
+                f"Missing Method: {object_type}.{missing_method}() - this method doesn't exist on the {object_type} object"
+            )
+
+            # Provide helpful suggestions based on common calendar methods
+            if object_type == "CalendarApp" and missing_method == "create_event":
+                issues.append(
+                    "Suggestion: Check available CalendarApp methods. Common alternatives: schedule_event, add_event, create_appointment, or use a different calendar import"
+                )
+
+        # Extract traceback information for context
+        traceback_match = re.search(r'File "[^"]+", line (\d+), in (\w+)', error_content)
+        if traceback_match:
+            line_number = traceback_match.group(1)
+            method_name = traceback_match.group(2)
+            issues.append(f"Error occurred at line {line_number} in method '{method_name}'")
+
+        # Extract the main exception type from traceback
+        main_exception_match = re.search(r"(\w+Error): (.+)", error_content)
+        if main_exception_match:
+            exception_type = main_exception_match.group(1)
+            exception_message = main_exception_match.group(2)
+            issues.append(f"Exception: {exception_type} - {exception_message}")
+
+        # If no specific issues were extracted, add the raw error as fallback
+        if not issues:
+            issues.append(f"Runtime Error Details: {error_content[:200]}...")
+
+        return issues
+
+    def _parse_error_type(self, output: str) -> str | None:
+        """Parse error type from subprocess output."""
+        if not output:
+            return None
+
+        # Look for ERROR_TYPE markers in the output
+        lines = output.split("\n")
+        for line in lines:
+            if line.startswith("ERROR_TYPE:"):
+                return line.strip()
+        return None
+
     def _validate_imports(self, code_text: str) -> list[str]:
         problems: list[str] = []
         instructions = self.import_instructions or ""
@@ -397,4 +735,163 @@ class ScenarioGeneratingAgent:
             problems.append(
                 "No import found in the code, need to import the tools at the beginning of the file. from the INSTRUSTIONS TO IMPORT AVAILABLE TOOLS."
             )
+        return problems
+
+    def _validate_similarity_against_existing(self, code_text: str) -> list[str]:  # noqa: C901
+        """Validate that the generated scenario is not too similar to existing scenarios.
+
+        Args:
+            code_text: The generated scenario code as a string
+
+        Returns:
+            List of issues if similarity is too high with any existing scenario
+        """
+        problems: list[str] = []
+
+        # Get the target directory for generated scenarios
+        target_dir = Path(__file__).resolve().parents[2] / "scenarios" / "generated_scenarios"
+
+        if not target_dir.exists():
+            logger.info(f"Generated scenarios directory does not exist: {target_dir}")
+            return problems
+
+        # Get all existing scenario files (excluding __pycache__ and non-python files)
+        existing_scenarios = [
+            f for f in target_dir.glob("*.py") if f.is_file() and not f.name.startswith("__") and f.name.endswith(".py")
+        ]
+
+        # Extract the scenario ID from the generated code to avoid comparing with itself
+        # if it was written in a previous iteration
+        new_scenario_id_match = re.search(r"@register_scenario\(\s*['\"]([^'\"]+)['\"]\s*\)", code_text)
+        new_scenario_id = new_scenario_id_match.group(1).strip() if new_scenario_id_match else None
+
+        if new_scenario_id:
+            # Filter out the file that would be generated for this scenario ID
+            existing_scenarios = [
+                f for f in existing_scenarios if not f.name.startswith(f"{new_scenario_id}_scenario.py")
+            ]
+
+        if not existing_scenarios:
+            logger.info("No existing scenarios found for similarity comparison")
+            return problems
+
+        logger.info(f"Found {len(existing_scenarios)} existing scenarios to compare against")
+        if new_scenario_id:
+            excluded_files = [
+                f
+                for f in target_dir.glob("*.py")
+                if f.is_file()
+                and not f.name.startswith("__")
+                and f.name.endswith(".py")
+                and f.name.startswith(f"{new_scenario_id}_scenario.py")
+            ]
+            if excluded_files:
+                logger.info(f"Excluding self-generated file: {excluded_files[0].name}")
+
+        # Create a temporary file for the new scenario
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write(code_text)
+            temp_file_path = f.name
+
+        try:
+            # Compare against each existing scenario
+            for existing_scenario in existing_scenarios:
+                logger.info(f"Comparing with existing scenario: {existing_scenario.name}")
+
+                try:
+                    # Run the deduplicate script to get all similarity scores
+                    cmd = [
+                        "python",
+                        "pas/scenario_generator/utils/deduplicate_scenarios.py",
+                        str(existing_scenario),
+                        temp_file_path,
+                        "--threshold",
+                        "1.0",  # Set high to get all scores without early exit
+                        "--metric",
+                        "max",
+                        "--k",
+                        "3",
+                    ]
+
+                    result = subprocess.run(cmd, cwd=os.getcwd(), capture_output=True, text=True, timeout=30)  # noqa: S603
+
+                    # Always get scores (since we set threshold to 1.0, it won't exit early)
+                    similarity_output = result.stdout + result.stderr
+
+                    # Extract similarity scores
+                    difflib_match = re.search(r"difflib_ratio\s*:\s*([0-9.]+)", similarity_output)
+                    jaccard_match = re.search(r"jaccard_shingles:\s*([0-9.]+)", similarity_output)
+                    cosine_match = re.search(r"cosine_tokens\s*:\s*([0-9.]+)", similarity_output)
+
+                    difflib_score = float(difflib_match.group(1)) if difflib_match else 0.0
+                    jaccard_score = float(jaccard_match.group(1)) if jaccard_match else 0.0
+                    cosine_score = float(cosine_match.group(1)) if cosine_match else 0.0
+
+                    # Apply different thresholds for different metrics
+                    difflib_threshold = 0.85
+                    jaccard_threshold = 0.8
+                    cosine_threshold = 0.93
+
+                    # Check if any score exceeds its respective threshold
+                    is_duplicate = (
+                        difflib_score >= difflib_threshold
+                        or jaccard_score >= jaccard_threshold
+                        or cosine_score >= cosine_threshold
+                    )
+
+                    if is_duplicate:
+                        logger.warning(f"Found duplicate scenario! Similarity scores with {existing_scenario.name}:")
+                        logger.warning(f"  difflib_ratio: {difflib_score:.4f} (threshold: {difflib_threshold})")
+                        logger.warning(f"  jaccard_shingles: {jaccard_score:.4f} (threshold: {jaccard_threshold})")
+                        logger.warning(f"  cosine_tokens: {cosine_score:.4f} (threshold: {cosine_threshold})")
+
+                        # Read the existing scenario code for context
+                        try:
+                            existing_code = existing_scenario.read_text(encoding="utf-8")
+
+                            problems.append(
+                                f"Generated scenario is too similar to existing scenario '{existing_scenario.name}'. "
+                                f"Similarity scores with different thresholds (higher = more similar):\n"
+                                f"• difflib_ratio={difflib_score:.4f} (threshold: {difflib_threshold} - structural/sequential similarity)\n"
+                                f"• jaccard_shingles={jaccard_score:.4f} (threshold: {jaccard_threshold} - pattern similarity)\n"
+                                f"• cosine_tokens={cosine_score:.4f} (threshold: {cosine_threshold} - vocabulary similarity)\n\n"
+                                f"Existing similar scenario code:\n```python\n{existing_code}\n```\n\n"
+                                "Please generate a scenario with different content, structure, identifiers, event flow, and app usage patterns. "
+                                "Focus on changing: variable names, email subjects, event titles, registry IDs, sequence of events, "
+                                "and avoid copying similar code patterns, token combinations, or structural elements."
+                            )
+                        except Exception as e:
+                            logger.warning(f"Could not read existing scenario code: {e}")
+                            problems.append(
+                                f"Generated scenario is too similar to existing scenario '{existing_scenario.name}'. "
+                                f"Similarity scores with different thresholds (higher = more similar):\n"
+                                f"• difflib_ratio={difflib_score:.4f} (threshold: {difflib_threshold} - structural/sequential similarity)\n"
+                                f"• jaccard_shingles={jaccard_score:.4f} (threshold: {jaccard_threshold} - pattern similarity)\n"
+                                f"• cosine_tokens={cosine_score:.4f} (threshold: {cosine_threshold} - vocabulary similarity)\n\n"
+                                "Please generate a scenario with different content, structure, identifiers, event flow, and app usage patterns. "
+                                "Focus on changing: variable names, email subjects, event titles, registry IDs, sequence of events, "
+                                "and avoid copying similar code patterns, token combinations, or structural elements."
+                            )
+                        break  # No need to check other scenarios once we find a duplicate
+
+                    else:
+                        logger.info(
+                            f"Comparison with {existing_scenario.name} completed successfully (not a duplicate)"
+                        )
+
+                except subprocess.TimeoutExpired:
+                    logger.warning(f"Similarity comparison with {existing_scenario.name} timed out")
+                    problems.append(f"Similarity comparison with {existing_scenario.name} timed out")
+                except Exception as e:
+                    logger.exception(f"Error comparing with {existing_scenario.name}")
+                    problems.append(f"Error during similarity comparison with {existing_scenario.name}: {e}")
+
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_file_path)
+                logger.info("Cleaned up temporary file for similarity comparison")
+            except OSError as e:
+                logger.warning(f"Failed to clean up temporary file {temp_file_path}: {e}")
+
         return problems
