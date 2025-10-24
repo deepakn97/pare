@@ -17,7 +17,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
 
-@register_scenario("scenario_financial_report_planning")
+@register_scenario("financial_report_planning")
 class ScenarioFinancialReportPlanning(Scenario):
     """Scenario: The agent helps the user organize financial report attachments from an email.
 

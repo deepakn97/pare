@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_supplier_contract_update_workflow")
+@register_scenario("supplier_contract_update_workflow")
 class ScenarioSupplierContractUpdateWorkflow(Scenario):
     """Scenario: The user gets a contract renewal email from a supplier.
 

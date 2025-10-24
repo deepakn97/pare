@@ -17,7 +17,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_personal_travel_itinerary_manager")
+@register_scenario("personal_travel_itinerary_manager")
 class ScenarioPersonalTravelItineraryManager(Scenario):
     """The agent detects an upcoming travel itinerary from an email, extracts important files.
 

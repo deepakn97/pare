@@ -15,7 +15,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_proactive_contact_update_notify")
+@register_scenario("contact_update_notify")
 class ScenarioProactiveContactUpdateNotify(Scenario):
     """Agent proactively detects outdated contact info and proposes update based on new email."""
 

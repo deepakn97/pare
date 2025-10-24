@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_proactive_file_summary_share")
+@register_scenario("file_summary_share")
 class ScenarioProactiveFileSummaryShare(Scenario):
     """Proactive file handling and sharing scenario.
 

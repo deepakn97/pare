@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_proactive_invoice_organizer")
+@register_scenario("invoice_organizer")
 class ScenarioProactiveInvoiceOrganizer(Scenario):
     """Agent identifies a new invoice email and offers to extract billing information, file it, and set a calendar reminder."""
 

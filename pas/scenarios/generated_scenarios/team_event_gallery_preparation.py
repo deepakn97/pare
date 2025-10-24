@@ -17,7 +17,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
 
-@register_scenario("scenario_team_event_gallery_preparation")
+@register_scenario("team_event_gallery_preparation")
 class ScenarioTeamEventGalleryPreparation(Scenario):
     """Scenario: The user asks the assistant to sort photographs from a team event.
 

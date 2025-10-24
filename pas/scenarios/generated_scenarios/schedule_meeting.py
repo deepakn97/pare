@@ -15,7 +15,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_tutorial_schedule_meeting")
+@register_scenario("schedule_meeting")
 class ScenarioTutorialScheduleMeeting(Scenario):
     """Agent proactively proposes scheduling a meeting after user receives email invitations."""
 

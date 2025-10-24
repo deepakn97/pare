@@ -259,11 +259,11 @@ class ScenarioGeneratingAgent:
         sid_match = re.search(r"@register_scenario\(\s*['\"]([^'\"]+)['\"]\s*\)", code_text)
         if sid_match:
             scenario_id = sid_match.group(1).strip()
-            file_name = f"{scenario_id}_scenario.py"
+            file_name = f"{scenario_id}.py"
         else:
             class_match = re.search(r"class\s+(\w+)\s*\(", code_text)
             base = class_match.group(1) if class_match else f"generated_{int(time.time())}"
-            file_name = f"{base.lower()}_scenario.py"
+            file_name = f"{base.lower()}.py"
 
         target_dir = Path(__file__).resolve().parents[2] / "scenarios" / "generated_scenarios"
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -767,9 +767,7 @@ class ScenarioGeneratingAgent:
 
         if new_scenario_id:
             # Filter out the file that would be generated for this scenario ID
-            existing_scenarios = [
-                f for f in existing_scenarios if not f.name.startswith(f"{new_scenario_id}_scenario.py")
-            ]
+            existing_scenarios = [f for f in existing_scenarios if not f.name.startswith(f"{new_scenario_id}.py")]
 
         if not existing_scenarios:
             logger.info("No existing scenarios found for similarity comparison")
@@ -783,7 +781,7 @@ class ScenarioGeneratingAgent:
                 if f.is_file()
                 and not f.name.startswith("__")
                 and f.name.endswith(".py")
-                and f.name.startswith(f"{new_scenario_id}_scenario.py")
+                and f.name.startswith(f"{new_scenario_id}.py")
             ]
             if excluded_files:
                 logger.info(f"Excluding self-generated file: {excluded_files[0].name}")

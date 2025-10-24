@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_proactive_followup_documents")
+@register_scenario("followup_documents")
 class ScenarioProactiveFollowupDocuments(Scenario):
     """Scenario where the agent proactively helps organize team documents from emails and file system."""
 

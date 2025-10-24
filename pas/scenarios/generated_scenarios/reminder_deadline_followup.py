@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_reminder_deadline_followup")
+@register_scenario("reminder_deadline_followup")
 class ScenarioReminderDeadlineFollowup(Scenario):
     """Scenario: The agent receives an urgent email, proposes to create a reminder, user confirms, reminder is created."""
 

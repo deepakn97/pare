@@ -17,7 +17,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_auto_task_digest_and_summary_suggestion")
+@register_scenario("task_digest_and_summary_suggestion")
 class ScenarioAutoTaskDigestAndSummarySuggestion(Scenario):
     """Agent reads a weekly summary email, detects tasks, creates reminders, and proposes drafting a summary message."""
 

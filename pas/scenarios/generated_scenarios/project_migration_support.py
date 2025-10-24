@@ -17,7 +17,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
 
-@register_scenario("scenario_project_migration_support")
+@register_scenario("project_migration_support")
 class ScenarioProjectMigrationSupport(Scenario):
     """Scenario: After a migration manager sends project migration plans via email.
 

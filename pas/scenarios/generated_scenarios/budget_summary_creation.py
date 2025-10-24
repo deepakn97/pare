@@ -17,7 +17,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_proactive_budget_summary_creation")
+@register_scenario("proactive_budget_summary_creation")
 class ScenarioProactiveBudgetSummaryCreation(Scenario):
     """Proactive variant: the agent detects a financial summary email and offers to store an annual report file."""
 
