@@ -42,7 +42,7 @@ def generate_scenarios_from_example(
     system_prompt = ""  # ScenarioGeneratingAgent will populate tools/time placeholders
     # Wire minimal generator (no BaseAgent needed)
     gen_agent = ScenarioGeneratingAgent(
-        llm_engine=engine, tools=[], max_iterations=5, import_instructions=import_instructions
+        llm_engine=engine, tools=[], max_iterations=15, import_instructions=import_instructions
     )
 
     logger.info("Running minimal scenario generator agent")
@@ -64,7 +64,16 @@ def main() -> None:
     # parser.add_argument("-s", "--scenario", dest="scenario_id_list", required=True)
     # are/simulation/scenario_generator.py
     parser.add_argument(
-        "-s", "--scenario", dest="scenario_id_list", nargs="+", default=["scenario_tutorial_proactive_confirm"]
+        "-s",
+        "--scenario",
+        dest="scenario_id_list",
+        nargs="+",
+        default=[
+            "scenario_tutorial_proactive_confirm",
+            "scenario_tutorial_proactive_reject",
+            "scenario_tutorial",
+            "scenario_find_image_file",
+        ],
     )
     parser.add_argument("-a", "--agent", dest="agent", default="scenario_generator")
     parser.add_argument("--model", dest="model", default="gpt-5-chat-latest")
@@ -86,6 +95,7 @@ def main() -> None:
     from are.simulation.scenarios.utils.constants import ALL_SCENARIOS
 
     scenario_list = []
+    logger.info(f"ALL_SCENARIOS: {ALL_SCENARIOS}")
     for scenario_id in args.scenario_id_list:
         scenario_type = ALL_SCENARIOS[scenario_id]
         scenario = scenario_type()
