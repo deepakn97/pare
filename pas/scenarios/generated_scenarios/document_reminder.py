@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_proactive_document_reminder")
+@register_scenario("document_reminder")
 class ScenarioProactiveDocumentReminder(Scenario):
     """Proactive scenario: assistant receives report email, proposes to set a reminder, user confirms, agent creates calendar reminder."""
 

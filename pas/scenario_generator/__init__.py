@@ -30,8 +30,27 @@ def register_custom_scenarios(registry: "ScenarioRegistry") -> None:
 
     # Import individual generated scenario files (since generated_scenarios is not a package)
     generated_scenario_files = [
-        "pas.scenarios.generated_scenarios.scenario_tutorial_schedule_meeting_scenario",
-        "pas.scenarios.generated_scenarios.scenario_tutorial_task_from_message_scenario",
+        "pas.scenarios.generated_scenarios.budget_summary_creation",
+        "pas.scenarios.generated_scenarios.contact_update_notify",
+        "pas.scenarios.generated_scenarios.customer_feedback_analysis_workflow",
+        "pas.scenarios.generated_scenarios.document_reminder",
+        "pas.scenarios.generated_scenarios.file_cleanup",
+        "pas.scenarios.generated_scenarios.file_summary_share",
+        "pas.scenarios.generated_scenarios.financial_report_planning",
+        "pas.scenarios.generated_scenarios.followup_contact_update",
+        "pas.scenarios.generated_scenarios.followup_documents",
+        "pas.scenarios.generated_scenarios.generate_project_kickoff_meetings",
+        "pas.scenarios.generated_scenarios.invoice_organizer",
+        "pas.scenarios.generated_scenarios.meeting_note_proposal",
+        "pas.scenarios.generated_scenarios.personal_travel_itinerary_manager",
+        "pas.scenarios.generated_scenarios.proactive_file_summary",
+        "pas.scenarios.generated_scenarios.project_migration_support",
+        "pas.scenarios.generated_scenarios.reminder_deadline_followup",
+        "pas.scenarios.generated_scenarios.remote_training_workshop_assistant",
+        "pas.scenarios.generated_scenarios.schedule_meeting",
+        "pas.scenarios.generated_scenarios.supplier_contract_update_workflow",
+        "pas.scenarios.generated_scenarios.task_digest_and_summary_suggestion",
+        "pas.scenarios.generated_scenarios.team_event_gallery_preparation",
     ]
 
     imported_count = 0

@@ -15,7 +15,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_followup_contact_update")
+@register_scenario("followup_contact_update")
 class ScenarioFollowUpContactUpdate(Scenario):
     """Proactive behavior: agent identifies new email containing contact details.
 

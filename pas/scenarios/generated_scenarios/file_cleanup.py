@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_proactive_file_cleanup")
+@register_scenario("file_cleanup")
 class ScenarioProactiveFileCleanup(Scenario):
     """Proactive agent variant: assistant detects large file and offers deletion; user confirms."""
 

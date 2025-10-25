@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_tutorial_proactive_file_summary")
+@register_scenario("proactive_file_summary")
 class ScenarioTutorialProactiveFileSummary(Scenario):
     """Agent receives hint about a report attachment, downloads it, and offers to summarize it."""
 

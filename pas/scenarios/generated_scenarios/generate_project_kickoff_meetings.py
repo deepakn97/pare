@@ -17,7 +17,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_auto_generate_project_kickoff_meetings")
+@register_scenario("generate_project_kickoff_meetings")
 class ScenarioAutoGenerateProjectKickoffMeetings(Scenario):
     """Scenario: The agent observes an email about a new project and automatically sets up kickoff meetings in the calendar."""
 

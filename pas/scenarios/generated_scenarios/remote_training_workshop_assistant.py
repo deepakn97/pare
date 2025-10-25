@@ -17,7 +17,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_remote_training_workshop_assistant")
+@register_scenario("remote_training_workshop_assistant")
 class ScenarioRemoteTrainingWorkshopAssistant(Scenario):
     """Agent identifies a new remote training opportunity from an email and assists in organizing follow-up and registration."""
 

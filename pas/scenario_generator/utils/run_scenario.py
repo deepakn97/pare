@@ -66,8 +66,10 @@ if args.temp_file:
 
 generated_dir = os.path.join(os.path.dirname(__file__), "..", "..", "scenarios", "generated_scenarios")
 if os.path.exists(generated_dir):
-    pattern = os.path.join(generated_dir, "*_scenario.py")
+    pattern = os.path.join(generated_dir, "*.py")
     generated_files = glob.glob(pattern)
+    # Filter out __pycache__ and other non-scenario files
+    generated_files = [f for f in generated_files if not os.path.basename(f).startswith("__")]
 
     for scenario_file_path in generated_files:
         scenario_file = os.path.basename(scenario_file_path)[:-3]  # Remove .py extension
@@ -106,7 +108,11 @@ def verify_scenario_registration(requested_scenario: str) -> bool:
             print(f"❌ Requested scenario '{requested_scenario}' is NOT registered")
 
         # For logging purposes, also check for tutorial scenarios
-        tutorial_scenarios = {sid for sid in registered_scenarios if sid.startswith("scenario_tutorial_")}
+        tutorial_scenarios = {
+            sid
+            for sid in registered_scenarios
+            if "tutorial" in sid or "schedule_meeting" in sid or "proactive_file_summary" in sid
+        }
         if tutorial_scenarios:
             print(f"[INFO] Tutorial scenarios found: {sorted(tutorial_scenarios)}")
 
@@ -138,7 +144,8 @@ if __name__ == "__main__":
     registration_success = verify_scenario_registration(args.scenario)
 
     # Set the arguments for are-run using parsed arguments
-    sys.argv = ["are-run", "-s", args.scenario, "-a", args.agent, "--provider", args.provider]
+    sys.argv = ["are-run", "-s", args.scenario, "-a", args.agent, "--provider", args.provider, "--oracle"]
+    # sys.argv = ["are-run", "-s", args.scenario, "-a", args.agent, "--provider", args.provider]
 
     # Run are-run only if scenarios are properly registered
     if registration_success:

@@ -16,7 +16,7 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 
-@register_scenario("scenario_proactive_meeting_note_proposal")
+@register_scenario("meeting_note_proposal")
 class ScenarioProactiveMeetingNoteProposal(Scenario):
     """Proactive variant: agent detects meeting report email, proposes to summarize and store it."""
 
