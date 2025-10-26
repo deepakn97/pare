@@ -14,6 +14,7 @@ from are.simulation.apps.agent_user_interface import AgentUserInterface
 
 if TYPE_CHECKING:
     from are.simulation.types import AbstractEnvironment
+from are.simulation.apps.apartment_listing import ApartmentListingApp
 from are.simulation.apps.calendar import CalendarApp
 from are.simulation.apps.contacts import Contact, ContactsApp, Gender, Status
 from are.simulation.apps.email_client import Email, EmailClientApp
@@ -43,6 +44,7 @@ class ScenarioTutorialProactiveConfirm(Scenario):
         fs = SandboxLocalFileSystem(sandbox_dir=kwargs.get("sandbox_dir"))  # File system application
         messaging = MessagingApp()  # Messaging application
         system = SystemApp()  # System application
+        apartment_listing = ApartmentListingApp()  # Apartment listing application
 
         default_fs_folders(fs)  # Set up default folders in the file system
 
@@ -74,7 +76,7 @@ class ScenarioTutorialProactiveConfirm(Scenario):
         )
 
         # List of all initialized applications
-        self.apps = [agui, calendar, email_client, contacts, fs, messaging, system]
+        self.apps = [agui, calendar, email_client, contacts, fs, messaging, system, apartment_listing]
 
     def build_events_flow(self) -> None:
         """Build the flow of events for the scenario."""
