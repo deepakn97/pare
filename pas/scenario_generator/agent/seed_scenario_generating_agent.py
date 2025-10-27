@@ -237,7 +237,11 @@ class SeedScenarioGeneratingAgent:
                 issues = ["Model did not return a fenced python block. Return a single fenced python code block only."]
                 continue
 
-            # Fix common linting issues first
+            # Fix scenario naming issues first
+            logger.info("==== Fixing scenario naming issues ====")
+            code_text = self._fix_scenario_naming_issues(code_text)
+
+            # Fix common linting issues
             logger.info("==== Fixing linting issues ====")
             code_text = self._fix_generated_file_linting_issues(code_text)
 
@@ -483,6 +487,46 @@ class SeedScenarioGeneratingAgent:
             if token not in instructions:
                 problems.append(f"Missing allowed import in instructions: '{token}'")
         return problems
+
+    def _fix_scenario_naming_issues(self, code_text: str) -> str:
+        """Fix scenario naming issues by removing 'scenario_' prefix from decorators, class names, and content."""
+        lines = code_text.split("\n")
+        fixed_lines = []
+
+        for line in lines:
+            # Fix @register_scenario decorator
+            if "@register_scenario(" in line:
+                # Extract the scenario ID and remove 'scenario_' prefix if present
+                import re
+
+                match = re.search(r'@register_scenario\(["\'"]([^"\'"]+)["\'"]\)', line)
+                if match:
+                    scenario_id = match.group(1)
+                    if scenario_id.startswith("scenario_"):
+                        scenario_id = scenario_id[9:]  # Remove "scenario_" prefix (9 characters)
+                        fixed_line = line.replace(match.group(1), scenario_id)
+                        fixed_lines.append(fixed_line)
+                        logger.info(f"Fixed scenario ID: {match.group(1)} -> {scenario_id}")
+                        continue
+
+            # Fix class names that start with "Scenario" - remove the "Scenario" prefix entirely
+            if line.strip().startswith("class Scenario"):
+                import re
+
+                class_match = re.search(r"class\s+(Scenario\w+)", line)
+                if class_match:
+                    class_name = class_match.group(1)
+                    # Remove "Scenario" prefix (8 characters) from class name
+                    scenario_part = class_name[8:]  # Remove "Scenario" prefix (8 characters)
+                    fixed_class_name = scenario_part
+                    fixed_line = line.replace(class_name, fixed_class_name)
+                    fixed_lines.append(fixed_line)
+                    logger.info(f"Fixed class name: {class_name} -> {fixed_class_name}")
+                    continue
+
+            fixed_lines.append(line)
+
+        return "\n".join(fixed_lines)
 
     def _fix_generated_file_linting_issues(self, code_text: str) -> str:
         """Fix common linting issues in generated code, specifically 'true'/'false' vs 'True'/'False'."""
