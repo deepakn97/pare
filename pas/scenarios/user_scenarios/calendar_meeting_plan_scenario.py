@@ -1,8 +1,10 @@
-"""Cal002: ProposeAndScheduleMeetingScenario
+"""Cal002: ProposeAndScheduleMeetingScenario.
+
 Aggregate participant availability, propose options, then schedule.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -20,6 +22,8 @@ from pas.apps.calendar import StatefulCalendarApp
 # ---------- Parameter definitions ----------
 @dataclass
 class MeetingParams:
+    """Parameters for a meeting."""
+
     start_time_ms: int
     end_time_ms: int
     title: str
@@ -40,7 +44,8 @@ def ms_to_str(ms: int) -> str:
 class ProposeAndScheduleMeetingScenario(Scenario):
     """Cal002: Check multi-participant availability, then create a meeting."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the scenario."""
         super().__init__()
         self._params = self._get_default_params()
 
@@ -59,6 +64,7 @@ class ProposeAndScheduleMeetingScenario(Scenario):
 
     # ---------- App initialization ----------
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize and populate the necessary apps."""
         print("[DEBUG] Cal002: init_and_populate_apps called")
         agui = AgentUserInterface()
         system = SystemApp()
@@ -68,6 +74,7 @@ class ProposeAndScheduleMeetingScenario(Scenario):
 
     # ---------- Build event flow ----------
     def build_events_flow(self) -> None:
+        """Build the event flow."""
         print("[DEBUG] Cal002: build_events_flow called")
 
         aui = self.get_typed_app(AgentUserInterface)
@@ -94,16 +101,14 @@ class ProposeAndScheduleMeetingScenario(Scenario):
 
             # Step 2: Oracle checks availability for each attendee
             availability_checks = []
-            for attendee in p.attendees:
-                check = (
-                    calendar.get_calendar_events_from_to(
-                        start_datetime=start_str,
-                        end_datetime=end_str,
+            if p.attendees is not None:
+                for _ in p.attendees:
+                    check = (
+                        calendar.get_calendar_events_from_to(start_datetime=start_str, end_datetime=end_str)
+                        .oracle()
+                        .depends_on(start_msg, delay_seconds=1)
                     )
-                    .oracle()
-                    .depends_on(start_msg, delay_seconds=1)
-                )
-                availability_checks.append(check)
+                    availability_checks.append(check)
 
             # Step 3: Oracle adds event (if all free)
             oracle_create = (
@@ -125,11 +130,12 @@ class ProposeAndScheduleMeetingScenario(Scenario):
                 content=f"I've confirmed everyone is available and created the event '{p.title}'."
             ).depends_on(oracle_create, delay_seconds=1)
 
-        self.events = [start_msg] + availability_checks + [oracle_create, agent_confirm]
+        self.events = [start_msg, *availability_checks, oracle_create, agent_confirm]
         print(f"[DEBUG] Cal002: Created {len(self.events)} events (with availability checks)")
 
     # ---------- Validation ----------
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
+        """Validate the scenario."""
         print("[DEBUG] Cal002: validate() called")
 
         try:
@@ -156,5 +162,6 @@ class ProposeAndScheduleMeetingScenario(Scenario):
         except Exception as e:
             print(f"[ERROR] Cal002: Validation failed with exception: {e}")
             import traceback
+
             traceback.print_exc()
             return ScenarioValidationResult(success=False, exception=e)
