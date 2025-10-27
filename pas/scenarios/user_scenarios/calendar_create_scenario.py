@@ -1,8 +1,10 @@
-"""Cal001: ScheduleEventScenario
+"""Cal001: ScheduleEventScenario.
+
 Create a calendar event and verify it was written.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -19,6 +21,8 @@ from pas.apps.calendar import StatefulCalendarApp
 
 @dataclass
 class ScheduleParams:
+    """Parameters for scheduling an event."""
+
     start_time_ms: int
     end_time_ms: int
     title: str
@@ -27,56 +31,57 @@ class ScheduleParams:
 
 
 def ms_to_str(ms: int) -> str:
-    """Convert milliseconds timestamp to datetime string"""
+    """Convert milliseconds timestamp to datetime string."""
     dt = datetime.fromtimestamp(ms / 1000, tz=UTC)
     return dt.strftime(DATETIME_FORMAT)
 
 
 def ms_to_hours(ms: int, base_ms: int) -> float:
-    """Convert milliseconds to hours offset from base time"""
+    """Convert milliseconds to hours offset from base time."""
     return (ms - base_ms) / (1000 * 60 * 60)
 
 
 @register_scenario("Cal001")
 class ScheduleEventScenario(Scenario):
-    """Cal001: Create a calendar event and verify it was written"""
+    """Cal001: Create a calendar event and verify it was written."""
 
     start_time: float | None = 0
     duration: float | None = 1  # Duration in hours
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the scenario."""
         super().__init__()
         self._params = self._get_default_params()
 
     def _get_default_params(self) -> ScheduleParams:
-        """Get default parameters"""
+        """Get default parameters."""
         return ScheduleParams(
             start_time_ms=1761420000000,  # Oct 24, 2025 3:00 PM UTC
-            end_time_ms=1761423600000,    # Oct 24, 2025 4:00 PM UTC
+            end_time_ms=1761423600000,  # Oct 24, 2025 4:00 PM UTC
             title="Team Sync",
             location="ESB 1001",
             description="bring slides",
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize and populate the necessary apps"""
+        """Initialize and populate the necessary apps."""
         print("[DEBUG] Cal001: init_and_populate_apps called")
-        
+
         agui = AgentUserInterface()
         system = SystemApp()
-        calendar = StatefulCalendarApp()  
+        calendar = StatefulCalendarApp()
 
         self.apps = [agui, system, calendar]
-        
+
         print("[DEBUG] Cal001: Apps initialized")
 
     def build_events_flow(self) -> None:
-        """Construct the event flow for creating a calendar event"""
+        """Construct the event flow for creating a calendar event."""
         print("[DEBUG] Cal001: build_events_flow called")
-        
+
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
-        
+
         p = self._params
 
         with EventRegisterer.capture_mode():
@@ -116,9 +121,9 @@ class ScheduleEventScenario(Scenario):
         print(f"[DEBUG] Cal001: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        """Validate whether the agent created the event correctly"""
+        """Validate whether the agent created the event correctly."""
         print("[DEBUG] Cal001: validate() called")
-        
+
         try:
             events = env.event_log.list_view()
             p = self._params
@@ -140,12 +145,9 @@ class ScheduleEventScenario(Scenario):
             calendar = self.get_typed_app(StatefulCalendarApp)
             try:
                 result = calendar.get_calendar_events_from_to(
-                    start_datetime=ms_to_str(p.start_time_ms),
-                    end_datetime=ms_to_str(p.end_time_ms),
-                    offset=0,
-                    limit=50,
+                    start_datetime=ms_to_str(p.start_time_ms), end_datetime=ms_to_str(p.end_time_ms), offset=0, limit=50
                 )
-                
+
                 # Extract events list
                 cal_events = []
                 for attr in ("events", "items"):
@@ -155,18 +157,15 @@ class ScheduleEventScenario(Scenario):
                         if v:
                             cal_events = list(v)
                             break
-                
+
                 if not cal_events:
                     try:
                         cal_events = list(result)
                     except TypeError:
                         cal_events = []
 
-                event_in_calendar = any(
-                    getattr(ev, "title", None) == p.title
-                    for ev in cal_events
-                )
-                
+                event_in_calendar = any(getattr(ev, "title", None) == p.title for ev in cal_events)
+
                 print(f"[DEBUG] Cal001: event_in_calendar={event_in_calendar}, found {len(cal_events)} events")
 
             except Exception as e:
@@ -181,6 +180,7 @@ class ScheduleEventScenario(Scenario):
         except Exception as e:
             print(f"[ERROR] Cal001: Validation failed with exception: {e}")
             import traceback
+
             traceback.print_exc()
 
             return ScenarioValidationResult(success=False, exception=e)
