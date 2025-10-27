@@ -1,7 +1,7 @@
 # Two-Agent Proactive System Design
 
 **Status**: Draft
-**Date**: 2025-10-21
+**Date**: 2025-10-26 (Updated with codebase audit)
 **Authors**: Design discussion with Claude
 
 ## Architecture Overview
@@ -19,10 +19,10 @@
         ▼               ▼               ▼
 ┌──────────────┐ ┌──────────────┐ ┌──────────────────────┐
 │StateAware    │ │UserAgent     │ │ProactiveAgent        │
-│Environment   │ │Orchestrator  │ │Orchestrator          │
+│Environment   │ │              │ │                      │
 │Wrapper       │ │              │ │                      │
 │──────────────│ │──────────────│ │──────────────────────│
-│- StatefulApps│ │- user_agent  │ │- observe_agent       │
+│- StatefulApps│ │- base_agent  │ │- observe_agent       │
 │- Events      │ │  (BaseAgent) │ │  (BaseAgent)         │
 │- Notif System│ │              │ │- execute_agent       │
 │              │ │              │ │  (BaseAgent)         │
@@ -30,6 +30,140 @@
 │get_tools()   │ │              │ │step()                │
 └──────────────┘ └──────────────┘ └──────────────────────┘
 ```
+
+## Codebase Audit and Migration Strategy
+
+### Current State Analysis
+
+The existing PAS codebase contains **~12,000 lines** of code, but analysis reveals that **~70% is unnecessary complexity** that should be removed or replaced for the new two-agent design.
+
+#### ✅ **KEEP - Core Components (~2,500 lines, 30%)**
+
+**1. Apps Module** (`pas/apps/`) - **ESSENTIAL**
+- ✅ `core.py` (236 lines) - `AppState` and `StatefulApp` base classes
+- ✅ `tool_decorators.py` - `@user_tool`, `@app_tool`, `@pas_event_registered`
+- ✅ All stateful app implementations:
+  - `contacts/app.py` + `states.py` (~300 lines)
+  - `email/app.py` + `states.py` (~530 lines)
+  - `calendar/app.py` + `states.py` (~600 lines)
+  - `messaging/app.py` + `states.py` (~400 lines)
+- ✅ `system.py` - `HomeScreenSystemApp` for go_back navigation
+- ❌ `proactive_agent_ui.py` - REMOVE (replaced by Meta-ARE's AgentUserInterface)
+- 🟡 `agent_ui/states.py` - DEFER (may be useful for stateful agent UI later)
+
+**Why keep**: This is PAS's core innovation - state-based navigation FSM for realistic mobile simulation. All apps properly implement `get_user_tools()` and `get_tools()` methods.
+
+**2. Environment** (`pas/environment.py`) - **ESSENTIAL**
+- ✅ `StateAwareEnvironmentWrapper` class (95 lines)
+- **TODO**: Add `get_user_tools()` and `get_tools()` method implementations
+
+**Why keep**: Critical for state transitions and tool discovery. Properly extends Meta-ARE's Environment.
+
+**3. Oracles** (`pas/oracles.py`) - **ESSENTIAL**
+- ✅ Entire file (114 lines) - `OracleTracker`, `event_matches()`
+
+**Why keep**: Needed for scenario validation. Well-designed, no changes needed.
+
+**4. Utilities** - **ESSENTIAL**
+- ✅ `logging_utils.py` - PAS logging setup
+- ✅ `llm_adapter.py` - `LLMClientProtocol` and `PasLLMEngine`
+
+**Why keep**: Small, focused utilities that work well.
+
+**5. Scenario Types** (`pas/scenarios/types.py`) - **PARTIAL**
+- ✅ `OracleAction` dataclass - Keep
+- ❌ `ScenarioSetup` dataclass - Remove (will be redefined for new design)
+
+#### ❌ **REMOVE - Bloated/Unnecessary (~1,300 lines, ~15%)**
+
+**1. Old Agent Implementations** - **DELETE/REPLACE**
+- ❌ `pas/proactive/agent.py` (~100 lines) - `LLMBasedProactiveAgent`
+- ❌ `pas/proactive/react_adapter.py` - Custom ReAct implementation
+- ❌ `pas/proactive/litellm_client.py` - LiteLLM wrapper
+- ❌ `pas/user_proxy/agent.py` (517 lines!) - `StatefulUserAgent`, `StatefulUserAgentRuntime`
+
+**Why remove**: Replaced by Meta-ARE `BaseAgent` directly. New design uses three `BaseAgent` instances (user, observe, execute) with different configs and tool sets.
+
+**Impact**: ~700 lines removed
+
+**2. Old Orchestration System** - **DELETE/REPLACE**
+- ❌ `pas/system/session.py` (205 lines) - `ProactiveSession`
+- ❌ `pas/system/runtime.py` - Helper functions
+- ❌ `pas/system/proactive.py` - `build_plan_executor`
+- ❌ `pas/system/notification.py` - Custom notification wrapper
+
+**Why remove**: Replaced by new `TwoAgentScenarioRunner` and orchestrators. Current design has custom notification handling and turn management that's redundant with Meta-ARE.
+
+**Impact**: ~400 lines removed
+
+**3. Old Scenario Builders** - **DELETE/REPLACE**
+- ❌ `pas/scenarios/base.py` (145 lines) - `build_proactive_stack()`
+- ✅ **Keep for reference**: Hand-written scenarios:
+  - `contacts_followup.py`
+  - `calendar_create_scenario.py`
+  - `calendar_meeting_plan_scenario.py`
+
+**Why remove**: `build_proactive_stack()` is tied to old architecture. Will be replaced by new builder in `TwoAgentScenarioRunner`.
+
+**Impact**: ~145 lines of builder code removed
+
+#### 🟡 **DEFER - Not Needed Now (~5,500+ lines, ~55%)**
+
+**1. Scenario Generator** (`pas/scenario_generator/`) - **ARCHIVE**
+- 🟡 Status: Keep as-is but ignore for now
+- Size: ~156KB, ~2,000+ lines
+- Contains: Agent for generating test scenarios, prompts, utils
+
+**Why defer**: Useful for generating test scenarios but not needed for core two-agent system implementation. Can be updated later once two-agent system works.
+
+**2. Generated Scenarios** (`pas/scenarios/generated_scenarios/`) - **KEEP**
+- 🟡 Status: Leave in place, ignore for now
+- Size: 19 files, ~140KB
+- Contains: Example proactive scenarios
+
+**Why defer**: Test data that doesn't hurt to keep. May be useful later for benchmarking.
+
+**3. Meta Adapter** (`pas/meta_adapter.py`) - **REVISIT LATER**
+- 🟡 Status: Keep but may need updates
+- Size: 362 lines
+- Purpose: Convert Meta-ARE scenarios to PAS format
+
+**Why defer**: May need updates for new two-agent design, but not urgent.
+
+**4. Scripts** (`pas/scripts/`) - **REWRITE**
+- 🟡 Status: Keep structure, update to use new orchestration
+- Files: `run_contacts_demo.py`, `run_demo.py`, `run_meta_tutorial_demo.py`
+
+**Why defer**: Useful for demos but need to be updated to use new `TwoAgentScenarioRunner`.
+
+### Summary Statistics
+
+| Category | Lines | Status | Notes |
+|----------|-------|--------|-------|
+| **Apps (core + 4 stateful)** | ~2,100 | ✅ KEEP | Core innovation |
+| **Environment wrapper** | 95 | ✅ KEEP | Add 2 methods |
+| **Oracles** | 114 | ✅ KEEP | Perfect as-is |
+| **Utilities** | ~100 | ✅ KEEP | Small & focused |
+| **Scenario types** | ~50 | ✅ KEEP | Just OracleAction |
+| | | | |
+| **Old proactive agent** | ~700 | ❌ REMOVE | → BaseAgent |
+| **Old orchestration** | ~400 | ❌ REMOVE | → New design |
+| **Old scenario builders** | ~145 | ❌ REMOVE | → New runners |
+| | | | |
+| **Scenario generator** | ~2,000 | 🟡 DEFER | Update later |
+| **Generated scenarios** | ~3,000 | 🟡 DEFER | Test data |
+| **Meta adapter** | 362 | 🟡 DEFER | May need updates |
+| **Scripts** | ~200 | 🔄 UPDATE | Use new design |
+
+**Net Result**:
+- **Keep/Use**: ~2,500 lines (apps + env + oracles + utils)
+- **Remove**: ~1,300 lines (old agents + orchestration)
+- **Write New**: ~1,000 lines (new orchestrators + runner + configs)
+- **Defer**: ~5,500 lines (generators + test data)
+
+**Final Codebase**: ~3,500 lines of core functionality (down from 12,000)
+
+---
 
 ## Core Components
 
@@ -64,28 +198,28 @@ class StateAwareEnvironmentWrapper(Environment):
 
 ---
 
-### 2. UserAgentOrchestrator (New)
+### 2. UserAgent (New)
 
-**File**: `pas/orchestrators/user_agent_orchestrator.py`
+**File**: `pas/agents/user/user_agent.py`
 
 **Class Definition**:
 ```python
-class UserAgentOrchestrator:
-    """Orchestrates the user agent's single-action turns."""
+class UserAgent:
+    """User agent for single-action turns (wraps Meta-ARE BaseAgent)."""
 
     def __init__(
         self,
-        user_agent: BaseAgent,
+        base_agent: BaseAgent,
         notification_system: BaseNotificationSystem,
         get_user_tools: Callable[[], list[Tool]],
     ):
         """
         Args:
-            user_agent: Meta-ARE BaseAgent with max_iterations=1
+            base_agent: Meta-ARE BaseAgent with max_iterations=1
             notification_system: Shared notification system
             get_user_tools: Callback to get current user tools (from environment)
         """
-        self.user_agent = user_agent
+        self.base_agent = base_agent
         self.notification_system = notification_system
         self.get_user_tools = get_user_tools
         self.last_read_timestamp = None
@@ -95,8 +229,8 @@ class UserAgentOrchestrator:
 
         1. Get new notifications from notification_system
         2. Build task from notifications
-        3. Refresh user_agent.tools from get_user_tools()
-        4. Run user_agent.run(task, max_iterations=1)
+        3. Refresh base_agent.tools from get_user_tools()
+        4. Run base_agent.run(task, max_iterations=1)
         5. Return result
         """
         pass
@@ -114,18 +248,18 @@ class UserAgentOrchestrator:
 - Poll notification system for new messages
 - Build task string from notifications (user messages + environment notifications)
 - Refresh tools before each turn using `get_user_tools()` callback
-- Execute user agent (1 action per turn)
+- Execute base agent (1 action per turn)
 - Track last read timestamp to avoid re-processing notifications
 
 ---
 
-### 3. ProactiveAgentOrchestrator (New)
+### 3. ProactiveAgent (New)
 
-**File**: `pas/orchestrators/proactive_agent_orchestrator.py`
+**File**: `pas/agents/proactive/proactive_agent.py`
 
 **Class Definition**:
 ```python
-class ProactiveAgentOrchestrator:
+class ProactiveAgent:
     """Orchestrates the proactive agent's observe/execute modes."""
 
     def __init__(
@@ -218,7 +352,7 @@ class ProactiveAgentOrchestrator:
 
 ### 4. TwoAgentScenarioRunner (New)
 
-**File**: `pas/scenario_runner/two_agent_runner.py`
+**File**: `pas/scenario_runner.py`
 
 **Class Definition**:
 ```python
@@ -438,15 +572,15 @@ Turn N:
    └─ Process events at time T
    └─ Emit notifications via notification_system
 
-2. UserAgentOrchestrator.step()
+2. UserAgent.step()
    ├─ Get notifications (env + agent messages)
    ├─ Build task: "New email from Alice. Proactive agent says: Shall I reply?"
-   ├─ Refresh tools: user_agent.tools = env.get_user_tools()
-   ├─ Run: user_agent.run(task, max_iterations=1)
+   ├─ Refresh tools: base_agent.tools = env.get_user_tools()
+   ├─ Run: base_agent.run(task, max_iterations=1)
    │   └─ BaseAgent executes: Think → Act (e.g., accept_proposal)
    └─ Return result
 
-3. ProactiveAgentOrchestrator.step()
+3. ProactiveAgent.step()
    ├─ Check mode (observe | awaiting_confirmation | execute)
    │
    ├─ If mode == "observe":
@@ -476,13 +610,15 @@ Turn N:
 ```
 pas/
 ├── environment.py                   # StateAwareEnvironmentWrapper (extend)
-├── orchestrators/
+├── scenario_runner.py               # TwoAgentScenarioRunner (new, root level)
+├── agents/                          # Agent implementations (Meta-ARE style)
 │   ├── __init__.py
-│   ├── user_agent_orchestrator.py   # UserAgentOrchestrator (new)
-│   └── proactive_agent_orchestrator.py  # ProactiveAgentOrchestrator (new)
-├── scenario_runner/
-│   ├── __init__.py
-│   └── two_agent_runner.py          # TwoAgentScenarioRunner (new)
+│   ├── user/
+│   │   ├── __init__.py
+│   │   └── user_agent.py           # UserAgent (new)
+│   └── proactive/
+│       ├── __init__.py
+│       └── proactive_agent.py      # ProactiveAgent (new)
 ├── configs/
 │   ├── __init__.py
 │   └── agent_configs.py             # System prompts + config builders (new)
@@ -511,31 +647,218 @@ pas/
 
 ## Implementation Phases
 
-### Phase 1: Core Orchestrators
-- Implement UserAgentOrchestrator with notification polling and tool refresh
-- Implement ProactiveAgentOrchestrator with mode management
-- Add get_user_tools() and get_tools() stubs to StateAwareEnvironmentWrapper
+### Phase 0: Codebase Cleanup (Optional but Recommended)
+**Goal**: Remove bloat before starting new implementation
 
-### Phase 2: Scenario Runner
-- Implement TwoAgentScenarioRunner main loop
-- Add agent builders using Meta-ARE factories
-- Add termination logic (max_turns, oracle satisfaction)
+**Actions**:
+1. Archive old code for reference:
+   ```bash
+   mkdir -p pas/_archive/
+   mv pas/proactive/ pas/_archive/proactive_old/
+   mv pas/user_proxy/ pas/_archive/user_proxy_old/
+   mv pas/system/ pas/_archive/system_old/
+   mv pas/scenarios/base.py pas/_archive/scenario_base_old.py
+   mv pas/apps/proactive_agent_ui.py pas/_archive/
+   ```
 
-### Phase 3: Configuration
-- Define system prompts for all three agents
-- Create config builder functions
-- Test prompt effectiveness
+2. Create new directory structure:
+   ```bash
+   mkdir -p pas/agents/user/
+   mkdir -p pas/agents/proactive/
+   mkdir -p pas/configs/
+   ```
 
-### Phase 4: Tool Injection
-- Implement accept/reject tool creation
-- Add injection logic in ProactiveAgentOrchestrator
-- Wire into AgentUserInterface
+3. Keep scenario generator as-is (ignore for now):
+   - Don't touch `pas/scenario_generator/`
+   - Don't touch `pas/scenarios/generated_scenarios/`
 
-### Phase 5: Integration & Testing
-- Create demo script
-- Test with simple scenario (contacts follow-up)
-- Validate oracle satisfaction
-- Debug notification flow
+**Outcome**: Clean slate with ~2,500 lines of essential code (apps + env + oracles + utils)
+
+---
+
+### Phase 1: Environment Extensions
+**Goal**: Add tool discovery methods to environment
+
+**Actions**:
+1. Implement `StateAwareEnvironmentWrapper.get_user_tools()`:
+   - Iterate over registered apps
+   - Call `app.get_user_tools()` if method exists
+   - Return aggregated list of user tools
+
+2. Implement `StateAwareEnvironmentWrapper.get_tools()`:
+   - Iterate over registered apps
+   - Call `app.get_tools()` if method exists
+   - Return aggregated list of all tools
+
+3. Test tool discovery:
+   - Create simple test with StatefulContactsApp
+   - Verify user tools change with state
+   - Verify all tools are available
+
+**Outcome**: Environment can provide current tools to orchestrators
+
+---
+
+### Phase 2: Agent Configurations
+**Goal**: Define system prompts and config builders
+
+**Actions**:
+1. Create `pas/configs/agent_configs.py`
+2. Define three system prompts (user, observe, execute)
+3. Implement config builder functions:
+   - `build_user_agent_config()`
+   - `build_proactive_observe_config()`
+   - `build_proactive_execute_config()`
+4. Test config creation
+
+**Outcome**: Reusable agent configurations ready for use
+
+---
+
+### Phase 3: User Agent Orchestrator
+**Goal**: Implement single-action user agent orchestration
+
+**Actions**:
+1. Create `pas/orchestrators/user_agent_orchestrator.py`
+2. Implement `UserAgentOrchestrator.__init__()`:
+   - Accept BaseAgent, notification system, get_user_tools callback
+   - Initialize state tracking
+
+3. Implement `UserAgentOrchestrator.step()`:
+   - Poll notifications from notification system
+   - Build task from notifications
+   - Refresh tools via `get_user_tools()` callback
+   - Run `user_agent.run(task)`
+   - Return result
+
+4. Implement `build_task_from_notifications()`:
+   - Format notifications into task string
+   - Follow Meta-ARE's task building pattern
+
+5. Test with standalone BaseAgent:
+   - Create simple test scenario
+   - Verify tool refresh works
+   - Verify notification polling works
+
+**Outcome**: Working user agent orchestrator
+
+---
+
+### Phase 4: Proactive Agent Orchestrator
+**Goal**: Implement observe/execute mode switching
+
+**Actions**:
+1. Create `pas/orchestrators/proactive_agent_orchestrator.py`
+2. Implement `ProactiveAgentOrchestrator.__init__()`:
+   - Accept two BaseAgent instances (observe, execute)
+   - Accept notification system and callbacks
+   - Initialize mode state
+
+3. Implement `ProactiveAgentOrchestrator.step()`:
+   - Mode branching logic (observe/awaiting_confirmation/execute)
+   - Call appropriate agent based on mode
+   - Handle mode transitions
+
+4. Implement helper methods:
+   - `build_observation_task()`
+   - `build_execution_task()`
+   - `check_for_proposal()` - inspect agent logs
+   - `check_for_confirmation()` - inspect notifications
+
+5. Test mode transitions:
+   - Mock send_message_to_user call
+   - Mock accept/reject notifications
+   - Verify mode switches correctly
+
+**Outcome**: Working proactive agent orchestrator with mode management
+
+---
+
+### Phase 5: Tool Injection System
+**Goal**: Dynamic accept/reject tool injection
+
+**Actions**:
+1. Create `pas/apps/system_tools.py`
+2. Implement `create_accept_proposal_tool()`:
+   - Create Tool instance with callback
+   - Decorated with @user_tool and @event_registered
+
+3. Implement `create_reject_proposal_tool()`:
+   - Similar to accept tool
+
+4. Implement `inject_confirmation_tools()`:
+   - Add tools to AgentUserInterface instance
+   - Register in environment
+
+5. Test injection:
+   - Create AgentUserInterface instance
+   - Inject tools dynamically
+   - Verify tools appear in user agent's tool list
+
+**Outcome**: Dynamic tool injection working
+
+---
+
+### Phase 6: Scenario Runner
+**Goal**: Main orchestrator tying everything together
+
+**Actions**:
+1. Create `pas/scenario_runner/two_agent_runner.py`
+2. Implement `TwoAgentScenarioRunner.__init__()`:
+   - Accept three agent configs
+
+3. Implement `TwoAgentScenarioRunner.run()`:
+   - Setup environment with apps and events
+   - Create notification system
+   - Build three BaseAgent instances
+   - Create orchestrators
+   - Main loop: user.step() → proactive.step()
+   - Termination logic
+
+4. Implement agent builders:
+   - `_build_user_agent()`
+   - `_build_observe_agent()`
+   - `_build_execute_agent()`
+
+5. Implement helpers:
+   - `_inject_accept_reject_tools()`
+   - `_check_termination()`
+
+6. Test full scenario:
+   - Use simple contacts scenario
+   - Verify both agents run
+   - Verify oracle tracking works
+
+**Outcome**: Complete two-agent system working end-to-end
+
+---
+
+### Phase 7: Demo Script & Testing
+**Goal**: Demonstrate system with realistic scenario
+
+**Actions**:
+1. Create `pas/scripts/run_two_agent_demo.py`
+2. Port contacts_followup scenario to new system
+3. Add comprehensive logging
+4. Test with different LLM models
+5. Validate oracle satisfaction
+6. Debug any notification flow issues
+
+**Outcome**: Polished demo ready for presentation
+
+---
+
+### Phase 8: Documentation & Cleanup
+**Goal**: Document new system and remove old code permanently
+
+**Actions**:
+1. Update README with new architecture
+2. Update API documentation
+3. Add usage examples
+4. Permanently delete archived old code (if confident)
+5. Update scenario generator to use new system (optional)
+
+**Outcome**: Clean, documented codebase
 
 ---
 
