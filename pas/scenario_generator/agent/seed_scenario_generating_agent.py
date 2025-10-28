@@ -405,6 +405,7 @@ class SeedScenarioGeneratingAgent:
 
             # Generate import instructions for selected apps only
             selected_import_instructions = self._generate_import_instructions_for_selected_apps(selected_apps)
+            logger.info(f"Selected import instructions: {selected_import_instructions}")
 
             # Temporarily replace self.tools with selected tools
             original_tools = self.tools.copy()
@@ -822,14 +823,23 @@ class SeedScenarioGeneratingAgent:
         # Get the catalog for all apps but filter to only selected ones
         catalog = scan_package("are.simulation.apps", include_sigs=True, doclen=140)
 
-        # Filter catalog to only include selected apps
-        filtered_catalog = {}
+        # Filter catalog to only include selected apps - maintain the list structure
+        filtered_modules = []
         for module_info in catalog.get("modules", []):
             module_name = module_info["module"]
             # Check if this module contains any of our selected apps
             module_classes = [cls["name"] for cls in module_info.get("exports", {}).get("classes", [])]
             if any(app in module_classes for app in apps_to_import):
-                filtered_catalog[module_name] = module_info
+                filtered_modules.append(module_info)
+
+        # Create filtered catalog with the same structure as the original
+        filtered_catalog = {
+            "package": catalog.get("package", ""),
+            "scanned_at": catalog.get("scanned_at", ""),
+            "root_paths": catalog.get("root_paths", []),
+            "modules": filtered_modules,
+            "import_suggestions": catalog.get("import_suggestions", []),
+        }
 
         # Generate import instructions for filtered catalog
         import_instructions = make_import_instructions(
