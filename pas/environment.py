@@ -12,6 +12,7 @@ from pas.apps.system import HomeScreenSystemApp
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from are.simulation.apps.app import App
     from are.simulation.notification_system import BaseNotificationSystem
     from are.simulation.tools import AppTool, Tool
     from are.simulation.types import CompletedEvent
@@ -50,22 +51,12 @@ class StateAwareEnvironmentWrapper(Environment):
             add_event_to_agent_log=add_event_to_agent_log,
         )
 
-        # Wire up navigation callbacks to the HomeScreen system app
-        home_screen_app = self.get_app_with_class(HomeScreenSystemApp)
-        if home_screen_app is None:
-            raise ValueError("HomeScreenSystemApp must be registered in the environment.")
-
-        home_screen_app.set_callbacks(
-            switch_app_callback=self._switch_app, open_app_callback=self._open_app, go_home_callback=self._go_home
-        )
-
         # PAS extensions (follow Meta ARE naming: no underscores for public attributes)
-        # ! NOTE: Why do we need any of these? Specially why do we need the user agent and why do we need to register it?
         self.completed_event_subscribers: list[Callable[[CompletedEvent], None]] = []
         self.processed_event_ids: set[str] = set()
         self.user_agent: _UserAgentProtocol | None = None
-        self.active_app: StatefulApp = self.get_app_with_class(HomeScreenSystemApp)
-        self.background_apps: list[StatefulApp] = []
+        self.active_app: StatefulApp | HomeScreenSystemApp | None = None
+        self.background_apps: list[StatefulApp | HomeScreenSystemApp] = []
 
     def get_user_tools(self) -> list[AppTool]:
         """Get tools available to the user agent from currentlly active app and system app.
@@ -92,7 +83,7 @@ class StateAwareEnvironmentWrapper(Environment):
         logger.debug(f"Added system app tools: {len(tools)}")
 
         # Include active app tools if active app is not the system app
-        if self.active_app != system_app:
+        if self.active_app is not None and self.active_app != system_app:
             tools.extend(self.active_app.get_user_tools())
             logger.debug(f"Added active app tools: {len(tools)}")
         return tools
@@ -108,6 +99,27 @@ class StateAwareEnvironmentWrapper(Environment):
             tools.extend(app.get_tools())
             logger.debug(f"Added app tools: {app_name} - {len(tools)}")
         return tools
+
+    def register_apps(self, apps: list[App]) -> None:
+        """Register apps and wire up navigation callbacks to HomeScreenSystemApp.
+
+        Args:
+            apps: List of apps to register
+        """
+        super().register_apps(apps)
+
+        # Wire up navigation callbacks to the HomeScreen system app
+        home_screen_app = self.get_app_with_class(HomeScreenSystemApp)
+        if home_screen_app is None:
+            raise ValueError("HomeScreenSystemApp must be registered in the environment.")
+
+        home_screen_app.set_callbacks(
+            switch_app_callback=self._switch_app, open_app_callback=self._open_app, go_home_callback=self._go_home
+        )
+
+        # Set initial active app to home screen
+        self.active_app = home_screen_app
+        logger.debug("Wired up navigation callbacks to HomeScreenSystemApp")
 
     def _go_home(self) -> str:
         """Go to the home screen and update the background apps stack.
