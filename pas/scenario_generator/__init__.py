@@ -24,7 +24,8 @@ def register_custom_scenarios(registry: "ScenarioRegistry") -> None:
 
     # Import modules containing custom scenarios
     custom_scenario_modules = [
-        "pas.scenario_generator.example_proactive_scenarios.scenario"
+        "pas.scenario_generator.example_proactive_scenarios.scenario",
+        "pas.scenario_generator.example_proactive_scenarios.scenario_with_all_apps_init",
         # Add other custom scenario modules here as needed
     ]
 

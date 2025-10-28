@@ -9,6 +9,7 @@ from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
 from are.simulation.scenarios import Scenario
 
 from pas.scenario_generator.agent.scenario_generating_agent import ScenarioGeneratingAgent
+from pas.scenario_generator.agent.seed_scenario_generating_agent import SeedScenarioGeneratingAgent
 from pas.scenario_generator.example_proactive_scenarios import scenario as _proactive_scenarios  # noqa: F401
 from pas.scenario_generator.utils.list_all_app_imports import make_import_instructions, scan_package
 
@@ -55,14 +56,83 @@ def generate_scenarios_from_example(
         return None
 
 
-__all__ = ["generate_scenarios_from_example"]
+def generate_scenarios_from_example_seed(
+    app_def_scenario: Scenario,
+    example_scenarios: list[Scenario],
+    model: str,
+    provider: str | None = None,
+    endpoint: str | None = None,
+    total_scenarios: int = 1,
+    apps_per_scenario: int = 4,
+) -> str | None:
+    """Runner that builds the SeedScenarioGeneratingAgent and generates scenarios using only tools from the app definition scenario.
+
+    Args:
+        app_def_scenario: Scenario that defines the available apps and tools
+        example_scenarios: List of example scenarios for reference (not used for tools)
+        model: LLM model to use
+        provider: Provider to use
+        endpoint: Optional endpoint URL
+        total_scenarios: Number of scenarios to generate
+        apps_per_scenario: Number of apps to use per scenario
+
+    Returns:
+        Generated scenario code or None if generation failed
+    """
+    # Get tools from the app definition scenario (not from example scenarios)
+    catalog = scan_package("are.simulation.apps", include_sigs=True, doclen=140)
+    import_instructions = make_import_instructions(catalog, max_mods=18, max_per_mod=10, include_sigs=True)
+
+    # Extract imports from app definition scenario and example scenarios
+    extracted = _extract_imports_from_scenarios([app_def_scenario, *example_scenarios])
+    logger.info(f"==== Extracted imports: {extracted}")
+    if extracted:
+        import_instructions = (
+            import_instructions
+            + "\n\n# Additional imports found in app definition and example scenarios\n"
+            + "\n".join(sorted(extracted))
+        )
+    logger.info(f"Import instructions: {import_instructions}")
+
+    # Create LLM engine
+    config = LLMEngineConfig(model_name=model, provider=provider, endpoint=endpoint)
+    engine = LLMEngineBuilder().create_engine(engine_config=config)
+
+    # Create SeedScenarioGeneratingAgent with tools from app definition scenario only
+    seed_agent = SeedScenarioGeneratingAgent(
+        llm_engine=engine,
+        tools=[],
+        max_iterations=15,
+        import_instructions=import_instructions,
+        app_def_scenario=app_def_scenario,
+    )
+
+    logger.info("Running SeedScenarioGeneratingAgent")
+    result = seed_agent.scenario_generation_run(
+        example_scenarios, app_def_scenario, total_scenarios=total_scenarios, apps_per_scenario=apps_per_scenario
+    )
+    logger.info("Seed scenario generation completed")
+    if result is not None:
+        return result.output
+    else:
+        return None
+
+
+__all__ = ["generate_scenarios_from_example", "generate_scenarios_from_example_seed"]
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser("generate-scenario")
-    # parser.add_argument("-s", "--scenario", dest="scenario_id_list", required=True)
-    # are/simulation/scenario_generator.py
+
+    # Generation mode selection
+    parser.add_argument(
+        "--no-seed",
+        action="store_true",
+        help="Use regular ScenarioGeneratingAgent instead of SeedScenarioGeneratingAgent (default)",
+    )
+
+    # Required arguments for both modes
     parser.add_argument(
         "-s",
         "--scenario",
@@ -70,11 +140,20 @@ def main() -> None:
         nargs="+",
         default=[
             "scenario_tutorial_proactive_confirm",
-            "scenario_tutorial_proactive_reject",
-            "scenario_tutorial",
+            # "scenario_tutorial_proactive_reject",
             "scenario_find_image_file",
         ],
     )
+
+    # App definition scenario (required for seed mode, which is the default)
+    parser.add_argument(
+        "--app-def-scenario",
+        dest="app_def_scenario",
+        default="scenario_with_all_apps_init",
+        help="Scenario ID that defines the available apps (required for seed mode, which is the default)",
+    )
+
+    # Optional arguments
     parser.add_argument("-a", "--agent", dest="agent", default="scenario_generator")
     parser.add_argument("--model", dest="model", default="gpt-5-chat-latest")
     parser.add_argument("--provider", dest="provider", default="openai")
@@ -83,32 +162,95 @@ def main() -> None:
     parser.add_argument(
         "--simulated_generation_time_mode", dest="sim_mode", default="measured", choices=["measured", "fixed"]
     )
+
+    # Multi-scenario generation arguments
+    parser.add_argument(
+        "--total-scenarios",
+        dest="total_scenarios",
+        type=int,
+        default=1,
+        help="Total number of scenarios to generate (default: 1)",
+    )
+    parser.add_argument(
+        "--apps-per-scenario",
+        dest="apps_per_scenario",
+        type=int,
+        default=2,
+        help="Number of apps (excluding AgentUserInterface) to use per scenario (default: 4)",
+    )
+
     args = parser.parse_args()
 
-    # Use the same loading path as are-run
-    # Build config for MultiScenarioRunner but with single ID
-    # This ensures discovery/registration side effects happen
-
     # Import our custom scenarios to register them
-
-    # Now fetch the scenario class from registry
     from are.simulation.scenarios.utils.constants import ALL_SCENARIOS
 
-    scenario_list = []
-    logger.info(f"ALL_SCENARIOS: {ALL_SCENARIOS}")
-    for scenario_id in args.scenario_id_list:
-        scenario_type = ALL_SCENARIOS[scenario_id]
-        scenario = scenario_type()
-        scenario.initialize()
-        scenario_list.append(scenario)
-        # logger.info(f"9999scenario: {scenario}")
-        logger.info(f"scenario_type: {scenario_type}")
-    logger.info("generate_scenarios_from_example started")
-    print(f"scenario_list: {scenario_list}")
+    # Validate arguments based on mode
+    if not args.no_seed and args.app_def_scenario not in ALL_SCENARIOS:
+        parser.error(f"App definition scenario '{args.app_def_scenario}' not found in registered scenarios")
 
-    output = generate_scenarios_from_example(
-        scenario_list=scenario_list, model=args.model, provider=args.provider, endpoint=args.endpoint
-    )
+    scenario_list = []
+    app_def_scenario = None
+
+    logger.info(f"ALL_SCENARIOS: {ALL_SCENARIOS}")
+
+    if not args.no_seed:
+        # SEED MODE: Use SeedScenarioGeneratingAgent (default)
+        logger.info("Using SeedScenarioGeneratingAgent mode")
+
+        # Load the app definition scenario (defines available tools)
+        if args.app_def_scenario not in ALL_SCENARIOS:
+            raise ValueError(f"App definition scenario '{args.app_def_scenario}' not found in registered scenarios")
+        app_def_scenario_type = ALL_SCENARIOS[args.app_def_scenario]
+        app_def_scenario = app_def_scenario_type()
+        app_def_scenario.initialize()
+        logger.info(f"Loaded app definition scenario: {app_def_scenario.__class__.__name__}")
+
+        # Load example scenarios (for reference only, not for tools)
+        for scenario_id in args.scenario_id_list:
+            if scenario_id not in ALL_SCENARIOS:
+                logger.warning(f"Example scenario '{scenario_id}' not found in registered scenarios")
+                continue
+            scenario_type = ALL_SCENARIOS[scenario_id]
+            scenario = scenario_type()
+            scenario.initialize()
+            scenario_list.append(scenario)
+            logger.info(f"Loaded example scenario: {scenario.__class__.__name__}")
+
+        logger.info("generate_scenarios_from_example (seed mode) started")
+        print(f"app_def_scenario: {app_def_scenario}")
+        print(f"example_scenarios: {scenario_list}")
+
+        output = generate_scenarios_from_example_seed(
+            app_def_scenario=app_def_scenario,
+            example_scenarios=scenario_list,
+            model=args.model,
+            provider=args.provider,
+            endpoint=args.endpoint,
+            total_scenarios=args.total_scenarios,
+            apps_per_scenario=args.apps_per_scenario,
+        )
+
+    else:
+        # REGULAR MODE: Use regular ScenarioGeneratingAgent
+        logger.info("Using regular ScenarioGeneratingAgent mode")
+
+        # Load all scenarios as before
+        for scenario_id in args.scenario_id_list:
+            if scenario_id not in ALL_SCENARIOS:
+                raise ValueError(f"Scenario '{scenario_id}' not found in registered scenarios")
+            scenario_type = ALL_SCENARIOS[scenario_id]
+            scenario = scenario_type()
+            scenario.initialize()
+            scenario_list.append(scenario)
+            logger.info(f"scenario_type: {scenario_type}")
+
+        logger.info("generate_scenarios_from_example started")
+        print(f"scenario_list: {scenario_list}")
+
+        output = generate_scenarios_from_example(
+            scenario_list=scenario_list, model=args.model, provider=args.provider, endpoint=args.endpoint
+        )
+
     logger.info("generate_scenarios_from_example finished")
     if output is not None:
         try:
