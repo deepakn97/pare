@@ -168,14 +168,14 @@ def main() -> None:
         "--total-scenarios",
         dest="total_scenarios",
         type=int,
-        default=3,
+        default=1,
         help="Total number of scenarios to generate (default: 1)",
     )
     parser.add_argument(
         "--apps-per-scenario",
         dest="apps_per_scenario",
         type=int,
-        default=3,
+        default=2,
         help="Number of apps (excluding AgentUserInterface) to use per scenario (default: 4)",
     )
 
