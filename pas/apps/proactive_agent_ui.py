@@ -138,6 +138,3 @@ class ProactiveAgentUserInterface(AgentUserInterface, StatefulApp):
         # Agent UI typically doesn't have complex state transitions
         # Proposals are managed through the pending_proposal attribute
         pass
-
-
-__all__ = ["ProactiveAgentUserInterface", "ProactiveProposal"]

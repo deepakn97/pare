@@ -70,6 +70,7 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 show_error_codes = true
+exclude = ["pas/_archives", "pas/scripts", "scripts"]
 
 # Treat meta-are as having type information (follow_imports = silent)
 # Ignore all errors from meta-are since it doesn't have type stubs
@@ -115,6 +116,9 @@ exclude = [
     "site-packages",
     "venv",
     # ---- project specific ----
+    "pas/_archives",
+    "pas/scripts",
+    "scripts"
 ]
 target-version = "py312"
 line-length = 120

@@ -185,6 +185,7 @@ class StatefulApp(App):
             tools.append(build_tool(self, self.go_back))
         return tools
 
+    # ! NOTE: Why do we need to get meta are user tools?
     def get_meta_are_user_tools(self) -> list[Tool]:
         """Return Meta ARE-compatible tool adapters for the current navigation state."""
         from are.simulation.tool_utils import AppToolAdapter  # Use native Meta ARE adapter

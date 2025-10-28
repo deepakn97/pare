@@ -14,7 +14,7 @@ from are.simulation.types import Action, EventRegisterer, EventType
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# Re-export the native user_tool from Meta ARE
+# Explicitly declare exports (needed for mypy since we re-export user_tool from Meta-ARE)
 __all__ = ["pas_event_registered", "user_tool"]
 
 

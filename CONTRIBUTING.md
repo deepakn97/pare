@@ -74,6 +74,27 @@ git push origin name-of-your-bugfix-or-feature
 
 11. Submit a pull request through the GitHub website.
 
+# Code Style Guidelines
+
+When contributing to this project, please follow these coding conventions:
+
+1. **Use f-strings for all string formatting and manipulation**
+   - Use f-strings instead of `%` formatting or `.format()`
+   - Examples:
+     ```python
+     # Good
+     logger.debug(f"Processing {count} items from {source}")
+     message = f"User {user.name} completed task {task.id}"
+
+     # Avoid
+     logger.debug("Processing %d items from %s", count, source)
+     message = "User {} completed task {}".format(user.name, task.id)
+     ```
+
+2. **Follow existing patterns in the codebase**
+   - Check similar files for conventions before implementing new features
+   - Maintain consistency with Meta-ARE base framework patterns
+
 # Pull Request Guidelines
 
 Before you submit a pull request, check that it meets these guidelines:

@@ -1,17 +1,21 @@
 # Two-Agent Proactive System Design
 
 **Status**: Draft
-**Date**: 2025-10-26 (Updated with codebase audit)
+**Date**: 2025-10-27 (Updated with Meta-ARE integration approach)
+**Previous Update**: 2025-10-26 (Codebase audit)
 **Authors**: Design discussion with Claude
+
+**Key Change**: `TwoAgentScenarioRunner` now extends Meta-ARE's `ScenarioRunner` class. We leverage Meta-ARE's `Scenario` class with `OracleEvent` for validation, getting scenario parsing, oracle validation, and trace export for free. We only implement the custom two-agent turn-based loop.
 
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    TwoAgentScenarioRunner                       │
+│              TwoAgentScenarioRunner                             │
+│              extends Meta-ARE ScenarioRunner                    │
 │  ─────────────────────────────────────────────────────────────  │
-│  Orchestrates: Environment + User Agent + Proactive Agent       │
-│  Main Loop: env.tick() → user.step() → proactive.step()        │
+│  • Inherits: Scenario parsing, oracle validation, trace export │
+│  • Implements: _run_with_two_agents() custom turn-based loop   │
 └─────────────────────────────────────────────────────────────────┘
                         │
         ┌───────────────┼───────────────┐
@@ -29,6 +33,16 @@
 │get_user_tools│ │step()        │ │                      │
 │get_tools()   │ │              │ │step()                │
 └──────────────┘ └──────────────┘ └──────────────────────┘
+                        │
+                        ▼
+        ┌───────────────────────────────┐
+        │   Meta-ARE Scenario           │
+        │───────────────────────────────│
+        │ • apps: list[App]             │
+        │ • events: list[AbstractEvent] │
+        │   (includes OracleEvent)      │
+        │ • validate(env) → Result      │
+        └───────────────────────────────┘
 ```
 
 ## Codebase Audit and Migration Strategy
@@ -59,20 +73,25 @@ The existing PAS codebase contains **~12,000 lines** of code, but analysis revea
 
 **Why keep**: Critical for state transitions and tool discovery. Properly extends Meta-ARE's Environment.
 
-**3. Oracles** (`pas/oracles.py`) - **ESSENTIAL**
-- ✅ Entire file (114 lines) - `OracleTracker`, `event_matches()`
+**3. Oracles** (`pas/oracles.py`) - **OPTIONAL** 🟡
+- 🟡 Entire file (114 lines) - `OracleTracker`, `event_matches()`
+- **NEW DECISION**: Meta-ARE's `Scenario.validate()` handles oracle validation via `OracleEvent`
+- **Status**: Can be removed since we're using Meta-ARE's oracle system
+- **Keep for now**: May be useful if we need lightweight validation without full Scenario
 
-**Why keep**: Needed for scenario validation. Well-designed, no changes needed.
+**Why reconsider**: Meta-ARE provides comprehensive oracle validation through `Scenario` class with `OracleEvent` entries. Using Meta-ARE's system gives us LLM-based judging, trace validation, and benchmark infrastructure for free.
 
-**4. Utilities** - **ESSENTIAL**
+**4. Utilities** - **PARTIAL**
 - ✅ `logging_utils.py` - PAS logging setup
-- ✅ `llm_adapter.py` - `LLMClientProtocol` and `PasLLMEngine`
+- 🟡 `llm_adapter.py` - `LLMClientProtocol` and `PasLLMEngine`
+  - **Status**: Can be removed - we use Meta-ARE's `LLMEngine` directly via `BaseAgent`
+  - **Decision**: Archive it
 
-**Why keep**: Small, focused utilities that work well.
+**Why keep logging_utils**: PAS-specific logging configuration that complements Meta-ARE's logging.
 
-**5. Scenario Types** (`pas/scenarios/types.py`) - **PARTIAL**
-- ✅ `OracleAction` dataclass - Keep
-- ❌ `ScenarioSetup` dataclass - Remove (will be redefined for new design)
+**5. Scenario Types** (`pas/scenarios/types.py`) - **PARTIAL** 🟡
+- 🟡 `OracleAction` dataclass - May not be needed (Meta-ARE has `OracleEvent`)
+- ❌ `ScenarioSetup` dataclass - Remove (replaced by Meta-ARE `Scenario` class)
 
 #### ❌ **REMOVE - Bloated/Unnecessary (~1,300 lines, ~15%)**
 
@@ -350,98 +369,121 @@ class ProactiveAgent:
 
 ---
 
-### 4. TwoAgentScenarioRunner (New)
+### 4. TwoAgentScenarioRunner (New - Extends Meta-ARE ScenarioRunner)
 
 **File**: `pas/scenario_runner.py`
 
 **Class Definition**:
 ```python
-class TwoAgentScenarioRunner:
-    """Main scenario runner for two-agent proactive system."""
+class TwoAgentScenarioRunner(ScenarioRunner):
+    """Extends Meta-ARE's ScenarioRunner for two-agent proactive system.
 
-    def __init__(
+    Inherits:
+        - Scenario parsing (JSON → Scenario object)
+        - Oracle validation (OracleEvent checking via scenario.validate())
+        - Trace export
+        - Environment setup and teardown
+        - Agent configuration infrastructure
+
+    Implements:
+        - Custom two-agent turn-based loop (_run_with_two_agents)
+        - UserAgent and ProactiveAgent orchestration
+        - Dynamic tool injection for accept/reject
+    """
+
+    def _run_with_two_agents(
         self,
-        user_agent_config: ARESimulationReactBaseAgentConfig,
+        scenario_id: str,
+        scenario: Scenario,
+        env: StateAwareEnvironmentWrapper,  # Or just Environment
+        user_config: ARESimulationReactBaseAgentConfig,
         proactive_observe_config: ARESimulationReactBaseAgentConfig,
         proactive_execute_config: ARESimulationReactBaseAgentConfig,
-    ):
-        """
+        max_turns: int | None = None,
+    ) -> ScenarioValidationResult:
+        """Run scenario with two-agent turn-based loop.
+
+        Flow:
+        1. Build three BaseAgent instances (user, observe, execute)
+        2. Wrap in UserAgent and ProactiveAgent orchestrators
+        3. Turn-based loop:
+            - user_agent.step()
+            - proactive_agent.step()
+            - Check termination (max_turns or env stopped)
+        4. Validate using scenario.validate(env) (handles OracleEvent checking)
+        5. Return ScenarioValidationResult
+
         Args:
-            user_agent_config: Config with system_prompt for user behavior
+            scenario_id: Scenario identifier for logging
+            scenario: Meta-ARE Scenario object (contains apps, events, oracles)
+            env: StateAwareEnvironmentWrapper instance (already started by parent)
+            user_config: Config for user agent
             proactive_observe_config: Config for observation agent
             proactive_execute_config: Config for execution agent
+            max_turns: Maximum number of turns (overrides scenario.nb_turns)
+
+        Returns:
+            ScenarioValidationResult with success status and rationale
         """
-        self.user_agent_config = user_agent_config
-        self.proactive_observe_config = proactive_observe_config
-        self.proactive_execute_config = proactive_execute_config
+        pass
 
     def run(
         self,
-        apps: list[StatefulApp],
-        initial_events: list[Event],
-        oracles: list[OracleAction] | None = None,
-        max_turns: int = 100,
+        config: ScenarioRunnerConfig,
+        scenario: Scenario | str,
+        completed_events: list[CompletedEvent] | None = None,
     ) -> ScenarioValidationResult:
-        """Run two-agent scenario.
+        """Override parent run() to use two-agent logic.
 
-        1. Setup environment with apps and initial events
-        2. Create notification system
-        3. Build three BaseAgent instances (user, observe, execute)
-        4. Create orchestrators
-        5. Start environment (non-blocking)
-        6. Main loop:
-            - user_orchestrator.step()
-            - proactive_orchestrator.step()
-            - Check termination (max_turns or oracles satisfied)
-        7. Stop environment
-        8. Return validation result
+        Delegates to parent ScenarioRunner for:
+        - Loading scenario from string if needed
+        - Setting up environment
+        - Starting env.run(scenario, wait_for_end=False)
+        - Stopping environment and cleanup
+        - Exporting traces if requested
+
+        Implements custom logic:
+        - Calls _run_with_two_agents() instead of _run_with_agent()
         """
         pass
 
     def _build_user_agent(
         self,
-        llm_engine: LLMEngine,
+        config: ARESimulationReactBaseAgentConfig,
         notification_system: BaseNotificationSystem,
-    ) -> BaseAgent:
-        """Build user BaseAgent from config."""
+        env: StateAwareEnvironmentWrapper,
+    ) -> UserAgent:
+        """Build UserAgent with Meta-ARE BaseAgent."""
         pass
 
-    def _build_observe_agent(
+    def _build_proactive_agent(
         self,
-        llm_engine: LLMEngine,
+        observe_config: ARESimulationReactBaseAgentConfig,
+        execute_config: ARESimulationReactBaseAgentConfig,
         notification_system: BaseNotificationSystem,
-    ) -> BaseAgent:
-        """Build observation BaseAgent from config."""
-        pass
-
-    def _build_execute_agent(
-        self,
-        llm_engine: LLMEngine,
-        notification_system: BaseNotificationSystem,
-    ) -> BaseAgent:
-        """Build execution BaseAgent from config."""
+        env: StateAwareEnvironmentWrapper,
+    ) -> ProactiveAgent:
+        """Build ProactiveAgent with two Meta-ARE BaseAgent instances."""
         pass
 
     def _inject_accept_reject_tools(self, env: StateAwareEnvironmentWrapper) -> None:
         """Dynamically inject accept_proposal/reject_proposal into AgentUserInterface."""
         pass
-
-    def _check_termination(
-        self,
-        turn: int,
-        max_turns: int,
-        oracle_tracker: OracleTracker | None,
-    ) -> bool:
-        """Check if scenario should terminate."""
-        pass
 ```
 
+**Benefits of Extending ScenarioRunner**:
+- ✅ Get scenario parsing for free (JSON → `Scenario`)
+- ✅ Get oracle validation for free (`scenario.validate(env)` checks `OracleEvent`)
+- ✅ Get trace export infrastructure
+- ✅ Get agent config builders and initialization
+- ✅ Get environment lifecycle management
+- ✅ Only implement our custom turn-based loop
+
 **Responsibilities**:
-- Main entry point for running two-agent scenarios
-- Setup environment, notification system, agents, orchestrators
-- Run main turn-based loop
-- Handle termination conditions (max_turns or oracle satisfaction)
-- Validate scenario outcomes
+- Implement `_run_with_two_agents()` method with custom turn-based logic
+- Build UserAgent and ProactiveAgent from configs
+- Handle tool injection and agent orchestration
+- Leverage parent class for everything else
 
 ---
 
@@ -676,19 +718,19 @@ pas/
 
 ---
 
-### Phase 1: Environment Extensions
+### Phase 1: Environment Extensions - Tool Discovery
 **Goal**: Add tool discovery methods to environment
 
 **Actions**:
 1. Implement `StateAwareEnvironmentWrapper.get_user_tools()`:
-   - Iterate over registered apps
-   - Call `app.get_user_tools()` if method exists
-   - Return aggregated list of user tools
+   - Return tools from `self.active_app` (current screen) if set
+   - Always include tools from system app (go_home, open_app)
+   - User can only see tools from current screen + system
 
 2. Implement `StateAwareEnvironmentWrapper.get_tools()`:
-   - Iterate over registered apps
+   - Iterate over ALL registered apps
    - Call `app.get_tools()` if method exists
-   - Return aggregated list of all tools
+   - Return aggregated list of all privileged tools
 
 3. Test tool discovery:
    - Create simple test with StatefulContactsApp
@@ -696,6 +738,40 @@ pas/
    - Verify all tools are available
 
 **Outcome**: Environment can provide current tools to orchestrators
+
+---
+
+### Phase 1.5: Active App Tracking (NEW)
+**Goal**: Implement logic to track which app is currently active
+
+**Design Decision**: Hybrid of Option A + Option D
+- **Initial state**: `active_app = None` (defaults to home screen - only system tools available)
+- **On `open_app(app_name)`**: Environment intercepts event and:
+  1. Pushes current `active_app` to `background_apps` stack
+  2. Sets `active_app = requested_app`
+  3. Calls `app.reset_to_root()` to reset app to initial state
+
+**Actions**:
+1. Add event handler in `StateAwareEnvironmentWrapper.add_to_log()`:
+   - Detect when `open_app` is called (check event.function_name())
+   - Extract `app_name` from event args
+   - Update `active_app` and `background_apps`
+
+2. Move `open_app` logic from `HomeScreenSystemApp` to environment:
+   - Currently: `system.open_app()` has app resolution and state reset logic
+   - New: `system.open_app()` just returns app name, environment handles switching
+   - Remove `attach_environment()` from `HomeScreenSystemApp`
+
+3. Initialize `active_app` on environment creation:
+   - When environment registers apps, if system app exists, set as initial active
+   - Or leave as None (home screen state)
+
+4. Test active app tracking:
+   - Verify `get_user_tools()` returns only system tools initially
+   - Call `open_app("contacts")`, verify tools update to contacts + system
+   - Verify background apps stack works
+
+**Outcome**: Proper app focus tracking, user tools reflect current screen
 
 ---
 
@@ -979,6 +1055,21 @@ def get_tools(self) -> list[Tool]:
 
 ### Q10: Scenario termination conditions?
 **Decision**: Two conditions: (1) max_turns reached, OR (2) oracles satisfied. Check both after each turn.
+
+### Q11: Should we use Meta-ARE's Scenario class and oracle system?
+**Decision**: **YES** - Major design pivot. Instead of building scenarios from scratch with raw apps/events, we extend Meta-ARE's `ScenarioRunner` and use their `Scenario` class.
+
+**Benefits**:
+- Get scenario parsing for free (JSON → Scenario objects)
+- Get oracle validation for free (OracleEvent checking via scenario.validate())
+- Get trace export, judging, and benchmark infrastructure
+- Only implement our custom turn-based loop (_run_with_two_agents)
+
+**Impact**:
+- TwoAgentScenarioRunner extends ScenarioRunner instead of being standalone
+- PAS's OracleTracker becomes optional (can remove)
+- LLM adapter becomes unnecessary (use Meta-ARE's LLMEngine)
+- Meta adapter may become unnecessary (scenarios already in Meta-ARE format)
 
 ---
 

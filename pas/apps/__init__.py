@@ -20,3 +20,12 @@ __all__ = [
     "StatefulMessagingApp",
     "user_tool",
 ]
+
+ALL_APPS = [
+    HomeScreenSystemApp,
+    ProactiveAgentUserInterface,
+    StatefulCalendarApp,
+    StatefulContactsApp,
+    StatefulEmailApp,
+    StatefulMessagingApp,
+]
