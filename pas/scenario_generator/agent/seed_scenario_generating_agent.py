@@ -354,14 +354,14 @@ class SeedScenarioGeneratingAgent:
 
         logger.info(f"Available apps: {available_apps}")
         logger.info(
-            f"Generating {total_scenarios} scenarios with {apps_per_scenario} apps each (plus AgentUserInterface)"
+            f"Generating {total_scenarios} scenarios with {apps_per_scenario} apps each (plus AgentUserInterface and SystemApp)"
         )
 
         # Build app tools info for the combination agent
         app_tools_info = defaultdict(list)
         for tool in self.tools:
             app_name = tool.name.split("__")[0]
-            if app_name != "AgentUserInterface":  # Exclude AUI from the tools info
+            if app_name not in {"AgentUserInterface", "SystemApp"}:  # Exclude AUI and SystemApp from the tools info
                 app_tools_info[app_name].append(tool)
 
         # Generate ALL app combinations at once using intelligent reasoning
@@ -762,11 +762,11 @@ class SeedScenarioGeneratingAgent:
         return problems
 
     def _get_available_apps(self) -> list[str]:
-        """Get list of available app names from tool_dict, excluding AgentUserInterface."""
+        """Get list of available app names from tool_dict, excluding AgentUserInterface and SystemApp."""
         available_apps = []
         for tool in self.tools:
             app_name = tool.name.split("__")[0]
-            if app_name != "AgentUserInterface" and app_name not in available_apps:
+            if app_name not in {"AgentUserInterface", "SystemApp"} and app_name not in available_apps:
                 available_apps.append(app_name)
         return available_apps
 
@@ -782,7 +782,7 @@ class SeedScenarioGeneratingAgent:
         app_tools_info = defaultdict(list)
         for tool in self.tools:
             app_name = tool.name.split("__")[0]
-            if app_name != "AgentUserInterface":  # Exclude AUI from the tools info
+            if app_name not in {"AgentUserInterface", "SystemApp"}:  # Exclude AUI and SystemApp from the tools info
                 app_tools_info[app_name].append(tool)
 
         # Use the intelligent app combination agent
@@ -795,12 +795,12 @@ class SeedScenarioGeneratingAgent:
         )
 
     def _get_tools_for_apps(self, selected_apps: frozenset[str]) -> list[Tool]:
-        """Get tools for the selected app combination (including AgentUserInterface)."""
+        """Get tools for the selected app combination (including AgentUserInterface and SystemApp)."""
         selected_tools = []
 
-        # Always include AgentUserInterface tools
+        # Always include AgentUserInterface and SystemApp tools
         for tool in self.tools:
-            if tool.name.startswith("AgentUserInterface__"):
+            if tool.name.startswith("AgentUserInterface__") or tool.name.startswith("SystemApp__"):
                 selected_tools.append(tool)
 
         # Add tools for selected apps
@@ -809,13 +809,15 @@ class SeedScenarioGeneratingAgent:
             if app_name in selected_apps:
                 selected_tools.append(tool)
 
-        logger.info(f"Selected {len(selected_tools)} tools for apps: AgentUserInterface + {sorted(selected_apps)}")
+        logger.info(
+            f"Selected {len(selected_tools)} tools for apps: AgentUserInterface + SystemApp + {sorted(selected_apps)}"
+        )
         return selected_tools
 
     def _generate_import_instructions_for_selected_apps(self, selected_apps: frozenset[str]) -> str:
         """Generate import instructions that only include the selected apps and their dependencies."""
-        # Always include AgentUserInterface
-        apps_to_import = {"AgentUserInterface"} | selected_apps
+        # Always include AgentUserInterface and SystemApp
+        apps_to_import = {"AgentUserInterface", "SystemApp"} | selected_apps
 
         # Generate import instructions for only the selected apps
         from pas.scenario_generator.utils.list_all_app_imports import make_import_instructions, scan_package
