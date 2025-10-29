@@ -70,7 +70,7 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 show_error_codes = true
-exclude = ["pas/_archives", "pas/scripts", "scripts"]
+exclude = ["pas/_archives", "pas/scripts", "scripts", "tests"]
 
 # Treat meta-are as having type information (follow_imports = silent)
 # Ignore all errors from meta-are since it doesn't have type stubs
@@ -118,7 +118,8 @@ exclude = [
     # ---- project specific ----
     "pas/_archives",
     "pas/scripts",
-    "scripts"
+    "scripts",
+    "tests"
 ]
 target-version = "py312"
 line-length = 120
@@ -157,8 +158,6 @@ ignore = [
     "D100", # Missing docstring in public module
     "D104", # Missing docstring in public package
     "D105", # Missing docstring in magic method
-    "ANN101", # Missing type annotation in for self
-    "ANN102", # Missing type annotation in for cls
 ]
 
 fixable = ["ALL"]
@@ -166,11 +165,12 @@ fixable = ["ALL"]
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-[tool.ruff.flake8-annotations]
+[tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true
 
 [tool.ruff.lint.isort]
 known-first-party = ["pas"]
+required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
@@ -181,7 +181,6 @@ known-first-party = ["pas"]
 preview = true
 quote-style = "double"
 indent-style = "space"
-skip-magic-trailing-comma = true
 line-ending = "auto"
 docstring-code-format=true
 
@@ -204,10 +203,6 @@ proactive-agent-sandbox = "pas.scenario_generator:register_custom_scenarios"
 
 [tool.uv.sources]
 meta-agents-research-environments = { git = "ssh://git@github.com/deepakn97/meta-are.git" }
-
-[[tool.mypy.overrides]]
-module = "pytest"
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "dotenv"

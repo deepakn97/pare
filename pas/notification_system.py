@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -10,6 +11,18 @@ if TYPE_CHECKING:
 
 from are.simulation.notification_system import Message, MessageType, VerboseNotificationSystem, VerbosityLevel
 from are.simulation.types import CompletedEvent
+
+
+class PASMessageType(Enum):
+    """Extended MessageType enum system for PAS.
+
+    AGENT_MESSAGE denotes any message sent by the agent to the user. This is important because user agent has to either accept or reject the agent's proposal.
+    """
+
+    AGENT_MESSAGE = "AGENT_MESSAGE"
+    USER_MESSAGE = "USER_MESSAGE"
+    ENVIRONMENT_NOTIFICATION = "ENVIRONMENT_NOTIFICATION"
+    ENVIRONMENT_STOP = "ENVIRONMENT_STOP"
 
 
 class PasNotificationSystem(VerboseNotificationSystem):
