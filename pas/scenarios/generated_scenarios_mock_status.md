@@ -2,10 +2,20 @@
 
 | Scenario | Mock Run Result |
 |----------|----------------|
-| proactive_budget_summary_creation | PASS |
+| apartment_safety_check | FAIL |
+| apartment_safety_selection | FAIL |
+| apartment_viewing_schedule | FAIL |
+| auto_meeting_with_cab_booking | FAIL |
+| city_safety_apartment_suggestion | FAIL |
+| compare_apartment_rentals | FAIL |
+| compare_market_inventories | FAIL |
 | contact_update_notify | PASS |
-| customer_feedback_analysis_workflow | FAIL |
+| document_organizer_proactive | FAIL |
 | document_reminder | PASS |
+| dual_storage_sync_confirmation | FAIL |
+| email_to_calendar_confirmation | FAIL |
+| email_to_reminder_conversion | FAIL |
+| express_gadget_delivery | FAIL |
 | file_cleanup | PASS |
 | file_summary_share | PASS |
 | financial_report_planning | FAIL |
@@ -13,13 +23,27 @@
 | followup_documents | PASS |
 | generate_project_kickoff_meetings | FAIL |
 | invoice_organizer | FAIL |
+| meeting_invite_coordination | PASS |
 | meeting_note_proposal | PASS |
+| online_order_pickup_trip | FAIL |
 | personal_travel_itinerary_manager | FAIL |
+| proactive_budget_summary_creation | PASS |
 | proactive_file_summary | PASS |
+| project_feedback_share | FAIL |
+| project_file_sync_proactive | FAIL |
 | project_migration_support | PASS |
+| project_planning_proactive | FAIL |
 | reminder_deadline_followup | PASS |
 | remote_training_workshop_assistant | PASS |
+| safe_apartment_finder | FAIL |
 | schedule_meeting | PASS |
 | supplier_contract_update_workflow | FAIL |
+| sync_contact_from_email_proactive | FAIL |
+| sync_contacts_from_chat | FAIL |
 | task_digest_and_summary_suggestion | FAIL |
 | team_event_gallery_preparation | FAIL |
+| team_file_share_collaboration | FAIL |
+| team_meeting_coordination | FAIL |
+| team_meeting_from_email | FAIL |
+| teamfollowup_with_reminder | FAIL |
+| weekend_grocery_pickup | FAIL |
