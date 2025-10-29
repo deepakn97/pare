@@ -30,7 +30,6 @@ def register_custom_scenarios(registry: "ScenarioRegistry") -> None:
     ]
 
     # Import individual generated scenario files (since generated_scenarios is not a package)
-    # Note: This list is maintained manually and should be updated when new scenarios are added
     generated_scenario_files = [
         "pas.scenarios.generated_scenarios.3apps_group.apartment_search_and_save_proactive",
         "pas.scenarios.generated_scenarios.3apps_group.city_safety_advice",
