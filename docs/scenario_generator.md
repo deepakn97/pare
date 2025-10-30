@@ -77,7 +77,8 @@ python pas/scenario_generator/scenario_generator.py \
     --simulated_generation_time_mode <measured|fixed> \
     --total-scenarios <number> \
     --apps-per-scenario <number> \
-    --app-def-scenario <scenario_id>
+    --app-def-scenario <scenario_id> \
+    --scale <AppClass1> <AppClass2> ...
 ```
 
 ### Parameters
@@ -95,6 +96,15 @@ python pas/scenario_generator/scenario_generator.py \
 - **`--total-scenarios`**: Number of scenarios to generate in batch mode (default: 1)
 - **`--apps-per-scenario`**: Number of apps to use per scenario (excluding AgentUserInterface) (default: 4)
 - **`--app-def-scenario`**: App definition scenario to extract tools from (default: "scenario_with_all_apps_init")
+- **`--scale`**: Optional explicit list of app class names to use for all generated scenarios. When omitted or set to none (default), the generator uses intelligent app-combination selection. When provided, the generator bypasses the combination agent and always uses the same set you pass (AgentUserInterface and SystemApp are always included by default).
+
+Example:
+
+```bash
+python pas/scenario_generator/scenario_generator.py \
+  --total-scenarios 3 \
+  --scale ApartmentListingApp ContactsApp ReminderApp
+```
 
 ## Output
 

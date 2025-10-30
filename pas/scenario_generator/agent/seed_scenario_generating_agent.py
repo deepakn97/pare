@@ -321,6 +321,7 @@ class SeedScenarioGeneratingAgent:
         initial_agent_logs: list[BaseAgentLog] | None = None,
         total_scenarios: int = 1,
         apps_per_scenario: int = 4,
+        selected_apps: list[str] | None = None,
     ) -> AgentExecutionResult:
         """Generate multiple scenarios with different app combinations.
 
@@ -338,6 +339,8 @@ class SeedScenarioGeneratingAgent:
             initial_agent_logs: Optional initial agent logs
             total_scenarios: Total number of scenarios to generate
             apps_per_scenario: Number of apps (excluding AgentUserInterface) to use per scenario
+            selected_apps: Optional explicit app class names to use for all scenarios. When provided,
+                bypasses app combination generation and reuses this set for each scenario.
         """
         # Use provided app_def_scenario or fall back to stored one
         if app_def_scenario is None and self.app_def_scenario is not None:
@@ -350,29 +353,53 @@ class SeedScenarioGeneratingAgent:
 
         # Get available apps and initialize history tracking
         available_apps = self._get_available_apps()
-        history_combinations: set[frozenset[str]] = set()
 
         logger.info(f"Available apps: {available_apps}")
         logger.info(
             f"Generating {total_scenarios} scenarios with {apps_per_scenario} apps each (plus AgentUserInterface and SystemApp)"
         )
 
-        # Build app tools info for the combination agent
-        app_tools_info = defaultdict(list)
-        for tool in self.tools:
-            app_name = tool.name.split("__")[0]
-            if app_name not in {"AgentUserInterface", "SystemApp"}:  # Exclude AUI and SystemApp from the tools info
-                app_tools_info[app_name].append(tool)
+        # If explicit selection is provided (via --scale), bypass combination agent and reuse the same set every time
+        if selected_apps:
+            # Sanitize/validate provided apps against available apps
+            selected_set = {app for app in selected_apps if app in available_apps}
+            missing = [app for app in selected_apps if app not in available_apps]
+            if missing:
+                logger.warning(
+                    f"Some requested apps are not available and will be ignored: {sorted(missing)}; available={sorted(available_apps)}"
+                )
 
-        # Generate ALL app combinations at once using intelligent reasoning
-        logger.info("==== Generating all app combinations at once ====")
-        all_app_combinations, all_summaries = self.app_combination_agent.generate_all_app_combinations(
-            available_apps=available_apps,
-            total_scenarios=total_scenarios,
-            apps_per_scenario=apps_per_scenario,
-            app_tools_info=dict(app_tools_info),
-            example_scenarios=example_scenarios,
-        )
+            # Ensure we always have exactly the provided set (AgentUserInterface and SystemApp are auto-included later)
+            if not selected_set:
+                logger.error("No valid apps provided via --scale; falling back to combination agent selection")
+                use_scale_mode = False
+            else:
+                use_scale_mode = True
+                all_app_combinations = [frozenset(selected_set)] * max(1, total_scenarios)
+                # Summaries not driven by app_combination_agent in scale mode; create simple placeholders
+                all_summaries = [f"Scenario focusing on apps: {', '.join(sorted(selected_set))}"] * len(
+                    all_app_combinations
+                )
+        else:
+            use_scale_mode = False
+
+        # Otherwise, use intelligent reasoning to generate combinations
+        if not use_scale_mode:
+            # Build app tools info for the combination agent
+            app_tools_info = defaultdict(list)
+            for tool in self.tools:
+                app_name = tool.name.split("__")[0]
+                if app_name not in {"AgentUserInterface", "SystemApp"}:  # Exclude AUI and SystemApp
+                    app_tools_info[app_name].append(tool)
+
+            logger.info("==== Generating all app combinations at once ====")
+            all_app_combinations, all_summaries = self.app_combination_agent.generate_all_app_combinations(
+                available_apps=available_apps,
+                total_scenarios=total_scenarios,
+                apps_per_scenario=apps_per_scenario,
+                app_tools_info=dict(app_tools_info),
+                example_scenarios=example_scenarios,
+            )
 
         # Log the summaries for debugging
         logger.info("Generated scenario summaries:")
@@ -391,9 +418,9 @@ class SeedScenarioGeneratingAgent:
         generated_scenarios = []
 
         # Generate scenarios using the pre-generated combinations
-        for scenario_num, selected_apps in enumerate(all_app_combinations[:total_scenarios]):
+        for scenario_num, selected_combo in enumerate(all_app_combinations[:total_scenarios]):
             logger.info(f"==== Generating scenario {scenario_num + 1}/{total_scenarios} ====")
-            logger.info(f"Using app combination: {sorted(selected_apps)}")
+            logger.info(f"Using app combination: {sorted(selected_combo)}")
 
             # Get the corresponding scenario summary
             scenario_summary = all_summaries[scenario_num] if scenario_num < len(all_summaries) else None
@@ -401,10 +428,10 @@ class SeedScenarioGeneratingAgent:
                 logger.info(f"Scenario guidance: {scenario_summary}")
 
             # Get tools for selected apps
-            selected_tools = self._get_tools_for_apps(selected_apps)
+            selected_tools = self._get_tools_for_apps(selected_combo)
 
             # Generate import instructions for selected apps only
-            selected_import_instructions = self._generate_import_instructions_for_selected_apps(selected_apps)
+            selected_import_instructions = self._generate_import_instructions_for_selected_apps(selected_combo)
             logger.info(f"Selected import instructions: {selected_import_instructions}")
 
             # Temporarily replace self.tools with selected tools
@@ -828,7 +855,6 @@ class SeedScenarioGeneratingAgent:
         # Filter catalog to only include selected apps - maintain the list structure
         filtered_modules = []
         for module_info in catalog.get("modules", []):
-            module_name = module_info["module"]
             # Check if this module contains any of our selected apps
             module_classes = [cls["name"] for cls in module_info.get("exports", {}).get("classes", [])]
             if any(app in module_classes for app in apps_to_import):
