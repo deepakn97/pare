@@ -169,7 +169,7 @@ DEFAULT_USER_STEP_2_MESSAGE = {
 
 ---
 
-### 3. ProactiveAgent (Pending - Phase 4)
+### 3. ProactiveAgent ✅ COMPLETED (Phase 4)
 
 **File**: `pas/agents/proactive/agent.py`
 
@@ -179,52 +179,54 @@ DEFAULT_USER_STEP_2_MESSAGE = {
 ```python
 def __init__(
     self,
-    # Shared parameters
     log_callback: Callable[[BaseAgentLog], None],
     pause_env: Callable[[], None] | None,
     resume_env: Callable[[float], None] | None,
-    time_manager: TimeManager,
-    simulated_generation_time_config: SimulatedGenerationTimeConfig | None = None,
-
-    # Observe agent
     observe_llm_engine: LLMEngine,
     observe_agent: BaseAgent,
-    observe_max_iterations: int = 1,
-
-    # Execute agent
     execute_llm_engine: LLMEngine,
     execute_agent: BaseAgent,
+    time_manager: TimeManager,
+    tools: list[Tool] | None = None,
+    observe_max_iterations: int = 1,
     execute_max_iterations: int = 20,
-
-    # Proactive-specific
     max_turns: int | None = None,
+    simulated_generation_time_config: SimulatedGenerationTimeConfig | None = None,
 )
 ```
 
 **Internal State**:
-- `mode`: "observe" | "awaiting_confirmation" | "execute"
+- `mode`: ProactiveAgentMode enum ("observe" | "awaiting_confirmation" | "execute")
 - `pending_goal`: Stored goal when awaiting confirmation
-- `last_read_timestamp`: For notification polling
 
 **Key Methods**:
-- `agent_loop()` - Execute one proactive agent turn with mode branching
-- `build_observation_task()` - Build task from user actions + env notifications
-- `build_execution_task()` - Build task with confirmed goal
+- `prepare_proactive_agent_run()` - One-time initialization (tools, system prompts, notification system)
+- `init_tools(scenario)` - Initialize tools for both agents (observe gets send_message_to_user only, execute gets all)
+- `init_observe_system_prompt(scenario)` - Replace placeholders in observe system prompt
+- `init_execute_system_prompt(scenario)` - Replace placeholders in execute system prompt
+- `init_notification_system(ns)` - Set notification system on both agents
+- `remove_aui_irrelevant_tools()` - Configure AgentUserInterface (set wait_for_user_response=False, remove redundant message tools)
+- `get_notifications()` - Poll notification system and filter by type (USER_MESSAGE, ENVIRONMENT_NOTIFICATION, ENVIRONMENT_STOP)
+- `build_task_from_notifications()` - Build task string from user messages
+- `agent_loop()` - Execute one proactive agent turn with mode branching (returns `str | MMObservation | None`)
 - `check_for_proposal()` - Check if observe_agent called send_message_to_user
-- `check_for_confirmation()` - Check notifications for accept/reject
+- `_check_confirmation()` - Private helper: Check notifications for accept/reject
+- `_run_observe_mode()` - Private helper: Run observe agent and check for proposals
+- `_run_execute_mode()` - Private helper: Run execute agent with pending goal
 
 **Responsibilities**:
 - Manage proactive agent state (observe/awaiting_confirmation/execute)
 - Execute observe agent (BaseAgent.run() with max_iterations=1)
 - Execute execute agent (BaseAgent.run() with max_iterations=20)
-- **Detect** send_message_to_user calls in agent logs (returns status to ScenarioRunner)
+- Detect send_message_to_user calls in agent logs
 - Detect user confirmation (accept/reject) and transition modes
 - Build appropriate task prompts for each mode
 
-**Important Note**:
-- ProactiveAgent does NOT inject tools - it only returns status information
-- Tool injection (accept_proposal/reject_proposal) is handled by **TwoAgentScenarioRunner**
-- When ProactiveAgent.agent_loop() returns "proposal made", ScenarioRunner injects tools into environment
+**Important Notes**:
+- **Tools are static** - ProactiveAgent gets ALL privileged tools from all apps (via `env.get_tools()`) regardless of state. Unlike UserAgent, no tool refresh is needed because the tool set doesn't change.
+- **Mode state is accessible** - TwoAgentScenarioRunner can check `proactive_agent.mode` to detect when proposals are made and when execution completes
+- **Return type** - `agent_loop()` returns `str | MMObservation | None` (BaseAgent.run() result), not status dict
+- **Tool injection** - ProactiveAgent does NOT inject accept/reject tools; that's handled by TwoAgentScenarioRunner by checking `proactive_agent.mode`
 
 ---
 
@@ -365,14 +367,14 @@ class PASAgentUserInterface(AgentUserInterface):
     @event_registered(operation_type=OperationType.WRITE, event_type=EventType.USER)
     def accept_proposal(self, reason: str = "") -> str:
         """Accept the proactive assistant's proposal."""
-        content = f"ACCEPT: {reason}" if reason else "ACCEPT"
+        content = f"[ACCEPT]: {reason}" if reason else "[ACCEPT]"
         return self.send_message_to_agent(content=content)
 
     @user_tool()
     @event_registered(operation_type=OperationType.WRITE, event_type=EventType.USER)
     def reject_proposal(self, reason: str = "") -> str:
         """Reject the proactive assistant's proposal."""
-        content = f"REJECT: {reason}" if reason else "REJECT"
+        content = f"[REJECT]: {reason}" if reason else "[REJECT]"
         return self.send_message_to_agent(content=content)
 ```
 
@@ -398,30 +400,31 @@ Turn N:
    └─ Return result
 
 3. ProactiveAgent.agent_loop()
+   ├─ Get notifications (USER_MESSAGE + ENVIRONMENT_NOTIFICATION + ENVIRONMENT_STOP)
    ├─ Check mode (observe | awaiting_confirmation | execute)
    │
    ├─ If mode == "observe":
-   │   ├─ Get notifications (user actions + env)
-   │   ├─ Build task from notifications
-   │   ├─ Refresh tools: observe_agent.tools = env.get_tools()
+   │   ├─ Build task from user messages (env notifications handled by BaseAgent preprocessing)
    │   ├─ Run: observe_agent.run(task, max_iterations=1)
    │   ├─ Check logs: did agent call send_message_to_user?
-   │   └─ If yes: return {"status": "proposal_made"}, mode = "awaiting_confirmation"
+   │   ├─ If yes: mode = "awaiting_confirmation", pending_goal = proposal content
+   │   └─ Return BaseAgent result (str | MMObservation | None)
    │
    ├─ If mode == "awaiting_confirmation":
    │   ├─ Check notifications for accept/reject
-   │   └─ If accept: mode = "execute", return {"status": "accepted"}
-   │   └─ If reject: mode = "observe", return {"status": "rejected"}
+   │   ├─ If accept: mode = "execute", run execute_agent immediately in same turn
+   │   ├─ If reject: mode = "observe"
+   │   └─ Return BaseAgent result or None
    │
    └─ If mode == "execute":
-       ├─ Build task: "Complete this goal: {pending_goal}"
-       ├─ Refresh tools: execute_agent.tools = env.get_tools()
+       ├─ Build task: "Proposed Goal: {pending_goal}\nUser reply: {user_message}"
        ├─ Run: execute_agent.run(task, max_iterations=20)
-       └─ mode = "observe", return {"status": "executed"}
+       ├─ mode = "observe", pending_goal = None
+       └─ Return BaseAgent result
 
 4. TwoAgentScenarioRunner (orchestration logic):
-   ├─ If proactive_result["status"] == "proposal_made":
-   │   └─ Inject accept_proposal/reject_proposal tools into AgentUserInterface
+   ├─ After proactive_agent.agent_loop(), check proactive_agent.mode:
+   │   └─ If mode == "awaiting_confirmation": inject accept_proposal/reject_proposal tools
    ├─ Check termination (max_turns or env stopped)
    └─ Loop back to step 1
 ```
@@ -442,15 +445,29 @@ Turn N:
 ### Phase 2: Agent System Prompts ✅ COMPLETED
 **Status**: All prompts implemented in pas/agents/*/prompts/
 
-### Phase 3: UserAgent ⏳ IN PROGRESS
+### Phase 3: UserAgent ✅ COMPLETED
 **Status**:
 - ✅ Phase 3.1: Created PASMessageType enum in notification_system.py, fixed role_dict/message_dict
 - ✅ Phase 3.2: get_notifications() completed
 - ✅ Phase 3.3: build_task_from_notifications() completed
-- ⏳ Phase 3.4: agent_loop() (NEXT)
+- ✅ Phase 3.4: agent_loop() completed
+- ✅ Phase 3.5: Comprehensive tests (28 tests)
 
-### Phase 4: ProactiveAgent
-**Status**: Pending - implement after UserAgent complete
+### Phase 4: ProactiveAgent ✅ COMPLETED
+**Status**: All methods implemented in pas/agents/proactive/agent.py
+- ✅ `__init__()` - Initialize with two BaseAgent instances
+- ✅ `init_tools()` - Filter tools for observe/execute agents
+- ✅ `init_observe_system_prompt()` - Replace placeholders
+- ✅ `init_execute_system_prompt()` - Replace placeholders
+- ✅ `prepare_proactive_agent_run()` - One-time initialization
+- ✅ `remove_aui_irrelevant_tools()` - Configure AgentUserInterface
+- ✅ `get_notifications()` - Poll and filter notifications
+- ✅ `build_task_from_notifications()` - Build task from user messages
+- ✅ `check_for_proposal()` - Detect send_message_to_user calls
+- ✅ `agent_loop()` - Mode-based execution with branching
+- ✅ `_check_confirmation()` - Private helper for accept/reject
+- ✅ `_run_observe_mode()` - Private helper for observe mode
+- ✅ `_run_execute_mode()` - Private helper for execute mode
 
 ### Phase 5: PASAgentUserInterface
 **Status**: Pending - accept_proposal/reject_proposal tools

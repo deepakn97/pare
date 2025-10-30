@@ -21,6 +21,7 @@ from are.simulation.agents.default_agent.base_agent import (
 )
 from are.simulation.agents.llm.types import MessageRole
 from are.simulation.notification_system import BaseNotificationSystem, Message, MessageType
+from are.simulation.tool_utils import AppToolAdapter
 
 from .prompts.notification_system import get_notification_system_prompt
 
@@ -120,8 +121,6 @@ class UserAgent:
         Args:
             tools: Tools to initialize.
         """
-        from are.simulation.tool_utils import AppToolAdapter
-
         logger.info(f"Initializing {len(tools)} tools: {[tool.name for tool in tools]}")
 
         are_simulation_tools = [AppToolAdapter(tool) for tool in tools]
@@ -188,7 +187,7 @@ class UserAgent:
         self.init_tools(scenario.get_user_tools())
         self.init_notification_system(notification_system)
         self.init_system_prompt(scenario)
-        self._initialized = True
+        # ! NOTE: We don't need to replay at all for our agents.
         # Sync the base agent time manager
         if initial_agent_logs is not None and len(initial_agent_logs) > 0:
             self.react_agent.replay(initial_agent_logs)
@@ -200,6 +199,7 @@ class UserAgent:
             )
         self.react_agent.pause_env = self.pause_env
         self.react_agent.resume_env = self.resume_env
+        self._initialized = True
 
     def get_notifications(
         self, notification_system: BaseNotificationSystem
@@ -229,12 +229,7 @@ class UserAgent:
 
         # Filter for AGENT_MESSAGE (ProactiveAgent proposals to UserAgent)
         # Note: We check against the string value to support both MessageType and PASMessageType
-        new_agent_messages = [
-            message
-            for message in new_messages
-            if (hasattr(message.message_type, "value") and message.message_type.value == "AGENT_MESSAGE")
-            or message.message_type == "AGENT_MESSAGE"
-        ]
+        new_agent_messages = [message for message in new_messages if message.message_type == MessageType.AGENT_MESSAGE]
 
         new_env_notifications = [
             message for message in new_messages if message.message_type == MessageType.ENVIRONMENT_NOTIFICATION
