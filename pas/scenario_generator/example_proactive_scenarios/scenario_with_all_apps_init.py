@@ -23,7 +23,6 @@ from are.simulation.apps.contacts import ContactsApp, InternalContacts
 
 # Communication apps
 from are.simulation.apps.email_client import EmailClientApp, EmailClientV2
-from are.simulation.apps.messaging import MessagingApp
 from are.simulation.apps.messaging_v2 import MessagingAppV2
 from are.simulation.apps.reminder import ReminderApp
 
@@ -32,6 +31,9 @@ from are.simulation.apps.sandbox_file_system import Files, SandboxLocalFileSyste
 from are.simulation.apps.shopping import Shopping, ShoppingApp
 from are.simulation.apps.system import SystemApp
 from are.simulation.apps.virtual_file_system import VirtualFileSystem
+
+# from are.simulation.apps.messaging import MessagingApp
+from pas.apps.messaging import StatefulMessagingApp
 
 if TYPE_CHECKING:
     from are.simulation.types import AbstractEnvironment
@@ -72,7 +74,7 @@ class ScenarioWithAllAppsInit(Scenario):
         # =============================================================================
         email_client = EmailClientApp()  # Email client application
         email_client_v2 = EmailClientV2()  # Enhanced email client
-        messaging = MessagingApp()  # Messaging application
+        messaging = StatefulMessagingApp()  # Messaging application
         messaging_v2 = MessagingAppV2()  # Enhanced messaging application
 
         # =============================================================================
