@@ -20,8 +20,9 @@ from are.simulation.agents.default_agent.base_agent import (
     RunningState,
 )
 from are.simulation.agents.llm.types import MessageRole
-from are.simulation.notification_system import BaseNotificationSystem, Message, MessageType
 from are.simulation.tool_utils import AppToolAdapter
+
+from pas.notification_system import PASMessageType as MessageType
 
 from .prompts.notification_system import get_notification_system_prompt
 
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
 
     from are.simulation.agents.llm.llm_engine import LLMEngine
     from are.simulation.apps.app_tool import AppTool, Attachment
+    from are.simulation.notification_system import BaseNotificationSystem, Message
     from are.simulation.scenarios.scenario import Scenario
     from are.simulation.time_manager import TimeManager
     from are.simulation.types import MMObservation, SimulatedGenerationTimeConfig

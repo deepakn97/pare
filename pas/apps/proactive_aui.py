@@ -30,31 +30,29 @@ class PASAgentUserInterface(AgentUserInterface):
     @type_check
     @user_tool()
     @event_registered(operation_type=OperationType.WRITE, event_type=EventType.USER)
-    def accept_proposal(self, reason: str = "") -> str:
+    def accept_proposal(self, content: str = "") -> str:
         """User accepts the pending proactive proposal.
 
         Args:
-            reason: Optional reason for accepting the proposal
+            content: The content of the message to send to the agent
 
         Returns:
             The message ID that was generated for this message, can be used for tracking
         """
-        content = f"[ACCEPT]: {reason}" if reason else "[ACCEPT]"
         with disable_events():
             return self.send_message_to_agent(content=content)
 
     @type_check
     @user_tool()
     @event_registered(operation_type=OperationType.WRITE, event_type=EventType.USER)
-    def reject_proposal(self, reason: str = "") -> str:
+    def reject_proposal(self, content: str = "") -> str:
         """User rejects the pending proactive proposal.
 
         Args:
-            reason: Optional reason for rejecting the proposal
+            content: The content of the message to send to the agent
 
         Returns:
             The message ID that was generated for this message, can be used for tracking
         """
-        content = f"[REJECT]: {reason}" if reason else "[REJECT]"
         with disable_events():
             return self.send_message_to_agent(content=content)

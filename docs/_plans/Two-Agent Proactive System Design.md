@@ -469,8 +469,13 @@ Turn N:
 - ✅ `_run_observe_mode()` - Private helper for observe mode
 - ✅ `_run_execute_mode()` - Private helper for execute mode
 
-### Phase 5: PASAgentUserInterface
-**Status**: Pending - accept_proposal/reject_proposal tools
+### Phase 5: PASAgentUserInterface ✅ COMPLETED
+**Status**: accept_proposal/reject_proposal tools implemented
+- ✅ Removed StatefulApp inheritance and state management
+- ✅ Implemented `accept_proposal(reason: str = "")` with `[ACCEPT]` format
+- ✅ Implemented `reject_proposal(reason: str = "")` with `[REJECT]` format
+- ✅ Both methods call `send_message_to_agent()` with tag prefixes
+- ✅ Clean 64-line implementation with proper decorators
 
 ### Phase 6: TwoAgentScenarioRunner
 **Status**: Pending - main orchestration loop
@@ -641,6 +646,169 @@ else:
 
 ---
 
+## Implementation Learnings
+
+### Test Writing Strategy (Phase 4.1)
+**Key insight**: Don't over-mock when writing unit tests.
+
+**Wrong approach**:
+- Mock everything including internal methods
+- Test Meta-ARE components
+- Check prompt initialization details
+
+**Correct approach**:
+- Mock only external dependencies (BaseAgent.run(), notification_system.message_queue)
+- Let internal methods execute naturally (check_for_proposal, _check_confirmation, etc.)
+- Test OUR logic, not Meta-ARE's logic
+- Focus on high-probability-of-failure scenarios
+- Example: Don't test prompt initialization, don't test Meta-ARE's BaseAgent behavior
+
+**Reference**: ProactiveAgent tests (tests/agents/proactive/test_agent.py) - 17 focused tests
+
+### ProactiveAgent Bug Fix (Phase 4.1)
+**Issue**: Tuple unpacking bug in `_check_confirmation()` handling.
+
+**Bug** (agent.py:404):
+```python
+accepted = self._check_confirmation(new_user_messages)  # Gets entire tuple
+if accepted:  # Tuple (False, None) is still truthy!
+```
+
+**Fix**:
+```python
+accepted, _ = self._check_confirmation(new_user_messages)  # Properly unpack
+if accepted:  # Now checks the actual boolean value
+```
+
+**Root cause**: Method returns `tuple[bool, str | None]`, but code wasn't unpacking. Non-empty tuples are always truthy in Python, so `(False, None)` evaluated to True.
+
+### PASAgentUserInterface Simplified Design (Phase 5)
+**Key decision**: Remove all state management - keep it simple.
+
+**Removed**:
+- `ProactiveProposal` dataclass
+- `pending_proposal` and `proposal_history` instance variables
+- `send_proposal_to_user()` method (ProactiveAgent uses parent's `send_message_to_user()`)
+- `get_pending_proposal()` method
+- StatefulApp inheritance (not needed)
+
+**Final implementation**:
+- Two simple methods: `accept_proposal(reason)` and `reject_proposal(reason)`
+- Both just call `self.send_message_to_agent(content=formatted_message)`
+- Use `with disable_events():` wrapper to prevent double event registration
+- Use `@type_check` decorator for parameter validation
+- Format: `"[ACCEPT]: {reason}"` or `"[ACCEPT]"` (tags as PREFIXES, not inline)
+
+**Reference**: pas/apps/agent_ui/app.py (64 lines total, very clean)
+
+### Message Format Clarification
+**Critical**: Tags are PREFIXES at the start of messages, not inline.
+
+**Correct format**:
+- `"[ACCEPT] yes, please go ahead with that"`
+- `"[REJECT] no, I don't want that"`
+
+**Wrong format** (tags inline):
+- `"yes, I [ACCEPT] this proposal"` ❌
+
+**Why**: Tags are injected by `accept_proposal()` and `reject_proposal()` tools, not typed by user. User's actual message (in any language) comes after the tag.
+
+### Phase 6 Implementation Discoveries (TwoAgentScenarioRunner)
+**Status**: Implementation in progress (pas/scenario_runner.py)
+
+**Critical Discoveries**:
+
+1. **UserAgent.agent_loop() requires `current_tools` parameter**
+   - NOT optional! Signature: `agent_loop(current_tools: list[AppTool], max_turns, initial_agent_logs)`
+   - Must refresh tools BEFORE each user turn: `user_tools = env.get_user_tools()`
+   - Pass to agent: `user_agent.agent_loop(current_tools=user_tools, max_turns=1)`
+   - Tool refresh is CRITICAL for state-dependent navigation
+
+2. **_run_with_two_agents() returns tuple for export**
+   - Return: `(validation_result, user_agent, proactive_agent)`
+   - Enables accessing agent properties for trace export:
+     - UserAgent: `.model`, `.agent_framework`
+     - ProactiveAgent: `.observe_model`, `.execute_model`, `.agent_framework`
+
+3. **Two-agent trace export format**
+   - model_id: `"user:{model}|observe:{model}|execute:{model}"`
+   - agent_id: `"user:{framework}|proactive:{framework}"`
+   - Uses Meta-ARE's JsonScenarioExporter
+
+4. **max_turns semantics**
+   - Outer loop `max_turns`: Number of full cycles (user turn + proactive turn)
+   - UserAgent.agent_loop() `max_turns=1`: Execute exactly one turn (one task execution)
+
+5. **Exception handling requires None checks**
+   - If exception during agent creation, agents are None
+   - Must check `if user_agent is not None and proactive_agent is not None` before export
+
+6. **Environment setup details**
+   - Use `PasNotificationSystem(verbosity=VerbosityLevel.HIGH)` not `VerboseNotificationSystem()`
+   - Set `exit_when_no_events=False` - don't exit when event queue empty
+   - Start with `env.run(scenario, wait_for_end=False)` - non-blocking
+   - Always call `env.stop()` in finally/cleanup
+
+**Implemented Methods**:
+- `run_pas_scenario()` - Public API with logging setup, timing, result formatting
+- `_run_pas_scenario()` - Environment setup, orchestration, trace export
+- `_run_with_two_agents()` - Core turn-based loop
+- `_export_pas_trace()` - Two-agent trace export
+
+**Still TODO for Phase 6**:
+- Implement PAS-specific config class (currently using self.config which doesn't exist)
+- Add scenario loading from string (currently raises NotImplementedError)
+- Add judge-only mode support
+- Testing
+
+### Phase 6.5 Implementation Discoveries (Notification System & Logs)
+**Status**: ✅ COMPLETED
+
+**Critical Discoveries**:
+
+1. **PASNotificationSystem architecture**
+   - Inherits from `BaseNotificationSystem` (not `VerboseNotificationSystem` as initially planned)
+   - Only overrides `convert_to_message()` for PAS-specific cases
+   - Falls back to parent for all standard cases (send_message_to_agent, environment notifications)
+   - Uses `AUIMessage` wrapper with proper `Sender.AGENT` / `Sender.USER` enum
+   - Attachment support for both AGENT_MESSAGE and USER_MESSAGE
+
+2. **Prefix logic moved to notification system (eliminates duplication)**
+   - Originally: Tools added `[ACCEPT]:`/`[REJECT]:` prefix → Notification system reconstructed it
+   - Now: Tools pass raw content → Notification system adds prefix based on function_name
+   - Single source of truth for message formatting
+   - PASAgentUserInterface tools:
+     - `accept_proposal(content)` - just passes through
+     - `reject_proposal(content)` - just passes through
+   - PASNotificationSystem adds prefixes:
+     - `accept_proposal` → `"[ACCEPT]: {content}"`
+     - `reject_proposal` → `"[REJECT]: {content}"`
+
+3. **AgentMessageLog and PASAgentLog design**
+   - PASAgentLog subclass approach (avoids monkey-patching)
+   - Extends `BaseAgentLog.from_dict()` with extended log_type_map
+   - Meta-ARE uses `"log_type"` key in serialization (not `"type"`)
+   - Uses `pop()` not `get()` - metadata keys must be removed before passing to constructor
+   - Type hints remain `BaseAgentLog` - no changes needed to existing code
+   - File: `pas/agents/agent_log.py`
+
+4. **ProactiveAgent doesn't need custom log preprocessing**
+   - TaskLog already handles USER_MESSAGE from UserAgent (accept/reject responses)
+   - BaseAgent.run() automatically creates TaskLog from task parameter
+   - No preprocessing step needed for ProactiveAgent
+
+**Implemented Components**:
+- `PASNotificationSystem` (pas/notification_system.py)
+  - `convert_to_message()` override with AGENT_MESSAGE and USER_MESSAGE handling
+- `AgentMessageLog` (pas/agents/agent_log.py)
+  - Log type for ProactiveAgent proposals to UserAgent
+- `PASAgentLog` (pas/agents/agent_log.py)
+  - Extended log type map with `from_dict()` override
+- Updated `PASAgentUserInterface` (pas/apps/proactive_aui.py)
+  - Simplified tools by removing prefix duplication
+
+---
+
 ## Open Questions
 
 1. **Notification filtering**: Should agents maintain last_read_timestamp, or use a different mechanism to avoid re-processing notifications?
@@ -665,3 +833,5 @@ else:
 - PAS StateAwareEnvironmentWrapper: `/Users/dnathani/Projects/goalInference/pas/pas/environment.py`
 - PAS StatefulApp: `/Users/dnathani/Projects/goalInference/pas/pas/apps/core.py`
 - PAS UserAgent: `/Users/dnathani/Projects/goalInference/pas/pas/agents/user/agent.py`
+
+---

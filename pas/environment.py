@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-from contextlib import suppress
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 from are.simulation.environment import Environment, EnvironmentConfig, EnvironmentType
 
@@ -14,19 +13,10 @@ if TYPE_CHECKING:
 
     from are.simulation.apps.app import App
     from are.simulation.notification_system import BaseNotificationSystem
-    from are.simulation.tools import AppTool, Tool
+    from are.simulation.tools import AppTool
     from are.simulation.types import CompletedEvent
 
 logger = logging.getLogger(__name__)
-
-
-# ! NOTE: Again, not clear why we need this protocol.
-class _UserAgentProtocol(Protocol):
-    """Protocol for user agents that support dynamic tool updates."""
-
-    def update_tools_for_app(self, app_name: str, new_tools: list[Tool]) -> None:
-        """Update tools for a specific app."""
-        ...
 
 
 class StateAwareEnvironmentWrapper(Environment):
@@ -43,7 +33,7 @@ class StateAwareEnvironmentWrapper(Environment):
         notification_system: BaseNotificationSystem | None = None,
         add_event_to_agent_log: Callable[[CompletedEvent], None] | None = None,
     ) -> None:
-        """Initialise the environment and set up completed-event subscribers."""
+        """Initialise the environment with active app tracking."""
         super().__init__(
             config=config,
             environment_type=environment_type,
@@ -52,11 +42,8 @@ class StateAwareEnvironmentWrapper(Environment):
         )
 
         # PAS extensions (follow Meta ARE naming: no underscores for public attributes)
-        self.completed_event_subscribers: list[Callable[[CompletedEvent], None]] = []
-        self.processed_event_ids: set[str] = set()
-        self.user_agent: _UserAgentProtocol | None = None
-        self.active_app: StatefulApp | HomeScreenSystemApp | None = None
-        self.background_apps: list[StatefulApp | HomeScreenSystemApp] = []
+        self.active_app: App | None = None
+        self.background_apps: list[App] = []
 
     def get_user_tools(self) -> list[AppTool]:
         """Get tools available to the user agent from currentlly active app and system app.
@@ -149,12 +136,19 @@ class StateAwareEnvironmentWrapper(Environment):
 
         Raises:
             KeyError: If the app is not registered.
-            ValueError: If the app is already open.
+            ValueError: If the app is not a StatefulApp (system apps cannot be opened).
         """
         if app_name not in self.apps:
             raise KeyError(f"App {app_name} is not available.")
 
-        target_app: StatefulApp = self.get_app(app_name)
+        target_app: App = self.get_app(app_name)
+
+        # Only StatefulApps can be opened (system apps use go_home or are always available)
+        if not isinstance(target_app, StatefulApp):
+            raise TypeError(
+                f"Cannot open {app_name}: system apps cannot be opened directly. "
+                f"Use go_home() for HomeScreen or access AgentUI tools directly."
+            )
 
         if self.active_app == target_app:
             logger.debug(f"App {app_name} is already active. Preserving current state.")
@@ -167,7 +161,7 @@ class StateAwareEnvironmentWrapper(Environment):
             self.background_apps.append(self.active_app)
 
         self.active_app = target_app
-        self.active_app.load_root_state()
+        target_app.load_root_state()  # Safe to call because we validated StatefulApp
         logger.debug(f"Opened {app_name} App successfully.")
         return f"Opened {app_name} App."
 
@@ -181,12 +175,19 @@ class StateAwareEnvironmentWrapper(Environment):
 
         Raises:
             KeyError: If the app is not registered.
-            ValueError: If the app is not open.
+            ValueError: If the app is not open or is not a StatefulApp.
         """
         if app_name not in self.apps:
             raise KeyError(f"App {app_name} is not available.")
 
-        target_app: StatefulApp = self.get_app(app_name)
+        target_app: App = self.get_app(app_name)
+
+        # Only StatefulApps can be switched to (system apps use go_home or are always available)
+        if not isinstance(target_app, StatefulApp):
+            raise TypeError(
+                f"Cannot switch to {app_name}: system apps cannot be switched to directly. "
+                f"Use go_home() for HomeScreen or access AgentUI tools directly."
+            )
 
         if self.active_app == target_app:
             logger.debug(f"App {app_name} is already active. Preserving current state.")
@@ -204,25 +205,6 @@ class StateAwareEnvironmentWrapper(Environment):
         logger.debug(f"Switched to active app: {app_name}")
         return f"Switched to {app_name} App successfully."
 
-    def register_user_agent(self, agent: _UserAgentProtocol) -> None:
-        """Register the user agent for dynamic tool updates.
-
-        Args:
-            agent: The user agent (typically StatefulUserAgent) that needs tool updates
-        """
-        self.user_agent = agent
-        logger.debug("Registered user agent for dynamic tool updates")
-
-    def subscribe_to_completed_events(self, callback: Callable[[CompletedEvent], None]) -> None:
-        """Register a callback that will receive every completed event."""
-        if callback not in self.completed_event_subscribers:
-            self.completed_event_subscribers.append(callback)
-
-    def unsubscribe_from_completed_events(self, callback: Callable[[CompletedEvent], None]) -> None:
-        """Remove a previously registered completed-event subscriber."""
-        with suppress(ValueError):  # pragma: no cover - defensive guard
-            self.completed_event_subscribers.remove(callback)
-
     def add_to_log(self, events: CompletedEvent | list[CompletedEvent]) -> None:
         """Override to add PAS state transition handling.
 
@@ -233,42 +215,12 @@ class StateAwareEnvironmentWrapper(Environment):
         super().add_to_log(event_list)  # Call Meta ARE's native event processing
 
         for event in event_list:
-            # Skip already processed events
-            if event.event_id in self.processed_event_ids:
-                continue
-
             logger.debug(
-                f"StateAwareEnvironmentWrapper observed event: app={event.app_name()} function={event.function_name()} type={event.event_type}"
+                f"StateAwareEnvironmentWrapper observed event: app={event.app_name()} "
+                f"function={event.function_name()} type={event.event_type}"
             )
 
             # Handle state transitions for StatefulApps
             app = self.get_app(event.app_name())
             if isinstance(app, StatefulApp):
                 app.handle_state_transition(event)
-                self._refresh_user_agent_tools(event.app_name(), app)
-
-            # Notify subscribers (used by UserProxy, ProactiveAgent, event logging, and oracles)
-            for callback in tuple(self.completed_event_subscribers):
-                callback(event)
-
-            self.processed_event_ids.add(event.event_id)
-
-    def _refresh_user_agent_tools(self, app_name: str, app: StatefulApp) -> None:
-        """Refresh user agent tools after a stateful app transitions state.
-
-        Args:
-            app_name: Name of the app that transitioned
-            app: The StatefulApp instance
-        """
-        if self.user_agent is None:
-            return
-
-        if not hasattr(self.user_agent, "update_tools_for_app"):
-            return
-
-        try:
-            new_tools = app.get_meta_are_user_tools()
-            self.user_agent.update_tools_for_app(app_name, new_tools)
-            logger.debug(f"Refreshed tools for app {app_name}: {len(new_tools)} tools now available")
-        except Exception as e:
-            logger.warning(f"Failed to refresh tools for app {app_name}: {e}")
