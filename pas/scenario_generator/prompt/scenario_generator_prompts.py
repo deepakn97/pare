@@ -56,6 +56,8 @@ Key requirements:
 - Use ALL available applications from the tool descriptions (every single app must be used)
 - Use at least one tool from each available app
 - Follow the same Scenario class structure and methods
+- In build_events_flow, you MUST use every initialized app at least once; do not only initialize
+  apps in init_and_populate_apps without using them in the event flow
 - Create comprehensive event flows that demonstrate all available applications
 - Import all required tools at the beginning of the file (per import instructions)
 - Maintain a similar validation approach style but target different signals than the example
@@ -185,6 +187,8 @@ SEED_SCENARIO_GENERATOR_AGENT_HINTS = textwrap.dedent(
     SCENARIO STRUCTURE REQUIREMENTS:
     - Follow the standard Scenario class structure (init_and_populate_apps, build_events_flow, validate)
     - Use the same app initialization pattern as the app definition scenario
+    - In build_events_flow, ENSURE all apps initialized in init_and_populate_apps are actually used at least once
+      with meaningful tool/action calls; do NOT leave any initialized app unused
     - Create different event flows and proactive behaviors than the examples
     - Maintain similar complexity and validation approach but target different signals
 

@@ -10,7 +10,6 @@ from are.simulation.scenarios import Scenario
 
 from pas.scenario_generator.agent.scenario_generating_agent import ScenarioGeneratingAgent
 from pas.scenario_generator.agent.seed_scenario_generating_agent import SeedScenarioGeneratingAgent
-from pas.scenario_generator.example_proactive_scenarios import scenario as _proactive_scenarios  # noqa: F401
 from pas.scenario_generator.utils.list_all_app_imports import make_import_instructions, scan_package
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,6 @@ def generate_scenarios_from_example(
     engine = LLMEngineBuilder().create_engine(engine_config=config)
 
     # Create a minimal BaseAgent configured for scenario generation (no repo config types)
-    system_prompt = ""  # ScenarioGeneratingAgent will populate tools/time placeholders
     # Wire minimal generator (no BaseAgent needed)
     gen_agent = ScenarioGeneratingAgent(
         llm_engine=engine, tools=[], max_iterations=15, import_instructions=import_instructions
@@ -64,6 +62,7 @@ def generate_scenarios_from_example_seed(
     endpoint: str | None = None,
     total_scenarios: int = 1,
     apps_per_scenario: int = 4,
+    selected_apps: list[str] | None = None,
 ) -> str | None:
     """Runner that builds the SeedScenarioGeneratingAgent and generates scenarios using only tools from the app definition scenario.
 
@@ -75,6 +74,10 @@ def generate_scenarios_from_example_seed(
         endpoint: Optional endpoint URL
         total_scenarios: Number of scenarios to generate
         apps_per_scenario: Number of apps to use per scenario
+
+    Args:
+        selected_apps: Optional explicit app class names to use for all scenarios. When provided,
+            bypasses app combination generation and always uses this set.
 
     Returns:
         Generated scenario code or None if generation failed
@@ -109,7 +112,11 @@ def generate_scenarios_from_example_seed(
 
     logger.info("Running SeedScenarioGeneratingAgent")
     result = seed_agent.scenario_generation_run(
-        example_scenarios, app_def_scenario, total_scenarios=total_scenarios, apps_per_scenario=apps_per_scenario
+        example_scenarios,
+        app_def_scenario,
+        total_scenarios=total_scenarios,
+        apps_per_scenario=apps_per_scenario,
+        selected_apps=selected_apps,
     )
     logger.info("Seed scenario generation completed")
     if result is not None:
@@ -178,6 +185,18 @@ def main() -> None:
         default=2,
         help="Number of apps (excluding AgentUserInterface) to use per scenario (default: 4)",
     )
+    # Explicit app scaling (bypass app combination agent)
+    parser.add_argument(
+        "--scale",
+        dest="scale_apps",
+        nargs="*",
+        default=None,
+        help=(
+            "Explicit list of app class names to use for all generated scenarios "
+            "(default: None). "
+            "AgentUserInterface and SystemApp are always included by default."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -228,6 +247,8 @@ def main() -> None:
             endpoint=args.endpoint,
             total_scenarios=args.total_scenarios,
             apps_per_scenario=args.apps_per_scenario,
+            # Pass explicit apps if provided by --scale
+            selected_apps=args.scale_apps,
         )
 
     else:

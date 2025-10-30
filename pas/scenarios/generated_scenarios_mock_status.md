@@ -3,17 +3,22 @@
 | Scenario | Mock Run Result |
 |----------|----------------|
 | apartment_hunt_assistant | FAIL |
+| apartment_hunt_proactive_followup | FAIL |
 | apartment_hunt_transport_and_schedule | FAIL |
+| apartment_hunting_followup | FAIL |
 | apartment_safety_check | FAIL |
 | apartment_safety_comparison | FAIL |
 | apartment_safety_selection | FAIL |
 | apartment_search_and_save_proactive | FAIL |
 | apartment_search_and_share | FAIL |
+| apartment_shared_visit_arrangement | FAIL |
 | apartment_viewing_coordination | FAIL |
 | apartment_viewing_schedule | FAIL |
 | asset_sync_and_share | FAIL |
 | auto_meeting_with_cab_booking | FAIL |
+| budget_review_coordination | FAIL |
 | business_meeting_coordination | FAIL |
+| cab_meeting_proactive | FAIL |
 | city_living_home_setup_assistant | FAIL |
 | city_relocation_advisor | FAIL |
 | city_safety_advice | FAIL |
@@ -21,6 +26,7 @@
 | city_trip_coordination | FAIL |
 | compare_apartment_rentals | FAIL |
 | compare_market_inventories | FAIL |
+| conference_trip_coordination | FAIL |
 | contact_directory_update | FAIL |
 | contact_update_notify | PASS |
 | customer_purchase_and_vendor_update | FAIL |
@@ -37,6 +43,7 @@
 | email_to_calendar_confirmation | FAIL |
 | email_to_filesystem_archival | FAIL |
 | email_to_reminder_conversion | FAIL |
+| event_planning_shopping_assistant | FAIL |
 | express_gadget_delivery | FAIL |
 | file_cleanup | PASS |
 | file_organization_proactive_backup | FAIL |
@@ -51,6 +58,7 @@
 | lifestyle_concierge_apartment_move | FAIL |
 | meeting_invite_coordination | PASS |
 | meeting_note_proposal | PASS |
+| morning_meeting_and_ride_coordination | FAIL |
 | office_report_review_and_archive | FAIL |
 | online_order_pickup_trip | FAIL |
 | online_shopping_discount_checkout | FAIL |
@@ -59,6 +67,8 @@
 | personal_travel_itinerary_manager | FAIL |
 | proactive_budget_summary_creation | PASS |
 | proactive_file_summary | PASS |
+| proactive_gift_reminder_workflow | FAIL |
+| proactive_meeting_summary_share | FAIL |
 | productivity_followup_workflow | FAIL |
 | productivity_supply_planner | FAIL |
 | productivity_sync_flow | FAIL |
@@ -85,10 +95,12 @@
 | sync_contact_from_email_proactive | FAIL |
 | sync_contacts_from_chat | FAIL |
 | task_digest_and_summary_suggestion | FAIL |
+| team_briefing_and_followup_email | FAIL |
 | team_collaboration_project_files | FAIL |
 | team_event_gallery_preparation | FAIL |
 | team_field_meeting_coordination | FAIL |
 | team_file_share_collaboration | FAIL |
+| team_lunch_and_supply_order | FAIL |
 | team_meeting_coordination | FAIL |
 | team_meeting_from_email | FAIL |
 | team_meeting_sync_proactive | FAIL |
