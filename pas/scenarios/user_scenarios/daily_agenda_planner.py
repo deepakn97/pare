@@ -1,20 +1,14 @@
 """
-Scenario: daily_agenda_planner
-Agent proactively reviews today’s calendar events and tasks,
-summarizes the day’s agenda, and offers to schedule focus time or reminders.
-
-Key features:
-- Aggregates today’s meetings from the calendar.
-- Retrieves pending tasks (simulated).
-- Generates a proactive morning summary message.
-- Offers follow-up action suggestions (e.g., schedule focus time).
+Scenario: proactive_daily_agenda_planner
+Agent proactively reviews today's calendar events and tasks,
+summarizes the agenda, and offers to schedule focus time or reminders.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, List
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.system import SystemApp
@@ -25,17 +19,20 @@ from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, E
 from pas.apps.calendar import StatefulCalendarApp
 
 
+# ---------- Parameters ----------
 @dataclass
 class AgendaParams:
-    """Parameters for the daily agenda planner scenario."""
+    """Parameters for proactive daily agenda planner."""
+
     date: str
     focus_time_start: str
     focus_time_end: str
 
 
-@register_scenario("daily_agenda_planner")
+# ---------- Scenario ----------
+@register_scenario("proactive_daily_agenda_planner")
 class ScenarioDailyAgendaPlanner(Scenario):
-    """Agent summarizes today’s schedule and offers to create focus time."""
+    """Agent summarizes today's schedule and offers to create focus time."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -50,90 +47,119 @@ class ScenarioDailyAgendaPlanner(Scenario):
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        print("[DEBUG] daily_agenda_planner: init_and_populate_apps called")
+        """Initialize apps."""
         agui = AgentUserInterface()
         system = SystemApp()
         calendar = StatefulCalendarApp()
         self.apps = [agui, system, calendar]
-        print("[DEBUG] daily_agenda_planner: apps initialized")
 
     def build_events_flow(self) -> None:
-        print("[DEBUG] daily_agenda_planner: build_events_flow called")
-
+        """Build proactive flow for daily agenda planning."""
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         p = self._params
 
-        # Simulated example calendar events for the day
-        todays_events = [
-            {"title": "Team Standup", "time": "09:00 AM"},
-            {"title": "Project Sync", "time": "11:00 AM"},
-            {"title": "Client Call", "time": "14:00 PM"},
-        ]
-        pending_tasks = ["Prepare report slides", "Review budget proposal"]
-
         with EventRegisterer.capture_mode():
-            # System detects it's morning
-            detected = aui.send_message_to_agent(
-                content=f"[System] It's morning of {p.date}. Reviewing today's schedule..."
+            # Agent proactively starts the day
+            morning_trigger = aui.send_message_to_user(
+                content=f"Good morning! Let me check your agenda for {p.date}."
             ).depends_on(None, delay_seconds=1)
 
-            # Agent composes a summary of today's agenda
-            events_summary = "\n".join([f"- {e['title']} at {e['time']}" for e in todays_events])
-            tasks_summary = "\n".join([f"- {t}" for t in pending_tasks])
-            summary_text = (
-                f"Here’s your agenda for {p.date}:\n"
-                f"Meetings:\n{events_summary}\n\n"
-                f"Pending tasks:\n{tasks_summary}\n\n"
-                f"Would you like me to block focus time from 3–5 PM?"
+            # Agent retrieves today's calendar events (oracle)
+            start_dt = f"{p.date}T00:00:00Z"
+            end_dt = f"{p.date}T23:59:59Z"
+            fetch_events = (
+                calendar.get_calendar_events_from_to(
+                    start_datetime=start_dt, end_datetime=end_dt
+                )
+                .oracle()
+                .depends_on(morning_trigger, delay_seconds=2)
             )
 
-            summary_msg = aui.send_message_to_user(content=summary_text).depends_on(detected, delay_seconds=1)
+            # Agent summarizes schedule and tasks
+            summary_message = aui.send_message_to_user(
+                content=(
+                    f"Here’s your plan for {p.date}:\n"
+                    f"- Meetings: Standup at 9AM, Project Sync at 11AM, Client Call at 2PM.\n"
+                    f"- Tasks: Prepare report slides, Review budget proposal.\n\n"
+                    f"Would you like me to block focus time from 3–5 PM?"
+                )
+            ).depends_on(fetch_events, delay_seconds=2)
 
-            # Simulate user confirming focus time scheduling
+            # User confirms scheduling
             user_reply = aui.send_message_to_agent(
                 content="Yes, please schedule focus time from 3–5 PM."
-            ).depends_on(summary_msg, delay_seconds=1)
+            ).depends_on(summary_message, delay_seconds=2)
 
-            # Oracle creates focus time event
-            focus_event = calendar.add_calendar_event(
-                title="Focus Time",
-                start_datetime=p.focus_time_start,
-                end_datetime=p.focus_time_end,
-                description="Reserved for deep work",
-                location="",
-                attendees=None,
-                tag=None,
-            ).oracle().depends_on(user_reply, delay_seconds=1)
+            # Agent creates focus time event (oracle)
+            create_focus_time = (
+                calendar.add_calendar_event(
+                    title="Focus Time",
+                    start_datetime=p.focus_time_start,
+                    end_datetime=p.focus_time_end,
+                    description="Reserved for deep work",
+                    location="",
+                    attendees=None,
+                    tag=None,
+                )
+                .oracle()
+                .depends_on(user_reply, delay_seconds=2)
+            )
 
             # Agent confirms success
             confirm_msg = aui.send_message_to_user(
-                content="Focus time scheduled from 3–5 PM. Have a productive day!"
-            ).depends_on(focus_event, delay_seconds=1)
+                content="I've scheduled Focus Time from 3–5 PM. Have a productive day!"
+            ).depends_on(create_focus_time, delay_seconds=2)
 
-        self.events = [detected, summary_msg, user_reply, focus_event, confirm_msg]
-        print(f"[DEBUG] daily_agenda_planner: Created {len(self.events)} events")
+        self.events = [
+            morning_trigger,
+            fetch_events,
+            summary_message,
+            user_reply,
+            create_focus_time,
+            confirm_msg,
+        ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
+        """Validate proactive summary and focus-time creation."""
         print("[DEBUG] daily_agenda_planner: validate() called")
+
         try:
             events = env.event_log.list_view()
-            p = self._params
 
-            focus_event_created = any(
-                event.event_type == EventType.AGENT
-                and isinstance(event.action, Action)
-                and event.action.class_name == "StatefulCalendarApp"
-                and event.action.function_name == "add_calendar_event"
-                and event.action.args.get("title") == "Focus Time"
-                for event in events
+            # Detect proactive morning message
+            proactive_summary = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "AgentUserInterface"
+                and e.action.function_name == "send_message_to_user"
+                and any(
+                    kw in e.action.args.get("content", "").lower()
+                    for kw in ["good morning", "agenda", "plan for", "focus time"]
+                )
+                for e in events
+                if e.event_type in (EventType.ENV, EventType.AGENT)
             )
 
-            print(f"[INFO] daily_agenda_planner: Validation success={focus_event_created}")
-            return ScenarioValidationResult(success=focus_event_created)
+            # Detect focus time creation
+            focus_event_created = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "add_calendar_event"
+                and e.action.args.get("title") == "Focus Time"
+                for e in events
+            )
 
-        except Exception as e:
-            print(f"[ERROR] daily_agenda_planner: Validation failed: {e}")
+            success = proactive_summary and focus_event_created
+
+            print("\n[VALIDATION SUMMARY]")
+            print(f"  - Proactive morning summary detected: {'PASS' if proactive_summary else 'FAIL'}")
+            print(f"  - Focus Time event created:           {'PASS' if focus_event_created else 'FAIL'}")
+            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+
+            return ScenarioValidationResult(success=success)
+
+        except Exception as exc:
+            print(f"[ERROR] daily_agenda_planner: Validation failed: {exc}")
             import traceback
             traceback.print_exc()
-            return ScenarioValidationResult(success=False, exception=e)
+            return ScenarioValidationResult(success=False, exception=exc)

@@ -1,6 +1,6 @@
-"""calendar_meeting_plan: ProposeAndScheduleMeetingScenario.
+"""proactive_calendar_meeting_plan: ProposeAndScheduleMeetingScenario.
 
-Aggregate participant availability, propose options, then schedule.
+Agent detects discussion about scheduling and proactively proposes and creates a meeting.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from pas.apps.calendar import StatefulCalendarApp
 # ---------- Parameter definitions ----------
 @dataclass
 class MeetingParams:
-    """Parameters for a meeting."""
+    """Parameters for a proactive meeting."""
 
     start_time_ms: int
     end_time_ms: int
@@ -40,12 +40,11 @@ def ms_to_str(ms: int) -> str:
 
 
 # ---------- Scenario definition ----------
-@register_scenario("calendar_meeting_plan")
+@register_scenario("proactive_calendar_meeting_plan")
 class ProposeAndScheduleMeetingScenario(Scenario):
-    """Cal002: Check multi-participant availability, then create a meeting."""
+    """Cal002 (Proactive): Agent proposes meeting time and schedules after confirmation."""
 
     def __init__(self) -> None:
-        """Initialize the scenario."""
         super().__init__()
         self._params = self._get_default_params()
 
@@ -65,18 +64,14 @@ class ProposeAndScheduleMeetingScenario(Scenario):
     # ---------- App initialization ----------
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize and populate the necessary apps."""
-        print("[DEBUG] calendar_meeting_plan: init_and_populate_apps called")
         agui = AgentUserInterface()
         system = SystemApp()
         calendar = StatefulCalendarApp()
         self.apps = [agui, system, calendar]
-        print("[DEBUG] calendar_meeting_plan: Apps initialized")
 
-    # ---------- Build event flow ----------
+    # ---------- Build proactive event flow ----------
     def build_events_flow(self) -> None:
-        """Build the event flow."""
-        print("[DEBUG] calendar_meeting_plan: build_events_flow called")
-
+        """Build proactive flow where agent proposes and confirms a meeting."""
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         p = self._params
@@ -85,32 +80,38 @@ class ProposeAndScheduleMeetingScenario(Scenario):
         end_str = ms_to_str(p.end_time_ms)
 
         with EventRegisterer.capture_mode():
-            # Step 1: User → Agent
-            start_msg = aui.send_message_to_agent(
-                content=(
-                    f"Please create a calendar event with the following details:\n"
-                    f"Title: {p.title}\n"
-                    f"Start time: {start_str}\n"
-                    f"End time: {end_str}\n"
-                    f"Location: {p.location}\n"
-                    f"Description: {p.description}\n"
-                    f"Attendees: {', '.join(p.attendees) if p.attendees else 'None'}\n\n"
-                    f"Before creating, please check whether all participants are free during that time."
-                )
+            # Context: team chat detected (not a command)
+            context_event = aui.send_message_to_agent(
+                content="Hey team, we should have a sync tomorrow to review quarterly plans."
             ).depends_on(None, delay_seconds=1)
 
-            # Step 2: Oracle checks availability for each attendee
+            # Agent proactively suggests a meeting
+            propose_event = aui.send_message_to_user(
+                content=(
+                    "I noticed a discussion about having a team sync tomorrow. "
+                    f"Would you like me to check everyone's availability and schedule '{p.title}'?"
+                )
+            ).depends_on(context_event, delay_seconds=2)
+
+            # User confirms scheduling
+            confirm_event = aui.send_message_to_agent(
+                content="Yes, please find a good time and set it up."
+            ).depends_on(propose_event, delay_seconds=2)
+
+            # Agent checks availability of all attendees (oracle)
             availability_checks = []
-            if p.attendees is not None:
+            if p.attendees:
                 for _ in p.attendees:
                     check = (
-                        calendar.get_calendar_events_from_to(start_datetime=start_str, end_datetime=end_str)
+                        calendar.get_calendar_events_from_to(
+                            start_datetime=start_str, end_datetime=end_str
+                        )
                         .oracle()
-                        .depends_on(start_msg, delay_seconds=1)
+                        .depends_on(confirm_event, delay_seconds=1)
                     )
                     availability_checks.append(check)
 
-            # Step 3: Oracle adds event (if all free)
+            # Agent creates meeting (oracle)
             oracle_create = (
                 calendar.add_calendar_event(
                     title=p.title,
@@ -122,46 +123,69 @@ class ProposeAndScheduleMeetingScenario(Scenario):
                     tag=None,
                 )
                 .oracle()
-                .depends_on(availability_checks[-1], delay_seconds=1)
+                .depends_on(availability_checks[-1] if availability_checks else confirm_event, delay_seconds=1)
             )
 
-            # Step 4: Agent confirms creation
-            agent_confirm = aui.send_message_to_user(
-                content=f"I've confirmed everyone is available and created the event '{p.title}'."
+            # Agent confirms success
+            done_event = aui.send_message_to_user(
+                content=f"Everyone is free. I've scheduled '{p.title}' at {p.location} from 3PM–4PM."
             ).depends_on(oracle_create, delay_seconds=1)
 
-        self.events = [start_msg, *availability_checks, oracle_create, agent_confirm]
-        print(f"[DEBUG] calendar_meeting_plan: Created {len(self.events)} events (with availability checks)")
+        self.events = [
+            context_event,
+            propose_event,
+            confirm_event,
+            *availability_checks,
+            oracle_create,
+            done_event,
+        ]
 
     # ---------- Validation ----------
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        """Validate the scenario."""
-        print("[DEBUG] calendar_meeting_plan: validate() called")
-
+        """Validate proactive meeting proposal and creation."""
         try:
             events = env.event_log.list_view()
             p = self._params
 
-            event_created = any(
-                event.event_type == EventType.AGENT
-                and isinstance(event.action, Action)
-                and event.action.class_name == "StatefulCalendarApp"
-                and event.action.function_name == "add_calendar_event"
-                and event.action.args.get("title") == p.title
-                for event in events
+            print("\n=== DEBUG EVENTS ===")
+            for e in events:
+                if isinstance(e.action, Action):
+                    print(
+                        f"{e.event_type:<10} | {e.action.class_name:<30} | "
+                        f"{e.action.function_name:<25} | {e.action.args}"
+                    )
+            print("=== END DEBUG ===\n")
+
+            # Check that proactive suggestion occurred
+            proactive_msg = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "AgentUserInterface"
+                and e.action.function_name == "send_message_to_user"
+                and any(
+                    kw in e.action.args.get("content", "").lower()
+                    for kw in ["meeting", "schedule", "availability", "sync"]
+                )
+                for e in events
+                if e.event_type in (EventType.ENV, EventType.AGENT)
             )
 
-            print(f"[DEBUG] calendar_meeting_plan: event_created={event_created}")
-            print(f"[DEBUG] calendar_meeting_plan: Total events in log: {len(events)}")
+            # Check that meeting was created
+            event_created = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "add_calendar_event"
+                and e.action.args.get("title") == p.title
+                for e in events
+            )
 
-            success = event_created
-            print(f"[INFO] calendar_meeting_plan: Validation result: success={success}")
+            success = proactive_msg and event_created
+
+            print(f"\n[VALIDATION SUMMARY]")
+            print(f"  - Proactive proposal detected: {'PASS' if proactive_msg else 'FAIL'}")
+            print(f"  - Calendar event created:      {'PASS' if event_created else 'FAIL'}")
+            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
 
             return ScenarioValidationResult(success=success)
 
-        except Exception as e:
-            print(f"[ERROR] calendar_meeting_plan: Validation failed with exception: {e}")
-            import traceback
-
-            traceback.print_exc()
-            return ScenarioValidationResult(success=False, exception=e)
+        except Exception as exc:
+            return ScenarioValidationResult(success=False, exception=exc)

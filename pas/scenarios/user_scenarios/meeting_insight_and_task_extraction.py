@@ -1,18 +1,18 @@
 """
-Scenario: meeting_insight_and_task_extraction
-Agent automatically summarizes meeting discussion, extracts action items,
-and offers to schedule follow-up or create tasks.
+Scenario: proactive_meeting_insight_and_task_extraction
+Agent proactively summarizes a meeting discussion, extracts action items,
+and proposes follow-up scheduling.
 
 Flow:
-1. System detects meeting transcript or notes.
-2. Agent summarizes key insights.
-3. Agent extracts action items.
-4. User confirms creation of tasks/follow-up meeting.
-5. Oracle writes follow-up event to calendar.
+1. Agent detects a completed meeting and transcript.
+2. Agent summarizes key insights and extracts tasks.
+3. Agent asks if user wants a follow-up scheduled.
+4. User confirms scheduling.
+5. Oracle creates the follow-up event.
+6. Agent confirms success.
 """
 
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 
@@ -25,9 +25,9 @@ from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, E
 from pas.apps.calendar import StatefulCalendarApp
 
 
+# ---------- Parameters ----------
 @dataclass
 class MeetingInsightParams:
-    """Parameters for meeting insight extraction."""
     meeting_title: str
     transcript_snippet: str
     followup_title: str
@@ -35,9 +35,10 @@ class MeetingInsightParams:
     followup_end: str
 
 
-@register_scenario("meeting_insight_and_task_extraction")
+# ---------- Scenario ----------
+@register_scenario("proactive_meeting_insight_and_task_extraction")
 class ScenarioMeetingInsightAndTaskExtraction(Scenario):
-    """Extract insights & tasks from meeting notes, propose follow-up actions."""
+    """Agent summarizes meeting insights, extracts tasks, and schedules follow-up."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -52,94 +53,117 @@ class ScenarioMeetingInsightAndTaskExtraction(Scenario):
                 "Carol: Let's meet next Monday to review progress."
             ),
             followup_title="Roadmap Progress Check-In",
-            followup_start="2025-11-03T10:00:00Z",
-            followup_end="2025-11-03T10:30:00Z",
+            followup_start="2025-11-05T10:00:00Z",
+            followup_end="2025-11-05T10:30:00Z",
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        print("[DEBUG] meeting_insight_and_task_extraction: init_and_populate_apps called")
+        """Initialize all apps used in this scenario."""
         agui = AgentUserInterface()
         system = SystemApp()
         calendar = StatefulCalendarApp()
         self.apps = [agui, system, calendar]
-        print("[DEBUG] meeting_insight_and_task_extraction: apps initialized")
 
     def build_events_flow(self) -> None:
-        print("[DEBUG] meeting_insight_and_task_extraction: build_events_flow called")
-
+        """Build proactive flow: summary → task extraction → confirmation → follow-up scheduling."""
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         p = self._params
 
         with EventRegisterer.capture_mode():
-            # System detects meeting transcript
-            detected = aui.send_message_to_agent(
-                content=f"[System] Meeting '{p.meeting_title}' just ended. Transcript snippet:\n{p.transcript_snippet}"
+            # Agent proactively initiates the summary after meeting ends
+            proactive_intro = aui.send_message_to_user(
+                content=(
+                    f"I noticed the meeting '{p.meeting_title}' has just ended. "
+                    f"Here's what was discussed:\n{p.transcript_snippet}"
+                )
             ).depends_on(None, delay_seconds=1)
 
             # Agent summarizes key insights
             summary_text = (
-                f"Meeting Summary for '{p.meeting_title}':\n"
+                f"**Summary of '{p.meeting_title}':**\n"
                 f"- Discussed Q4 launch timeline.\n"
-                f"- Marketing brief to be updated by Wednesday (Bob).\n"
-                f"- Agreed to review progress next Monday.\n"
+                f"- Bob will update the marketing brief by Wednesday.\n"
+                f"- Carol proposed a progress review next Monday.\n"
             )
-            summary_msg = aui.send_message_to_user(content=summary_text).depends_on(detected, delay_seconds=1)
+            summary_msg = aui.send_message_to_user(content=summary_text).depends_on(proactive_intro, delay_seconds=1)
 
-            # Agent extracts action items
+            # Agent extracts and lists action items
             tasks_text = (
-                "Extracted Action Items:\n"
-                "1. Bob → Update marketing brief by Wednesday\n"
-                "2. Alice → Finalize Q4 launch plan\n"
-                "3. Carol → Prepare progress deck for Monday meeting\n\n"
-                "Would you like me to schedule the follow-up meeting?"
+                "Here are the extracted action items:\n"
+                "1. Alice → Finalize Q4 launch plan.\n"
+                "2. Bob → Update marketing brief by Wednesday.\n"
+                "3. Carol → Prepare progress deck for next meeting.\n\n"
+                "Would you like me to schedule a follow-up session?"
             )
             task_msg = aui.send_message_to_user(content=tasks_text).depends_on(summary_msg, delay_seconds=1)
 
-            # Simulate user confirmation
+            # User confirms scheduling
             user_confirm = aui.send_message_to_agent(
                 content="Yes, please schedule the follow-up meeting."
             ).depends_on(task_msg, delay_seconds=1)
 
-            # Oracle creates follow-up calendar event
-            followup_event = calendar.add_calendar_event(
-                title=p.followup_title,
-                start_datetime=p.followup_start,
-                end_datetime=p.followup_end,
-                description="Auto-created from meeting insight extraction",
-                location="TBD",
-                attendees=["alice@example.com", "bob@example.com", "carol@example.com"],
-                tag=None,
-            ).oracle().depends_on(user_confirm, delay_seconds=1)
+            # Oracle creates the calendar follow-up event
+            followup_event = (
+                calendar.add_calendar_event(
+                    title=p.followup_title,
+                    start_datetime=p.followup_start,
+                    end_datetime=p.followup_end,
+                    description="Follow-up session generated from meeting insights.",
+                    location="TBD",
+                    attendees=["alice@example.com", "bob@example.com", "carol@example.com"],
+                    tag=None,
+                )
+                .oracle()
+                .depends_on(user_confirm, delay_seconds=1)
+            )
 
             # Agent confirms success
             confirm_msg = aui.send_message_to_user(
-                content=f"Follow-up meeting '{p.followup_title}' scheduled for {p.followup_start}."
+                content=f"Follow-up meeting '{p.followup_title}' has been scheduled for {p.followup_start}."
             ).depends_on(followup_event, delay_seconds=1)
 
-        self.events = [detected, summary_msg, task_msg, user_confirm, followup_event, confirm_msg]
-        print(f"[DEBUG] meeting_insight_and_task_extraction: Created {len(self.events)} events")
+        self.events = [proactive_intro, summary_msg, task_msg, user_confirm, followup_event, confirm_msg]
+        print(f"[DEBUG] proactive_meeting_insight_and_task_extraction: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        print("[DEBUG] meeting_insight_and_task_extraction: validate() called")
+        """Validate proactive summary and successful follow-up scheduling."""
+        print("[DEBUG] proactive_meeting_insight_and_task_extraction: validate() called")
+
         try:
             events = env.event_log.list_view()
             p = self._params
 
-            created = any(
-                event.event_type == EventType.AGENT
-                and isinstance(event.action, Action)
-                and event.action.class_name == "StatefulCalendarApp"
-                and event.action.function_name == "add_calendar_event"
-                and event.action.args.get("title") == p.followup_title
-                for event in events
+            # Agent proactively initiates meeting summary
+            proactive_detected = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "AgentUserInterface"
+                and e.action.function_name == "send_message_to_user"
+                and "meeting" in e.action.args.get("content", "").lower()
+                and "ended" in e.action.args.get("content", "").lower()
+                for e in events
             )
 
-            print(f"[INFO] meeting_insight_and_task_extraction: Validation success={created}")
-            return ScenarioValidationResult(success=created)
+            # Follow-up calendar event created
+            event_created = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "add_calendar_event"
+                and e.action.args.get("title") == p.followup_title
+                for e in events
+            )
+
+            success = proactive_detected and event_created
+
+            print("\n[VALIDATION SUMMARY]")
+            print(f"  - Proactive initiation detected: {'PASS' if proactive_detected else 'FAIL'}")
+            print(f"  - Follow-up meeting created:     {'PASS' if event_created else 'FAIL'}")
+            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+
+            return ScenarioValidationResult(success=success)
 
         except Exception as e:
-            print(f"[ERROR] meeting_insight_and_task_extraction: Validation failed: {e}")
+            print(f"[ERROR] proactive_meeting_insight_and_task_extraction: Validation failed: {e}")
             import traceback
             traceback.print_exc()
             return ScenarioValidationResult(success=False, exception=e)

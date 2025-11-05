@@ -1,7 +1,7 @@
 """
-Scenario: meeting_action_item_tracker
-Agent reviews meeting notes, extracts action items, confirms responsible contacts,
-and schedules follow-up reminders.
+Scenario: proactive_meeting_action_item_tracker
+Agent reviews meeting notes, extracts action items, identifies responsible contacts,
+and proactively schedules follow-up reminders with notifications.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from pas.apps.contacts import StatefulContactsApp
 from pas.apps.messaging import StatefulMessagingApp
 
 
+# ---------- Parameters ----------
 @dataclass
 class ActionItemParams:
     meeting_title: str
@@ -26,9 +27,10 @@ class ActionItemParams:
     followup_date: str
 
 
-@register_scenario("meeting_action_item_tracker")
+# ---------- Scenario ----------
+@register_scenario("proactive_meeting_action_item_tracker")
 class ScenarioMeetingActionItemTracker(Scenario):
-    """Summarize meeting tasks and schedule follow-ups for each responsible contact."""
+    """Agent proactively summarizes meeting action items and sets follow-up reminders."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -42,112 +44,140 @@ class ScenarioMeetingActionItemTracker(Scenario):
                 ("Finalize UI mockups", "Bob"),
                 ("Test login flow", "Carol"),
             ],
-            followup_date="2025-10-31T17:00:00Z",
+            followup_date="2025-11-05T17:00:00Z",
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        print("[DEBUG] meeting_action_item_tracker: init_and_populate_apps called")
-        self.apps = [
-            AgentUserInterface(),
-            SystemApp(),
-            StatefulCalendarApp(),
-            StatefulContactsApp(),
-            StatefulMessagingApp(),
-        ]
-        print("[DEBUG] meeting_action_item_tracker: apps initialized")
+        """Initialize apps required for this scenario."""
+        agui = AgentUserInterface()
+        system = SystemApp()
+        calendar = StatefulCalendarApp()
+        contacts = StatefulContactsApp()
+        messaging = StatefulMessagingApp()
+        self.apps = [agui, system, calendar, contacts, messaging]
 
     def build_events_flow(self) -> None:
-        print("[DEBUG] meeting_action_item_tracker: build_events_flow called")
-
+        """Build proactive event flow."""
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         contacts = self.get_typed_app(StatefulContactsApp)
         messaging = self.get_typed_app(StatefulMessagingApp)
         p = self._params
 
-        action_summary = "\n  - ".join([f"{t} → {a}" for t, a in p.action_items])
+        action_summary = "\n  - " + "\n  - ".join([f"{t} → {a}" for t, a in p.action_items])
 
         with EventRegisterer.capture_mode():
-            detect_meeting = aui.send_message_to_agent(
-                content=f"[System] Detected notes from '{p.meeting_title}'"
+            # Agent proactively summarizes meeting notes
+            proactive_start = aui.send_message_to_user(
+                content=(
+                    f"I reviewed the notes from '{p.meeting_title}' and extracted these action items:"
+                    f"{action_summary}"
+                )
             ).depends_on(None, delay_seconds=1)
 
-            summarize_tasks = aui.send_message_to_user(
-                content=(
-                    f"From the meeting '{p.meeting_title}', I extracted these action items:\n"
-                    f"  - {action_summary}"
-                )
-            ).depends_on(detect_meeting, delay_seconds=1)
+            # Agent offers to schedule reminders
+            offer_followup = aui.send_message_to_user(
+                content=f"Would you like me to set reminders for these tasks on {p.followup_date.split('T')[0]}?"
+            ).depends_on(proactive_start, delay_seconds=1)
 
-            propose_followup = aui.send_message_to_user(
-                content=f"Would you like me to set reminders for these on {p.followup_date.split('T')[0]}?"
-            ).depends_on(summarize_tasks, delay_seconds=1)
-
+            # User confirms scheduling
             user_confirm = aui.send_message_to_agent(
-                content="Yes, please set reminders for everyone."
-            ).depends_on(propose_followup, delay_seconds=1)
+                content="Yes, please schedule follow-up reminders for everyone."
+            ).depends_on(offer_followup, delay_seconds=1)
 
-            create_event = calendar.add_calendar_event(
-                title=f"Follow-up: {p.meeting_title}",
-                start_datetime=p.followup_date,
-                end_datetime=p.followup_date,
-                description="Automated reminder for action items",
-                location="Office",
-                attendees=[a for _, a in p.action_items],
-                tag="followup",
-            ).oracle().depends_on(user_confirm, delay_seconds=1)
+            # Oracle retrieves contacts (realistic action)
+            fetch_contacts = (
+                contacts.search_contacts(query="; ".join([a for _, a in p.action_items]))
+                .oracle()
+                .depends_on(user_confirm, delay_seconds=1)
+            )
 
-            notify = messaging.send_message(
-                user_id="demo_user",
-                content=(
-                    f"📢 Follow-up scheduled for '{p.meeting_title}'. "
-                    f"Action items:\n  - {action_summary}"
-                ),
-            ).depends_on(create_event, delay_seconds=1)
+            # Oracle creates follow-up calendar event
+            create_event = (
+                calendar.add_calendar_event(
+                    title=f"Follow-up: {p.meeting_title}",
+                    start_datetime=p.followup_date,
+                    end_datetime=p.followup_date,
+                    description="Automated reminder for meeting action items.",
+                    location="Office",
+                    attendees=[a for _, a in p.action_items],
+                    tag="followup",
+                )
+                .oracle()
+                .depends_on(fetch_contacts, delay_seconds=1)
+            )
 
-            final_msg = aui.send_message_to_user(
-                content=f"Reminders set and team notified for '{p.meeting_title}'."
-            ).depends_on(notify, delay_seconds=1)
+            # Oracle sends team notification
+            notify_team = (
+                messaging.send_message(
+                    user_id="team_channel",
+                    content=(
+                        f"Follow-up scheduled for '{p.meeting_title}'. "
+                        f"Action items:{action_summary}"
+                    ),
+                )
+                .oracle()
+                .depends_on(create_event, delay_seconds=1)
+            )
+
+            # Agent confirms completion
+            confirm_msg = aui.send_message_to_user(
+                content=f"Reminders and notifications have been set for '{p.meeting_title}'."
+            ).depends_on(notify_team, delay_seconds=1)
 
         self.events = [
-            detect_meeting,
-            summarize_tasks,
-            propose_followup,
+            proactive_start,
+            offer_followup,
             user_confirm,
+            fetch_contacts,
             create_event,
-            notify,
-            final_msg,
+            notify_team,
+            confirm_msg,
         ]
-        print(f"[DEBUG] meeting_action_item_tracker: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        """More robust validation that adapts to ARE event log formats."""
-        print("[DEBUG] meeting_action_item_tracker: validate() called")
+        """Validate proactive initiation, calendar creation, and messaging notification."""
+        print("[DEBUG] proactive_meeting_action_item_tracker: validate() called")
+
         try:
             events = env.event_log.list_view()
+            p = self._params
 
-            def stringify(e) -> str:
-                """Extract action-related info as lowercase string for fuzzy match."""
-                parts = []
-                if hasattr(e, "action_id"):
-                    parts.append(str(e.action_id))
-                if hasattr(e, "action"):
-                    parts.extend([
-                        getattr(e.action, "class_name", ""),
-                        getattr(e.action, "function_name", ""),
-                        getattr(e.action, "app_name", ""),
-                        getattr(e.action, "tool_name", ""),
-                    ])
-                return " ".join(parts).lower()
+            # Agent proactive initiation
+            proactive_detected = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "AgentUserInterface"
+                and e.action.function_name == "send_message_to_user"
+                and "i reviewed the notes" in e.action.args.get("content", "").lower()
+                for e in events
+            )
 
-            # Look for any event related to calendar creation
-            created = any("calendar" in stringify(e) and "add" in stringify(e) for e in events)
-            # Look for any messaging send action
-            notified = any("messaging" in stringify(e) and "send" in stringify(e) for e in events)
+            # Calendar event creation
+            followup_created = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "add_calendar_event"
+                and p.meeting_title.lower() in e.action.args.get("title", "").lower()
+                for e in events
+            )
 
-            ok = created and notified
-            print(f"[INFO] meeting_action_item_tracker: Validation success={ok}")
-            return ScenarioValidationResult(success=ok)
+            # Messaging notification
+            team_notified = any(
+                isinstance(e.action, Action)
+                and e.action.class_name == "StatefulMessagingApp"
+                and e.action.function_name == "send_message"
+                for e in events
+            )
+
+            success = proactive_detected and followup_created and team_notified
+
+            print("\n[VALIDATION SUMMARY]")
+            print(f"  - Proactive start detected:  {'PASS' if proactive_detected else 'FAIL'}")
+            print(f"  - Calendar event created:    {'PASS' if followup_created else 'FAIL'}")
+            print(f"  - Team notified via message: {'PASS' if team_notified else 'FAIL'}")
+            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+
+            return ScenarioValidationResult(success=success)
 
         except Exception as e:
             import traceback
