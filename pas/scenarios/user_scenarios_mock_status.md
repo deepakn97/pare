@@ -1,7 +1,7 @@
-# Scenarios Mock Test Status
-
 | Scenario                              | Mock Run Result |
 |--------------------------------------|-----------------|
+| airport_arrival_transit              | PASS            |
+| advertising_email_summary            | PASS            |
 | calendar_create                      | PASS            |
 | calendar_meeting_plan                | PASS            |
 | daily_agenda_planner                 | PASS            |
@@ -12,6 +12,8 @@
 | meeting_preparation_helper           | PASS            |
 | message_summary_and_action           | PASS            |
 | post_meeting_summary_generator       | PASS            |
-| rsvp_nudge_and_summary               | PASS            |
+| price_evaluation_ad_summary          | PASS            |
+| subscription_email_summary           | PASS            |
 | task_followup_reminder               | PASS            |
+
 
