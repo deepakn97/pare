@@ -5,6 +5,7 @@ Agent detects meeting intent and proactively proposes scheduling a calendar even
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -17,6 +18,10 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps.calendar import StatefulCalendarApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -62,11 +67,12 @@ class ProactiveScheduleEventScenario(Scenario):
         agui = AgentUserInterface()
         system = SystemApp()
         calendar = StatefulCalendarApp()
-
         self.apps = [agui, system, calendar]
+        logger.debug("proactive_calendar_create: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Define proactive event flow."""
+        logger.debug("proactive_calendar_create: Building events flow")
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         p = self._params
@@ -111,6 +117,7 @@ class ProactiveScheduleEventScenario(Scenario):
             ).depends_on(oracle_create, delay_seconds=1)
 
         self.events = [context_event, propose_event, confirm_event, oracle_create, done_event]
+        logger.debug(f"proactive_calendar_create: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate proactive scheduling behavior."""
@@ -118,14 +125,14 @@ class ProactiveScheduleEventScenario(Scenario):
             events = env.event_log.list_view()
             p = self._params
 
-            print("\n=== DEBUG EVENTS ===")
+            logger.debug("=== DEBUG EVENTS ===")
             for e in events:
                 if isinstance(e.action, Action):
-                    print(
+                    logger.debug(
                         f"{e.event_type:<10} | {e.action.class_name:<30} | "
                         f"{e.action.function_name:<25} | {e.action.args}"
                     )
-            print("=== END DEBUG ===\n")
+            logger.debug("=== END DEBUG ===")
 
             # Check proactive message (agent offering scheduling)
             proactive_msg = any(
@@ -151,12 +158,13 @@ class ProactiveScheduleEventScenario(Scenario):
 
             success = proactive_msg and event_created
 
-            print(f"\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive scheduling detected: {'PASS' if proactive_msg else 'FAIL'}")
-            print(f"  - Calendar event created:        {'PASS' if event_created else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive scheduling detected: {'PASS' if proactive_msg else 'FAIL'}")
+            logger.debug(f"  - Calendar event created:        {'PASS' if event_created else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as exc:
+            logger.error(f"proactive_calendar_create validation failed: {exc}")
             return ScenarioValidationResult(success=False, exception=exc)

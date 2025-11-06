@@ -5,6 +5,7 @@ and sends the summary to participants automatically.
 """
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +17,10 @@ from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, E
 
 from pas.apps.calendar import StatefulCalendarApp
 from pas.apps.messaging import StatefulMessagingApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -47,11 +52,11 @@ class ScenarioProactivePostMeetingSummaryGenerator(Scenario):
         calendar = StatefulCalendarApp()
         messaging = StatefulMessagingApp()
         self.apps = [agui, system, calendar, messaging]
-        print("[DEBUG] proactive_post_meeting_summary_generator: Apps initialized")
+        logger.debug("proactive_post_meeting_summary_generator: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Define proactive post-meeting summary workflow."""
-        print("[DEBUG] proactive_post_meeting_summary_generator: build_events_flow called")
+        logger.debug("proactive_post_meeting_summary_generator: build_events_flow called")
 
         aui = self.get_typed_app(AgentUserInterface)
         system = self.get_typed_app(SystemApp)
@@ -96,11 +101,11 @@ class ScenarioProactivePostMeetingSummaryGenerator(Scenario):
             send_summary,
             finish,
         ]
-        print(f"[DEBUG] proactive_post_meeting_summary_generator: Created {len(self.events)} events")
+        logger.debug(f"proactive_post_meeting_summary_generator: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that proactive initiation and summary dispatch occurred."""
-        print("[DEBUG] proactive_post_meeting_summary_generator: validate() called")
+        logger.debug("proactive_post_meeting_summary_generator: validate() called")
 
         try:
             events = env.event_log.list_view()
@@ -124,15 +129,13 @@ class ScenarioProactivePostMeetingSummaryGenerator(Scenario):
 
             success = proactive_detected and summary_sent
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive initiation detected: {'PASS' if proactive_detected else 'FAIL'}")
-            print(f"  - Summary message sent:          {'PASS' if summary_sent else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive initiation detected: {'PASS' if proactive_detected else 'FAIL'}")
+            logger.debug(f"  - Summary message sent:          {'PASS' if summary_sent else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as e:
-            print(f"[ERROR] proactive_post_meeting_summary_generator: Validation failed: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] proactive_post_meeting_summary_generator: Validation failed: {e}")
             return ScenarioValidationResult(success=False, exception=e)

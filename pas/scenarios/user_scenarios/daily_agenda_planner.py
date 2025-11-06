@@ -6,6 +6,7 @@ summarizes the agenda, and offers to schedule focus time or reminders.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -17,6 +18,10 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps.calendar import StatefulCalendarApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -52,9 +57,12 @@ class ScenarioDailyAgendaPlanner(Scenario):
         system = SystemApp()
         calendar = StatefulCalendarApp()
         self.apps = [agui, system, calendar]
+        logger.debug("proactive_daily_agenda_planner: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Build proactive flow for daily agenda planning."""
+        logger.debug("proactive_daily_agenda_planner: Building event flow")
+
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         p = self._params
@@ -119,10 +127,11 @@ class ScenarioDailyAgendaPlanner(Scenario):
             create_focus_time,
             confirm_msg,
         ]
+        logger.debug(f"proactive_daily_agenda_planner: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate proactive summary and focus-time creation."""
-        print("[DEBUG] daily_agenda_planner: validate() called")
+        logger.debug("proactive_daily_agenda_planner: validate() called")
 
         try:
             events = env.event_log.list_view()
@@ -151,15 +160,13 @@ class ScenarioDailyAgendaPlanner(Scenario):
 
             success = proactive_summary and focus_event_created
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive morning summary detected: {'PASS' if proactive_summary else 'FAIL'}")
-            print(f"  - Focus Time event created:           {'PASS' if focus_event_created else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive morning summary detected: {'PASS' if proactive_summary else 'FAIL'}")
+            logger.debug(f"  - Focus Time event created:           {'PASS' if focus_event_created else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as exc:
-            print(f"[ERROR] daily_agenda_planner: Validation failed: {exc}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] daily_agenda_planner: Validation failed: {exc}")
             return ScenarioValidationResult(success=False, exception=exc)

@@ -5,6 +5,7 @@ and proactively schedules follow-up reminders with notifications.
 """
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,6 +18,10 @@ from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, E
 from pas.apps.calendar import StatefulCalendarApp
 from pas.apps.contacts import StatefulContactsApp
 from pas.apps.messaging import StatefulMessagingApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -55,9 +60,12 @@ class ScenarioMeetingActionItemTracker(Scenario):
         contacts = StatefulContactsApp()
         messaging = StatefulMessagingApp()
         self.apps = [agui, system, calendar, contacts, messaging]
+        logger.debug("proactive_meeting_action_item_tracker: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Build proactive event flow."""
+        logger.debug("proactive_meeting_action_item_tracker: Building event flow")
+
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         contacts = self.get_typed_app(StatefulContactsApp)
@@ -134,10 +142,11 @@ class ScenarioMeetingActionItemTracker(Scenario):
             notify_team,
             confirm_msg,
         ]
+        logger.debug(f"proactive_meeting_action_item_tracker: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate proactive initiation, calendar creation, and messaging notification."""
-        print("[DEBUG] proactive_meeting_action_item_tracker: validate() called")
+        logger.debug("proactive_meeting_action_item_tracker: validate() called")
 
         try:
             events = env.event_log.list_view()
@@ -171,15 +180,14 @@ class ScenarioMeetingActionItemTracker(Scenario):
 
             success = proactive_detected and followup_created and team_notified
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive start detected:  {'PASS' if proactive_detected else 'FAIL'}")
-            print(f"  - Calendar event created:    {'PASS' if followup_created else 'FAIL'}")
-            print(f"  - Team notified via message: {'PASS' if team_notified else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive start detected:  {'PASS' if proactive_detected else 'FAIL'}")
+            logger.debug(f"  - Calendar event created:    {'PASS' if followup_created else 'FAIL'}")
+            logger.debug(f"  - Team notified via message: {'PASS' if team_notified else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] proactive_meeting_action_item_tracker: Validation failed: {e}")
             return ScenarioValidationResult(success=False, exception=e)

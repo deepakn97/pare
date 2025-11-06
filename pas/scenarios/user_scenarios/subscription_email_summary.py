@@ -5,6 +5,7 @@ notifies the user about auto-renew dates, and asks if they wish to cancel any.
 """
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Any, List
 
@@ -16,6 +17,10 @@ from are.simulation.types import AbstractEnvironment, EventRegisterer, Action, E
 
 from pas.apps.email import StatefulEmailApp
 from pas.apps.messaging import StatefulMessagingApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -34,8 +39,10 @@ class ScenarioProactiveSubscriptionEmailSummary(Scenario):
         super().__init__()
         self._params = SubscriptionEmailParams(
             keywords=["subscription", "renewal", "membership", "auto-renew", "invoice"],
-            summary_template=" I found {count} active subscriptions: {services}. "
-                             "The nearest renewal is on {nearest_date}.",
+            summary_template=(
+                "I found {count} active subscriptions: {services}. "
+                "The nearest renewal is on {nearest_date}."
+            ),
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
@@ -45,11 +52,11 @@ class ScenarioProactiveSubscriptionEmailSummary(Scenario):
         email = StatefulEmailApp()
         messaging = StatefulMessagingApp()
         self.apps = [aui, system, email, messaging]
-        print("[DEBUG] proactive_subscription_email_summary: Apps initialized")
+        logger.debug("proactive_subscription_email_summary: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Build proactive email summarization and renewal reminder workflow."""
-        print("[DEBUG] proactive_subscription_email_summary: build_events_flow called")
+        logger.debug("proactive_subscription_email_summary: build_events_flow called")
 
         aui = self.get_typed_app(AgentUserInterface)
         system = self.get_typed_app(SystemApp)
@@ -87,7 +94,7 @@ class ScenarioProactiveSubscriptionEmailSummary(Scenario):
 
             # Agent proactively warns about auto-renewals
             warn_msg = aui.send_message_to_user(
-                content="⚠️ Netflix and Adobe Creative Cloud are set to auto-renew this month. Would you like me to cancel or pause any of them?"
+                content="Netflix and Adobe Creative Cloud are set to auto-renew this month. Would you like me to cancel or pause any of them?"
             ).depends_on(summary_msg, delay_seconds=1)
 
             # User replies with instruction
@@ -117,15 +124,14 @@ class ScenarioProactiveSubscriptionEmailSummary(Scenario):
             confirm_msg,
             finish,
         ]
-        print(f"[DEBUG] proactive_subscription_email_summary: Created {len(self.events)} events")
+        logger.debug(f"proactive_subscription_email_summary: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate proactive trigger, email search, and user decision steps."""
-        print("[DEBUG] proactive_subscription_email_summary: validate() called")
+        logger.debug("proactive_subscription_email_summary: validate() called")
 
         try:
             events = env.event_log.list_view()
-            p = self._params
 
             proactive_triggered = any(
                 isinstance(e.action, Action)
@@ -150,16 +156,15 @@ class ScenarioProactiveSubscriptionEmailSummary(Scenario):
 
             success = proactive_triggered and email_search_executed and cancel_decision_detected
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive detection triggered:  {'PASS' if proactive_triggered else 'FAIL'}")
-            print(f"  - Email search executed:          {'PASS' if email_search_executed else 'FAIL'}")
-            print(f"  - User cancel decision detected:  {'PASS' if cancel_decision_detected else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive detection triggered:  {'PASS' if proactive_triggered else 'FAIL'}")
+            logger.debug(f"  - Email search executed:          {'PASS' if email_search_executed else 'FAIL'}")
+            logger.debug(f"  - User cancel decision detected:  {'PASS' if cancel_decision_detected else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as e:
-            print(f"[ERROR] proactive_subscription_email_summary: Validation failed: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] proactive_subscription_email_summary: Validation failed: {e}")
             return ScenarioValidationResult(success=False, exception=e)
+

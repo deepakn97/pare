@@ -1,5 +1,6 @@
 from __future__ import annotations
 import base64
+import logging
 from typing import Any
 
 from are.simulation.apps.agent_user_interface import AgentUserInterface
@@ -13,6 +14,9 @@ from are.simulation.data.population_scripts.sandbox_file_system_population impor
 from are.simulation.scenarios.scenario import Scenario, ScenarioValidationResult
 from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 @register_scenario("proactive_airport_arrival_transit")
@@ -43,12 +47,15 @@ class ScenarioProactiveAirportArrivalTransit(Scenario):
         )
 
         self.apps = [aui, calendar, email_app, contacts_app, messenger, fs_app, sys_app]
+        logger.debug("proactive_airport_arrival_transit: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Define proactive flow for airport-arrival transit help."""
         aui = self.get_typed_app(AgentUserInterface)
         email_app = self.get_typed_app(EmailClientApp)
         fs_app = self.get_typed_app(SandboxLocalFileSystem)
+
+        logger.debug("proactive_airport_arrival_transit: Building event flow")
 
         with EventRegisterer.capture_mode():
             # Arrival email from airline
@@ -102,19 +109,21 @@ class ScenarioProactiveAirportArrivalTransit(Scenario):
             done_event,
         ]
 
+        logger.debug(f"proactive_airport_arrival_transit: Created {len(self.events)} events")
+
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Ensure proactive suggestion and file-creation occurred."""
         try:
             logs = env.event_log.list_view()
 
-            print("\n=== DEBUG EVENTS ===")
+            logger.debug("=== DEBUG EVENTS ===")
             for e in logs:
                 if isinstance(e.action, Action):
-                    print(
+                    logger.debug(
                         f"{e.event_type:<10} | {e.action.class_name:<30} | "
                         f"{e.action.function_name:<25} | {e.action.args}"
                     )
-            print("=== END DEBUG ===\n")
+            logger.debug("=== END DEBUG ===")
 
             #  Broader proactive detection — allow both ENV and AGENT events
             proactive_msg = any(
@@ -140,12 +149,13 @@ class ScenarioProactiveAirportArrivalTransit(Scenario):
 
             success = proactive_msg and file_event
 
-            print(f"\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive message detected: {'PASS' if proactive_msg else 'FAIL'}")
-            print(f"  - TransitPlan file created:   {'PASS' if file_event else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive message detected: {'PASS' if proactive_msg else 'FAIL'}")
+            logger.debug(f"  - TransitPlan file created:   {'PASS' if file_event else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as exc:
+            logger.error(f"Validation failed with exception: {exc}")
             return ScenarioValidationResult(success=False, exception=exc)

@@ -13,6 +13,7 @@ Flow:
 """
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,6 +24,10 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps.calendar import StatefulCalendarApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -63,9 +68,12 @@ class ScenarioMeetingInsightAndTaskExtraction(Scenario):
         system = SystemApp()
         calendar = StatefulCalendarApp()
         self.apps = [agui, system, calendar]
+        logger.debug("proactive_meeting_insight_and_task_extraction: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Build proactive flow: summary → task extraction → confirmation → follow-up scheduling."""
+        logger.debug("proactive_meeting_insight_and_task_extraction: Building event flow")
+
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         p = self._params
@@ -124,11 +132,11 @@ class ScenarioMeetingInsightAndTaskExtraction(Scenario):
             ).depends_on(followup_event, delay_seconds=1)
 
         self.events = [proactive_intro, summary_msg, task_msg, user_confirm, followup_event, confirm_msg]
-        print(f"[DEBUG] proactive_meeting_insight_and_task_extraction: Created {len(self.events)} events")
+        logger.debug(f"proactive_meeting_insight_and_task_extraction: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate proactive summary and successful follow-up scheduling."""
-        print("[DEBUG] proactive_meeting_insight_and_task_extraction: validate() called")
+        logger.debug("proactive_meeting_insight_and_task_extraction: validate() called")
 
         try:
             events = env.event_log.list_view()
@@ -155,15 +163,13 @@ class ScenarioMeetingInsightAndTaskExtraction(Scenario):
 
             success = proactive_detected and event_created
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive initiation detected: {'PASS' if proactive_detected else 'FAIL'}")
-            print(f"  - Follow-up meeting created:     {'PASS' if event_created else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive initiation detected: {'PASS' if proactive_detected else 'FAIL'}")
+            logger.debug(f"  - Follow-up meeting created:     {'PASS' if event_created else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as e:
-            print(f"[ERROR] proactive_meeting_insight_and_task_extraction: Validation failed: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] proactive_meeting_insight_and_task_extraction: Validation failed: {e}")
             return ScenarioValidationResult(success=False, exception=e)

@@ -8,6 +8,7 @@ and suggests actions like unsubscribing or moving them to a separate folder.
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, List
+import logging
 
 from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.system import SystemApp
@@ -17,6 +18,10 @@ from are.simulation.types import AbstractEnvironment, EventRegisterer, Action, E
 
 from pas.apps.email import StatefulEmailApp
 from pas.apps.messaging import StatefulMessagingApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -35,9 +40,10 @@ class ScenarioProactiveAdvertisingEmailSummary(Scenario):
         super().__init__()
         self._params = AdEmailParams(
             keyword_filters=["sale", "discount", "deal", "promotion", "offer"],
-            summary_template=" I found {count} promotional emails this week. Top brands: {brands}.",
+            summary_template="I found {count} promotional emails this week. Top brands: {brands}.",
         )
 
+    # ---------- App Initialization ----------
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize apps used in this scenario."""
         aui = AgentUserInterface()
@@ -45,11 +51,12 @@ class ScenarioProactiveAdvertisingEmailSummary(Scenario):
         email = StatefulEmailApp()
         messaging = StatefulMessagingApp()
         self.apps = [aui, system, email, messaging]
-        print("[DEBUG] proactive_advertising_email_summary: Apps initialized")
+        logger.debug("proactive_advertising_email_summary: Apps initialized")
 
-    def build_events_flow(self) -> None:
+    # ---------- Event Flow ----------
+    def build_events_flow(self) -> list:
         """Define proactive advertising email summarization flow."""
-        print("[DEBUG] proactive_advertising_email_summary: build_events_flow called")
+        logger.debug("proactive_advertising_email_summary: build_events_flow called")
 
         aui = self.get_typed_app(AgentUserInterface)
         system = self.get_typed_app(SystemApp)
@@ -92,7 +99,7 @@ class ScenarioProactiveAdvertisingEmailSummary(Scenario):
                 content="Summary and recommendations sent successfully."
             ).oracle().depends_on(suggest_action, delay_seconds=1)
 
-        self.events = [
+        events = [
             proactive_detect,
             user_confirm,
             current_time,
@@ -101,11 +108,14 @@ class ScenarioProactiveAdvertisingEmailSummary(Scenario):
             suggest_action,
             finish,
         ]
-        print(f"[DEBUG] proactive_advertising_email_summary: Created {len(self.events)} events")
 
+        logger.debug(f"proactive_advertising_email_summary: Created {len(events)} events")
+        return events   # ✅ 必须返回事件列表
+
+    # ---------- Validation ----------
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate proactive trigger, email search, and summary generation."""
-        print("[DEBUG] proactive_advertising_email_summary: validate() called")
+        logger.debug("proactive_advertising_email_summary: validate() called")
         try:
             events = env.event_log.list_view()
             p = self._params
@@ -127,22 +137,26 @@ class ScenarioProactiveAdvertisingEmailSummary(Scenario):
             summary_sent = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "AgentUserInterface"
-                and "summary" in e.action.args.get("content", "")
+                and "summary" in e.action.args.get("content", "").lower()
                 for e in events
             )
 
             success = proactive_triggered and email_search_executed and summary_sent
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive detection triggered: {'PASS' if proactive_triggered else 'FAIL'}")
-            print(f"  - Email search executed:         {'PASS' if email_search_executed else 'FAIL'}")
-            print(f"  - Summary message sent:          {'PASS' if summary_sent else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL '}\n")
+            logger.info("[VALIDATION SUMMARY]")
+            logger.info(f"  - Proactive detection triggered: {'PASS' if proactive_triggered else 'FAIL'}")
+            logger.info(f"  - Email search executed:         {'PASS' if email_search_executed else 'FAIL'}")
+            logger.info(f"  - Summary message sent:          {'PASS' if summary_sent else 'FAIL'}")
+            logger.info(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
-            return ScenarioValidationResult(success=success)
+            return ScenarioValidationResult(
+                success=success,
+                rationale="Validation completed for proactive_advertising_email_summary."
+            )
 
         except Exception as e:
-            print(f"[ERROR] proactive_advertising_email_summary: Validation failed: {e}")
+            logger.error(f"proactive_advertising_email_summary: Validation failed: {e}")
             import traceback
             traceback.print_exc()
             return ScenarioValidationResult(success=False, exception=e)
+

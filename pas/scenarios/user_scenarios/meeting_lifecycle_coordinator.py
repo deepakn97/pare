@@ -5,6 +5,7 @@ Preparation → Action Tracking → Summary → Follow-up.
 """
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +17,10 @@ from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, E
 
 from pas.apps.calendar import StatefulCalendarApp
 from pas.apps.messaging import StatefulMessagingApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -49,10 +54,12 @@ class ScenarioMeetingLifecycleCoordinator(Scenario):
         calendar = StatefulCalendarApp()
         messaging = StatefulMessagingApp()
         self.apps = [agui, system, calendar, messaging]
-        print("[DEBUG] proactive_meeting_lifecycle_coordinator: Apps initialized")
+        logger.debug("proactive_meeting_lifecycle_coordinator: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Define event chain for the proactive lifecycle."""
+        logger.debug("proactive_meeting_lifecycle_coordinator: Building event flow")
+
         aui = self.get_typed_app(AgentUserInterface)
         system = self.get_typed_app(SystemApp)
         calendar = self.get_typed_app(StatefulCalendarApp)
@@ -103,11 +110,11 @@ class ScenarioMeetingLifecycleCoordinator(Scenario):
             followup_msg,
             finish_msg,
         ]
-        print(f"[DEBUG] proactive_meeting_lifecycle_coordinator: Created {len(self.events)} events")
+        logger.debug(f"proactive_meeting_lifecycle_coordinator: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that all four proactive lifecycle stages executed correctly."""
-        print("[DEBUG] proactive_meeting_lifecycle_coordinator: validate() called")
+        logger.debug("proactive_meeting_lifecycle_coordinator: validate() called")
 
         try:
             events = env.event_log.list_view()
@@ -152,17 +159,17 @@ class ScenarioMeetingLifecycleCoordinator(Scenario):
 
             success = proactive_detected and prep_done and tracker_done and summary_done and followup_done
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive initiation detected: {'PASS' if proactive_detected else 'FAIL'}")
-            print(f"  - Preparation message sent:     {'PASS' if prep_done else 'FAIL'}")
-            print(f"  - Action tracking executed:     {'PASS' if tracker_done else 'FAIL'}")
-            print(f"  - Summary stage completed:      {'PASS' if summary_done else 'FAIL'}")
-            print(f"  - Follow-up reminders sent:     {'PASS' if followup_done else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive initiation detected: {'PASS' if proactive_detected else 'FAIL'}")
+            logger.debug(f"  - Preparation message sent:     {'PASS' if prep_done else 'FAIL'}")
+            logger.debug(f"  - Action tracking executed:     {'PASS' if tracker_done else 'FAIL'}")
+            logger.debug(f"  - Summary stage completed:      {'PASS' if summary_done else 'FAIL'}")
+            logger.debug(f"  - Follow-up reminders sent:     {'PASS' if followup_done else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] proactive_meeting_lifecycle_coordinator: Validation failed: {e}")
             return ScenarioValidationResult(success=False, exception=e)
+

@@ -5,6 +5,7 @@ evaluates whether the current deal is among the best, and suggests to the user w
 """
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Any, List
 
@@ -17,12 +18,20 @@ from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, E
 from pas.apps.email import StatefulEmailApp
 from pas.apps.messaging import StatefulMessagingApp
 
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
+
+
+# ---------- Parameters ----------
 @dataclass
 class PriceEvalParams:
     keyword_filters: List[str]
     summary_template: str
     threshold_best_percent: float
 
+
+# ---------- Scenario ----------
 @register_scenario("proactive_price_evaluation_ad_summary")
 class ScenarioProactivePriceEvaluationAdSummary(Scenario):
     """Agent proactively summarises discount ads, checks historical prices, and advises purchase timing."""
@@ -36,15 +45,17 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize required apps."""
         aui = AgentUserInterface()
         system = SystemApp()
         email = StatefulEmailApp()
         messaging = StatefulMessagingApp()
         self.apps = [aui, system, email, messaging]
-        print("[DEBUG] proactive_price_evaluation_ad_summary: Apps initialized")
+        logger.debug("proactive_price_evaluation_ad_summary: Apps initialized")
 
     def build_events_flow(self) -> None:
-        print("[DEBUG] proactive_price_evaluation_ad_summary: build_events_flow called")
+        """Define proactive flow for detecting and evaluating promotional emails."""
+        logger.debug("proactive_price_evaluation_ad_summary: build_events_flow called")
 
         aui = self.get_typed_app(AgentUserInterface)
         email = self.get_typed_app(StatefulEmailApp)
@@ -72,8 +83,7 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
                 query=" OR ".join(p.keyword_filters)
             ).oracle().depends_on(current_time, delay_seconds=1)
 
-            # Agent cross-checks historical pricing (simulated)
-            # Simulated: item “4K TV Model X”, current price $799, historical low $750
+            # Simulated price evaluation logic
             item = "4K TV Model X"
             current_price = 799
             historical_low = 750
@@ -92,7 +102,7 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
 
             # Agent proposes an action
             propose = aui.send_message_to_user(
-                content=("Would you like me to set a price-watch alert if this isn't the best deal, or buy it now?")
+                content="Would you like me to set a price-watch alert if this isn't the best deal, or buy it now?"
             ).depends_on(summary, delay_seconds=1)
 
             # Simulate user decision
@@ -103,7 +113,7 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
             # Messaging app confirms the action
             confirm = messaging.send_message(
                 user_id=user_id,
-                content=" Got it. I will monitor that item and alert you if the price drops further."
+                content="Got it. I will monitor that item and alert you if the price drops further."
             ).oracle().depends_on(user_decision, delay_seconds=1)
 
         self.events = [
@@ -114,16 +124,16 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
             summary,
             propose,
             user_decision,
-            confirm
+            confirm,
         ]
-        print(f"[DEBUG] proactive_price_evaluation_ad_summary: Created {len(self.events)} events")
+        logger.debug(f"proactive_price_evaluation_ad_summary: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        print("[DEBUG] proactive_price_evaluation_ad_summary: validate() called")
+        """Validate that proactive detection, email search, and summary generation occurred."""
+        logger.debug("proactive_price_evaluation_ad_summary: validate() called")
 
         try:
             events = env.event_log.list_view()
-            p = self._params
 
             proactive_triggered = any(
                 isinstance(e.action, Action)
@@ -131,12 +141,14 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
                 and "discount/promotional product emails" in e.action.args.get("content", "").lower()
                 for e in events
             )
+
             email_search_executed = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulEmailApp"
                 and e.action.function_name in ["search_emails", "read_emails"]
                 for e in events
             )
+
             summary_sent = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "AgentUserInterface"
@@ -146,15 +158,14 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
 
             success = proactive_triggered and email_search_executed and summary_sent
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive detection triggered: {'PASS' if proactive_triggered else 'FAIL'}")
-            print(f"  - Email search executed:            {'PASS' if email_search_executed else 'FAIL'}")
-            print(f"  - Summary message sent:             {'PASS' if summary_sent else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive detection triggered: {'PASS' if proactive_triggered else 'FAIL'}")
+            logger.debug(f"  - Email search executed:         {'PASS' if email_search_executed else 'FAIL'}")
+            logger.debug(f"  - Summary message sent:          {'PASS' if summary_sent else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
+
         except Exception as e:
-            print(f"[ERROR] proactive_price_evaluation_ad_summary: Validation failed: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] proactive_price_evaluation_ad_summary: Validation failed: {e}")
             return ScenarioValidationResult(success=False, exception=e)

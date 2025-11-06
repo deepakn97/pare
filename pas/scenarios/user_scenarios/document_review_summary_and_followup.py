@@ -13,6 +13,7 @@ Flow:
 """
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,6 +24,10 @@ from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps.calendar import StatefulCalendarApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -65,10 +70,13 @@ class ScenarioDocumentReviewSummaryAndFollowup(Scenario):
         system = SystemApp()
         calendar = StatefulCalendarApp()
         self.apps = [agui, system, calendar]
+        logger.debug("proactive_document_review_summary_and_followup: Apps initialized")
 
     # ---------- Event Flow ----------
     def build_events_flow(self) -> None:
         """Define proactive event flow for document review and meeting scheduling."""
+        logger.debug("proactive_document_review_summary_and_followup: Building events flow")
+
         aui = self.get_typed_app(AgentUserInterface)
         calendar = self.get_typed_app(StatefulCalendarApp)
         p = self._params
@@ -119,11 +127,12 @@ class ScenarioDocumentReviewSummaryAndFollowup(Scenario):
             add_event,
             confirm_msg,
         ]
+        logger.debug(f"proactive_document_review_summary_and_followup: Created {len(self.events)} events")
 
     # ---------- Validation ----------
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that the agent summarized feedback and created a meeting."""
-        print("[DEBUG] proactive_document_review_summary_and_followup: validate() called")
+        logger.debug("proactive_document_review_summary_and_followup: validate() called")
 
         try:
             events = env.event_log.list_view()
@@ -149,14 +158,13 @@ class ScenarioDocumentReviewSummaryAndFollowup(Scenario):
 
             success = proactive_summary and followup_created
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive review summary detected: {'PASS' if proactive_summary else 'FAIL'}")
-            print(f"  - Follow-up meeting created:         {'PASS' if followup_created else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive review summary detected: {'PASS' if proactive_summary else 'FAIL'}")
+            logger.debug(f"  - Follow-up meeting created:         {'PASS' if followup_created else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] proactive_document_review_summary_and_followup: Validation failed: {e}")
             return ScenarioValidationResult(success=False, exception=e)

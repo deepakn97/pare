@@ -5,6 +5,7 @@ and sends reminder messages to responsible participants.
 """
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +17,10 @@ from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, E
 
 from pas.apps.calendar import StatefulCalendarApp
 from pas.apps.messaging import StatefulMessagingApp
+
+
+# ---------- Logger ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- Parameters ----------
@@ -34,7 +39,7 @@ class ScenarioProactiveTaskFollowupReminder(Scenario):
         super().__init__()
         self._params = FollowupParams(
             tag_keyword="Task",
-            reminder_message="⏰ Reminder: You have a pending task approaching its deadline. Please review and update your progress.",
+            reminder_message="Reminder: You have a pending task approaching its deadline. Please review and update your progress.",
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
@@ -44,11 +49,11 @@ class ScenarioProactiveTaskFollowupReminder(Scenario):
         calendar = StatefulCalendarApp()
         messaging = StatefulMessagingApp()
         self.apps = [aui, system, calendar, messaging]
-        print("[DEBUG] proactive_task_followup_reminder: Apps initialized")
+        logger.debug("proactive_task_followup_reminder: Apps initialized")
 
     def build_events_flow(self) -> None:
         """Define proactive task reminder workflow."""
-        print("[DEBUG] proactive_task_followup_reminder: build_events_flow called")
+        logger.debug("proactive_task_followup_reminder: build_events_flow called")
 
         aui = self.get_typed_app(AgentUserInterface)
         system = self.get_typed_app(SystemApp)
@@ -77,10 +82,10 @@ class ScenarioProactiveTaskFollowupReminder(Scenario):
 
             # Agent summarizes found tasks
             summary_msg = aui.send_message_to_user(
-                content=f"🔍 I found several calendar entries tagged with '{p.tag_keyword}'. Sending reminders now..."
+                content=f"I found several calendar entries tagged with '{p.tag_keyword}'. Sending reminders now..."
             ).depends_on(task_events, delay_seconds=1)
 
-            # Send reminder to relevant participants (mocked messaging)
+            # Send reminder to relevant participants
             send_reminder = messaging.send_message(
                 user_id="team_user",
                 content=p.reminder_message,
@@ -100,11 +105,11 @@ class ScenarioProactiveTaskFollowupReminder(Scenario):
             send_reminder,
             finish,
         ]
-        print(f"[DEBUG] proactive_task_followup_reminder: Created {len(self.events)} events")
+        logger.debug(f"proactive_task_followup_reminder: Created {len(self.events)} events")
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate proactive trigger, task search, and reminder message."""
-        print("[DEBUG] proactive_task_followup_reminder: validate() called")
+        logger.debug("proactive_task_followup_reminder: validate() called")
 
         try:
             events = env.event_log.list_view()
@@ -138,16 +143,14 @@ class ScenarioProactiveTaskFollowupReminder(Scenario):
 
             success = proactive_triggered and task_search_executed and reminder_sent
 
-            print("\n[VALIDATION SUMMARY]")
-            print(f"  - Proactive detection triggered: {'PASS' if proactive_triggered else 'FAIL'}")
-            print(f"  - Calendar task search executed: {'PASS' if task_search_executed else 'FAIL'}")
-            print(f"  - Reminder messages sent:        {'PASS' if reminder_sent else 'FAIL'}")
-            print(f"  => Scenario result: {'PASS' if success else 'FAIL'}\n")
+            logger.debug("[VALIDATION SUMMARY]")
+            logger.debug(f"  - Proactive detection triggered: {'PASS' if proactive_triggered else 'FAIL'}")
+            logger.debug(f"  - Calendar task search executed: {'PASS' if task_search_executed else 'FAIL'}")
+            logger.debug(f"  - Reminder messages sent:        {'PASS' if reminder_sent else 'FAIL'}")
+            logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
             return ScenarioValidationResult(success=success)
 
         except Exception as e:
-            print(f"[ERROR] proactive_task_followup_reminder: Validation failed: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[ERROR] proactive_task_followup_reminder: Validation failed: {e}")
             return ScenarioValidationResult(success=False, exception=e)
