@@ -127,6 +127,12 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
             confirm,
         ]
         logger.debug(f"proactive_price_evaluation_ad_summary: Created {len(self.events)} events")
+        # ✅ Register all events to start when the environment initializes
+        for e in self.events:
+            self.register_event(EventType.APP_START, e)
+
+logger.debug(f"proactive_advertising_email_summary: Created and registered {len(events)} events")
+
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that proactive detection, email search, and summary generation occurred."""
