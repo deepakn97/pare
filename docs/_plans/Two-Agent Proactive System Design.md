@@ -110,7 +110,7 @@ class StateAwareEnvironmentWrapper(Environment):
 
 ---
 
-### 2. UserAgent (In Progress - Phase 3)
+### 2. UserAgent ✅ COMPLETED (Phase 3)
 
 **File**: `pas/agents/user/agent.py`
 
@@ -230,7 +230,7 @@ def __init__(
 
 ---
 
-### 4. TwoAgentScenarioRunner (Pending - Phase 6)
+### 4. TwoAgentScenarioRunner ✅ COMPLETED (Phase 6)
 
 **File**: `pas/scenario_runner.py`
 
@@ -380,6 +380,139 @@ class PASAgentUserInterface(AgentUserInterface):
 
 ---
 
+### 7. UserAgent Context Injection via Pre-steps
+
+**Motivation**: UserAgent needs real-time awareness of (1) what actions it can currently take, and (2) where it is in the app navigation hierarchy. This context must update dynamically as the user navigates between apps and app states.
+
+**Why Not Use Task or System Prompt?**
+- **Task**: Reserved for agent messages and notifications (what the agent should *do*)
+- **System Prompt**: Static, set once at initialization (cannot reflect dynamic state changes)
+- **Solution**: Use Meta-ARE's `conditional_pre_steps` mechanism to inject context as log entries before each agent iteration
+
+**Architecture Pattern**:
+```
+ScenarioRunner (has env)
+    → passes context as parameters
+    → UserAgent.agent_loop(current_tools, current_app, current_state)
+    → stores in BaseAgent.custom_state
+    → Pre-step reads from custom_state
+    → appends logs before BaseAgent.run()
+```
+
+**Implementation Components**:
+
+1. **Custom Log Types** (`pas/agents/agent_log.py`):
+   - `AvailableToolsLog`: Lists all currently available tools with descriptions
+   - `CurrentAppStateLog`: Shows active app and current navigation state
+
+2. **Message Formatting** (`pas/agents/user/agent.py:50-53`):
+   ```python
+   DEFAULT_USER_STEP_2_ROLE["available_tools"] = MessageRole.USER
+   DEFAULT_USER_STEP_2_ROLE["current_app_state"] = MessageRole.USER
+   DEFAULT_USER_STEP_2_MESSAGE["available_tools"] = "Available tools:\n***\n{content}\n***\n"
+   DEFAULT_USER_STEP_2_MESSAGE["current_app_state"] = "Current app state:\n***\n{content}\n***\n"
+   ```
+
+3. **Pre-step Function** (`pas/agents/user/steps.py:23-83`):
+   ```python
+   def pull_notifications_and_tools(agent: BaseAgent) -> None:
+       # Pull notifications (AGENT_MESSAGE, ENVIRONMENT_NOTIFICATION)
+       # ... notification handling code ...
+
+       # Inject available tools context
+       current_tools = list(agent.tools.values())
+       if current_tools:
+           toolbox = Toolbox(tools=current_tools)
+           tool_descriptions = toolbox.show_tool_descriptions(DEFAULT_TOOL_DESCRIPTION_TEMPLATE)
+           agent.append_agent_log(AvailableToolsLog(content=tool_descriptions, ...))
+
+       # Inject app state context
+       current_app = agent.custom_state.get("current_app")
+       current_state = agent.custom_state.get("current_state")
+       if current_app:
+           app_info = f"Current active app: {current_app.name}\n"
+           if current_state:
+               app_info += f"Current active state: {current_state.name}\n"
+           agent.append_agent_log(CurrentAppStateLog(content=app_info, ...))
+   ```
+
+4. **Context Passing** (`pas/scenario_runner.py:231-235`):
+   ```python
+   user_tools = env.get_user_tools()
+   current_app = env.active_app
+   current_state = current_app.current_state if current_app else None
+
+   user_result = user_agent.agent_loop(
+       user_tools,
+       current_app=current_app,
+       current_state=current_state
+   )
+   ```
+
+5. **Context Storage** (`pas/agents/user/agent.py:agent_loop()`):
+   ```python
+   def agent_loop(self, current_tools, current_app=None, current_state=None):
+       # Store in custom_state for pre-step access
+       self.react_agent.custom_state["current_app"] = current_app
+       self.react_agent.custom_state["current_state"] = current_state
+       # ... rest of method
+   ```
+
+**Agent's View** (formatted by message_dict):
+```
+Available tools:
+***
+- StatefulContactsApp__list_contacts: Lists all contacts...
+    Takes inputs: {}
+    Returns an output of type: string
+
+- StatefulContactsApp__open_contact: Opens a specific contact...
+    Takes inputs: {'contact_id': {'type': 'string'}}
+    Returns an output of type: string
+***
+
+Current app state:
+***
+Current active app: StatefulContactsApp
+Current active state: ContactsList
+***
+
+Proactive agent messages:
+***
+Would you like me to send a message to Alice?
+***
+```
+
+**Key Design Decisions**:
+
+1. **Why use `Toolbox.show_tool_descriptions()`?**
+   - Provides complete tool information (name, description, inputs, output types)
+   - Uses Meta-ARE's standard Jinja2 template system
+   - Consistent with how system prompts describe tools
+
+2. **Why store app/state in `custom_state`?**
+   - Pre-steps only receive `agent: BaseAgent` parameter
+   - `custom_state` is Meta-ARE's dict for agent-specific data
+   - Alternative would require environment reference (breaks encapsulation)
+
+3. **Why pass context through scenario_runner?**
+   - Scenario_runner has environment reference
+   - Maintains separation: UserAgent doesn't depend on environment
+   - Follows existing pattern (current_tools already passed this way)
+
+4. **When does context update?**
+   - Every turn before `UserAgent.agent_loop()` call
+   - Tools refresh: After state transitions (via `env.get_user_tools()`)
+   - App/state refresh: After navigation actions (env tracks `active_app`)
+
+**Benefits**:
+- Agent always sees current tool capabilities (crucial for state-based navigation)
+- Agent knows location in app hierarchy (improves decision-making)
+- Context updates automatically with every turn (no manual refresh needed)
+- Clean separation: context passing vs context formatting
+
+---
+
 ## Data Flow
 
 ### Single Turn Execution Flow
@@ -480,8 +613,8 @@ Turn N:
 ### Phase 6: TwoAgentScenarioRunner
 **Status**: Pending - main orchestration loop
 
-### Phase 6.5: Notification System Extensions
-**Status**: Pending - PASNotificationSystem, AgentMessageLog (before running code)
+### Phase 6.5: Notification System Extensions ✅ COMPLETED
+**Status**: PASNotificationSystem, AgentMessageLog implemented
 
 ### Phase 7: Demo Script
 **Status**: Pending - manual BaseAgent creation, preprocessing function
@@ -802,10 +935,340 @@ if accepted:  # Now checks the actual boolean value
   - `convert_to_message()` override with AGENT_MESSAGE and USER_MESSAGE handling
 - `AgentMessageLog` (pas/agents/agent_log.py)
   - Log type for ProactiveAgent proposals to UserAgent
+- `AvailableToolsLog` (pas/agents/agent_log.py)
+  - Log type for current tool descriptions (injected by pre-step)
+- `CurrentAppStateLog` (pas/agents/agent_log.py)
+  - Log type for current app and state context (injected by pre-step)
 - `PASAgentLog` (pas/agents/agent_log.py)
-  - Extended log type map with `from_dict()` override
+  - Extended log type map with `from_dict()` override for all PAS log types
 - Updated `PASAgentUserInterface` (pas/apps/proactive_aui.py)
   - Simplified tools by removing prefix duplication
+
+---
+
+## Phase 8: Notification Formatting System (In Progress)
+
+**Status**: IN PROGRESS (2025-11-04)
+**Context**: Testing demo script revealed need for formatted notifications and user action observation
+
+### Background: The Problem
+
+During demo testing, we discovered two critical issues:
+
+1. **User actions poorly formatted**: ProactiveAgent received ugly notification like:
+   ```
+   HomeScreenSystemApp: CompletedEvent(event_type=<EventType.AGENT: 'AGENT'>, ...)
+   ```
+   Instead of readable format like:
+   ```
+   [2024-01-01 00:00:12] User: HomeScreenSystemApp__open_app(app_name='StatefulMessagingApp')
+   ```
+
+2. **Message queue consumption bug**: Both UserAgent and ProactiveAgent should see environment notifications, but `message_queue.get_by_timestamp()` **removes** messages from queue. Current flow:
+   - Turn starts → UserAgent pre-step calls `get_by_timestamp()` → consumes all `ENVIRONMENT_NOTIFICATION`
+   - ProactiveAgent pre-step runs → queue is empty → misses notifications!
+
+### Solution Architecture
+
+#### Part 1: User Action Formatting (Delta Approach)
+
+**Design**: Format user actions (EventType.USER) separately from environment notifications:
+
+1. **Add `USER_ACTION` to PASMessageType enum** ✅ COMPLETED
+   - New message type distinct from `ENVIRONMENT_NOTIFICATION`
+   - Allows different formatting for user actions vs environment events
+
+2. **PASNotificationSystem.convert_to_message()** ✅ COMPLETED
+   - Detect `event.event_type == EventType.USER`
+   - Format as: `"{AppName}__{function}(arg1=val1, arg2=val2)"`
+   - Return `Message(message_type=USER_ACTION)`
+
+3. **UserActionLog class** ✅ COMPLETED
+   - New log type with `get_type() = "user_action"`
+   - ProactiveAgent pre-step creates these from `USER_ACTION` messages
+
+4. **Pre-step delta handling** (PENDING - Phase 8.5)
+   - `message_queue.get_by_timestamp()` automatically provides delta (only new messages)
+   - No manual index tracking needed!
+
+**Data Flow**:
+```
+User calls tool
+  → @pas_event_registered creates CompletedEvent(event_type=EventType.USER)
+  → PASNotificationSystem.convert_to_message()
+  → Returns Message(message_type=USER_ACTION, message="AppName__func(args)")
+  → Added to notification_system.message_queue
+  → ProactiveAgent pre-step pulls USER_ACTION → creates UserActionLog
+  → format_notification() adds timestamp: "[2024-01-01 12:00:00] AppName__func(args)"
+  → message_dict wraps: "New user action:\n***\n[timestamp] AppName__func(args)\n***\n"
+```
+
+#### Part 2: Message Queue Sharing Bug - Scenario Runner Solution
+
+**Problem Analysis**: Cannot modify BaseNotificationSystem easily because:
+- `self.message_queue.put()` called in 3 places (lines 236, 258, 299)
+- `self.message_queue.messages.peek()` used in `get_next_notification_time()` (line 220)
+- `self.message_queue.has_new_messages()` used in `handle_timeout_after_events()` (line 248)
+- Any custom MessageQueue affects ALL these methods
+
+**Rejected Solutions**:
+- ❌ **Two queues in notification system**: Would require overriding `handle_time_based_notifications()`, `handle_timeout_after_events()`, `handle_event()` - too much duplication
+- ❌ **Custom MessageQueue with per-agent tracking**: Would break `get_next_notification_time()` and `has_new_messages()` - complex to maintain
+- ❌ **Subscriber pattern**: User explicitly ruled out
+
+**CHOSEN SOLUTION: Scenario Runner Distribution** ✅
+
+**Architecture**: TwoAgentScenarioRunner gets messages once per turn, stores in each agent's `custom_state`:
+
+```python
+# In TwoAgentScenarioRunner._run_with_two_agents()
+while turn_count < max_turns:
+    # Get ALL notifications ONCE per turn
+    all_notifications = env.notification_system.message_queue.get_by_timestamp(
+        timestamp=datetime.fromtimestamp(env.time_manager.time(), tz=UTC)
+    )
+
+    # Distribute to both agents via custom_state
+    # Note: execute_agent doesn't need notifications (only observe_agent does)
+    user_agent.react_agent.custom_state["notifications"] = all_notifications
+    proactive_agent.observe_agent.custom_state["notifications"] = all_notifications
+
+    # Continue with existing code...
+    user_tools = env.get_user_tools()
+    current_app = env.active_app
+    current_state = current_app.current_state if current_app and isinstance(current_app, StatefulApp) else None
+
+    user_result = user_agent.agent_loop(
+        user_tools, current_app, current_state, reset=user_reset or not user_agent.react_agent.is_initialized
+    )
+
+    proactive_result = proactive_agent.agent_loop(
+        reset=proactive_reset or not proactive_agent.observe_agent.is_initialized
+    )
+```
+
+**Detailed Implementation Steps for Phase 8.7**:
+
+1. **TwoAgentScenarioRunner._run_with_two_agents()** (scenario_runner.py:234)
+   - Add `get_by_timestamp()` call at start of while loop
+   - Store result in both agents' `custom_state["notifications"]`
+
+2. **UserAgent.get_notifications()** (agents/user/agent.py:252-267)
+   - Change from: `notification_system.message_queue.get_by_timestamp(...)`
+   - To: `self.react_agent.custom_state.get("notifications", [])`
+   - Remove re-insertion logic (lines 264-265)
+
+3. **ProactiveAgent.get_notifications()** (agents/proactive/agent.py:306-325)
+   - Change from: `notification_system.message_queue.get_by_timestamp(...)`
+   - To: `self.observe_agent.custom_state.get("notifications", [])`
+   - Remove re-insertion logic (lines 318-319)
+
+4. **User pre-step** (agents/user/steps.py:25-27)
+   - Change from: `agent.notification_system.message_queue.get_by_timestamp(...)`
+   - To: `agent.custom_state.get("notifications", [])`
+
+5. **Proactive pre-step** (agents/proactive/steps.py:23-25)
+   - Change from: `agent.notification_system.message_queue.get_by_timestamp(...)`
+   - To: `agent.custom_state.get("notifications", [])`
+
+**Execution Flow After Phase 8.7**:
+```
+Turn starts
+├─ Scenario runner: get_by_timestamp() ONCE → store in custom_state
+├─ UserAgent.agent_loop()
+│  ├─ get_notifications() → reads from custom_state, filters by type
+│  ├─ build_task_from_notifications() → uses filtered AGENT_MESSAGE
+│  └─ react_agent.run() → pre-step reads from same custom_state
+│     └─ Pre-step creates: AgentMessageLog, EnvironmentNotificationLog, AvailableToolsLog, CurrentAppStateLog
+│
+└─ ProactiveAgent.agent_loop()
+   ├─ get_notifications() → reads from custom_state, filters by type
+   ├─ build_task_from_notifications() → uses filtered USER_MESSAGE
+   └─ observe_agent.run() → pre-step reads from same custom_state
+      └─ Pre-step creates: EnvironmentNotificationLog, UserActionLog (after Phase 8.5)
+```
+
+**Key Insight**: `get_notifications()` is NOT removed because it:
+- Filters notifications by type (AGENT_MESSAGE, USER_MESSAGE, etc.)
+- Detects ENVIRONMENT_STOP for termination
+- Builds task strings via `build_task_from_notifications()`
+- Pre-steps handle log creation, `get_notifications()` handles task building
+
+**Advantages**:
+- ✅ ZERO modifications to BaseNotificationSystem
+- ✅ Both agents see identical raw notifications
+- ✅ Single source of truth (one `get_by_timestamp()` call per turn)
+- ✅ Clean separation of concerns (runner distributes, agents filter/consume)
+- ✅ Eliminates message queue consumption race condition
+
+#### Part 3: Two-Template Notification System
+
+**Requirement**: UserAgent and ProactiveAgent should see DIFFERENT views of the same notification:
+- **UserAgent**: Truncated view (e.g., "Email from Alice: Meeting tomor...")
+- **ProactiveAgent**: Full view (e.g., "Email from Alice: Meeting tomorrow\n\n[full body]")
+
+**Design**: App-specific Jinja2 templates with user/agent distinction
+
+**Template Location**: `pas/apps/notification_templates.py` (single file for all apps)
+**Rationale**:
+- When developer adds new app, they add templates for BOTH views in ONE place
+- Easy to review/compare formatting across apps
+- Follows pattern: templates describe app behavior, not agent behavior
+
+**Template Structure**:
+```python
+NOTIFICATION_TEMPLATES = {
+    "user": {  # Templates for UserAgent (truncated)
+        "StatefulEmailApp": {
+            "create_and_add_email": "Email from {{sender}}: {{subject[:20]}}..."
+        },
+        "StatefulMessagingApp": {
+            "create_and_add_message": "New message in {{conversation_id}}"
+        },
+        "StatefulCalendarApp": {
+            "create_and_add_email_by_attendee": "Calendar: Event by {{who_add}}"
+        }
+    },
+    "agent": {  # Templates for ProactiveAgent (full)
+        "StatefulEmailApp": {
+            "create_and_add_email": "Email from {{sender}}: {{subject}}\n{{body}}"
+        },
+        "StatefulMessagingApp": {
+            "create_and_add_message": "Message in {{conversation_id}}: {{content}}"
+        },
+        "StatefulCalendarApp": {
+            "create_and_add_email_by_attendee": "Calendar: {{title}} by {{who_add}}"
+        }
+    }
+}
+```
+
+**Usage** (in scenario runner when distributing notifications):
+```python
+# Format notifications differently for each agent
+user_notifications = format_notifications(all_notifications, view="user")
+agent_notifications = format_notifications(all_notifications, view="agent")
+
+user_agent.custom_state["notifications"] = user_notifications
+proactive_agent.custom_state["notifications"] = agent_notifications
+```
+
+### Implementation Status
+
+**✅ Completed**:
+- Phase 8.1: Add USER_ACTION to PASMessageType enum
+- Phase 8.2: Implement UserActionLog class
+- Phase 8.3: Format user actions in PASNotificationSystem.convert_to_message()
+- Phase 8.4: Create pas/apps/notification_templates.py with two-template system
+- Phase 8.5: Update proactive pre-step to handle USER_ACTION messages
+- Phase 8.6: Add user_action to ProactiveAgent role_dict and message_dict
+- Phase 8.7: Implement scenario runner notification distribution (message queue fix)
+
+**⏳ Pending**:
+- Phase 8.8: Fix notification view parameter usage (see "Notification View Problem" below)
+- Phase 8.9: Test notification formatting with demo script
+
+### Key Design Decisions
+
+1. **Why delta approach?**
+   - BaseAgent's `build_history_from_logs()` iterates through ALL logs from beginning
+   - Each `UserActionLog` entry appears exactly once in chronological order
+   - No redundancy - LLM sees full action history naturally
+
+2. **Why scenario runner distribution?**
+   - Avoids modifying BaseNotificationSystem (complex, many dependencies)
+   - Clean separation: notification system creates messages, scenario runner distributes them
+   - Only 5 lines changed vs 50+ lines for other approaches
+
+3. **Why two templates?**
+   - Research requirement: user should have limited information, agent should have full context
+   - Simulates realistic information asymmetry
+   - Single template file makes it easy for developers to maintain consistency
+
+4. **Why `AppName__function` format for user actions?**
+   - Shows agent the exact tool name that was called
+   - Matches tool naming convention (what agent would use to call same tool)
+   - Clear and unambiguous
+
+### Notification View Problem (Phase 8.8)
+
+**Status**: ⚠️ DISCOVERED (2025-11-05)
+
+**Problem**: Created two-template system but `view` parameter isn't being used correctly.
+
+**Current Flow**:
+```python
+# In PASNotificationSystem.convert_to_message() (line 52)
+def convert_to_message(self, event: CompletedEvent, view: Literal["user", "agent"] = "user") -> Message | None:
+    # ...
+    message = get_content_for_environment_message(event, view)  # Calls with view parameter
+    # ...
+
+# But ALL notifications are created with default view="user"!
+# Both agents get Message objects with truncated "user" view content
+```
+
+**Current Implementation**:
+- `PASNotificationSystem.convert_to_message()` defaults to `view="user"` (line 52)
+- `Message` objects are created ONCE when event completes
+- Scenario runner distributes SAME Message objects to both agents:
+  ```python
+  all_notifications = env.notification_system.message_queue.get_by_timestamp(...)
+  user_agent.react_agent.custom_state["notifications"] = all_notifications  # user view
+  proactive_agent.observe_agent.custom_state["notifications"] = all_notifications  # also user view!
+  ```
+
+**Result**: ProactiveAgent currently sees truncated "user" view instead of full "agent" view.
+
+**Design Doc Mismatch**: Lines 1146-1154 suggested reformatting approach:
+```python
+user_notifications = format_notifications(all_notifications, view="user")
+agent_notifications = format_notifications(all_notifications, view="agent")
+```
+
+**Two Solution Options**:
+
+1. **Re-format approach**: Scenario runner reformats Message.message content using templates
+   - Pro: `Message` objects already created, just update `.message` field
+   - Con: Need to track event metadata to know which template to use
+   - Con: Might lose information if event data wasn't preserved in Message
+
+2. **Dual-creation approach**: Notification system creates two versions per event
+   - Con: Requires overriding `handle_event()` in PASNotificationSystem
+   - Con: More complex - need two separate message queues or message routing
+
+3. **On-demand formatting** (RECOMMENDED): Don't pre-format messages, format during pre-step
+   - Change `Message.message` to store raw event data (dict with args)
+   - Pre-step calls `render_template(message.raw_data, view="user"|"agent")`
+   - Pro: Clean separation - notification system stores data, pre-step formats it
+   - Pro: Single message queue, format once per agent
+   - Con: Requires changing Message structure or using message.metadata
+
+**Question for User**: Which approach should we take?
+
+### Related Bugs Discovered
+
+1. **EventType bug** ✅ FIXED (Phase 7.8)
+   - `@pas_event_registered` defaulted to `EventType.AGENT`
+   - User actions incorrectly labeled as AGENT events
+   - **Fix**: Changed default to `EventType.USER`
+
+2. **time_read bug** (Pending - Phase 9)
+   - `pas/notification_system.py:126` sets `time_read=timestamp`
+   - Messages immediately marked as read
+   - **Fix**: Remove or set to `None`
+
+---
+
+## Project Status Reference
+
+**Current Phase**: Phase 8 (Notification Formatting System) - see "Phase 8: Notification Formatting System" section above for detailed status
+
+**For TODO tracking**: See "Implementation Phases" section above (lines 567-624) for canonical phase breakdown and current status
+
+**Active work**: Phase 8.8 - Fix notification view parameter usage (see "Notification View Problem" in Phase 8 section)
+
+**IMPORTANT FOR NEXT SESSION**: When starting a new conversation, use the TodoWrite tool to restore working context. Reference the Implementation Phases section and Phase 8 detailed section to build the todo list
 
 ---
 

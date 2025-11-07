@@ -81,7 +81,7 @@ USER_AGENT_REACT_JSON_INSTRUCTIONS = textwrap.dedent(
 
 USER_AGENT_TASK_EXECUTION_PRINCIPLES = textwrap.dedent(
     """TASK EXECUTION PRINCIPLES:
-  1. AUTONOMY: Complete tasks independently - there is no one to ask for help
+  1. AUTONOMY: Try to complete tasks independently, if the proactive agent proposes a task, validate if the proposal aligns with your recent actions.
   2. PERSISTENCE: If a tool fails, try alternative approaches
   3. RESOURCEFULNESS: Use available tools to gather missing information
   4. DECISIVENESS: Make reasonable assumptions when faced with ambiguity
@@ -96,29 +96,52 @@ USER_AGENT_PROACTIVE_INTERACTION = textwrap.dedent(
       2. Check if it matches your recent action history and context
       3. Decide if accepting it would be helpful or interrupt your actual goal
     - You can ACCEPT a proposal if it accurately identifies your intent
-    - You can REJECT a proposal if it misunderstands your goal or would be unhelpful"""
+    - You can REJECT a proposal if it misunderstands your goal, would be unhelpful or if it is vague and unclear."""
 )
 
 PAS_USER_ENVIRONMENT_INSTRUCTIONS = textwrap.dedent(
     """MOBILE PHONE ENVIRONMENT:
-  - Available apps: <<available_apps>>
   - You can only interact with the currently active app plus system navigation tools
   - The environment changes based on your actions
-
-  APP NAVIGATION:
-  - open_app(app_name): Open an app from home screen (only available on home screen)
-  - switch_app(app_name): Switch to an already-open app (preserves state)
-  - go_home(): Return to home screen
 
   STATE-BASED INTERACTION:
   - Each app has multiple states representing different screens
   - Available tools change based on current app state
+  - The current app, the app state and the available actions at that state are given to you at each step.
+
+  APP NAVIGATION:
+  - open_app(app_name): Open an app from home screen launcher.
+    * Only available when ON the home screen, i.e. when the HomeScreenSystemApp is active.
+    * Use this to launch a new app.
+  - switch_app(app_name): Switch to an already-open app in the background.
+    * Always available regardless of current location.
+    * Preserves the app's previous state.
+    * Can only switch to apps you've already opened.
+    * You CANNOT switch to the HomeScreenSystemApp, you have to use go_home() instead.
+
+  - go_home(): Return to the home screen.
+    * Only available when NOT on the home screen (i.e. when the HomeScreenSystemApp is not active).
+    * Use this to switch from the current app to home screen.
+
+  - PASAgentUserInterface is a special app that allows you to communicate with the proactive agent. The tools from this app are always available. You CANNOT switch to this app, but you can use the tools from this app from anywhere.
+
+  SYSTEM RESPONSE TOOLS (always available):
+  - accept_proposal() and reject_proposal() are always available.
+  - These are always-accessible tools. You don't need to navigate to the PASAgentUserInterface app to use these tools.
+  - Use these to respond to the proactive agent's task proposals.
+
+  AVAILABLE APPS:
+  <<available_apps>>
 
   <<notification_system_description>>
 
   <<curent_time_description>>"""
 )
 
+
+# <task_execution_principles>
+# {task_execution_principles}
+# </task_execution_principles>
 USER_AGENT_SYSTEM_PROMPT_TEMPLATE = textwrap.dedent(
     """<general_instructions>
   {general_instructions}
@@ -131,10 +154,6 @@ USER_AGENT_SYSTEM_PROMPT_TEMPLATE = textwrap.dedent(
   <agent_instructions>
   {agent_instructions}
   </agent_instructions>
-
-  <task_execution_principles>
-  {task_execution_principles}
-  </task_execution_principles>
 
   <environment_instructions>
   {environment_instructions}

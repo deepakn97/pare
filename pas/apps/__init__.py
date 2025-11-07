@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from are.simulation.apps import App
+
 from pas.apps.calendar.app import StatefulCalendarApp
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.core import AppState, StatefulApp
@@ -12,6 +14,7 @@ from pas.apps.system import HomeScreenSystemApp
 from pas.apps.tool_decorators import user_tool
 
 __all__ = [
+    "App",
     "AppState",
     "HomeScreenSystemApp",
     "PASAgentUserInterface",

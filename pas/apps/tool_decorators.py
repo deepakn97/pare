@@ -18,8 +18,9 @@ if TYPE_CHECKING:
 __all__ = ["pas_event_registered", "user_tool"]
 
 
+# NOTE: Keep the default event type as USER since we use the @user_tool + pas_event_registered to register events for the user agent.
 def pas_event_registered(
-    operation_type: OperationType = OperationType.READ, event_type: EventType = EventType.AGENT
+    operation_type: OperationType = OperationType.READ, event_type: EventType = EventType.USER
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """PAS-specific event registration decorator that handles AppState instances.
 

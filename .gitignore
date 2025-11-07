@@ -221,3 +221,5 @@ __marimo__/
 
 # YoYo AI version control directory
 .yoyo/
+
+results/demo/*

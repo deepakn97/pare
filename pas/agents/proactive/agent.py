@@ -7,13 +7,18 @@ Based on meta-are/are/simulation/agents/default_agent/are_simulation_main.py
 from __future__ import annotations
 
 import logging
+import time
 from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
 from are.simulation.agents.agent_log import ToolCallLog
-from are.simulation.notification_system import Message, MessageType
+from are.simulation.agents.default_agent.base_agent import DEFAULT_STEP_2_MESSAGE, DEFAULT_STEP_2_ROLE
+from are.simulation.agents.llm.types import MessageRole
+from are.simulation.notification_system import Message
 from are.simulation.tool_utils import AppTool, AppToolAdapter
+
+from pas.notification_system import PASMessageType
 
 from .prompts.notification_system import get_execute_notification_system_prompt, get_observe_notification_system_prompt
 
@@ -31,6 +36,12 @@ if TYPE_CHECKING:
     from pas.apps import PASAgentUserInterface
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_PROACTIVE_STEP_2_ROLE = DEFAULT_STEP_2_ROLE.copy()
+DEFAULT_PROACTIVE_STEP_2_MESSAGE = DEFAULT_STEP_2_MESSAGE.copy()
+DEFAULT_PROACTIVE_STEP_2_ROLE["user_action"] = MessageRole.USER
+DEFAULT_PROACTIVE_STEP_2_MESSAGE["user_action"] = "[User Actions]:\n***\n{content}\n***\n"
 
 
 class ProactiveAgentMode(Enum):
@@ -102,6 +113,8 @@ class ProactiveAgent:
         self.observe_agent.llm_engine = self.observe_llm_engine
         self.observe_agent.time_manager = self.time_manager
         self.observe_agent.log_callback = log_callback
+        self.observe_agent.role_dict = DEFAULT_PROACTIVE_STEP_2_ROLE
+        self.observe_agent.message_dict = DEFAULT_PROACTIVE_STEP_2_MESSAGE
 
         # Execute Agent arguments
         self.execute_llm_engine = execute_llm_engine
@@ -111,6 +124,8 @@ class ProactiveAgent:
         self.execute_agent.llm_engine = self.execute_llm_engine
         self.execute_agent.time_manager = self.time_manager
         self.execute_agent.log_callback = log_callback
+        self.execute_agent.role_dict = DEFAULT_PROACTIVE_STEP_2_ROLE
+        self.execute_agent.message_dict = DEFAULT_PROACTIVE_STEP_2_MESSAGE
 
         # Environment methods to handle simulation time.
         self.simulated_generation_time_config = simulated_generation_time_config
@@ -148,7 +163,9 @@ class ProactiveAgent:
         are_simulation_tools = [AppToolAdapter(tool) for tool in app_tools]
         self.tools += are_simulation_tools
 
-        observe_tools = [tool for tool in self.tools if "send_message_to_user" in tool.name.lower()]
+        observe_tool_names = ["PASAgentUserInterface__wait", "PASAgentUserInterface__send_message_to_user"]
+
+        observe_tools = [tool for tool in app_tools if tool.name in observe_tool_names]
         if len(observe_tools) == 0:
             raise ValueError("No observe tools found. The observe agent must have the send_message_to_user tool.")
         self.observe_agent.tools = {tool.name: tool for tool in observe_tools}
@@ -177,8 +194,6 @@ class ProactiveAgent:
             "system_prompt"
         ].replace("<<agent_reminder_description>>", "")
 
-        logger.debug(f"Initialized observe system prompt: {self.observe_agent.init_system_prompts['system_prompt']}")
-
     def init_execute_system_prompt(self, scenario: Scenario) -> None:
         """Initialize the execute system prompt.
 
@@ -200,8 +215,6 @@ class ProactiveAgent:
         self.execute_agent.init_system_prompts["system_prompt"] = self.execute_agent.init_system_prompts[
             "system_prompt"
         ].replace("<<agent_reminder_description>>", "")
-
-        logger.debug(f"Initialized execute system prompt: {self.execute_agent.init_system_prompts['system_prompt']}")
 
     def init_notification_system(self, notification_system: BaseNotificationSystem) -> None:
         """Initialize the notification system.
@@ -258,7 +271,7 @@ class ProactiveAgent:
         Returns:
             List of app tools.
         """
-        aui_tool = next(tool for tool in app_tools if "ProactiveAgentUserInterface" in tool.name)
+        aui_tool = next(tool for tool in app_tools if "PASAgentUserInterface" in tool.name)
 
         if aui_tool is not None:
             aui: PASAgentUserInterface = aui_tool.class_instance
@@ -271,57 +284,56 @@ class ProactiveAgent:
             # And thus he won't need to use these tools to get the messages.
             # FIXME: The name of the tools might be wrong here. Check in future.
             tools_to_remove = {
-                "ProactiveAgentUserInterface__get_last_message_from_user",
-                "ProactiveAgentUserInterface__get_last_message_from_agent",
-                "ProactiveAgentUserInterface__get_last_unread_messages",
-                "ProactiveAgentUserInterface__get_all_messages",
+                "PASAgentUserInterface__get_last_message_from_user",
+                "PASAgentUserInterface__get_last_message_from_agent",
+                "PASAgentUserInterface__get_last_unread_messages",
+                "PASAgentUserInterface__get_all_messages",
             }
             logger.warning(f"Removing tools {tools_to_remove} from app_tools")
             app_tools = [tool for tool in app_tools if tool.name not in tools_to_remove]
         return app_tools
 
-    def get_notifications(
-        self, notification_system: BaseNotificationSystem
-    ) -> tuple[list[Message], list[Message], list[Message]]:
-        """Get new notifications from the notification system.
+    def get_notifications(self) -> tuple[list[Message], list[Message], list[Message]]:
+        """Get new notifications from the custom state, NOT from the notification system.
+
+        Notification system get_by_timestamp() method is destructive and removes messages from the queue. This creates an assymetric view of system notifications for the two agents.
 
         From the Proactive Agent perspective:
         - user_messages: messages sent by the user to the agent.
         - environment_notifications: Environment events like incoming email, messages etc.
         - env_stop_messages: Environment stop signals
 
-        Args:
-            notification_system: Notification system to get notifications from.
-
         Returns:
             Tuple of (list of new user messages, list of new environment notifications, list of environment stop messages).
-
-        Raises:
-                RuntimeError: If notification system is not set.
         """
-        if notification_system is None:
-            raise RuntimeError("Notification system not set")
-
-        new_messages = notification_system.message_queue.get_by_timestamp(
-            datetime.fromtimestamp(self.time_manager.time(), tz=UTC)
+        # new_messages = self.observe_agent.custom_state.get("notifications", [])
+        new_messages = self.observe_agent.notification_system.message_queue.get_by_timestamp(
+            timestamp=datetime.fromtimestamp(self.time_manager.time(), tz=UTC)
         )
 
         # Filter for USER_MESSAGE (User messages to Proactive Agent)
         # Note: We check against the string value to support both MessageType and PASMessageType
-        new_user_messages = [message for message in new_messages if message.message_type == MessageType.USER_MESSAGE]
+        user_messages = [message for message in new_messages if message.message_type == PASMessageType.USER_MESSAGE]
 
-        new_env_notifications = [
-            message for message in new_messages if message.message_type == MessageType.ENVIRONMENT_NOTIFICATION
+        env_notifications = [
+            message for message in new_messages if message.message_type == PASMessageType.ENVIRONMENT_NOTIFICATION_AGENT
         ]
-
-        for message in new_env_notifications:
-            notification_system.message_queue.put(message)
 
         env_stop_messages = [
-            message for message in new_messages if message.message_type == MessageType.ENVIRONMENT_STOP
+            message for message in new_messages if message.message_type == PASMessageType.ENVIRONMENT_STOP
         ]
+        # Reinsert the env notifications for user and agent + any extra messages back into the notification system.
+        # This is important because the preprocessing step and the next agent will use the same notification system.
+        # Here we don't need to reinsert the user messages because they are consumed while building the task.
+        messages_to_put_back = [m for m in new_messages if m not in user_messages + env_stop_messages]
 
-        return new_user_messages, new_env_notifications, env_stop_messages
+        logger.info(
+            f"Proactive agent get_notifications() -> message types to put back: {'; '.join([m.message_type.value for m in messages_to_put_back])}"
+        )
+        for message in messages_to_put_back:
+            self.observe_agent.notification_system.message_queue.put(message)
+
+        return user_messages, env_notifications, env_stop_messages
 
     def build_task_from_notifications(self, user_messages: list[Message]) -> str:
         """Build User Agent task from agent messages.
@@ -363,11 +375,13 @@ class ProactiveAgent:
     def agent_loop(
         self,
         initial_task: str | None = None,
+        reset: bool = True,
     ) -> str | MMObservation | None:
         """Execute one proactive agent turn either in observe or execute mode.
 
         Args:
             initial_task: Initial task to run the agent with.
+            reset: Whether to reset the proactive agent.
 
         Returns:
             Result from the last agent turn execution.
@@ -378,18 +392,20 @@ class ProactiveAgent:
         if self.observe_agent.notification_system is None or self.execute_agent.notification_system is None:
             raise RuntimeError("Notification system not set for either observe or execute agent")
 
+        # ? NOTE: Here also we need to put this notification in the custom state and not in the notification system.
         if initial_task is not None:
-            self.observe_agent.notification_system.message_queue.put(
+            self.observe_agent.custom_state.get("notifications", []).append(
                 Message(
-                    message_type=MessageType.USER_MESSAGE,
+                    message_type=PASMessageType.USER_MESSAGE,
                     message=initial_task,
                     timestamp=datetime.fromtimestamp(self.time_manager.time(), tz=UTC),
                 )
             )
 
-        new_user_messages, new_env_notifications, env_stop_messages = self.get_notifications(
-            self.observe_agent.notification_system
-        )
+        new_user_messages, new_env_notifications, env_stop_messages = self.get_notifications()
+        logger.info(f"New user messages: {new_user_messages}")
+        logger.info(f"New environment notifications: {new_env_notifications}")
+        logger.info(f"Environment stop messages: {env_stop_messages}")
 
         if len(env_stop_messages) > 0:
             logger.warning(f"Environment stop message received - Stopping Agent: {env_stop_messages}")
@@ -398,7 +414,7 @@ class ProactiveAgent:
         task = ""
         if len(new_user_messages) > 0 or len(new_env_notifications) > 0:
             if self.mode == ProactiveAgentMode.OBSERVE:
-                result = self._run_observe_mode(new_user_messages, new_env_notifications)
+                result = self._run_observe_mode(new_user_messages, new_env_notifications, reset)
                 return result
             elif self.mode == ProactiveAgentMode.AWAITING_CONFIRMATION:
                 accepted, _ = self._check_confirmation(new_user_messages)
@@ -409,6 +425,9 @@ class ProactiveAgent:
                 return self._run_execute_mode(new_user_messages, new_env_notifications)
             else:
                 raise RuntimeError(f"Unknown mode: {self.mode}")
+        else:
+            logger.info("No new messages from user agent or environment. Sleeping for 2 seconds.")
+            time.sleep(2)
         return None
 
     def _check_confirmation(self, user_messages: list[Message]) -> tuple[bool, str | None]:
@@ -421,7 +440,7 @@ class ProactiveAgent:
             Tuple of (True, response) if user accepted the proposal, (False, None) if user rejected the proposal, (False, None) if response is unclear.
         """
         if not user_messages:
-            logger.debug("No user response yet, still awaiting confirmation")
+            logger.info("No user response yet, still awaiting confirmation")
             return False, None
 
         response = user_messages[-1].message
@@ -440,21 +459,28 @@ class ProactiveAgent:
         self,
         user_messages: list[Message],
         env_notifications: list[Message],
+        reset: bool = True,
     ) -> str | MMObservation | None:
         """Run the observe agent and check for proposals.
 
         Args:
             user_messages: List of user messages.
             env_notifications: List of environment notifications.
+            reset: Whether to reset the observe agent.
 
         Returns:
             Result from the last agent turn execution.
         """
         logger.info("Running in OBSERVE mode")
-        # ! TODO: We should add a generic observation task string if user messages is empty. If user sent message, then pass that as a task. Use build_task_from_notifications function for this.
+        # Reset the internal iterations counter, otherwise after first turn, the agent will exit. And if we increase the number of max_iterations, then the agent will take multiple turns.
+        # ! FIXME: Find a better solution for this iterations issue.
+        self.observe_agent.iterations = 0
+
         task = self.build_task_from_notifications(user_messages)
         attachments: list[Attachment] = [attachment for message in user_messages for attachment in message.attachments]
-        result = self.observe_agent.run(task=task, hint=None, attachments=attachments)
+        result = self.observe_agent.run(
+            task=task, hint=None, reset=reset, attachments=attachments if attachments else None
+        )
 
         proposal_made, proposal_content = self.check_for_proposal()
         if proposal_made:
@@ -490,6 +516,7 @@ class ProactiveAgent:
         task = f"Proposed Goal: {self.pending_goal}"
         task += f"\nUser reply: {self.build_task_from_notifications(user_messages)}"
         attachments: list[Attachment] = [attachment for message in user_messages for attachment in message.attachments]
+        self.execute_agent.initialize(attachments=attachments)
         result = self.execute_agent.run(task=task, hint=None, attachments=attachments)
 
         self.mode = ProactiveAgentMode.OBSERVE

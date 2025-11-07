@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from are.simulation.apps.agent_user_interface import AgentUserInterface
-from are.simulation.tool_utils import OperationType
+from are.simulation.tool_utils import OperationType, app_tool
 from are.simulation.types import EventType, disable_events, event_registered
 from are.simulation.utils import type_check
 
@@ -56,3 +56,17 @@ class PASAgentUserInterface(AgentUserInterface):
         """
         with disable_events():
             return self.send_message_to_agent(content=content)
+
+    @type_check
+    @app_tool()
+    @event_registered(event_type=EventType.AGENT)
+    def wait(self) -> str:
+        """Observe and wait without taking action.
+
+        Use this when you want to continue monitoring but don't have a specific
+        proposal or message for the user yet.
+
+        Returns:
+            Confirmation that the agent is in observation mode.
+        """
+        return "Continuing to observe user activity."

@@ -78,7 +78,10 @@ class PASAgentLog(BaseAgentLog):
             "raw_facts": LLMOutputFactsLog,
             "llm_output_facts": LLMOutputFactsLog,
             "agent_user_interface": AgentUserInterfaceLog,
+            "available_tools": AvailableToolsLog,
+            "current_app_state": CurrentAppStateLog,
             "agent_message": AgentMessageLog,
+            "user_action": UserActionLog,
             "environment_notifications": EnvironmentNotificationLog,
             "hint": HintLog,
             "task_reminder": TaskReminderLog,
@@ -122,3 +125,60 @@ class AgentMessageLog(BaseAgentLog):
     def get_type(self) -> str:
         """Return log type identifier."""
         return "agent_message"
+
+
+@dataclass
+class AvailableToolsLog(BaseAgentLog):
+    """Log entry for all available tools for user agent at the current state.
+
+    Used by UserAgent preprocessing to store AVAILABLE_TOOLS notifications.
+    These are tools that are available to the user agent at the current state.
+    """
+
+    content: str
+
+    def get_content_for_llm(self) -> str | None:
+        """Return content to be sent to LLM."""
+        return self.content
+
+    def get_type(self) -> str:
+        """Return log type identifier."""
+        return "available_tools"
+
+
+@dataclass
+class UserActionLog(BaseAgentLog):
+    """Log entry for user actions observed by the proactive agent.
+
+    Each log represents a list of user actions since the last step.
+    Multiple logs accumulate in the agent history to show full action sequence.
+    """
+
+    content: str
+
+    def get_content_for_llm(self) -> str | None:
+        """Return content to be sent to LLM."""
+        return self.content
+
+    def get_type(self) -> str:
+        """Return log type identifier."""
+        return "user_action"
+
+
+@dataclass
+class CurrentAppStateLog(BaseAgentLog):
+    """Log entry for the current app state for user agent at the current state.
+
+    Used by UserAgent preprocessing to store CURRENT_APP_STATE notifications.
+    These are the current state of the app at the current state.
+    """
+
+    content: str
+
+    def get_content_for_llm(self) -> str | None:
+        """Return content to be sent to LLM."""
+        return self.content
+
+    def get_type(self) -> str:
+        """Return log type identifier."""
+        return "current_app_state"

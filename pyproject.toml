@@ -39,6 +39,8 @@ dev = [
     "mkdocs>=1.4.2",
     "mkdocs-material>=8.5.10",
     "mkdocstrings[python]>=0.26.1",
+    "ipython>=9.6.0",
+    "jupyter>=1.1.1",
 ]
 
 [build-system]
@@ -198,11 +200,11 @@ known_first_party = ["pas"]
 typeCheckingMode = "off"
 ignore = ["*"]
 
-[project.entry-points."are.simulation.scenarios"]
-proactive-agent-sandbox = "pas.scenario_generator:register_custom_scenarios"
+# [project.entry-points."are.simulation.scenarios"]
+# proactive-agent-sandbox = "pas.scenario_generator:register_custom_scenarios"
 
 [tool.uv.sources]
-meta-agents-research-environments = { git = "ssh://git@github.com/deepakn97/meta-are.git" }
+meta-agents-research-environments = { path = "../meta-are", editable = true }
 
 [[tool.mypy.overrides]]
 module = "dotenv"

@@ -58,7 +58,7 @@ PROACTIVE_OBSERVE_REACT_JSON_INSTRUCTIONS = textwrap.dedent(
 
   Action:
   {{
-    "action": "send_message_to_user",
+    "action": "PASAgentUserInterface__send_message_to_user",
     "action_input": {{
       "content": "your specific task proposal here"
     }}
@@ -70,7 +70,7 @@ PROACTIVE_OBSERVE_REACT_JSON_INSTRUCTIONS = textwrap.dedent(
 
   Action:
   {{
-    "action": "wait",
+    "action": "PASAgentUserInterface__wait",
     "action_input": {{}}
   }}<end_action>
 

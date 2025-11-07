@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from are.simulation.environment import Environment, EnvironmentConfig, EnvironmentType
 
+from pas.apps import PASAgentUserInterface
 from pas.apps.core import StatefulApp
 from pas.apps.system import HomeScreenSystemApp
 
@@ -56,6 +57,9 @@ class StateAwareEnvironmentWrapper(Environment):
             list[AppTool]: Tools available to the user agent from currently active apps.
         """
         tools: list[AppTool] = []
+
+        aui_tools = self.get_app_with_class(PASAgentUserInterface).get_user_tools()
+        tools.extend(aui_tools)
 
         # Always add the system app tools
         system_app = self.get_app_with_class(HomeScreenSystemApp)
@@ -221,6 +225,7 @@ class StateAwareEnvironmentWrapper(Environment):
             )
 
             # Handle state transitions for StatefulApps
+            # ! FIXME: This is wrong. The state transition should only be triggered by a user action.
             app = self.get_app(event.app_name())
             if isinstance(app, StatefulApp):
                 app.handle_state_transition(event)

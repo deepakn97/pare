@@ -1,5 +1,7 @@
 """Scenario generator module for registering custom scenarios."""
 
+from __future__ import annotations
+
 import importlib
 import logging
 from typing import TYPE_CHECKING
@@ -10,7 +12,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_custom_scenarios(registry: "ScenarioRegistry") -> None:
+def register_custom_scenarios(registry: ScenarioRegistry) -> None:
     """Register all custom scenarios from this project with the provided registry.
 
     This function is called by the meta-ARE framework when it discovers the

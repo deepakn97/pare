@@ -7,14 +7,24 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from are.simulation.agents.default_agent.base_agent import BaseAgent
+from are.simulation.agents.default_agent.tools.json_action_executor import JsonActionExecutor
 from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
 from are.simulation.data_handler.exporter import JsonScenarioExporter
 from are.simulation.environment import EnvironmentConfig
+from are.simulation.notification_system import VerbosityLevel
 from are.simulation.scenario_runner import ScenarioRunner
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import EnvironmentState, EnvironmentType
 
 from pas.agents import ProactiveAgent, UserAgent
+from pas.agents.proactive.prompts.execute_prompt import (
+    DEFAULT_PROACTIVE_EXECUTE_PROMPT_WITH_HINTS,
+)
+from pas.agents.proactive.prompts.observe_prompt import DEFAULT_PROACTIVE_OBSERVE_PROMPT
+from pas.agents.proactive.steps import get_proactive_agent_pre_step
+from pas.agents.user.prompts.system_prompt import DEFAULT_USER_AGENT_SYSTEM_PROMPT
+from pas.agents.user.steps import get_user_agent_pre_step
+from pas.apps import StatefulApp
 from pas.environment import StateAwareEnvironmentWrapper
 from pas.notification_system import PASNotificationSystem
 
@@ -103,7 +113,6 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             export_apps=export_apps,
             trace_dump_format=trace_dump_format,
             scenario_exception=validation_result.exception,
-            runner_config=self.config,
         )
         if success:
             logger.info(f"Trace exported to {export_path}")
@@ -152,6 +161,12 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             llm_engine=user_llm_engine,
             tools={},  # Will be set by the UsetAgent.init_tools()
             max_iterations=user_config.max_iterations,
+            conditional_pre_steps=[get_user_agent_pre_step()],
+            action_executor=JsonActionExecutor(
+                tools={},
+                use_custom_logger=user_config.use_custom_logger,
+            ),
+            system_prompts={"system_prompt": DEFAULT_USER_AGENT_SYSTEM_PROMPT},
         )
 
         observe_llm_engine = LLMEngineBuilder().create_engine(proactive_observe_config.llm_engine_config)
@@ -159,6 +174,12 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             llm_engine=observe_llm_engine,
             tools={},  # Will be set by the ProactiveAgent.init_tools()
             max_iterations=proactive_observe_config.max_iterations,
+            conditional_pre_steps=[get_proactive_agent_pre_step()],
+            action_executor=JsonActionExecutor(
+                tools={},
+                use_custom_logger=proactive_observe_config.use_custom_logger,
+            ),
+            system_prompts={"system_prompt": DEFAULT_PROACTIVE_OBSERVE_PROMPT},
         )
 
         execute_llm_engine = LLMEngineBuilder().create_engine(proactive_execute_config.llm_engine_config)
@@ -166,6 +187,12 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             llm_engine=execute_llm_engine,
             tools={},  # Will be set by the ProactiveAgent.init_tools()
             max_iterations=proactive_execute_config.max_iterations,
+            conditional_pre_steps=[get_proactive_agent_pre_step()],
+            action_executor=JsonActionExecutor(
+                tools={},
+                use_custom_logger=proactive_execute_config.use_custom_logger,
+            ),
+            system_prompts={"system_prompt": DEFAULT_PROACTIVE_EXECUTE_PROMPT_WITH_HINTS},
         )
 
         user_agent = UserAgent(
@@ -201,14 +228,39 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         proactive_agent.prepare_proactive_agent_run(scenario, env.notification_system)
 
         turn_count = 0
+        # reset on first turn, then false for subsequent turns.
+        user_reset = True
+        proactive_reset = True
         while (max_turns is None or turn_count < max_turns) and env.state != EnvironmentState.STOPPED:
             user_tools = env.get_user_tools()
-            # ! TODO: Check if setting the max_turns to 1 is correct.
-            user_result = user_agent.agent_loop(user_tools, max_turns=1)
-            logger.info(f"Turn {turn_count} - User Agent Output: {user_result}")
+            current_app = env.active_app
+            current_state = current_app.current_state if current_app and isinstance(current_app, StatefulApp) else None
 
-            proactive_result = proactive_agent.agent_loop()
+            # Distribute notifications to both agents, so that they can see the same notifications.
+            # ! NOTE: This was a really bad idea. It gives stale notifications to the agents.
+            # all_notifications = env.notification_system.message_queue.get_by_timestamp(
+            #     timestamp=datetime.fromtimestamp(env.time_manager.time(), tz=UTC)
+            # )
+
+            # user_agent.react_agent.custom_state["notifications"] = all_notifications
+            # proactive_agent.observe_agent.custom_state["notifications"] = all_notifications
+            # proactive_agent.execute_agent.custom_state["notifications"] = all_notifications
+
+            # ! TODO: Check if setting the max_turns to 1 is correct.
+            # logger.debug(
+            #     f"Turn {turn_count} - Notifications: {json.dumps([{'Message': notification.message, 'Message Type': notification.message_type.value} for notification in all_notifications], indent=2)}"
+            # )
+            user_result = user_agent.agent_loop(
+                user_tools, current_app, current_state, reset=user_reset or not user_agent.react_agent.is_initialized()
+            )
+            logger.info(f"Turn {turn_count} - User Agent Output: {user_result}")
+            user_reset = False
+
+            proactive_result = proactive_agent.agent_loop(
+                reset=proactive_reset or not proactive_agent.observe_agent.is_initialized()
+            )
             logger.info(f"Turn {turn_count} - Proactive Agent Output: {proactive_result}")
+            proactive_reset = False
 
             turn_count += 1
 
@@ -254,7 +306,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         env = StateAwareEnvironmentWrapper(
             environment_type=EnvironmentType.CLI,
             config=env_config,
-            notification_system=PASNotificationSystem(),
+            notification_system=PASNotificationSystem(verbosity_level=VerbosityLevel.HIGH),
         )
 
         env.run(scenario, wait_for_end=False)
@@ -296,7 +348,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
                 proactive_agent.agent_framework,
                 validation_result,
                 run_duration,
-                output_dir=self.config.output_dir,
+                output_dir="traces/demo",
                 export_apps=not has_hf_metadata,
                 trace_dump_format="hf",
             )
