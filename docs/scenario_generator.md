@@ -39,6 +39,7 @@ The generator uses a **multi-iteration approach**:
 - **Proactive interaction pattern validation**: Enforces agent proposal → user response → agent action pattern
 - **Meaningful user responses**: Validates that user responses are contextual and detailed (not just "yes")
 - **Strict tool constraints**: Generated scenarios can only use tools from the selected app combination
+- **Summary-based deduplication**: Uses LLM-generated summaries to detect semantically similar scenarios more efficiently
 
 ## Command Line Interface
 
@@ -156,6 +157,75 @@ python pas/scenario_generator/utils/list_all_app_imports.py
 
 This utility scans the entire `are.simulation.apps` package and generates comprehensive import instructions that help the LLM agent understand what APIs and classes are available.
 
+### Scenario Summary Generation and Deduplication
+
+The system includes an advanced summary-based deduplication system that uses LLM-generated summaries to detect similar scenarios more efficiently and semantically.
+
+#### Overview
+
+Instead of comparing raw code, the system generates natural language summaries of scenarios and compares these summaries using multiple similarity metrics. This approach provides:
+- **Semantic comparison**: Compares scenario meanings rather than code structure
+- **Faster validation**: Summary comparison is faster than code parsing
+- **Better context**: Provides scenario summaries in error messages for better LLM understanding
+
+#### Summary Generation
+
+Generate summaries for scenario files using the `SummaryGeneratingAgent`:
+
+```bash
+# Generate summary for a single scenario
+uv run python pas/scenario_generator/utils/generate_scenario_summaries.py \
+  --file pas/scenarios/generated_scenarios/meeting_invite_coordination.py
+
+# Generate summaries for all scenarios (including subdirectories)
+uv run python pas/scenario_generator/utils/generate_scenario_summaries.py --all
+
+# Force regeneration of existing summaries
+uv run python pas/scenario_generator/utils/generate_scenario_summaries.py --all --force
+```
+
+**Output**: Summaries are saved to `pas/scenarios/generated_scenarios/scenario_summaries.json` in JSON format:
+```json
+{
+  "scenario_id": "Summary text describing the scenario...",
+  ...
+}
+```
+
+#### Summary-Based Validation
+
+Validate a new scenario against existing summaries before adding it:
+
+```bash
+# Validate and add a scenario summary (returns True/False)
+uv run python pas/scenario_generator/utils/validate_and_add_scenario_summary.py \
+  --file pas/scenarios/generated_scenarios/new_scenario.py
+
+# Use custom similarity thresholds
+uv run python pas/scenario_generator/utils/validate_and_add_scenario_summary.py \
+  --file scenario.py \
+  --difflib-threshold 0.75 \
+  --jaccard-threshold 0.75 \
+  --cosine-threshold 0.90
+```
+
+**Similarity Metrics:**
+- **`difflib_ratio`** (default threshold: 0.8): Structural/sequential similarity
+- **`jaccard_shingles`** (default threshold: 0.8): Pattern similarity using k-gram shingles
+- **`cosine_tokens`** (default threshold: 0.94): Vocabulary similarity based on token frequency
+
+**Integration**: The scenario generator automatically uses summary-based validation during generation. When a generated scenario is too similar to existing ones, the system includes the existing scenario's summary in the error message to help the LLM understand what needs to be changed.
+
+#### Automatic Integration
+
+The `SeedScenarioGeneratingAgent` automatically:
+1. Generates a summary for each newly generated scenario
+2. Compares it against all existing summaries in `scenario_summaries.json`
+3. Provides detailed feedback including existing scenario summaries when duplicates are detected
+4. Uses the same thresholds as code-based validation for consistency
+
+For detailed API documentation, see [Summary and Deduplication API](api/summary_and_deduplication.md).
+
 ## Seed Scenario Generator (Advanced)
 
 The **Seed Scenario Generator** is an advanced generation mode that provides sophisticated scenario creation capabilities beyond the standard generator.
@@ -193,7 +263,7 @@ The **Seed Scenario Generator** is an advanced generation mode that provides sop
    - Syntax and import validation
    - Comprehensive tool usage validation
    - Proactive interaction pattern validation
-   - Similarity validation against existing scenarios
+   - Summary-based similarity validation against existing scenarios
 5. **Iterative Repair**: Failed scenarios are automatically repaired through multiple iterations
 
 ### Example Usage
@@ -242,7 +312,7 @@ Specialized agent for intelligent app combination selection:
 #### Seed Mode (Additional)
 - `_validate_comprehensive_tool_usage()`: Ensures all apps are used in each scenario
 - `_validate_proactive_interaction_pattern()`: Validates agent proposal → user response → agent action pattern
-- `_validate_similarity_against_existing()`: Prevents duplicate scenario generation
+- `_validate_similarity_against_existing_scenario_summary()`: Prevents duplicate scenario generation using summary-based comparison
 - `_generate_import_instructions_for_selected_apps()`: Creates dynamic import statements for selected apps
 
 ### Import Management
