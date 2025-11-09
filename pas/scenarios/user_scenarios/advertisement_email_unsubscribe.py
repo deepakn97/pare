@@ -39,7 +39,7 @@ class ScenarioProactiveAdvertisementEmailUnsubscribe(Scenario):
         super().__init__()
         self._params = AdEmailParams(
             keywords=["sale", "promotion", "offer", "discount", "deal", "new product"],
-            summary_template="I found {count} promotional emails from: {senders}. Would you like me to unsubscribe from any of them?",
+            summary_template="I found several promotional emails this week. Some frequent senders include {brands}.",
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
@@ -64,7 +64,10 @@ class ScenarioProactiveAdvertisementEmailUnsubscribe(Scenario):
         with EventRegisterer.capture_mode():
             # 1. Agent proactively detects advertisement emails
             proactive_detect = aui.send_message_to_user(
-                content="I noticed several promotional and advertisement emails in your inbox. Would you like me to summarize them and check for unsubscribe options?"
+                content=(
+                    "I noticed several promotional and advertisement emails in your inbox. "
+                    "Would you like me to summarize them and check for unsubscribe options?"
+                )
             ).depends_on(None, delay_seconds=1)
 
             # 2. User confirms summarization
@@ -75,16 +78,15 @@ class ScenarioProactiveAdvertisementEmailUnsubscribe(Scenario):
             # 3. System gets current time
             current_time = system.get_current_time().oracle().depends_on(user_confirm, delay_seconds=1)
 
-            # 4. Email app searches advertisement messages
+            # 4. Email app searches advertisement messages (real oracle action)
             fetch_ads = email.search_emails(
                 query=" OR ".join(p.keywords)
             ).oracle().depends_on(current_time, delay_seconds=1)
 
-            # 5. Agent summarizes top senders (simulated)
+            # 5. Agent summarizes detected promotional senders (language-level simulation)
             summary_msg = aui.send_message_to_user(
                 content=p.summary_template.format(
-                    count=4,
-                    senders="Amazon Deals, BestBuy, Adobe Creative Cloud, and Nike",
+                    brands="Amazon Deals, BestBuy, Adobe Creative Cloud, and Nike"
                 )
             ).depends_on(fetch_ads, delay_seconds=1)
 
@@ -98,10 +100,13 @@ class ScenarioProactiveAdvertisementEmailUnsubscribe(Scenario):
                 content="Unsubscribe from Adobe Creative Cloud and Nike, keep the others."
             ).depends_on(unsubscribe_prompt, delay_seconds=1)
 
-            # 8. Messaging app confirms simulated unsubscription
+            # 8. Messaging app confirms unsubscription
             confirm_msg = messaging.send_message(
                 user_id="demo_user",
-                content="You have been unsubscribed from Adobe Creative Cloud and Nike promotional emails. Amazon and BestBuy remain subscribed.",
+                content=(
+                    "You have been unsubscribed from Adobe Creative Cloud and Nike promotional emails. "
+                    "Amazon and BestBuy remain subscribed."
+                ),
             ).oracle().depends_on(user_decision, delay_seconds=1)
 
             # 9. Agent finalizes the confirmation

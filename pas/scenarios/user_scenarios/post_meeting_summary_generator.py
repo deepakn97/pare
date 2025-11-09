@@ -38,7 +38,7 @@ class ScenarioProactivePostMeetingSummaryGenerator(Scenario):
         super().__init__()
         self._params = PostMeetingParams(
             summary_template=(
-                "Summary of '{title}':\n"
+                "Summary of {title}:\n"
                 "- Discussed project progress updates\n"
                 "- Assigned next steps to team members\n"
                 "- Scheduled next sync for next week"
@@ -65,30 +65,30 @@ class ScenarioProactivePostMeetingSummaryGenerator(Scenario):
         p = self._params
 
         with EventRegisterer.capture_mode():
-            # Agent proactively detects recently ended meetings
+            # 1. Agent proactively detects recently ended meetings
             proactive_start = aui.send_message_to_user(
                 content="I noticed your meeting just ended — let me summarize the discussion and share it with the team."
             ).depends_on(None, delay_seconds=1)
 
-            # Get current time
+            # 2. Get current time
             current_time = system.get_current_time().oracle().depends_on(proactive_start, delay_seconds=1)
 
-            # Retrieve today's meetings
+            # 3. Retrieve today's meetings (real oracle call)
             read_meetings = calendar.read_today_calendar_events().oracle().depends_on(current_time, delay_seconds=1)
 
-            # Agent informs user it's generating summary
+            # 4. Agent informs user it is preparing the summary
             preparing_summary = aui.send_message_to_user(
-                content="Generating post-meeting summary now..."
+                content="Generating the post-meeting summary now..."
             ).depends_on(read_meetings, delay_seconds=1)
 
-            # Create and send summary message to participants
-            summary_text = p.summary_template.format(title="Product Sprint Sync")
+            # 5. Create and send summary message (no hardcoded meeting title)
+            summary_text = p.summary_template.format(title="your recent meeting")
             send_summary = messaging.send_message(
                 user_id="team_channel",
                 content=summary_text,
             ).oracle().depends_on(preparing_summary, delay_seconds=1)
 
-            # Confirm to user that summaries were delivered
+            # 6. Confirm to user that summaries were delivered
             finish = aui.send_message_to_user(
                 content="I've sent the meeting summary to all participants."
             ).depends_on(send_summary, delay_seconds=1)
@@ -110,7 +110,7 @@ class ScenarioProactivePostMeetingSummaryGenerator(Scenario):
         try:
             events = env.event_log.list_view()
 
-            # Check proactive initiation message
+            # Detect proactive trigger
             proactive_detected = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "AgentUserInterface"
@@ -118,7 +118,7 @@ class ScenarioProactivePostMeetingSummaryGenerator(Scenario):
                 for e in events
             )
 
-            # Check message summary sent to participants
+            # Detect message summary sent to participants
             summary_sent = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulMessagingApp"

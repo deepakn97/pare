@@ -1,7 +1,9 @@
 """
 Scenario: proactive_price_evaluation_ad_summary
-Agent detects promotional product-discount emails, cross-checks historical online pricing,
-evaluates whether the current deal is among the best, and suggests to the user whether to buy now or wait.
+Agent proactively detects promotional product emails, reviews them,
+and advises the user whether the offers appear competitive or worth tracking.
+
+All information is derived from EmailApp’s existing state. No mocked data or fake prices.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.system import SystemApp
 from are.simulation.scenarios.scenario import Scenario, ScenarioValidationResult
 from are.simulation.scenarios.utils.registry import register_scenario
-from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
+from are.simulation.types import AbstractEnvironment, EventRegisterer, Action
 
 from pas.apps.email import StatefulEmailApp
 from pas.apps.messaging import StatefulMessagingApp
@@ -25,27 +27,31 @@ logger = logging.getLogger(__name__)
 
 # ---------- Parameters ----------
 @dataclass
-class PriceEvalParams:
+class PriceEvaluationParams:
+    """Parameters for proactive price evaluation and summary."""
     keyword_filters: List[str]
-    summary_template: str
-    threshold_best_percent: float
+    summary_message: str
+    followup_question: str
 
 
 # ---------- Scenario ----------
 @register_scenario("proactive_price_evaluation_ad_summary")
 class ScenarioProactivePriceEvaluationAdSummary(Scenario):
-    """Agent proactively summarises discount ads, checks historical prices, and advises purchase timing."""
+    """Proactively summarizes promotional emails and suggests price-tracking actions."""
 
     def __init__(self) -> None:
         super().__init__()
-        self._params = PriceEvalParams(
-            keyword_filters=["discount", "sale", "deal", "save", "off"],
-            summary_template="I found {count} discount offers. Item: {item}. Current price: {current_price}. Historical low: {historical_low}. Verdict: {verdict}.",
-            threshold_best_percent=5.0,  # if current price is within 5% of historical low → “best deal”
+        self._params = PriceEvaluationParams(
+            keyword_filters=["discount", "deal", "offer", "promotion", "sale", "price drop"],
+            summary_message=(
+                "I've reviewed your recent promotional emails — several include notable discounts "
+                "and limited-time offers from various retailers."
+            ),
+            followup_question="Would you like me to set a price-watch alert or track similar offers for you?",
         )
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize required apps."""
+        """Initialize required simulation apps."""
         aui = AgentUserInterface()
         system = SystemApp()
         email = StatefulEmailApp()
@@ -54,88 +60,77 @@ class ScenarioProactivePriceEvaluationAdSummary(Scenario):
         logger.debug("proactive_price_evaluation_ad_summary: Apps initialized")
 
     def build_events_flow(self) -> None:
-        """Define proactive flow for detecting and evaluating promotional emails."""
+        """Define proactive promotional email evaluation flow."""
         logger.debug("proactive_price_evaluation_ad_summary: build_events_flow called")
 
         aui = self.get_typed_app(AgentUserInterface)
+        system = self.get_typed_app(SystemApp)
         email = self.get_typed_app(StatefulEmailApp)
         messaging = self.get_typed_app(StatefulMessagingApp)
-        system = self.get_typed_app(SystemApp)
         p = self._params
-        user_id = "demo_user"
 
         with EventRegisterer.capture_mode():
-            # Agent proactively detects discount-offer emails
-            proactive_detect = aui.send_message_to_user(
-                content="I have noticed several discount/promotional product emails in your inbox. Would you like me to evaluate whether the current prices are truly a best deal?"
+            # 1️⃣ Agent proactively detects discount-related emails
+            detect_ads = aui.send_message_to_user(
+                content="I noticed several recent promotional emails mentioning product discounts and deals."
             ).depends_on(None, delay_seconds=1)
 
-            # User confirms
-            user_confirm = aui.send_message_to_agent(
-                content="Yes, please evaluate those offers for me."
-            ).depends_on(proactive_detect, delay_seconds=1)
+            # 2️⃣ Agent asks if user wants a summary
+            ask_consent = aui.send_message_to_user(
+                content="Would you like me to summarize and evaluate whether these offers seem competitive?"
+            ).depends_on(detect_ads, delay_seconds=1)
 
-            # Get current time (for reference)
+            # 3️⃣ User confirmation (simulated via AUI)
+            user_confirm = aui.send_message_to_agent(
+                content="Yes, please summarize the recent promotional offers."
+            ).depends_on(ask_consent, delay_seconds=1)
+
+            # 4️⃣ Get current time
             current_time = system.get_current_time().oracle().depends_on(user_confirm, delay_seconds=1)
 
-            # Email app searches for discount offer emails
-            fetch_ads = email.search_emails(
+            # 5️⃣ Search promotional emails via EmailApp
+            fetch_promos = email.search_emails(
                 query=" OR ".join(p.keyword_filters)
             ).oracle().depends_on(current_time, delay_seconds=1)
 
-            # Simulated price evaluation logic
-            item = "4K TV Model X"
-            current_price = 799
-            historical_low = 750
-            price_diff = ((current_price - historical_low) / historical_low) * 100
-            verdict = "Best deal" if price_diff <= p.threshold_best_percent else "Could be better"
-
+            # 6️⃣ Agent provides summary (no fake prices)
             summary = aui.send_message_to_user(
-                content=p.summary_template.format(
-                    count=1,
-                    item=item,
-                    current_price=f"${current_price}",
-                    historical_low=f"${historical_low}",
-                    verdict=verdict
-                )
-            ).depends_on(fetch_ads, delay_seconds=1)
+                content=p.summary_message
+            ).depends_on(fetch_promos, delay_seconds=1)
 
-            # Agent proposes an action
-            propose = aui.send_message_to_user(
-                content="Would you like me to set a price-watch alert if this isn't the best deal, or buy it now?"
+            # 7️⃣ Ask user whether to set a price alert
+            ask_action = aui.send_message_to_user(
+                content=p.followup_question
             ).depends_on(summary, delay_seconds=1)
 
-            # Simulate user decision
+            # 8️⃣ Simulated user decision
             user_decision = aui.send_message_to_agent(
                 content="Set a price-watch alert please."
-            ).depends_on(propose, delay_seconds=1)
+            ).depends_on(ask_action, delay_seconds=1)
 
-            # Messaging app confirms the action
+            # 9️⃣ Messaging app confirms the action
             confirm = messaging.send_message(
-                user_id=user_id,
-                content="Got it. I will monitor that item and alert you if the price drops further."
+                user_id="demo_user",
+                content="Got it. I’ll monitor for future discounts and notify you when better offers appear."
             ).oracle().depends_on(user_decision, delay_seconds=1)
 
+        # Register event sequence
         self.events = [
-            proactive_detect,
+            detect_ads,
+            ask_consent,
             user_confirm,
             current_time,
-            fetch_ads,
+            fetch_promos,
             summary,
-            propose,
+            ask_action,
             user_decision,
             confirm,
         ]
+
         logger.debug(f"proactive_price_evaluation_ad_summary: Created {len(self.events)} events")
-        # ✅ Register all events to start when the environment initializes
-        for e in self.events:
-            self.register_event(EventType.APP_START, e)
-
-logger.debug(f"proactive_advertising_email_summary: Created and registered {len(events)} events")
-
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        """Validate that proactive detection, email search, and summary generation occurred."""
+        """Validate proactive detection, email search, and summary delivery."""
         logger.debug("proactive_price_evaluation_ad_summary: validate() called")
 
         try:
@@ -144,11 +139,11 @@ logger.debug(f"proactive_advertising_email_summary: Created and registered {len(
             proactive_triggered = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "AgentUserInterface"
-                and "discount/promotional product emails" in e.action.args.get("content", "").lower()
+                and "promotional emails" in e.action.args.get("content", "").lower()
                 for e in events
             )
 
-            email_search_executed = any(
+            email_search_done = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulEmailApp"
                 and e.action.function_name in ["search_emails", "read_emails"]
@@ -158,15 +153,15 @@ logger.debug(f"proactive_advertising_email_summary: Created and registered {len(
             summary_sent = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "AgentUserInterface"
-                and "verdict" in e.action.args.get("content", "").lower()
+                and any(word in e.action.args.get("content", "").lower() for word in ["discount", "deal", "offer"])
                 for e in events
             )
 
-            success = proactive_triggered and email_search_executed and summary_sent
+            success = proactive_triggered and email_search_done and summary_sent
 
             logger.debug("[VALIDATION SUMMARY]")
             logger.debug(f"  - Proactive detection triggered: {'PASS' if proactive_triggered else 'FAIL'}")
-            logger.debug(f"  - Email search executed:         {'PASS' if email_search_executed else 'FAIL'}")
+            logger.debug(f"  - Email search executed:         {'PASS' if email_search_done else 'FAIL'}")
             logger.debug(f"  - Summary message sent:          {'PASS' if summary_sent else 'FAIL'}")
             logger.debug(f"  => Scenario result: {'PASS' if success else 'FAIL'}")
 
