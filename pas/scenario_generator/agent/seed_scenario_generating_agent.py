@@ -1,5 +1,6 @@
 import glob
 import importlib.util
+import json
 import logging
 import os
 import re
@@ -13,7 +14,8 @@ except ImportError:
     from datetime import datetime
 
     UTC = UTC
-from collections import defaultdict
+import difflib
+from collections import Counter, defaultdict
 from inspect import getsource
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -30,6 +32,7 @@ from are.simulation.tool_box import DEFAULT_TOOL_DESCRIPTION_TEMPLATE, Toolbox
 from are.simulation.tool_utils import AppTool, AppToolAdapter
 
 from pas.scenario_generator.agent.app_combination_agent import AppCombinationAgent
+from pas.scenario_generator.agent.summary_generating_agent import SummaryGeneratingAgent
 from pas.scenario_generator.prompt.scenario_generator_prompts import (
     DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT,
     DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT_WITH_INSTRUCTIONS,
@@ -265,8 +268,8 @@ class SeedScenarioGeneratingAgent:
 
             # Validate similarity against existing scenarios if no other issues
             if not issues:
-                logger.info("==== Validating similarity against existing scenarios ====")
-                similarity_issues = self._validate_similarity_against_existing(code_text)
+                logger.info("==== Validating similarity against existing scenario summaries ====")
+                similarity_issues = self._validate_similarity_against_existing_scenario_summary(code_text)
                 issues.extend(similarity_issues)
 
             # # Validate mock run if no other issues
@@ -1236,6 +1239,203 @@ class SeedScenarioGeneratingAgent:
             problems.append(
                 "No import found in the code, need to import the tools at the beginning of the file. from the INSTRUSTIONS TO IMPORT AVAILABLE TOOLS."
             )
+        return problems
+
+    def _tokens_from_text(self, text: str) -> list[str]:
+        """Extract identifiers and keywords from text."""
+        return re.findall(r"[A-Za-z_][A-Za-z_0-9]*", text)
+
+    def _shingles(self, tokens: list[str], k: int = 3) -> set[str]:
+        """Generate k-gram token shingles from a list of tokens."""
+        if len(tokens) < k:
+            return {" ".join(tokens)} if tokens else set()
+        return {" ".join(tokens[i : i + k]) for i in range(len(tokens) - k + 1)}
+
+    def _jaccard(self, a: set[str], b: set[str]) -> float:
+        """Calculate Jaccard similarity between two sets."""
+        if not a and not b:
+            return 1.0
+        inter = len(a & b)
+        union = len(a | b) or 1
+        return inter / union
+
+    def _cosine_counter(self, ca: Counter[str], cb: Counter[str]) -> float:
+        """Calculate cosine similarity between two Counter objects."""
+        if not ca and not cb:
+            return 1.0
+        keys = set(ca) | set(cb)
+        dot = sum(ca[k] * cb[k] for k in keys)
+        na = sum(v * v for v in ca.values()) ** 0.5
+        nb = sum(v * v for v in cb.values()) ** 0.5
+        return 0.0 if na == 0 or nb == 0 else dot / (na * nb)
+
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text by collapsing whitespace."""
+        return re.sub(r"\s+", " ", text).strip()
+
+    def _compare_summaries(self, summary1: str, summary2: str, k: int = 3) -> dict[str, float | int]:
+        """Compare two summaries using multiple similarity metrics."""
+        s1 = self._normalize_text(summary1)
+        s2 = self._normalize_text(summary2)
+
+        # Metric 1: difflib
+        sm_ratio = difflib.SequenceMatcher(a=s1, b=s2, autojunk=False).ratio()
+
+        # Metric 2: Jaccard over token shingles
+        toks1, toks2 = self._tokens_from_text(s1), self._tokens_from_text(s2)
+        sh1, sh2 = self._shingles(toks1, k=k), self._shingles(toks2, k=k)
+        jac = self._jaccard(sh1, sh2)
+
+        # Metric 3: Cosine over token frequency
+        c1, c2 = Counter(toks1), Counter(toks2)
+        cos = self._cosine_counter(c1, c2)
+
+        return {
+            "difflib_ratio": sm_ratio,
+            "jaccard_shingles": jac,
+            "cosine_tokens": cos,
+            "len_tokens_1": len(toks1),
+            "len_tokens_2": len(toks2),
+        }
+
+    def _load_scenario_summaries(self) -> dict[str, str]:
+        """Load scenario summaries from JSON file if it exists.
+
+        Returns:
+            Dictionary mapping scenario IDs to summaries
+        """
+        target_dir = Path(__file__).resolve().parents[2] / "scenarios" / "generated_scenarios"
+        summaries_path = target_dir / "scenario_summaries.json"
+
+        if summaries_path.exists():
+            try:
+                with open(summaries_path, encoding="utf-8") as f:
+                    summaries = json.load(f)
+                    logger.info(f"Loaded {len(summaries)} scenario summaries from {summaries_path}")
+                    return summaries
+            except Exception as e:
+                logger.warning(f"Failed to load scenario summaries from {summaries_path}: {e}")
+                return {}
+        else:
+            logger.info(f"Scenario summaries file not found at {summaries_path}")
+            return {}
+
+    def _validate_similarity_against_existing_scenario_summary(self, code_text: str) -> list[str]:
+        """Validate that the generated scenario summary is not too similar to existing scenario summaries.
+
+        Args:
+            code_text: The generated scenario code as a string
+
+        Returns:
+            List of issues if similarity is too high with any existing scenario summary
+        """
+        problems: list[str] = []
+
+        # Extract the scenario ID from the generated code
+        new_scenario_id_match = re.search(r"@register_scenario\(\s*['\"]([^'\"]+)['\"]\s*\)", code_text)
+        new_scenario_id = new_scenario_id_match.group(1).strip() if new_scenario_id_match else None
+
+        if not new_scenario_id:
+            logger.warning("Could not extract scenario ID from generated code, skipping summary-based validation")
+            return problems
+
+        # Load existing summaries
+        existing_summaries = self._load_scenario_summaries()
+
+        if not existing_summaries:
+            logger.info("No existing scenario summaries found for comparison")
+            return problems
+
+        # Remove the current scenario from existing summaries if it exists
+        if new_scenario_id in existing_summaries:
+            existing_summaries = {k: v for k, v in existing_summaries.items() if k != new_scenario_id}
+
+        if not existing_summaries:
+            logger.info("No other existing scenario summaries found for comparison")
+            return problems
+
+        logger.info(f"Found {len(existing_summaries)} existing scenario summaries to compare against")
+
+        # Generate summary for the new scenario code
+        try:
+            summary_agent = SummaryGeneratingAgent(self.llm_engine)
+            new_summary = summary_agent.generate_summary(code_text)
+
+            if not new_summary:
+                logger.warning("Failed to generate summary for new scenario, skipping summary-based validation")
+                return problems
+
+            logger.info(f"Generated summary for new scenario '{new_scenario_id}': {new_summary[:100]}...")
+
+        except Exception:
+            logger.exception("Error generating summary for new scenario")
+            return problems
+
+        # Thresholds (matching the code-based validation)
+        difflib_threshold = 0.8
+        jaccard_threshold = 0.8
+        cosine_threshold = 0.94
+        k = 3
+
+        # Compare against each existing summary
+        for existing_scenario_id, existing_summary in existing_summaries.items():
+            logger.info(f"Comparing summary with existing scenario '{existing_scenario_id}'")
+
+            try:
+                scores = self._compare_summaries(new_summary, existing_summary, k=k)
+
+                logger.info(
+                    f"Comparison with '{existing_scenario_id}': "
+                    f"difflib_ratio={scores['difflib_ratio']:.4f}, "
+                    f"jaccard_shingles={scores['jaccard_shingles']:.4f}, "
+                    f"cosine_tokens={scores['cosine_tokens']:.4f}"
+                )
+
+                # Check if any metric exceeds its threshold
+                is_duplicate = (
+                    scores["difflib_ratio"] >= difflib_threshold
+                    or scores["jaccard_shingles"] >= jaccard_threshold
+                    or scores["cosine_tokens"] >= cosine_threshold
+                )
+
+                if is_duplicate:
+                    logger.warning(
+                        f"Found duplicate scenario summary! Similarity scores with '{existing_scenario_id}':"
+                    )
+                    logger.warning(f"  difflib_ratio: {scores['difflib_ratio']:.4f} (threshold: {difflib_threshold})")
+                    logger.warning(
+                        f"  jaccard_shingles: {scores['jaccard_shingles']:.4f} (threshold: {jaccard_threshold})"
+                    )
+                    logger.warning(f"  cosine_tokens: {scores['cosine_tokens']:.4f} (threshold: {cosine_threshold})")
+
+                    # Build error message similar to code-based validation
+                    error_msg = (
+                        f"Generated scenario is too similar to existing scenario '{existing_scenario_id}'. "
+                        f"Similarity scores with different thresholds (higher = more similar):\n"
+                        f"• difflib_ratio={scores['difflib_ratio']:.4f} (threshold: {difflib_threshold} - structural/sequential similarity)\n"
+                        f"• jaccard_shingles={scores['jaccard_shingles']:.4f} (threshold: {jaccard_threshold} - pattern similarity)\n"
+                        f"• cosine_tokens={scores['cosine_tokens']:.4f} (threshold: {cosine_threshold} - vocabulary similarity)\n\n"
+                    )
+
+                    # Add existing scenario summary for context
+                    error_msg += f"Existing similar scenario summary:\n{existing_summary}\n\n"
+
+                    error_msg += (
+                        "Please generate a scenario with different content, structure, identifiers, event flow, and app usage patterns. "
+                        "Focus on changing: variable names, email subjects, event titles, registry IDs, sequence of events, "
+                        "and avoid copying similar code patterns, token combinations, or structural elements."
+                    )
+
+                    problems.append(error_msg)
+                    break  # No need to check other scenarios once we find a duplicate
+
+                else:
+                    logger.info(f"Comparison with '{existing_scenario_id}' completed successfully (not a duplicate)")
+
+            except Exception as e:
+                logger.exception(f"Error comparing with existing scenario '{existing_scenario_id}'")
+                problems.append(f"Error during similarity comparison with '{existing_scenario_id}': {e}")
+
         return problems
 
     def _validate_similarity_against_existing(self, code_text: str) -> list[str]:  # noqa: C901
