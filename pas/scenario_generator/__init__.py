@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import logging
+import os
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -26,34 +30,27 @@ def register_custom_scenarios(registry: ScenarioRegistry) -> None:
 
     # Import modules containing custom scenarios
     custom_scenario_modules = [
-        "pas.scenario_generator.example_proactive_scenarios.scenario"
+        "pas.scenario_generator.example_proactive_scenarios.scenario",
+        "pas.scenario_generator.example_proactive_scenarios.scenario_with_all_apps_init",
         # Add other custom scenario modules here as needed
     ]
 
-    # Import individual generated scenario files (since generated_scenarios is not a package)
-    generated_scenario_files = [
-        "pas.scenarios.generated_scenarios.budget_summary_creation",
-        "pas.scenarios.generated_scenarios.contact_update_notify",
-        "pas.scenarios.generated_scenarios.customer_feedback_analysis_workflow",
-        "pas.scenarios.generated_scenarios.document_reminder",
-        "pas.scenarios.generated_scenarios.file_cleanup",
-        "pas.scenarios.generated_scenarios.file_summary_share",
-        "pas.scenarios.generated_scenarios.financial_report_planning",
-        "pas.scenarios.generated_scenarios.followup_contact_update",
-        "pas.scenarios.generated_scenarios.followup_documents",
-        "pas.scenarios.generated_scenarios.generate_project_kickoff_meetings",
-        "pas.scenarios.generated_scenarios.invoice_organizer",
-        "pas.scenarios.generated_scenarios.meeting_note_proposal",
-        "pas.scenarios.generated_scenarios.personal_travel_itinerary_manager",
-        "pas.scenarios.generated_scenarios.proactive_file_summary",
-        "pas.scenarios.generated_scenarios.project_migration_support",
-        "pas.scenarios.generated_scenarios.reminder_deadline_followup",
-        "pas.scenarios.generated_scenarios.remote_training_workshop_assistant",
-        "pas.scenarios.generated_scenarios.schedule_meeting",
-        "pas.scenarios.generated_scenarios.supplier_contract_update_workflow",
-        "pas.scenarios.generated_scenarios.task_digest_and_summary_suggestion",
-        "pas.scenarios.generated_scenarios.team_event_gallery_preparation",
-    ]
+    # Auto-discover generated scenario files by file path; import by spec (no package required)
+    base_dir = Path(__file__).resolve().parents[1] / "scenarios" / "generated_scenarios"
+    discovered_files: list[Path] = []
+    excluded_filenames = {"meeting_invite_coordination.py", "project_feedback_share.py", "weekend_grocery_pickup.py"}
+    if base_dir.exists():
+        for p in base_dir.rglob("*.py"):
+            if p.name.startswith("__"):
+                continue
+            if "__pycache__" in str(p):
+                continue
+            if p.name in excluded_filenames:
+                # Skip baseline scenarios that are registered elsewhere to avoid duplicate IDs
+                continue
+            discovered_files.append(p)
+    else:
+        logger.warning(f"Generated scenarios directory not found: {base_dir}")
 
     imported_count = 0
     for module_name in custom_scenario_modules:
@@ -64,13 +61,20 @@ def register_custom_scenarios(registry: ScenarioRegistry) -> None:
         except Exception as e:
             logger.warning(f"Failed to import custom scenario module {module_name}: {e}", exc_info=True)
 
-    # Import generated scenario files
-    for scenario_file in generated_scenario_files:
+    # Import generated scenario files by file path to support non-package directories
+    for idx, file_path in enumerate(sorted(discovered_files)):
         try:
-            importlib.import_module(scenario_file)
+            module_name = f"pas.scenarios.generated_dynamic.module_{idx}"
+            spec = importlib.util.spec_from_file_location(module_name, str(file_path))
+            if spec is None or spec.loader is None:
+                raise ImportError(f"spec_from_file_location failed for {file_path}")  # noqa: TRY301
+            module = importlib.util.module_from_spec(spec)
+            # Ensure the module is discoverable by dataclasses/ARE during class creation
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
             imported_count += 1
-            logger.debug(f"Imported generated scenario file: {scenario_file}")
+            logger.debug(f"Imported generated scenario file by path: {file_path}")
         except Exception as e:
-            logger.warning(f"Failed to import generated scenario file {scenario_file}: {e}", exc_info=True)
+            logger.warning(f"Failed to import generated scenario file {file_path}: {e}", exc_info=True)
 
     logger.info(f"Registered custom scenarios from {imported_count} modules")
