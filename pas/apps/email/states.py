@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -10,6 +11,8 @@ from are.simulation.types import OperationType, disable_events
 
 from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
+
+logger = logging.getLogger(__name__)
 
 
 def _normalise_folder(folder: str | None) -> str:
@@ -56,7 +59,11 @@ class MailboxView(AppState):
     def list_emails(self, offset: int = 0, limit: int = 10) -> ReturnedEmails:
         """List emails in the current folder with pagination support."""
         with disable_events():
-            return self.app.list_emails(folder_name=self.folder, offset=offset, limit=limit)
+            emails = self.app.list_emails(folder_name=self.folder, offset=offset, limit=limit)
+
+        logger.debug(f"Listed emails: {emails.emails}")
+
+        return emails
 
     @user_tool()
     @pas_event_registered()

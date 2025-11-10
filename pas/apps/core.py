@@ -25,6 +25,8 @@ class AppState(ABC):
     Note: Different from Meta AREs data state (JSON)
     """
 
+    # ! TODO: We should also add a name here.
+
     def __init__(self) -> None:
         """Initialize the app tools."""
         self._app: App | None = None
@@ -94,6 +96,7 @@ class StatefulApp(App):
     """
 
     name: str | None
+    description: str | None = None
 
     def __init__(self, name: str | None = None, *args: Any, **kwargs: Any) -> None:
         """Initialize the stateful app.
@@ -185,6 +188,7 @@ class StatefulApp(App):
             tools.append(build_tool(self, self.go_back))
         return tools
 
+    # ! NOTE: Why do we need to get meta are user tools?
     def get_meta_are_user_tools(self) -> list[Tool]:
         """Return Meta ARE-compatible tool adapters for the current navigation state."""
         from are.simulation.tool_utils import AppToolAdapter  # Use native Meta ARE adapter

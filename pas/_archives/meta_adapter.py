@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from are.simulation.scenarios.scenario import Scenario
 
     from pas.environment import StateAwareEnvironmentWrapper
-    from pas.proactive import LLMClientProtocol
+    from pas.proactive import LLMClientProtocol # type: ignore
 
 
 APP_NAME_MAP = {

@@ -14,12 +14,13 @@ from are.simulation.types import Action, EventRegisterer, EventType
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# Re-export the native user_tool from Meta ARE
+# Explicitly declare exports (needed for mypy since we re-export user_tool from Meta-ARE)
 __all__ = ["pas_event_registered", "user_tool"]
 
 
+# NOTE: Keep the default event type as USER since we use the @user_tool + pas_event_registered to register events for the user agent.
 def pas_event_registered(
-    operation_type: OperationType = OperationType.READ, event_type: EventType = EventType.AGENT
+    operation_type: OperationType = OperationType.READ, event_type: EventType = EventType.USER
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """PAS-specific event registration decorator that handles AppState instances.
 
