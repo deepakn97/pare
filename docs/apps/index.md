@@ -2,6 +2,8 @@
 
 Use these pages to explore the current user-facing tool surface for each PAS stateful app. Every document lists all `@user_tool` methods, the Meta-ARE calls they wrap, return values, and navigation effects.
 
+- Need to create another app surface? Follow the [Adding a Stateful App](./adding_stateful_app.md) guide.
+
 - [Stateful Contacts App](./contacts.md)
 - [Stateful Messaging App](./messaging.md)
 - [Stateful Email App](./email.md)

@@ -20,6 +20,7 @@ nav:
       - Visual Overview: architecture_visual.md
   - Apps:
       - App APIs Overview: apps/index.md
+      - Adding a Stateful App: apps/adding_stateful_app.md
       - Contacts App: apps/contacts.md
       - Messaging App: apps/messaging.md
       - Email App: apps/email.md
