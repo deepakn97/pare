@@ -27,6 +27,19 @@ Closes #
 <!-- Link to design documents if applicable -->
 <!-- Example: See `docs/_plans/Two-Agent Proactive System Design.md` -->
 
+## Component
+
+<!-- Select the component(s) this PR affects -->
+
+- [ ] Core (All files in the root `pas`, e.g. `pas/environment.py`)
+- [ ] Agents (All files in `pas/agents/`)
+- [ ] Scenarios (All files in `pas/scenarios/`)
+- [ ] Scenario Generator (All files in `pas/scenario_generator/`)
+- [ ] Apps (All files in `pas/apps/`)
+- [ ] Documentation
+- [ ] Testing Infrastructure
+- [ ] Other
+
 ## Changes Made
 
 <!-- Provide a bullet-point summary of your changes -->
@@ -71,8 +84,6 @@ Closes #
 
 ## Code Quality
 
-- [ ] Code passes `ruff check --fix` (linting)
-- [ ] Code passes `uv run mypy` (type checking)
 - [ ] Pre-commit hooks pass (see output below)
 - [ ] No dependency issues (`uv run deptry pas`)
 - [ ] Code follows project style guidelines (f-strings, Google docstrings, etc.)

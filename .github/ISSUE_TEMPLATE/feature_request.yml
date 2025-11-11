@@ -59,14 +59,11 @@ body:
       label: Component
       description: Which component would this feature affect?
       options:
-        - Environment & Tool Discovery
-        - UserAgent
-        - ProactiveAgent
-        - TwoAgentScenarioRunner
-        - Notification System
-        - Stateful Apps (Contacts, Email, Calendar, Messaging)
-        - Agent UI
-        - Scenario Generation
+        - "Core (All files in the root `pas`, e.g. `pas/environment.py`)"
+        - "Agents (All files in `pas/agents/`)"
+        - "Scenarios (All files in `pas/scenarios/`)"
+        - "Scenario Generator (All files in `pas/scenario_generator/`)"
+        - "Apps (All files in `pas/apps/`)"
         - Documentation
         - Testing Infrastructure
         - Other
