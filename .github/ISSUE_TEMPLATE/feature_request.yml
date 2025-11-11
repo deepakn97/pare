@@ -53,17 +53,30 @@ body:
         - Are there existing workarounds?
         - Why is the proposed solution better?
 
+  - type: markdown
+    attributes:
+      value: |
+        **Component Guide:**
+        - **Core**: All Python source files in the root `pas` directory (e.g., `pas/environment.py`, `pas/scenario_runner.py`, `pas/notification_system.py`)
+        - **Agents**: All files in `pas/agents/` (e.g., `pas/agents/user/`, `pas/agents/proactive/`, `pas/agents/agent_log.py`)
+        - **Scenarios**: All files in `pas/scenarios/` (scenario definitions, not runner code)
+        - **Scenario Generator**: All files in `pas/scenario_generator/`
+        - **Apps**: All files in `pas/apps/` (e.g., `pas/apps/contacts/`, `pas/apps/email/`, `pas/apps/calendar/`)
+        - **Documentation**: Documentation files (e.g., `docs/`, `mkdocs.yml`, `README.md`, `CONTRIBUTING.md`)
+        - **Testing Infrastructure**: Testing and CI/CD (e.g., `tests/`, `.github/workflows/`, `.pre-commit-config.yaml`)
+        - **Other**: Project configuration and other files (e.g., `pyproject.toml`, `Makefile`, `.gitignore`)
+
   - type: dropdown
     id: component
     attributes:
       label: Component
       description: Which component would this feature affect?
       options:
-        - "Core (All files in the root `pas`, e.g. `pas/environment.py`)"
-        - "Agents (All files in `pas/agents/`)"
-        - "Scenarios (All files in `pas/scenarios/`)"
-        - "Scenario Generator (All files in `pas/scenario_generator/`)"
-        - "Apps (All files in `pas/apps/`)"
+        - Core
+        - Agents
+        - Scenarios
+        - Scenario Generator
+        - Apps
         - Documentation
         - Testing Infrastructure
         - Other

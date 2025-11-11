@@ -36,7 +36,7 @@ Closes #
 - [ ] Scenarios (All files in `pas/scenarios/`)
 - [ ] Scenario Generator (All files in `pas/scenario_generator/`)
 - [ ] Apps (All files in `pas/apps/`)
-- [ ] Documentation
+- [ ] Documentation (Documentation files e.g., `docs/`, `mkdocs.yml`, `README.md`)
 - [ ] Testing Infrastructure
 - [ ] Other
 

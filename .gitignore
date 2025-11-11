@@ -1,8 +1,3 @@
-docs/source
-
-# Personal notes (not for version control)
-personal_notes/
-
 # From https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore
 
 # Byte-compiled / optimized / DLL files
@@ -182,9 +177,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# PAS runtime logs
-logs/
-
 # Abstra
 # Abstra is an AI-powered process automation framework.
 # Ignore directories containing user credentials, local state, and settings.
@@ -222,4 +214,11 @@ __marimo__/
 # YoYo AI version control directory
 .yoyo/
 
-results/demo/*
+# Project specific directories
+logs/
+traces/
+results/
+uv.lock
+
+# Personal notes (not for version control)
+personal_notes/
