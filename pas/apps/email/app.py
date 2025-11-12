@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from are.simulation.apps.email_client import Email, EmailClientV2, EmailFolderName
-from are.simulation.types import disable_events
+from are.simulation.tool_utils import OperationType, env_tool
+from are.simulation.types import EventType, disable_events, event_registered
 from are.simulation.utils import uuid_hex
 
 from pas.apps.core import StatefulApp
@@ -203,6 +204,41 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
             self.add_email(email=email, folder_name=EmailFolderName.SENT)
 
         return email.email_id
+
+    @env_tool()
+    @event_registered(operation_type=OperationType.WRITE, event_type=EventType.ENV)
+    def send_email_to_user_with_id(
+        self,
+        email_id: str,
+        sender: str,
+        subject: str = "",
+        content: str = "",
+    ) -> str:
+        """Create an incoming email with a specified ID and add it to user's INBOX.
+
+        This is a PAS-specific environment tool that allows scenarios to reference
+        the email_id in subsequent events (e.g., for replying to the email).
+
+        Args:
+            email_id: The ID to assign to this email.
+            sender: The sender of the email.
+            subject: The subject of the email.
+            content: The content of the email.
+
+        Returns:
+            The email_id that was provided.
+        """
+        email = Email(
+            email_id=email_id,
+            sender=sender,
+            recipients=[self.user_email],
+            subject=subject,
+            content=content,
+            timestamp=self.time_manager.time(),
+            is_read=False,
+        )
+        self.folders[EmailFolderName.INBOX].add_email(email)
+        return email_id
 
     def create_root_state(self) -> MailboxView:
         """Return the mailbox view rooted in the inbox."""

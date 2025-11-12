@@ -24,13 +24,14 @@ from are.simulation.agents.are_simulation_agent_config import (
     LLMEngineConfig,
 )
 from are.simulation.scenario_runner import ScenarioRunnerConfig
-from are.simulation.scenarios.utils.registry import registry
 from are.simulation.cli.utils import setup_logging, suppress_noisy_loggers
 
 from pas.scenario_runner import TwoAgentScenarioRunner
+from pas.scenarios.registry import registry
 
-# Import scenarios to register them
-import pas.scenarios.user_scenarios.very_basic_demo  # noqa: F401
+# Scenarios are auto-registered via entry points in pyproject.toml
+# See: [project.entry-points."pas.scenarios"]
+# PAS uses its own standalone registry, completely independent of Meta-ARE
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ def run_demo(
     proactive_model: str = "gpt-4o-mini",
     max_turns: int | None = 10,
     output_dir: str | None = None,
+    oracle_mode: bool = False,
 ) -> None:
     """Run the two-agent demo with the specified configuration.
 
@@ -61,14 +63,16 @@ def run_demo(
         proactive_model: LLM model to use for the proactive observe and execute agents.
         max_turns: Maximum number of agent turns to run (None for unlimited).
         output_dir: Directory to export traces to (None for default).
+        oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
     """
 
     logger.info(f"Running two-agent demo with scenario: {scenario_name}")
     logger.info(f"User model: {user_model}")
     logger.info(f"Proactive model: {proactive_model}")
     logger.info(f"Max turns: {max_turns}")
+    logger.info(f"Oracle mode: {oracle_mode}")
 
-    # Load the scenario
+    # Load the scenario using PAS registry
     scenario_class = registry.get_scenario(scenario_name)
 
     scenario = scenario_class()
@@ -110,6 +114,7 @@ def run_demo(
         proactive_observe_config=proactive_observe_config,
         proactive_execute_config=proactive_execute_config,
         max_turns=max_turns,
+        oracle_mode=oracle_mode,
     )
 
     # Display results
@@ -166,6 +171,11 @@ def main(argv: list[str] | None = None) -> None:
         default="traces/pas",
         help="Directory to export traces to",
     )
+    parser.add_argument(
+        "--oracle",
+        action="store_true",
+        help="Run in oracle mode (executes predefined oracle events without agents)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -186,6 +196,7 @@ def main(argv: list[str] | None = None) -> None:
         proactive_model=args.proactive_model,
         max_turns=max_turns,
         output_dir=args.output_dir,
+        oracle_mode=args.oracle,
     )
 
 

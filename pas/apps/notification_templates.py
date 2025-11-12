@@ -4,11 +4,13 @@ NOTIFICATION_TEMPLATES = {
     "user": {
         "StatefulEmailApp": {
             "send_email_to_user_only": "New email from {{sender}}: {{subject}}\n{{content[:20]}}...",
+            "send_email_to_user_with_id": "New email from {{sender}}: {{subject}}\n{{content[:20]}}...",
             "reply_to_email_from_user": "Reply from {{sender}}: {{content[:20]}}...",
             "create_and_add_email": "New email from {{sender}}: {{subject}}\n{{content[:20]}}...",
         },
         "StatefulMessagingApp": {
             "create_and_add_message": "New message from {{sender_id}} in {{conversation_id}}: {{content[:20]}}...",
+            # ! TODO: Add template for a new message.
         },
         "StatefulCalendarApp": {
             "add_calendar_event_by_attendee": "New calendar event by {{who_add}}: {{title}} at {{start_datetime}}",
@@ -18,6 +20,7 @@ NOTIFICATION_TEMPLATES = {
     "agent": {
         "StatefulEmailApp": {
             "send_email_to_user_only": "New email from {{sender}}: {{subject}}\n\n{{content}}",
+            "send_email_to_user_with_id": "New email from {{sender}}: {{subject}}\n\n{{content}}",
             "reply_to_email_from_user": "Reply from {{sender}} to email {{email_id}}:\n\n{{content}}",
             "create_and_add_email": "New email from {{sender}} to {{recipients|join(', ')}}: {{subject}}\n\n{{content}}",
         },

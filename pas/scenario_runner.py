@@ -277,6 +277,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         proactive_observe_config: ARESimulationReactBaseAgentConfig,
         proactive_execute_config: ARESimulationReactBaseAgentConfig,
         max_turns: int | None = None,
+        oracle_mode: bool = False,
     ) -> ScenarioValidationResult:
         """Run a Proactive Agent Sandbox scenario.
 
@@ -286,18 +287,19 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             proactive_observe_config: The configuration for the proactive observe agent.
             proactive_execute_config: The configuration for the proactive execute agent.
             max_turns: The maximum number of turns to cycles.
+            oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
 
         Returns:
             The validation result of the scenario.
         """
         env_config = EnvironmentConfig(
-            oracle_mode=False,
-            queue_based_loop=False,
+            oracle_mode=oracle_mode,
+            queue_based_loop=oracle_mode,
             wait_for_user_input_timeout=None,
             time_increment_in_seconds=scenario.time_increment_in_seconds,
             start_time=scenario.start_time,
             dump_dir=None,
-            exit_when_no_events=False,
+            exit_when_no_events=oracle_mode,
         )
 
         if scenario.start_time and scenario.start_time > 0:
@@ -312,16 +314,26 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         env.run(scenario, wait_for_end=False)
 
         try:
-            # ! TODO: Running without an agent is not implemented yet. This can be useful when evaluating the user simulator agent.
-            validation_result, user_agent, proactive_agent = self._run_with_two_agents(
-                scenario_id=scenario.scenario_id,
-                scenario=scenario,
-                env=env,
-                user_config=user_config,
-                proactive_observe_config=proactive_observe_config,
-                proactive_execute_config=proactive_execute_config,
-                max_turns=max_turns,
-            )
+            if oracle_mode:
+                # Oracle mode: use inherited _run_without_agent from ScenarioRunner
+                # The environment will execute all OracleEvents automatically
+                validation_result = self._run_without_agent(
+                    scenario_id=scenario.scenario_id,
+                    scenario=scenario,
+                    env=env,
+                )
+                user_agent, proactive_agent = None, None
+            else:
+                # Normal mode: run with two agents
+                validation_result, user_agent, proactive_agent = self._run_with_two_agents(
+                    scenario_id=scenario.scenario_id,
+                    scenario=scenario,
+                    env=env,
+                    user_config=user_config,
+                    proactive_observe_config=proactive_observe_config,
+                    proactive_execute_config=proactive_execute_config,
+                    max_turns=max_turns,
+                )
         except Exception as exception:
             logger.exception("Failed to run scenario")
             validation_result, user_agent, proactive_agent = (
@@ -363,6 +375,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         proactive_observe_config: ARESimulationReactBaseAgentConfig,
         proactive_execute_config: ARESimulationReactBaseAgentConfig,
         max_turns: int | None = None,
+        oracle_mode: bool = False,
     ) -> ScenarioValidationResult:
         """Run a Proactive Agent Sandbox scenario.
 
@@ -372,6 +385,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             proactive_observe_config: The configuration for the proactive observe agent.
             proactive_execute_config: The configuration for the proactive execute agent.
             max_turns: The maximum number of turns to cycles.
+            oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
 
         Returns:
             The validation result of the scenario.
@@ -394,7 +408,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         try:
             # ! TODO: Judge only mode is not implemented yet.
             result = self._run_pas_scenario(
-                scenario, user_config, proactive_observe_config, proactive_execute_config, max_turns
+                scenario, user_config, proactive_observe_config, proactive_execute_config, max_turns, oracle_mode
             )
         except Exception as exception:
             logger.exception("Failed to run scenario")

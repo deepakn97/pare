@@ -200,8 +200,8 @@ known_first_party = ["pas"]
 typeCheckingMode = "off"
 ignore = ["*"]
 
-# [project.entry-points."are.simulation.scenarios"]
-# proactive-agent-sandbox = "pas.scenario_generator:register_custom_scenarios"
+[project.entry-points."pas.scenarios"]
+proactive-agent-sandbox = "pas.scenarios.registration:register_pas_scenarios"
 
 [tool.uv.sources]
 meta-agents-research-environments = { path = "../meta-are", editable = true }
