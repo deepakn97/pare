@@ -2,24 +2,24 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps.contacts import Contact
 from are.simulation.scenarios.scenario import Scenario, ScenarioStatus, ScenarioValidationResult
-from are.simulation.scenarios.utils.registry import register_scenario
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps import HomeScreenSystemApp, PASAgentUserInterface, StatefulContactsApp, StatefulEmailApp
+from pas.scenarios.registry import register_scenario
 
 
-@register_scenario("demo_simple_contact")
-class DemoSimpleContact(Scenario):
+@register_scenario("email_notification")
+class EmailNotification(Scenario):
     """Simple contacts scenario - user views contact, proactive agent offers help."""
 
-    start_time: float | None = 0
-    duration: float | None = 3600
-    status: ScenarioStatus = ScenarioStatus.Valid
-    is_benchmark_ready: bool = False
+    start_time = datetime(2025, 11, 11, 9, 0, 0, tzinfo=UTC).timestamp()
+    status = ScenarioStatus.Draft
+    is_benchmark_ready = False
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize apps with test data."""
@@ -48,8 +48,9 @@ class DemoSimpleContact(Scenario):
         system_app = self.get_typed_app(HomeScreenSystemApp)
 
         with EventRegisterer.capture_mode():
-            # Incoming message from Alice
-            email_event = self.email.send_email_to_user_only(
+            # Incoming message from Alice (environment event with known ID)
+            email_event = self.email.send_email_to_user_with_id(
+                email_id="email-from-alice",
                 sender="alice.smith@example.com",
                 subject="Let's Hangout?",
                 content="Hello, how are you? I was thinking we could go out for a drink today. Are you free at 7 PM?",
@@ -71,7 +72,17 @@ class DemoSimpleContact(Scenario):
                 .depends_on(propose_event, delay_seconds=2)
             )
 
-        self.events = [email_event, propose_event, response_event]
+            # Agent replies to Alice's email
+            send_email_event = (
+                emails.reply_to_email(
+                    email_id="email-from-alice",
+                    content="Hi Alice, yeah let's hangout at 7 PM today. See you there!",
+                )
+                .oracle()
+                .depends_on(response_event, delay_seconds=2)
+            )
+
+        self.events = [email_event, propose_event, response_event, send_email_event]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that agent offered help."""
@@ -88,16 +99,16 @@ class DemoSimpleContact(Scenario):
                 for e in log_entries
             )
 
-            # Check if agent sent message to Alice
-            message_found = any(
+            # Check if agent replied to Alice's email
+            reply_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "send_email"
-                and "alice.smith@example.com" in e.action.args.get("recipients", [])
+                and e.action.function_name == "reply_to_email"
+                and e.action.args.get("email_id") == "email-from-alice"
                 for e in log_entries
             )
 
-            return ScenarioValidationResult(success=(proposal_found and message_found))
+            return ScenarioValidationResult(success=(proposal_found and reply_found))
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
