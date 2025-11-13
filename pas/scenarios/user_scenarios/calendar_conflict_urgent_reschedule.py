@@ -7,7 +7,7 @@ from typing import Any
 
 from are.simulation.apps.contacts import Contact
 from are.simulation.scenarios.scenario import Scenario, ScenarioStatus, ScenarioValidationResult
-from are.simulation.types import AbstractEnvironment, EventRegisterer
+from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps import (
     HomeScreenSystemApp,
@@ -214,5 +214,75 @@ class CalendarConflictUrgentReschedule(Scenario):
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that agent detected conflict, rescheduled existing event, and notified Emma."""
-        # TODO: Implement in Step 4
-        pass
+        try:
+            log_entries = env.event_log.list_view()
+
+            # Check 1: Agent sent proposal mentioning the conflict with manager's meeting
+            proposal_found = any(
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "PASAgentUserInterface"
+                and e.action.function_name == "send_message_to_user"
+                and any(name in e.action.args.get("content", "") for name in ["David Wilson", "manager"])
+                and any(keyword in e.action.args.get("content", "") for keyword in ["conflict", "urgent"])
+                and any(keyword in e.action.args.get("content", "") for keyword in ["Design Review", "Emma"])
+                for e in log_entries
+            )
+
+            # Check 2: Agent checked calendar for conflicts
+            calendar_check_found = any(
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "get_calendar_events_from_to"
+                for e in log_entries
+            )
+
+            # Check 3: Agent EDITED the existing Design Review event (not created new one)
+            edit_event_found = any(
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "edit_calendar_event"
+                and e.action.args.get("event_id") == self.design_review_event_id
+                and e.action.args.get("start_datetime") == "2025-11-20 10:00:00"
+                and e.action.args.get("end_datetime") == "2025-11-20 11:00:00"
+                for e in log_entries
+            )
+
+            # Check 4: Agent added manager's urgent meeting
+            manager_meeting_added = any(
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "add_calendar_event"
+                and e.action.args.get("start_datetime") == "2025-11-19 14:00:00"
+                and e.action.args.get("end_datetime") == "2025-11-19 15:00:00"
+                and any(keyword in e.action.args.get("title", "") for keyword in ["David", "Executive"])
+                for e in log_entries
+            )
+
+            # Check 5: Agent replied to Emma's email about the reschedule
+            emma_notified = any(
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulEmailApp"
+                and e.action.function_name == "reply_to_email"
+                and e.action.args.get("email_id") == self.emma_email_id
+                and any(
+                    keyword in e.action.args.get("content", "")
+                    for keyword in ["reschedule", "move", "change", "urgent"]
+                )
+                and any(
+                    keyword in e.action.args.get("content", "") for keyword in ["Wednesday", "Nov 20", "10 AM", "10:00"]
+                )
+                for e in log_entries
+            )
+
+            success = (
+                proposal_found and calendar_check_found and edit_event_found and manager_meeting_added and emma_notified
+            )
+            return ScenarioValidationResult(success=success)
+
+        except Exception as e:
+            return ScenarioValidationResult(success=False, exception=e)
