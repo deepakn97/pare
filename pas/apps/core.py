@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import ast
 import inspect
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, cast
 
-from are.simulation.apps.app import App
-from are.simulation.tool_utils import AppTool, build_tool
+from are.simulation.apps.app import App, ToolType
+from are.simulation.tool_utils import AppTool, ToolAttributeName, build_tool
 
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
@@ -238,3 +239,115 @@ class StatefulApp(App):
             list[type[AppState]]: The reachable states from the given state.
         """
         raise NotImplementedError("Subclasses must implement get_reachable_states")
+
+    # NOTE: Extend Meta-ARE tool discovery to support PAS state tools and event-only tools
+    def get_tools_with_attribute(
+        self, attribute: ToolAttributeName | None, tool_type: ToolType | None
+    ) -> list[AppTool]:
+        """Return tools by attribute/tool type, extended for PAS stateful apps.
+
+        - If tool_type/attribute correspond to USER tools, include state-bound user tools.
+        - Otherwise, defer to Meta-ARE base implementation.
+        - Special case: if both tool_type and attribute are None, return "event-only" tools:
+          methods decorated with @event_registered-like decorator but without any of
+          @app_tool, @user_tool, @env_tool, @data_tool. Detected via AST across the MRO.
+        """
+        # Special case: event-only tools discovery via AST (no tool decorator present)
+        if tool_type is None and attribute is None:
+            return self._get_event_only_tools_via_ast()
+
+        # Include state-bound user tools for USER queries
+        if tool_type == ToolType.USER and attribute == ToolAttributeName.USER:
+            if self.current_state is None:
+                return []
+            # AppState already builds AppTool objects with class_instance bound to state
+            return list(self.current_state.get_available_actions())
+
+        # Fallback to base Meta-ARE behavior for APP/ENV/DATA (and any other cases)
+        return super().get_tools_with_attribute(attribute=attribute, tool_type=tool_type)
+
+    # Internal helpers
+    def _get_event_only_tools_via_ast(self) -> list[AppTool]:  # noqa: C901
+        """Discover event-registered methods without tool decorators across the class MRO."""
+        discovered_tools: list[AppTool] = []
+        processed_function_names: set[str] = set()
+
+        # Names of decorators to include/exclude (base name, without module prefixes)
+        include_event_names = {"event_registered", "pas_event_registered"}
+        exclude_tool_names = {"app_tool", "user_tool", "env_tool", "data_tool"}
+
+        def _decorator_base_name(dec: ast.expr) -> str | None:
+            # Extract the base name of a decorator (handles Name, Attribute, Call)
+            node = dec
+            if isinstance(node, ast.Call):
+                node = node.func
+            if isinstance(node, ast.Name):
+                return node.id
+            if isinstance(node, ast.Attribute):
+                # Get last attribute part (e.g., tool_utils.user_tool -> user_tool)
+                return node.attr
+            return None
+
+        # Traverse MRO to include inherited methods (ARE base apps)
+        for cls in inspect.getmro(self.__class__):
+            # Stop once we hit the framework base App class
+            if cls is App or cls is ABC or cls is object:
+                continue
+
+            try:
+                source_file = inspect.getsourcefile(cls) or inspect.getfile(cls)
+                if not source_file:
+                    continue
+                source_text = inspect.getsource(cls)
+            except Exception:  # noqa: S112
+                # Skip classes without retrievable source (e.g., C extensions)
+                continue
+
+            try:
+                # Parse the full module, then isolate the class body where possible
+                module_source = None
+                try:
+                    with open(source_file, encoding="utf-8") as f:
+                        module_source = f.read()
+                except Exception:
+                    module_source = source_text
+
+                tree = ast.parse(module_source or source_text)
+            except SyntaxError:
+                continue
+
+            # Find the class definition node matching this cls
+            class_nodes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == cls.__name__]
+            if not class_nodes:
+                continue
+
+            for class_node in class_nodes:
+                for node in class_node.body:
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        func_name = node.name
+                        if func_name in processed_function_names:
+                            continue
+
+                        decorator_names = {name for d in node.decorator_list if (name := _decorator_base_name(d))}
+                        # Must include event decorator, and must NOT include any tool decorator
+                        has_event = any(d in include_event_names for d in decorator_names)
+                        has_tool = any(d in exclude_tool_names for d in decorator_names)
+                        if not has_event or has_tool:
+                            continue
+
+                        # Retrieve the bound method from the instance
+                        func_obj = getattr(self, func_name, None)
+                        if func_obj is None or not callable(func_obj):
+                            continue
+
+                        # Build the AppTool (skip if missing docstring or invalid)
+                        try:
+                            tool = build_tool(self, func_obj)
+                        except Exception:  # noqa: S112
+                            # Skip functions that cannot be converted (e.g., missing docstrings)
+                            continue
+
+                        discovered_tools.append(tool)
+                        processed_function_names.add(func_name)
+
+        return discovered_tools

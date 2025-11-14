@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_custom_scenarios(registry: ScenarioRegistry) -> None:
+def register_custom_scenarios(registry: ScenarioRegistry) -> None:  # noqa: C901
     """Register all custom scenarios from this project with the provided registry.
 
     This function is called by the meta-ARE framework when it discovers the
@@ -32,6 +32,8 @@ def register_custom_scenarios(registry: ScenarioRegistry) -> None:
     custom_scenario_modules = [
         "pas.scenario_generator.example_proactive_scenarios.scenario",
         "pas.scenario_generator.example_proactive_scenarios.scenario_with_all_apps_init",
+        "pas.scenario_generator.example_proactive_scenarios.scenario_with_all_pas_apps",
+        "pas.scenario_generator.example_proactive_scenarios.very_basic_demo_pas_app",
         # Add other custom scenario modules here as needed
     ]
 

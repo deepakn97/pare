@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import textwrap
 
 from .system_prompt import SYSTEM_PROMPT_TEMPLATE
@@ -24,45 +26,73 @@ INSTRUCTIONS TO IMPORT AVAILABLE TOOLS:
 
 SEED_TASK_BASE = textwrap.dedent(
     """Reference scenario(s) (generate a new .py scenario file inspired by these, \
-but with DIFFERENT content and themes while using ALL available API tools and apps). \
+but with DIFFERENT content and themes while using tools from the selected apps; \
+if no apps are explicitly selected, use all available apps). \
 The difficulty of the generated scenario should be similar to the reference scenarios.
 
-    CRITICAL REQUIREMENT: You MUST use ALL applications available in the tool descriptions, and use at least one tool from each app. \
-Create a comprehensive scenario that demonstrates the full ecosystem of available applications.
+    CRITICAL REQUIREMENT: Initialize all selected apps \
+using the standard PAS initialization pattern (see `scenario_with_all_pas_apps` and `very_basic_demo_pas_app`). \
+Prefer to use tools from each initialized app when it meaningfully contributes to the workflow; it is acceptable \
+if some apps are only initialized and not used.
 
     PROACTIVE INTERACTION REQUIREMENT (MANDATORY): The scenario MUST include a proactive interaction pattern where:
     1. The agent proposes a specific action to the user (using AgentUserInterface__send_message_to_user)
     2. The user responds with detailed approval (using AgentUserInterface__send_message_to_agent with meaningful, contextual response like "Yes, please share it with Jordan" or "Yes, go ahead and schedule that meeting")
     3. The agent then executes the proposed action based on user approval
     4. This pattern should be central to the scenario's workflow, not just a minor interaction
+    5. Each proactive proposal MUST be grounded in prior context: only propose actions that clearly follow from
+       earlier environment events or tool outputs (e.g., forwarding a specific image that was actually received in
+       a previous message, not an invented one).
 
 NOVELTY AND ANTI-DUPLICATION REQUIREMENTS (critical):
 - Choose a DIFFERENT primary objective than any provided example (do not replicate scheduling if example schedules; pick another realistic task).
-- Use a COMPREHENSIVE mix of ALL available apps - every single app must be used meaningfully.
+- Use a RICH mix of the selected apps so that multiple apps play meaningful roles where appropriate.
 - Vary the event flow: different number of events (±2 or more), different ordering, different delays, and different combination of event types.
 - Use DIFFERENT local identifiers: variable names, temporary IDs, email subjects, message contents, event titles, and registry IDs MUST differ from examples. \
   Do not reuse example identifiers except API-required class/method names.
 - Change validation signals: assert success via different cues (e.g., different function args checked, counts, or presence of reminders/updates rather than creation of the same item).
 - Avoid long token reuse: aside from API symbols, avoid reusing any 5+ consecutive identifier/keyword token sequences seen in examples.
 - Ensure the generated class name and @register_scenario key are unique and not present in the references.
+- IMPORTANT: Novelty is primarily about new COMBINATIONS and SEQUENCES of tools across apps (mix of ENV/non-ENV/oracle usage),
+  not just different storyline content. Choose different tool flows and cross-app interactions than the examples.
+- STRONG DIVERGENCE: Avoid repeating common example themes (e.g., calendar rescheduling conflicts, summarizing or forwarding messages/photos,
+  simple “check my calendar” proposals). Prefer new objectives (e.g., fetch a code or order number from messages and notify a teammate;
+  auto-create a contact from a message signature and then send a follow-up; tag and filter conversations; block focus time on the calendar
+  based on a chat instruction). Prefer different app pairings and ENV methods than examples.
+
+CONTEXT-GROUNDED BEHAVIOR (critical):
+- Do NOT invent new concrete facts (emails, messages, users, file paths, IDs, URLs, event contents, etc.) that do not come from:
+  (a) explicit initialization in init_and_populate_apps, or
+  (b) the return values or state changes of previous tool calls in this scenario.
+- Any action you take (forwarding, sharing, scheduling, attaching files, etc.) MUST be grounded in prior
+  environment events or tool outputs in this scenario. If the environment never produced an item, you must
+  not pretend it exists.
 
     SIMILARITY DETECTION CONTEXT (for understanding why scenarios might be flagged as duplicates):
     - difflib_ratio: measures structural/sequential similarity (longest matching code sequences) - avoid copying similar code structure
     - jaccard_shingles: measures pattern similarity (overlap of 3-token code patterns) - avoid similar token combinations
     - cosine_tokens: measures vocabulary similarity (similarity of token usage frequency) - vary your identifier and keyword choices
     Different thresholds: difflib/jaccard ≥0.8, cosine ≥0.93. If any score exceeds its threshold, the scenario will be rejected.
+    If similarity is close to threshold or flagged, immediately PIVOT: change objective/domain, pick different tools combinations,
+    alter the event sequence and delays, rename identifiers and titles, and choose different validation targets (IDs, counts, tags).
 
 Key requirements:
-- Use ALL available applications from the tool descriptions (every single app must be used)
-- Use at least one tool from each available app
-- Follow the same Scenario class structure and methods
-- In build_events_flow, you MUST use every initialized app at least once; do not only initialize
-  apps in init_and_populate_apps without using them in the event flow
-- Create comprehensive event flows that demonstrate all available applications
-- Import all required tools at the beginning of the file (per import instructions)
-- Maintain a similar validation approach style but target different signals than the example
-- Ensure every app plays a meaningful role in the scenario workflow
-- MANDATORY: Include proactive interaction pattern (agent proposes action → user responds → agent acts accordingly if user approves)
+    - Initialize all selected apps using the standard PAS pattern
+    - Prefer to use at least one tool from each initialized app when meaningful (optional)
+    - Follow the same Scenario class structure and methods
+    - In build_events_flow, prefer to use initialized apps where they add value; it is acceptable if some initialized apps are unused
+    - IMPORTANT: Before any agent proposal, create one or more non-oracle environment events using only VALID ENV tools
+      from the selected apps (per notification templates) to establish context. Do NOT use EventRegisterer.create_env_event
+      or any EventRegisterer.* placeholder helpers (e.g., env_event, register_env_event); start directly with a real ENV tool call
+      on the app (e.g., messaging.create_and_add_message(...), calendar.add_calendar_event(...)).
+    - All events (ENV, AGENT, and USER) that participate in the scenario flow MUST be created inside one or more
+      'with EventRegisterer.capture_mode():' blocks, mirroring the pattern used in the example scenario
+      `very_basic_demo_pas_app`.
+    - Create comprehensive event flows that demonstrate the selected applications
+    - Import all required tools at the beginning of the file (per import instructions)
+    - Maintain a similar validation approach style but target different signals than the example
+    - Ensure every selected/available app plays a meaningful role in the scenario workflow
+    - MANDATORY: Include proactive interaction pattern (agent proposes action → user responds → agent acts accordingly if user approves)
 
 Return only a single fenced python code block for the new scenario class."""
 )
@@ -152,18 +182,18 @@ SEED_SCENARIO_GENERATOR_SYSTEM_PROMPT_TEMPLATE = textwrap.dedent(
     """You are an expert assistant specialized in generating scenarios using a predefined set of applications and tools.
 
     CRITICAL REQUIREMENTS:
-    1. You MUST use ALL applications available from the app definition scenario
+    1. Initialize all selected apps using the standard PAS pattern
     2. You can ONLY use tools from the provided app definition scenario - no others are allowed
-    3. Every single app must be incorporated into the scenario workflow (use at least one tool from each app)
-    4. Do not ignore or skip any available applications
+    3. Prefer to incorporate each initialized app into the workflow when it adds value (optional per app)
+    4. It is acceptable if some initialized apps are not used in the event flow
 
     Your task is to generate a comprehensive scenario that:
-    1. Uses ALL applications available from the app definition scenario (mandatory requirement)
-    2. Uses at least one tool from each available app
-    3. Creates a realistic workflow that demonstrates the full capabilities of the available app ecosystem
+    1. Initializes all selected apps with the standard PAS pattern
+    2. Prefer to use at least one tool from each initialized app when meaningful (optional)
+    3. Creates a realistic workflow that demonstrates the capabilities of the selected app ecosystem
     4. Treats the example scenarios as reference material only - for structure, patterns, and inspiration
     5. Creates novel content while following the same API patterns and coding structure
-    6. Ensures the generated scenario can run successfully with all available applications
+    6. Ensures the generated scenario can run successfully with the selected applications
     7. MANDATORY: Includes a proactive interaction pattern where the agent proposes an action and asks for user permission"""
 )
 
@@ -174,50 +204,74 @@ SEED_SCENARIO_GENERATOR_AGENT_HINTS = textwrap.dedent(
     APP CONSTRAINTS (STRICTLY ENFORCED):
     - ONLY use tools from the app definition scenario provided
     - DO NOT use apps or tools that appear in example scenarios but are not in the app definition scenario
-    - Import only the tools that are available in the app definition scenario
-    - If an example scenario uses an app not in the app definition scenario, find an alternative approach using available tools
+    - Imports are STRICTLY LIMITED to the symbols listed in "INSTRUCTIONS TO IMPORT AVAILABLE TOOLS" for the SELECTED APPS ONLY.
+      Do NOT import other PAS apps or modules not listed there.
 
     COMPREHENSIVE APP USAGE (MANDATORY):
-    - You MUST incorporate ALL available apps into the scenario workflow
-    - Use at least one tool from each available app
-    - Every app should play a meaningful role in the scenario
-    - Create realistic workflows that demonstrate the full ecosystem of available applications
-    - Ensure no app is left unused in the generated scenario
+    - Initialize all selected apps (or all available apps if none are explicitly selected) using the standard PAS pattern
+    - Prefer to use at least one tool from each initialized app when meaningful (optional)
+    - Aim for meaningful roles for apps where appropriate; it's acceptable if some apps remain unused
+    - Create realistic workflows that demonstrate the selected applications where they add value
 
     SCENARIO STRUCTURE REQUIREMENTS:
     - Follow the standard Scenario class structure (init_and_populate_apps, build_events_flow, validate)
-    - Use the same app initialization pattern as the app definition scenario
-    - In build_events_flow, ENSURE all apps initialized in init_and_populate_apps are actually used at least once
-      with meaningful tool/action calls; do NOT leave any initialized app unused
+    - Use the same app initialization pattern as shown in `scenario_with_all_pas_apps` and `very_basic_demo_pas_app`
+    - Always initialize HomeScreenSystemApp(name="HomeScreenSystemApp") in init_and_populate_apps, include it in self.apps,
+      and retrieve it in build_events_flow via self.get_typed_app(HomeScreenSystemApp) (demo-style usage). Optionally,
+      you may use a simple oracle navigation call like system_app.go_home().oracle() or system_app.open_app("Messaging").oracle() if it helps context.
+    - In build_events_flow, prefer to use initialized apps with meaningful tool/action calls; it is acceptable if some initialized apps are unused
+    - All scenario events (environment context events, agent proposals, user approvals, and agent follow-up actions)
+      MUST be emitted inside one or more 'with EventRegisterer.capture_mode():' blocks, just as in `very_basic_demo_pas_app`.
+    - IMPORTANT: Before any agent proposal, create one or more non-oracle context events.
+      Use only the non-oracle ENV methods listed under "Allowed non-oracle environment methods (by selected app)" below.
+      Call these by their exact method names and correct parameters.
     - Create different event flows and proactive behaviors than the examples
     - Maintain similar complexity and validation approach but target different signals
 
     PROACTIVE INTERACTION PATTERN (MANDATORY):
     - The scenario MUST include this exact pattern in the build_events_flow():
       1. Agent proposes action: aui.send_message_to_user(content="[specific proposal with question]")
-      2. User responds: aui.send_message_to_agent(content="[meaningful, contextual approval like 'Yes, please share it with Jordan' or 'Yes, go ahead and schedule that meeting']")
+      2. User responds: aui.accept_proposal(content="[meaningful, contextual approval like 'Yes, please share it with Jordan' or 'Yes, go ahead and schedule that meeting']") (reject_proposal(...) also allowed)
       3. Agent executes the proposed action based on user approval
     - This pattern should be central to the scenario, not just a minor interaction
-    - The proposal should be meaningful and related to the scenario's main objective
+    - The proposal should be meaningful, logically motivated, and clearly related to the scenario's main objective
+      based on prior environment events or tool outputs (e.g., propose forwarding a photo only if that photo was
+      actually received earlier in the conversation, and the recipient has requested it).
     - Use realistic, specific proposals that make sense for the available apps
     - The user should ALWAYS respond with detailed, contextual approval (not just "yes")
+    - ENVIRONMENT CONTEXT: Ensure the proposal is preceded by at least one non-oracle environment event
+      (e.g., a system notification or incoming message) using the allowed environment tools from the selected apps.
 
     NOVELTY REQUIREMENTS:
     - Choose a DIFFERENT primary objective than any provided example
-    - Use a DIFFERENT mix of the available apps
+    - Use a DIFFERENT mix of the available tools and ENV methods than the examples
     - Vary the event flow: different number of events, different ordering, different delays
     - Use DIFFERENT identifiers: variable names, email subjects, message contents, event titles
-    - Change validation signals to check for different outcomes than the examples
-    - Avoid copying token sequences from examples; reuse only API method names
+    - Change validation signals to check for different outcomes (IDs, counts, tag/state changes) than the examples
+    - If similarity is reported, PIVOT immediately: change objective, domain, app combination, structure, identifiers, validation targets
+    - IMPORTANT: Novelty is primarily about COMBINATIONS and SEQUENCES of tools across apps (ENV/non-ENV/oracle),
+      not just new storyline content. Prefer different cross-app tool flows and step ordering than the examples.
 
-    COMPREHENSIVE APP USAGE (MANDATORY):
-    - Use ALL applications exactly as defined in the app definition scenario
-    - Use at least one tool from each available app
-    - Follow the same method signatures and parameter patterns for all tools
-    - Ensure all method calls are valid for the available tools
-    - Test your app usage mentally against the available tool descriptions
-    - Every app must be used at least once in a meaningful way
-    - Create realistic workflows that demonstrate each app's purpose
+    API CORRECTNESS RULES (STRICT):
+    - Do NOT use env_action or env_event. For non-oracle context events, call only the methods listed under
+      "Allowed non-oracle environment methods (by selected app)" below, using exact method names and parameters.
+      Do NOT use EventRegisterer.env_event, EventRegisterer.create_env_event, EventRegisterer.register_env_event,
+      or any EventRegisterer.* placeholders. Always call ENV methods directly on the app instance.
+    - Approvals must use PASAgentUserInterface.accept_proposal(...) (or reject_proposal(...)) instead of send_message_to_agent for approvals.
+    - Messaging preconditions:
+      - In init_and_populate_apps, set messaging.current_user_id and messaging.current_user_name, and add needed users (e.g., messaging.add_users([...])).
+      - Create any conversations up-front (e.g., messaging.create_group_conversation(...)) and CAPTURE the returned conversation_id for later use.
+      - For create_and_add_message(...), you MUST provide conversation_id and sender_id (valid participants of that conversation). Do NOT use user_name; it is not a valid parameter.
+    - System/time:
+      - Do not create oracle events just to read time. Prefer environment context events (e.g., wait_for_notification) to set context; use time reads only as regular calls when needed.
+    - IDs, data, and handles:
+      - Never hardcode non-existent IDs (e.g., conversation_id) or other concrete values (file paths, message IDs, URLs, etc.).
+        Always use the values returned by earlier tool calls or those explicitly created in init_and_populate_apps.
+      - When acting on existing content (forwarding messages, sharing attachments, updating items), derive the target
+        and any required identifiers from prior environment events or tool outputs; do not fabricate new ones.
+    - Validation guidance:
+      - Calendar: prefer verifying event time ranges, attendee lists, or existence by ID over subjective title checks.
+      - Messaging: avoid subjective content checks; prefer checking message presence/count, returned IDs, or structured metadata.
 
     SIMILARITY AVOIDANCE:
     - difflib_ratio ≥0.8: avoid similar code structure and sequences
@@ -225,13 +279,6 @@ SEED_SCENARIO_GENERATOR_AGENT_HINTS = textwrap.dedent(
     - cosine_tokens ≥0.93: vary identifier and keyword choices significantly
     - If flagged as similar, completely change the scenario behavior and flow
 
-    AVAILABLE TOOLS:
-    <<tool_descriptions>>
-
-    INSTRUCTIONS TO IMPORT AVAILABLE TOOLS:
-    <<import_instructions>>
-
-    <<curent_time_description>>
     """
 )
 
@@ -250,14 +297,22 @@ SEED_SCENARIO_GENERATOR_ENVIRONMENT_INSTRUCTIONS = textwrap.dedent(
     <<import_instructions>>
 
     FUNDAMENTAL RULES FOR SCENARIO GENERATION:
-    1. COMPREHENSIVE USAGE: Use ALL applications from the app definition scenario (mandatory)
-    2. APP USAGE: Use at least one tool from each available app
+    1. APP INITIALIZATION: Initialize ALL applications from the app definition scenario (mandatory)
+    2. APP USAGE: Prefer to use at least one tool from each initialized app when meaningful (optional)
     3. CONSTRAINT: Use only the tools from the app definition scenario
     4. REFERENCE: Use example scenarios for structure and patterns, not for tool selection
-    5. NOVELTY: Create unique scenarios that differ significantly from examples
+    5. NOVELTY: Create unique scenarios that differ significantly from examples. If an 'EXISTING SCENARIO SUMMARIES' section is provided below,
+       actively avoid creating scenarios that resemble any of those summaries.
     6. VALIDITY: Ensure all tool calls are valid for the available tools
     7. EXECUTION: Generate complete, runnable scenario code that uses every app
-    8. PROACTIVE INTERACTION: MUST include agent proposal → user response → agent action pattern if user approves
+    8. CAPTURE MODE: All scenario events (environment context events, agent proposals, user approvals, agent follow-up actions)
+       MUST be created inside one or more 'with EventRegisterer.capture_mode():' blocks (no ad-hoc events outside capture_mode).
+    9. PROACTIVE INTERACTION: MUST include agent proposal → user response → agent action pattern if user approves
+
+    === PAS Tool Usage Rules ===
+    <<pas_rules_block>>
+
+    <<pas_grouped_block>>
 
     {seed_scenario_generator_agent_hints}
 
@@ -271,4 +326,25 @@ DEFAULT_SEED_SCENARIO_GENERATOR_SYSTEM_PROMPT = SYSTEM_PROMPT_TEMPLATE.format(
     environment_instructions=SEED_SCENARIO_GENERATOR_ENVIRONMENT_INSTRUCTIONS.format(
         seed_scenario_generator_agent_hints=""
     ),
+)
+
+# ===== PAS Dynamic Blocks =====
+
+PAS_RULES_BLOCK_TEMPLATE = textwrap.dedent(
+    """1) In init_and_populate_apps: Only use data tools OR event-only tools (methods with only @event_registered). Do NOT use env_action/env_event helpers.
+2) In build_event_flow WITH EventRegisterer.capture_mode():
+   - Before any agent proposal, create at least one non-oracle environment event from the allowed list to establish context.
+   - For non-oracle events: Only use ENV tools from the selected apps listed below in 'Allowed non-oracle environment methods'.
+     Do NOT use EventRegisterer.env_event, EventRegisterer.create_env_event, EventRegisterer.register_env_event, or any EventRegisterer.* placeholders.
+     Always call ENV methods directly on the app instance (e.g., messaging.create_and_add_message(...), calendar.add_calendar_event(...)).
+   - For oracle events (.oracle()): Any tools from the selected apps are allowed.
+3) In build_event_flow OUTSIDE capture_mode: Prefer oracle usage when using non-env tools."""
+)
+
+PAS_GROUPED_BLOCK_TEMPLATE = textwrap.dedent(
+    """-- Allowed tools in init_and_populate_apps (data + event-only) --
+<<init_allowed_block>>
+
+-- Allowed non-oracle environment methods (by selected app) --
+<<allowed_non_oracle_by_app_block>>"""
 )
