@@ -134,6 +134,7 @@ class UserAgent:
         are_simulation_tools = [AppToolAdapter(tool) for tool in user_tools]
         self.tools = are_simulation_tools
         self.react_agent.tools = {tool.name: tool for tool in self.tools}
+        self.react_agent.init_tools()
         logger.info(f"Initialized {len(self.tools)} tools: {[tool.name for tool in self.tools]}")
 
     def remove_aui_irrelevant_tools(self, tools: list[AppTool]) -> list[AppTool]:
