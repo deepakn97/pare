@@ -17,17 +17,19 @@ import argparse
 import logging
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 from are.simulation.agents.are_simulation_agent_config import (
     ARESimulationReactBaseAgentConfig,
     LLMEngineConfig,
 )
-from are.simulation.scenario_runner import ScenarioRunnerConfig
 from are.simulation.cli.utils import setup_logging, suppress_noisy_loggers
+from are.simulation.scenario_runner import ScenarioRunnerConfig
+from are.simulation.scenarios.utils.scenario_expander import EnvEventsConfig
+from are.simulation.types import ToolAugmentationConfig
+from dotenv import load_dotenv
 
 from pas.scenario_runner import TwoAgentScenarioRunner
-from pas.scenarios.registry import registry
+from pas.scenarios.utils.registry import registry
+from pas.scenarios.utils.scenario_expander import default_weight_per_app_class
 
 # Scenarios are auto-registered via entry points in pyproject.toml
 # See: [project.entry-points."pas.scenarios"]
@@ -48,12 +50,15 @@ logger = logging.getLogger(__name__)
 
 
 def run_demo(
-    scenario_name: str = "demo_simple_contact",
+    scenario_name: str = "email_notification",
     user_model: str = "gpt-4o-mini",
     proactive_model: str = "gpt-4o-mini",
     max_turns: int | None = 10,
     output_dir: str | None = None,
     oracle_mode: bool = False,
+    tool_failure_prob: float = 0.0,
+    env_events_per_min: float = 0.0,
+    env_events_seed: int = 42,
 ) -> None:
     """Run the two-agent demo with the specified configuration.
 
@@ -64,18 +69,39 @@ def run_demo(
         max_turns: Maximum number of agent turns to run (None for unlimited).
         output_dir: Directory to export traces to (None for default).
         oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
+        tool_failure_prob: Probability (0.0-1.0) that agent tools fail.
+        env_events_per_min: Average number of environmental noise events per minute.
+        env_events_seed: Random seed for reproducible noise generation.
     """
-
     logger.info(f"Running two-agent demo with scenario: {scenario_name}")
     logger.info(f"User model: {user_model}")
     logger.info(f"Proactive model: {proactive_model}")
     logger.info(f"Max turns: {max_turns}")
     logger.info(f"Oracle mode: {oracle_mode}")
+    logger.info(f"Tool failure probability: {tool_failure_prob}")
+    logger.info(f"Environmental noise events per minute: {env_events_per_min}")
+    logger.info(f"Environmental noise seed: {env_events_seed}")
 
     # Load the scenario using PAS registry
     scenario_class = registry.get_scenario(scenario_name)
 
     scenario = scenario_class()
+
+    # Configure tool failure probability if requested
+    if tool_failure_prob > 0:
+        scenario.tool_augmentation_config = ToolAugmentationConfig(
+            tool_failure_probability=tool_failure_prob,
+            apply_tool_name_augmentation=False,
+            apply_tool_description_augmentation=False,
+        )
+
+    if env_events_per_min > 0:
+        scenario.env_events_config = EnvEventsConfig(
+            num_env_events_per_minute=int(env_events_per_min),
+            env_events_seed=env_events_seed,
+            weight_per_app_class=default_weight_per_app_class(),
+        )
+
     scenario.initialize(sandbox_dir=Path("sandbox"))
 
     # Create agent configurations
@@ -91,13 +117,14 @@ def run_demo(
 
     proactive_execute_config = ARESimulationReactBaseAgentConfig(
         llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider="openai"),
-        max_iterations=10,  # Execution might need multiple tool calls
+        max_iterations=5,  # Execution might need multiple tool calls
     )
 
     # Create runner configuration
-    output_path = Path(output_dir) if output_dir else Path("traces/pas")
+    output_path = Path(output_dir) if output_dir else Path("results/")
     output_path.mkdir(parents=True, exist_ok=True)
 
+    # ! TODO: Support dumping agent traces as well, I think right now it is only dumping the user agent logs. We also don't use this config anywhere.
     runner_config = ScenarioRunnerConfig(
         output_dir=str(output_path),
         dump_agent_logs=True,
@@ -172,6 +199,24 @@ def main(argv: list[str] | None = None) -> None:
         help="Directory to export traces to",
     )
     parser.add_argument(
+        "--tool-failure-prob",
+        type=float,
+        default=0.0,
+        help="Probability (0.0-1.0) that agent tools fail",
+    )
+    parser.add_argument(
+        "--env-events-per-min",
+        type=float,
+        default=0.0,
+        help="Average number of environmental noise events per minute",
+    )
+    parser.add_argument(
+        "--env-events-seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducible noise generation",
+    )
+    parser.add_argument(
         "--oracle",
         action="store_true",
         help="Run in oracle mode (executes predefined oracle events without agents)",
@@ -197,6 +242,9 @@ def main(argv: list[str] | None = None) -> None:
         max_turns=max_turns,
         output_dir=args.output_dir,
         oracle_mode=args.oracle,
+        tool_failure_prob=args.tool_failure_prob,
+        env_events_per_min=args.env_events_per_min,
+        env_events_seed=args.env_events_seed,
     )
 
 

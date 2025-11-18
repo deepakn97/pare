@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps.contacts import Contact
-from are.simulation.scenarios.scenario import Scenario, ScenarioStatus, ScenarioValidationResult
+from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps import (
@@ -16,11 +16,12 @@ from pas.apps import (
     StatefulContactsApp,
     StatefulEmailApp,
 )
-from pas.scenarios.registry import register_scenario
+from pas.scenarios import PASScenario
+from pas.scenarios.utils.registry import register_scenario
 
 
 @register_scenario("email_calendar_meeting_request")
-class EmailCalendarMeetingRequest(Scenario):
+class EmailCalendarMeetingRequest(PASScenario):
     """Agent reads meeting request email, checks calendar availability, and offers to create event.
 
     User receives a meeting request email from colleague with date/time/location details.
@@ -37,11 +38,11 @@ class EmailCalendarMeetingRequest(Scenario):
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize apps with test data."""
         # Initialize apps
-        self.email = StatefulEmailApp(name="StatefulEmailApp")
-        self.calendar = StatefulCalendarApp(name="StatefulCalendarApp")
-        self.contacts = StatefulContactsApp(name="StatefulContactsApp")
+        self.email = StatefulEmailApp(name="Emails")
+        self.calendar = StatefulCalendarApp(name="Calendar")
+        self.contacts = StatefulContactsApp(name="Contacts")
         self.agent_ui = PASAgentUserInterface()
-        self.system_app = HomeScreenSystemApp(name="HomeScreenSystemApp")
+        self.system_app = HomeScreenSystemApp(name="System")
 
         # Populate contacts - Add Sarah Johnson (meeting requester)
         self.contacts.add_contact(
@@ -81,8 +82,8 @@ class EmailCalendarMeetingRequest(Scenario):
     def build_events_flow(self) -> None:
         """Build event flow - incoming email triggers proactive calendar check and event creation."""
         aui = self.get_typed_app(PASAgentUserInterface)
-        email = self.get_typed_app(StatefulEmailApp)
-        calendar = self.get_typed_app(StatefulCalendarApp)
+        email = self.get_typed_app(StatefulEmailApp, "Emails")
+        calendar = self.get_typed_app(StatefulCalendarApp, "Calendar")
 
         with EventRegisterer.capture_mode():
             # Event 1: Incoming meeting request email from Sarah (environment event)
@@ -90,7 +91,7 @@ class EmailCalendarMeetingRequest(Scenario):
                 sender="sarah.johnson@company.com",
                 subject="Project Planning Meeting - Next Tuesday",
                 content="Hi! I'd like to schedule a project planning meeting next Tuesday, November 19th at 2:00 PM. The meeting will be 1 hour long and we'll meet at Downtown Office - Conference Room A. Let me know if this works for you!",
-            ).delayed(2)
+            ).delayed(20)
 
             # Event 2: Agent proactively proposes to check calendar and add meeting (oracle)
             proposal_event = (

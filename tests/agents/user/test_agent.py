@@ -4,11 +4,11 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from are.simulation.agents.default_agent.base_agent import BaseAgent, BaseAgentLog, RunningState
-from are.simulation.notification_system import BaseNotificationSystem, Message, MessageType
+from are.simulation.notification_system import Message
 from are.simulation.scenarios.scenario import Scenario
 
 from pas.agents.user.agent import UserAgent
-from pas.notification_system import PASMessageType
+from pas.notification_system import PASMessageType, PASNotificationSystem
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def mock_time_manager():
 @pytest.fixture
 def mock_notification_system():
     """Mock notification system."""
-    system = Mock(spec=BaseNotificationSystem)
+    system = Mock(spec=PASNotificationSystem)
     system.message_queue = Mock()
     system.message_queue.get_by_timestamp.return_value = []
     system.message_queue.put = Mock()
@@ -125,7 +125,7 @@ def test_get_notifications_filters_agent_messages(user_agent, mock_notification_
     mock_notification_system.message_queue.get_by_timestamp.return_value = [agent_msg]
     user_agent.react_agent.notification_system = mock_notification_system
 
-    agent_messages, env_notifications, env_stop = user_agent.get_notifications(mock_notification_system)
+    agent_messages, env_notifications, env_stop = user_agent.get_notifications()
 
     assert len(agent_messages) == 1
     assert agent_messages[0] == agent_msg
@@ -136,12 +136,12 @@ def test_get_notifications_filters_agent_messages(user_agent, mock_notification_
 def test_get_notifications_filters_env_notifications(user_agent, mock_notification_system):
     """Test get_notifications filters ENVIRONMENT_NOTIFICATION type correctly."""
     env_msg = Mock(spec=Message)
-    env_msg.message_type = MessageType.ENVIRONMENT_NOTIFICATION
+    env_msg.message_type = PASMessageType.ENVIRONMENT_NOTIFICATION_USER
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [env_msg]
     user_agent.react_agent.notification_system = mock_notification_system
 
-    agent_messages, env_notifications, env_stop = user_agent.get_notifications(mock_notification_system)
+    agent_messages, env_notifications, env_stop = user_agent.get_notifications()
 
     assert len(agent_messages) == 0
     assert len(env_notifications) == 1
@@ -152,12 +152,12 @@ def test_get_notifications_filters_env_notifications(user_agent, mock_notificati
 def test_get_notifications_filters_env_stop(user_agent, mock_notification_system):
     """Test get_notifications filters ENVIRONMENT_STOP type correctly."""
     stop_msg = Mock(spec=Message)
-    stop_msg.message_type = MessageType.ENVIRONMENT_STOP
+    stop_msg.message_type = PASMessageType.ENVIRONMENT_STOP
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [stop_msg]
     user_agent.react_agent.notification_system = mock_notification_system
 
-    agent_messages, env_notifications, env_stop = user_agent.get_notifications(mock_notification_system)
+    agent_messages, env_notifications, env_stop = user_agent.get_notifications()
 
     assert len(agent_messages) == 0
     assert len(env_notifications) == 0
@@ -168,21 +168,22 @@ def test_get_notifications_filters_env_stop(user_agent, mock_notification_system
 def test_get_notifications_puts_env_notifications_back(user_agent, mock_notification_system):
     """Test get_notifications puts env notifications back in queue."""
     env_msg = Mock(spec=Message)
-    env_msg.message_type = MessageType.ENVIRONMENT_NOTIFICATION
+    env_msg.message_type = PASMessageType.ENVIRONMENT_NOTIFICATION_USER
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [env_msg]
     user_agent.react_agent.notification_system = mock_notification_system
 
-    user_agent.get_notifications(mock_notification_system)
+    user_agent.get_notifications()
 
     # Verify message was put back in queue
     mock_notification_system.message_queue.put.assert_called_once_with(env_msg)
 
 
 def test_get_notifications_raises_without_system(user_agent):
-    """Test get_notifications raises RuntimeError when notification_system is None."""
-    with pytest.raises(RuntimeError, match="Notification system not set"):
-        user_agent.get_notifications(None)
+    """Test get_notifications raises AttributeError when notification_system is None."""
+    user_agent.react_agent.notification_system = None
+    with pytest.raises(AttributeError):
+        user_agent.get_notifications()
 
 
 def test_get_notifications_handles_mixed_messages(user_agent, mock_notification_system):
@@ -191,15 +192,15 @@ def test_get_notifications_handles_mixed_messages(user_agent, mock_notification_
     agent_msg.message_type = PASMessageType.AGENT_MESSAGE
 
     env_msg = Mock(spec=Message)
-    env_msg.message_type = MessageType.ENVIRONMENT_NOTIFICATION
+    env_msg.message_type = PASMessageType.ENVIRONMENT_NOTIFICATION_USER
 
     stop_msg = Mock(spec=Message)
-    stop_msg.message_type = MessageType.ENVIRONMENT_STOP
+    stop_msg.message_type = PASMessageType.ENVIRONMENT_STOP
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [agent_msg, env_msg, stop_msg]
     user_agent.react_agent.notification_system = mock_notification_system
 
-    agent_messages, env_notifications, env_stop = user_agent.get_notifications(mock_notification_system)
+    agent_messages, env_notifications, env_stop = user_agent.get_notifications()
 
     assert len(agent_messages) == 1
     assert len(env_notifications) == 1
@@ -344,23 +345,23 @@ def test_agent_loop_raises_when_no_notification_system(user_agent):
         user_agent.agent_loop(current_tools=[])
 
 
-@patch("pas.agents.user.agent.time.sleep")
-def test_agent_loop_initializes_tools(mock_sleep, user_agent, mock_notification_system):
+def test_agent_loop_initializes_tools(user_agent, mock_notification_system):
     """Test agent_loop calls init_tools with current_tools."""
     user_agent._initialized = True
     user_agent.react_agent.notification_system = mock_notification_system
     user_agent.init_tools = Mock()
 
-    # No notifications, will sleep once then hit max_turns
+    # No notifications - agent will run with empty task
     mock_notification_system.message_queue.get_by_timestamp.return_value = []
+    user_agent.react_agent.run = Mock(return_value="")
+    user_agent.react_agent.custom_state = {"running_state": RunningState.TERMINATED}
 
-    user_agent.agent_loop(current_tools=["tool1", "tool2"], max_turns=0)
+    user_agent.agent_loop(current_tools=["tool1", "tool2"])
 
     user_agent.init_tools.assert_called_once_with(["tool1", "tool2"])
 
 
-@patch("pas.agents.user.agent.time.sleep")
-def test_agent_loop_handles_agent_messages(mock_sleep, user_agent, mock_notification_system):
+def test_agent_loop_handles_agent_messages(user_agent, mock_notification_system):
     """Test agent_loop processes agent messages and calls base_agent.run()."""
     user_agent._initialized = True
     user_agent.react_agent.notification_system = mock_notification_system
@@ -372,17 +373,14 @@ def test_agent_loop_handles_agent_messages(mock_sleep, user_agent, mock_notifica
     msg.message_type = PASMessageType.AGENT_MESSAGE
     msg.attachments = []
 
-    # Mock get_notifications to control loop behavior
-    user_agent.get_notifications = Mock(side_effect=[
-        ([msg], [], []),  # First call: has agent message
-        ([], [], []),      # Second call: no messages, will exit due to max_turns
-    ])
+    # Mock get_notifications to return agent message
+    user_agent.get_notifications = Mock(return_value=([msg], [], []))
 
     # Mock base_agent.run() to return result and set TERMINATED state
     user_agent.react_agent.run = Mock(return_value="Agent response")
     user_agent.react_agent.custom_state = {"running_state": RunningState.TERMINATED}
 
-    result = user_agent.agent_loop(current_tools=[], max_turns=1)
+    result = user_agent.agent_loop(current_tools=[])
 
     # Verify base_agent.run() was called
     user_agent.react_agent.run.assert_called_once()
@@ -392,15 +390,14 @@ def test_agent_loop_handles_agent_messages(mock_sleep, user_agent, mock_notifica
     assert result == "Agent response"
 
 
-@patch("pas.agents.user.agent.time.sleep")
-def test_agent_loop_handles_env_stop(mock_sleep, user_agent, mock_notification_system):
-    """Test agent_loop breaks on ENVIRONMENT_STOP message."""
+def test_agent_loop_handles_env_stop(user_agent, mock_notification_system):
+    """Test agent_loop returns early on ENVIRONMENT_STOP message."""
     user_agent._initialized = True
     user_agent.react_agent.notification_system = mock_notification_system
     user_agent.init_tools = Mock()
 
     stop_msg = Mock(spec=Message)
-    stop_msg.message_type = MessageType.ENVIRONMENT_STOP
+    stop_msg.message_type = PASMessageType.ENVIRONMENT_STOP
 
     # Return stop message and empty lists
     mock_notification_system.message_queue.get_by_timestamp.return_value = [stop_msg]
@@ -408,14 +405,14 @@ def test_agent_loop_handles_env_stop(mock_sleep, user_agent, mock_notification_s
     # Mock get_notifications to return stop message
     user_agent.get_notifications = Mock(return_value=([], [], [stop_msg]))
 
-    result = user_agent.agent_loop(current_tools=[], max_turns=10)
+    result = user_agent.agent_loop(current_tools=[])
 
-    # Should break immediately without running agent
+    # Should return immediately without running agent
     assert user_agent.react_agent.run.call_count == 0
+    assert result == ""
 
 
-@patch("pas.agents.user.agent.time.sleep")
-def test_agent_loop_handles_failed_state(mock_sleep, user_agent, mock_notification_system):
+def test_agent_loop_handles_failed_state(user_agent, mock_notification_system):
     """Test agent_loop raises RuntimeError on FAILED state."""
     user_agent._initialized = True
     user_agent.react_agent.notification_system = mock_notification_system
@@ -435,48 +432,4 @@ def test_agent_loop_handles_failed_state(mock_sleep, user_agent, mock_notificati
     user_agent.react_agent.get_agent_logs = Mock(return_value=[Mock()])
 
     with pytest.raises(RuntimeError, match="User agent failed"):
-        user_agent.agent_loop(current_tools=[], max_turns=1)
-
-
-@patch("pas.agents.user.agent.time.sleep")
-def test_agent_loop_respects_max_turns(mock_sleep, user_agent, mock_notification_system):
-    """Test agent_loop stops after max_turns."""
-    user_agent._initialized = True
-    user_agent.react_agent.notification_system = mock_notification_system
-    user_agent.init_tools = Mock()
-
-    msg = Mock(spec=Message)
-    msg.message = "Test"
-    msg.message_type = PASMessageType.AGENT_MESSAGE
-    msg.attachments = []
-
-    # Mock get_notifications to always return a message (would loop forever without max_turns)
-    user_agent.get_notifications = Mock(return_value=([msg], [], []))
-
-    user_agent.react_agent.run = Mock(return_value="Response")
-    user_agent.react_agent.custom_state = {"running_state": RunningState.TERMINATED}
-
-    user_agent.agent_loop(current_tools=[], max_turns=3)
-
-    # Should have called run() exactly 3 times
-    assert user_agent.react_agent.run.call_count == 3
-
-
-@patch("pas.agents.user.agent.time.sleep")
-def test_agent_loop_sleeps_when_no_notifications(mock_sleep, user_agent, mock_notification_system):
-    """Test agent_loop sleeps when no notifications are available."""
-    user_agent._initialized = True
-    user_agent.react_agent.notification_system = mock_notification_system
-    user_agent.init_tools = Mock()
-
-    # Mock get_notifications to return empty lists (avoid infinite loop)
-    user_agent.get_notifications = Mock(side_effect=[
-        ([], [], []),  # First call: no notifications, will sleep
-        ([], [], [MessageType.ENVIRONMENT_STOP]),  # Second call: stop to exit loop
-    ])
-
-    # Run agent loop
-    user_agent.agent_loop(current_tools=[])
-
-    # Verify sleep was called once
-    mock_sleep.assert_called_once_with(1)
+        user_agent.agent_loop(current_tools=[])

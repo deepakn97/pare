@@ -406,7 +406,6 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             set_logger_scenario_id(scenario.scenario_id, run_number)
 
         try:
-            # ! TODO: Judge only mode is not implemented yet.
             result = self._run_pas_scenario(
                 scenario, user_config, proactive_observe_config, proactive_execute_config, max_turns, oracle_mode
             )

@@ -153,29 +153,25 @@ def main(argv: list[str] | None = None) -> None:
 
 ### Agent Error Handling
 
-```python
-# 4. Ensure agents handle ToolException gracefully
-# Files: pas/agents/user/*.py and pas/agents/proactive/*.py (future work)
+**How Tool Failures Work:**
 
-# In agent's action execution loop:
-try:
-    result = tool.execute(**args)
-except ToolException as e:
-    # Log the failure
-    logger.warning(f"Tool {tool_name} failed: {e}")
+1. Tool fails: `AppTool.__call__()` raises `Exception` with message `"Calling {name} failed with error: Internal error - Retry again later"`
+2. Meta-ARE wraps it in `JsonExecutionAgentError` with tool description
+3. `BaseAgent.execute_agent_loop()` catches exception and logs as `ErrorLog`
+4. Agent continues executing (doesn't crash)
+5. Error appears in agent's observation history for next LLM prompt
 
-    # Agent should:
-    # 1. Inform user of failure (if user-facing action)
-    # 2. Attempt retry or alternative approach
-    # 3. Update internal state to track failures
-    # 4. Continue with remaining tasks
+**No PAS Code Changes Required:**
+- PAS agents inherit `BaseAgent` which already handles tool failures gracefully
+- Errors automatically logged and presented to LLM in observation history
+- Agent can reason about errors and adapt strategy based on error messages
 
-    # Example recovery strategies:
-    # - Retry with exponential backoff
-    # - Try alternative tool/approach
-    # - Notify user and request manual intervention
-    # - Skip non-critical task and continue
-```
+**Optional Advanced Recovery Strategies:**
+- Retry with exponential backoff (track failures in `custom_state`)
+- Try alternative tools when primary tool fails
+- Notify user for critical failures via `send_message_to_user`
+- Graceful degradation: skip non-critical tasks, continue workflow
+- Implement via custom agent post-processing steps or enhanced system prompts
 
 ### Environmental Noise Behavior
 
@@ -387,3 +383,237 @@ uv run python -m pas.scripts.run_two_agent_demo \
 - [x] I have searched existing issues and discussions to ensure this is not a duplicate
 - [x] I have considered how this feature fits with PAS's research goals (agent robustness evaluation)
 - [ ] I am willing to contribute to implementing this feature
+
+---
+
+## Working Notes
+
+### Meta-ARE Noise Infrastructure Review (Step 1 Completed)
+
+**Key Findings from Code Analysis:**
+
+#### 1. ToolAugmentationConfig (are/simulation/types.py:1546-1551)
+
+```python
+@dataclass
+class ToolAugmentationConfig:
+    tool_failure_probability: float = 0.1
+    # Mapping from original tool name to the new tool name
+    apply_tool_name_augmentation: bool = True
+    apply_tool_description_augmentation: bool = True
+```
+
+**Purpose**: Configures tool failure rate and optional tool name/description obfuscation.
+
+**How It Works**:
+- Stored in `scenario.tool_augmentation_config` (set during preprocessing)
+- Applied via `scenario.apply_augmentation_configs()` method (are/simulation/scenarios/scenario.py:1258)
+- Calls `app.set_failure_probability(config.tool_failure_probability)` on each app
+- `App.set_failure_probability()` (are/simulation/apps/app.py:108):
+  - Sets `self.failure_probability` attribute
+  - Resets tool registries to force re-decoration with new failure rate
+- Tool execution checks failure via `AppTool` decorator logic
+- If `rng.random() < failure_probability`, raises `ToolException("This tool call failed")`
+
+#### 2. EnvEventsConfig (are/simulation/scenarios/utils/scenario_expander.py:56-96)
+
+```python
+@dataclass
+class EnvEventsConfig:
+    num_env_events_per_minute: int = 10
+    env_events_seed: int = 0
+    n_message_events_per_conversation: int = 4
+    n_item_events_per_product: int = 2
+    weight_per_app_class: dict[str, float] = field(default_factory=default_weight_per_app_class)
+```
+
+**Purpose**: Controls background event generation (emails, messages, calendar invites, etc.).
+
+**How It Works**:
+- Stored in `scenario.env_events_config` (set during preprocessing)
+- Applied via `EnvEventsExpander.add_env_events_to_scenario()` during `scenario.initialize()` (are/simulation/scenarios/scenario.py:175-177)
+- Uses Poisson process (exponential inter-arrival times) for realistic event timing
+- Samples from `scenario.augmentation_data` to generate noise events
+- Adds new `Event` objects to `scenario.events` list with dependency chains
+- Events tagged with `ENV_EVENT_EXPANSION_TAG` prefix for tracking
+
+#### 3. Integration Pattern in Meta-ARE ScenarioRunner
+
+**Config Storage** (are/simulation/scenarios/config.py:104-108):
+```python
+class ScenarioRunnerConfig(BaseModel):
+    # ...
+    tool_augmentation_config: ToolAugmentationConfig | None = None
+    env_events_config: EnvEventsConfig | None = None
+```
+
+**Application Flow** (are/simulation/scenarios/scenario_imported_from_json/utils.py:43-82):
+```python
+def preprocess_scenario(
+    scenario: BenchmarkScenarioImportedFromJson,
+    tool_augmentation_config: ToolAugmentationConfig | None = None,
+    env_events_config: EnvEventsConfig | None = None,
+):
+    # ...
+    # Step 1: Attach configs to scenario
+    scenario.tool_augmentation_config = tool_augmentation_config  # Line 78
+    scenario.env_events_config = env_events_config                # Line 79
+
+    # Step 2: Initialize scenario (applies configs)
+    scenario.initialize()  # Line 82
+    # This calls:
+    #   - scenario.apply_augmentation_configs() for tool failures
+    #   - EnvEventsExpander.add_env_events_to_scenario() for environmental noise
+```
+
+**ScenarioRunner Integration**:
+- Configs passed from `ScenarioRunnerConfig` to `preprocess_scenario()`
+- In `load_and_preprocess_scenario_str()` helper function
+- Called by `ScenarioRunner.run()` when loading scenarios from JSON
+
+#### 4. Key Implementation Details
+
+**Tool Failure Mechanism**:
+- `App.failure_probability` attribute (default 0.0)
+- `App.set_failure_probability(prob)` updates all tool registries
+- Tools decorated with failure check in `AppTool.__call__()`
+- Agents see `ToolException` when tool fails
+- Exception includes message: "This tool call failed"
+
+**Environmental Event Scheduling**:
+- Uses `numpy.random.default_rng(seed)` for Poisson sampling
+- Uses `random.Random(seed)` for event selection
+- Events scheduled with `event.depends_on(start_event, delay_seconds=tick)`
+- Tick times computed via `np.cumsum(np_rng.exponential(scale=1/rate, size=n))`
+- Supports multiple app types: Messaging, Email, Shopping, Apartment listings
+
+**Augmentation Data Requirements**:
+- Environmental noise requires `scenario.augmentation_data` with app states
+- Contains conversation histories, email templates, product catalogs
+- EnvEventsExpander samples from this data to generate realistic noise
+- If augmentation_data missing, env noise cannot be generated
+
+#### 5. PAS Integration Strategy
+
+Based on Meta-ARE's implementation, PAS integration should:
+
+1. **In `scenario_runner.py` (TwoAgentScenarioRunner.run())**:
+   - Accept `tool_augmentation_config` and `env_events_config` parameters
+   - Attach to `scenario` object before initialization
+   - Call `scenario.initialize()` to apply configs
+   - No need to manually call `apply_augmentation_configs()` or `EnvEventsExpander` (handled in `initialize()`)
+
+2. **In `scripts/run_two_agent_demo.py`**:
+   - Add CLI flags: `--tool-failure-prob`, `--env-events-per-min`, `--noise-seed`
+   - Construct `ToolAugmentationConfig` and `EnvEventsConfig` from args
+   - Pass to `runner.run()` method
+
+3. **PAS Apps Compatibility**:
+   - All `StatefulApp` classes inherit from `meta_are.App`
+   - Therefore already support `set_failure_probability()`
+   - No changes needed to app implementations
+   - Tool failures handled automatically by Meta-ARE's `AppTool` decorator
+
+4. **Agent Error Handling** (future work):
+   - User agent and proactive agent need `try/except ToolException` blocks
+   - Should log failures and implement retry/recovery strategies
+   - Document best practices for error handling in agent implementations
+
+#### 6. Open Questions
+
+1. **Oracle Mode Behavior**: ✅ **DECISION MADE**
+   - **Do NOT disable tool failures in oracle mode**
+   - Keep default `tool_failure_probability = 0.0` so oracle runs cleanly by default
+   - Users can explicitly set `--tool-failure-prob > 0` to test oracle robustness
+   - This allows testing scenarios with failures when needed
+
+2. **Augmentation Data for PAS**: ✅ **CONFIRMED - PAS scenarios do NOT have `augmentation_data`**
+   - Searched PAS codebase - no references to `augmentation_data` found
+   - Examined scenario structure (e.g., `email_calendar_meeting_request.py`) - no augmentation data present
+   - Base `Scenario` class from Meta-ARE defines `augmentation_data: dict[str, Any] = field(default_factory=dict)`
+   - **Structure required by EnvEventsExpander**:
+     ```python
+     augmentation_data = {
+         "apps": [
+             {
+                 "name": "StatefulMessagingApp",  # Must match app instance name
+                 "app_state": {
+                     "conversations": {
+                         "conv_id": {
+                             "conversation_id": "conv_id",
+                             "messages": [
+                                 {"sender": "Alice", "content": "..."},
+                                 # More messages for noise generation
+                             ]
+                         }
+                     }
+                 }
+             },
+             {
+                 "name": "StatefulEmailApp",
+                 "app_state": {
+                     "folders": {
+                         "INBOX": {
+                             "emails": [
+                                 {
+                                     "email_id": "...",
+                                     "sender": "...",
+                                     "recipients": [...],
+                                     "subject": "...",
+                                     "content": "..."
+                                 }
+                             ]
+                         }
+                     }
+                 }
+             }
+         ]
+     }
+     ```
+   - **Decision**: Environmental noise feature requires implementing augmentation data generation for PAS scenarios
+
+3. **App Class Names**: EnvEventsExpander uses hardcoded app class names
+   - Meta-ARE: `MessagingApp`, `EmailClientApp`, etc.
+   - PAS: `StatefulMessagingApp`, `StatefulEmailApp`, etc.
+   - **Potential issue**: Name mismatch may prevent noise generation
+   - **Solution**: May need to configure `weight_per_app_class` with PAS app names
+
+4. **Scenario Duration**: EnvEventsExpander requires `scenario.duration`
+   - Defaults to 360 seconds if not set
+   - PAS scenarios should set this explicitly
+
+### Next Steps (Steps 2-8)
+
+**Step 2**: Add noise config parameters to `TwoAgentScenarioRunner.run()`
+- Add two optional parameters to method signature
+- Store in scenario before calling initialization
+
+**Step 3**: Implement tool augmentation application
+- Verify `scenario.initialize()` calls `apply_augmentation_configs()`
+- Test that tool failures occur with configured probability
+
+**Step 4**: Implement env events expansion
+- Verify `scenario.initialize()` calls `EnvEventsExpander`
+- Check if PAS scenarios have required `augmentation_data`
+- Test noise event generation
+
+**Step 5**: Add CLI flags
+- `--tool-failure-prob` (float, 0.0-1.0)
+- `--env-events-per-min` (float, >= 0)
+- `--noise-seed` (int, for reproducibility)
+
+**Step 6**: Verify app inheritance
+- Confirm `StatefulApp` → `meta_are.App` inheritance chain
+- Test `set_failure_probability()` on PAS apps
+- Verify tool failure injection works
+
+**Step 7**: Integration testing
+- Run existing scenarios with tool failures enabled
+- Run with environmental noise enabled
+- Verify agents receive failure exceptions
+- Check noise events appear in logs
+
+**Step 8**: Document agent requirements
+- Document ToolException handling patterns
+- Provide example error recovery strategies
+- Update agent development guidelines

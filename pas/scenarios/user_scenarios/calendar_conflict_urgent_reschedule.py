@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps.contacts import Contact
-from are.simulation.scenarios.scenario import Scenario, ScenarioStatus, ScenarioValidationResult
+from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps import (
@@ -16,11 +16,12 @@ from pas.apps import (
     StatefulContactsApp,
     StatefulEmailApp,
 )
-from pas.scenarios.registry import register_scenario
+from pas.scenarios import PASScenario
+from pas.scenarios.utils.registry import register_scenario
 
 
 @register_scenario("calendar_conflict_urgent_reschedule")
-class CalendarConflictUrgentReschedule(Scenario):
+class CalendarConflictUrgentReschedule(PASScenario):
     """Agent detects calendar conflict with urgent meeting and proactively reschedules existing event.
 
     The user has a "Design Review" meeting scheduled with Emma Davis on Tuesday, November 19th
@@ -51,11 +52,11 @@ class CalendarConflictUrgentReschedule(Scenario):
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize apps with test data."""
         # Initialize apps
-        self.email = StatefulEmailApp(name="StatefulEmailApp")
-        self.calendar = StatefulCalendarApp(name="StatefulCalendarApp")
-        self.contacts = StatefulContactsApp(name="StatefulContactsApp")
+        self.email = StatefulEmailApp(name="Emails")
+        self.calendar = StatefulCalendarApp(name="Calendar")
+        self.contacts = StatefulContactsApp(name="Contacts")
         self.agent_ui = PASAgentUserInterface()
-        self.system_app = HomeScreenSystemApp(name="HomeScreenSystemApp")
+        self.system_app = HomeScreenSystemApp(name="System")
 
         # Populate contacts
         # Emma Davis (colleague - Design Review participant)
@@ -119,8 +120,8 @@ class CalendarConflictUrgentReschedule(Scenario):
     def build_events_flow(self) -> None:
         """Build event flow - urgent meeting request triggers conflict detection and rescheduling."""
         aui = self.get_typed_app(PASAgentUserInterface)
-        email = self.get_typed_app(StatefulEmailApp)
-        calendar = self.get_typed_app(StatefulCalendarApp)
+        email = self.get_typed_app(StatefulEmailApp, "Emails")
+        calendar = self.get_typed_app(StatefulCalendarApp, "Calendar")
 
         with EventRegisterer.capture_mode():
             # Event 1: Incoming urgent email from manager (environment event)
@@ -128,7 +129,7 @@ class CalendarConflictUrgentReschedule(Scenario):
                 sender="david.wilson@company.com",
                 subject="Urgent: Executive Review Meeting",
                 content="We need to discuss the Q4 roadmap urgently. Can you meet tomorrow (Tuesday Nov 19) at 2:00 PM? This is time-sensitive and I need your input before the board meeting on Wednesday.",
-            ).delayed(2)
+            ).delayed(20)
 
             # Event 2: Agent checks calendar for manager's proposed time (oracle)
             check_conflict_event = (

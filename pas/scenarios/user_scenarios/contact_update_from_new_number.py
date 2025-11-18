@@ -6,15 +6,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps.contacts import Contact
-from are.simulation.scenarios.scenario import Scenario, ScenarioStatus, ScenarioValidationResult
+from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps import HomeScreenSystemApp, PASAgentUserInterface, StatefulContactsApp, StatefulMessagingApp
-from pas.scenarios.registry import register_scenario
+from pas.scenarios import PASScenario
+from pas.scenarios.utils.registry import register_scenario
 
 
 @register_scenario("contact_update_from_new_number")
-class ContactUpdateFromNewNumber(Scenario):
+class ContactUpdateFromNewNumber(PASScenario):
     """Agent updates contact information from messages received from unknown number.
 
     The user has an existing contact for "Michael Chen" with old phone and email.
@@ -38,10 +39,10 @@ class ContactUpdateFromNewNumber(Scenario):
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize apps with test data."""
         # Initialize apps
-        self.messaging = StatefulMessagingApp(name="StatefulMessagingApp")
-        self.contacts = StatefulContactsApp(name="StatefulContactsApp")
+        self.messaging = StatefulMessagingApp(name="Messages")
+        self.contacts = StatefulContactsApp(name="Contacts")
         self.agent_ui = PASAgentUserInterface()
-        self.system_app = HomeScreenSystemApp(name="HomeScreenSystemApp")
+        self.system_app = HomeScreenSystemApp(name="System")
 
         # Populate contacts - Add existing contact for Michael Chen with OLD information
         self.michael_chen_contact_id = self.contacts.add_contact(
@@ -62,8 +63,8 @@ class ContactUpdateFromNewNumber(Scenario):
     def build_events_flow(self) -> None:
         """Build event flow - messages from unknown number trigger contact update."""
         aui = self.get_typed_app(PASAgentUserInterface)
-        messaging = self.get_typed_app(StatefulMessagingApp)
-        contacts = self.get_typed_app(StatefulContactsApp)
+        messaging = self.get_typed_app(StatefulMessagingApp, "Messages")
+        contacts = self.get_typed_app(StatefulContactsApp, "Contacts")
 
         with EventRegisterer.capture_mode():
             # Event 1: First message from unknown number - identity claim and phone update request
@@ -71,7 +72,7 @@ class ContactUpdateFromNewNumber(Scenario):
                 conversation_id="conv-unknown-555987654",
                 sender_id="555-987-6543",
                 content="Hey, this is Michael Chen. I got a new phone number - please update my contact to this number.",
-            ).delayed(2)
+            ).delayed(20)
 
             # Event 2: Second message from same unknown number - email update
             message2_event = messaging.create_and_add_message(

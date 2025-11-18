@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
-from pas.scenarios.registry import registry
+from pas.scenarios.scenario import PASScenario
+from pas.scenarios.utils.registry import registry
 
-__all__ = ["registry"]
+__all__ = ["PASScenario", "registry"]

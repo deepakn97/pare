@@ -2,5 +2,9 @@
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).parent.parent
+
+__all__: list[str] = ["PROJECT_ROOT"]
 __version__ = "0.1.0"
