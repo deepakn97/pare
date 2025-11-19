@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import typing as t
 from typing import TYPE_CHECKING, Any, Literal
-
+from are.simulation.apps.cab import CabApp
 from are.simulation.apps.calendar import CalendarApp
 from are.simulation.apps.contacts import ContactsApp
 from are.simulation.apps.email_client import EmailClientApp
@@ -13,7 +13,7 @@ from are.simulation.apps.messaging import MessagingApp
 from are.simulation.apps.messaging_v2 import MessagingAppV2
 from are.simulation.apps.system import SystemApp
 from are.simulation.types import AbstractEvent, ActionDescription, EventType, OracleEvent
-
+from pas.apps.cab import StatefulCabApp
 from pas.apps.calendar.app import StatefulCalendarApp
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.email.app import StatefulEmailApp
@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 APP_NAME_MAP = {
     "ContactsApp": "contacts",
+    "CabApp": "cab",
     "CalendarApp": "calendar",
     "EmailClientApp": "email",
     "MessagingApp": "messaging",
@@ -133,7 +134,10 @@ def _initialise_stateful_app(
     return stateful
 
 
+
 def _convert_meta_app(meta_app: object) -> object:
+    if isinstance(meta_app, CabApp):
+        return _initialise_stateful_app(meta_app, StatefulCabApp, name="cab")
     if isinstance(meta_app, ContactsApp):
         return _initialise_stateful_app(meta_app, StatefulContactsApp, name="contacts")
     if isinstance(meta_app, CalendarApp):

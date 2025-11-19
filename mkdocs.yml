@@ -25,6 +25,7 @@ nav:
       - Messaging App: apps/messaging.md
       - Email App: apps/email.md
       - Calendar App: apps/calendar.md
+      - Cab Booking App: apps/cab.md
   - API Reference:
       - Overview: modules.md
       - System & Session: api/system.md
