@@ -150,7 +150,7 @@ def main() -> None:  # noqa: C901
         "--scenario",
         dest="scenario_id_list",
         nargs="+",
-        default=["demo_simple_contact"],
+        default=["demo_simple_contact", "calendar_conflict_urgent_reschedule", "contact_update_from_new_number"],
     )
 
     # App definition scenario (required for seed mode, which is the default)
@@ -216,10 +216,12 @@ def main() -> None:  # noqa: C901
             importlib.import_module(f"{_user_scenarios_pkg.__name__}.{_modname}")
     except Exception as e:
         logger.warning(f"Failed to import user scenarios: {e}")
-    # Use live registry snapshot (avoid stale constants)
-    from are.simulation.scenarios.utils.registry import registry
+    # Use live registry snapshots from BOTH ARE and PAS registries
+    from are.simulation.scenarios.utils.registry import registry as are_registry
 
-    ALL_SCENARIOS = registry.get_all_scenarios()
+    from pas.scenarios.registry import registry as pas_registry
+
+    ALL_SCENARIOS = {**are_registry.get_all_scenarios(), **pas_registry.get_all_scenarios()}
 
     # Validate arguments based on mode
     if not args.no_seed and args.app_def_scenario not in ALL_SCENARIOS:
