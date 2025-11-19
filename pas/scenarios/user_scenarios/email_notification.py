@@ -6,15 +6,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps.contacts import Contact
-from are.simulation.scenarios.scenario import Scenario, ScenarioStatus, ScenarioValidationResult
+from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps import HomeScreenSystemApp, PASAgentUserInterface, StatefulContactsApp, StatefulEmailApp
-from pas.scenarios.registry import register_scenario
+from pas.scenarios import PASScenario
+from pas.scenarios.utils.registry import register_scenario
 
 
 @register_scenario("email_notification")
-class EmailNotification(Scenario):
+class EmailNotification(PASScenario):
     """Simple contacts scenario - user views contact, proactive agent offers help."""
 
     start_time = datetime(2025, 11, 11, 9, 0, 0, tzinfo=UTC).timestamp()
@@ -23,8 +24,8 @@ class EmailNotification(Scenario):
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize apps with test data."""
-        self.email = StatefulEmailApp(name="StatefulEmailApp")
-        self.contacts = StatefulContactsApp(name="StatefulContactsApp")
+        self.email = StatefulEmailApp(name="Emails")
+        self.contacts = StatefulContactsApp(name="Contacts")
         self.contacts.add_contact(
             Contact(
                 first_name="Alice",
@@ -36,16 +37,16 @@ class EmailNotification(Scenario):
         )
 
         self.agent_ui = PASAgentUserInterface()
-        self.system_app = HomeScreenSystemApp(name="HomeScreenSystemApp")
+        self.system_app = HomeScreenSystemApp(name="System")
 
         self.apps = [self.email, self.contacts, self.agent_ui, self.system_app]
 
     def build_events_flow(self) -> None:
         """Build event flow - user browses contacts, agent offers help."""
         aui = self.get_typed_app(PASAgentUserInterface)
-        contacts = self.get_typed_app(StatefulContactsApp)
-        emails = self.get_typed_app(StatefulEmailApp)
-        system_app = self.get_typed_app(HomeScreenSystemApp)
+        contacts = self.get_typed_app(StatefulContactsApp, "Contacts")
+        emails = self.get_typed_app(StatefulEmailApp, "Emails")
+        system_app = self.get_typed_app(HomeScreenSystemApp, "System")
 
         with EventRegisterer.capture_mode():
             # Incoming message from Alice (environment event with known ID)
@@ -54,7 +55,7 @@ class EmailNotification(Scenario):
                 sender="alice.smith@example.com",
                 subject="Let's Hangout?",
                 content="Hello, how are you? I was thinking we could go out for a drink today. Are you free at 7 PM?",
-            ).delayed(2)
+            ).delayed(20)
 
             # Agent proactively offers to help (oracle - simulates proactive agent action)
             propose_event = (

@@ -5,9 +5,10 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from are.simulation.agents.agent_log import ToolCallLog
 from are.simulation.agents.default_agent.base_agent import BaseAgent
-from are.simulation.notification_system import BaseNotificationSystem, Message, MessageType
+from are.simulation.notification_system import BaseNotificationSystem, Message
 
 from pas.agents.proactive.agent import ProactiveAgent, ProactiveAgentMode
+from pas.notification_system import PASMessageType
 
 
 @pytest.fixture
@@ -309,7 +310,7 @@ def test_agent_loop_environment_stop_returns_none(proactive_agent, mock_notifica
 
     # Mock ENVIRONMENT_STOP
     stop_msg = Mock(spec=Message)
-    stop_msg.message_type = MessageType.ENVIRONMENT_STOP
+    stop_msg.message_type = PASMessageType.ENVIRONMENT_STOP
     mock_notification_system.message_queue.get_by_timestamp.return_value = [stop_msg]
 
     result = proactive_agent.agent_loop()
@@ -324,16 +325,19 @@ def test_agent_loop_initial_task_injection(proactive_agent, mock_notification_sy
     proactive_agent.observe_agent.notification_system = mock_notification_system
     proactive_agent.execute_agent.notification_system = mock_notification_system
 
+    # Initialize custom_state with notifications list
+    proactive_agent.observe_agent.custom_state = {"notifications": []}
+
     # Mock empty notifications
     mock_notification_system.message_queue.get_by_timestamp.return_value = []
 
     proactive_agent.agent_loop(initial_task="Please help with task X")
 
-    # Verify message_queue.put was called
-    assert mock_notification_system.message_queue.put.called
-    call_args = mock_notification_system.message_queue.put.call_args[0][0]
-    assert call_args.message_type == MessageType.USER_MESSAGE
-    assert call_args.message == "Please help with task X"
+    # Verify message was added to custom_state notifications
+    notifications = proactive_agent.observe_agent.custom_state["notifications"]
+    assert len(notifications) == 1
+    assert notifications[0].message_type == PASMessageType.USER_MESSAGE
+    assert notifications[0].message == "Please help with task X"
 
 
 # ==================== Full Integration Flow Tests ====================
@@ -350,7 +354,7 @@ def test_full_accept_flow_observe_to_execute_to_observe(proactive_agent, mock_no
 
     user_msg1 = Mock(spec=Message)
     user_msg1.message = "test"
-    user_msg1.message_type = MessageType.USER_MESSAGE
+    user_msg1.message_type = PASMessageType.USER_MESSAGE
     user_msg1.attachments = []
     mock_notification_system.message_queue.get_by_timestamp.return_value = [user_msg1]
 
@@ -371,7 +375,7 @@ def test_full_accept_flow_observe_to_execute_to_observe(proactive_agent, mock_no
     # Step 3: AWAITING mode with accept
     accept_msg = Mock(spec=Message)
     accept_msg.message = "[ACCEPT] yes, please proceed"
-    accept_msg.message_type = MessageType.USER_MESSAGE
+    accept_msg.message_type = PASMessageType.USER_MESSAGE
     accept_msg.attachments = []
     mock_notification_system.message_queue.get_by_timestamp.return_value = [accept_msg]
 
@@ -395,7 +399,7 @@ def test_reject_flow_observe_to_awaiting_to_observe_skip_execute(proactive_agent
 
     user_msg = Mock(spec=Message)
     user_msg.message = "test"
-    user_msg.message_type = MessageType.USER_MESSAGE
+    user_msg.message_type = PASMessageType.USER_MESSAGE
     user_msg.attachments = []
     mock_notification_system.message_queue.get_by_timestamp.return_value = [user_msg]
 
@@ -406,7 +410,7 @@ def test_reject_flow_observe_to_awaiting_to_observe_skip_execute(proactive_agent
     # Step 2: AWAITING mode with reject
     reject_msg = Mock(spec=Message)
     reject_msg.message = "[REJECT] no, please don't do that"
-    reject_msg.message_type = MessageType.USER_MESSAGE
+    reject_msg.message_type = PASMessageType.USER_MESSAGE
     reject_msg.attachments = []
     mock_notification_system.message_queue.get_by_timestamp.return_value = [reject_msg]
 
