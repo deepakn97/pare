@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 from are.simulation.apps.agent_user_interface import AgentUserInterface

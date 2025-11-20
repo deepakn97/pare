@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.reminder import ReminderApp
 from are.simulation.apps.sandbox_file_system import Files, SandboxLocalFileSystem

@@ -4,6 +4,8 @@
 Removes the 'scenario_' prefix from @register_scenario decorators, class names, and filenames.
 """
 
+from __future__ import annotations
+
 import re
 from pathlib import Path
 

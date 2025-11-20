@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, cast
+
 from are.simulation.types import OperationType, disable_events
+
 from pas.apps.core import AppState
-from pas.apps.tool_decorators import user_tool, pas_event_registered
+from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
     from pas.apps.cab.app import StatefulCabApp
@@ -25,8 +29,7 @@ class CabHome(AppState):
         end_location: str,
         ride_time: str | None = None,
     ):
-        """
-        Retrieve available ride options for the given start and end locations.
+        """Retrieve available ride options for the given start and end locations.
 
         Args:
             start_location (str): Pickup location for the ride.
@@ -55,8 +58,7 @@ class CabHome(AppState):
         service_type: str,
         ride_time: str | None = None,
     ):
-        """
-        Request a fare quotation for the selected route and service type.
+        """Request a fare quotation for the selected route and service type.
 
         Args:
             start_location (str): Pickup location for the quotation.
@@ -86,8 +88,7 @@ class CabHome(AppState):
         service_type: str,
         ride_time: str | None = None,
     ):
-        """
-        Create a new ride order for a selected service type.
+        """Create a new ride order for a selected service type.
 
         Args:
             start_location (str): Starting point of the ride.
@@ -111,8 +112,7 @@ class CabHome(AppState):
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
     def get_ride_history(self, offset: int = 0, limit: int = 10):
-        """
-        Fetch past ride history records for the user.
+        """Fetch past ride history records for the user.
 
         Args:
             offset (int): Pagination offset for ride history retrieval.
@@ -144,8 +144,7 @@ class CabRideDetail(AppState):
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
     def get_current_ride_status(self):
-        """
-        Retrieve the live status of the current ride.
+        """Retrieve the live status of the current ride.
 
         Returns:
             dict[str, object]: A dictionary containing live ride progress, driver
@@ -158,8 +157,7 @@ class CabRideDetail(AppState):
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
     def get_ride(self):
-        """
-        Fetch a full ride record for the ride represented by this detail screen.
+        """Fetch a full ride record for the ride represented by this detail screen.
 
         Returns:
             CabRide: A ride object containing route details, timestamps, pricing,
@@ -172,8 +170,7 @@ class CabRideDetail(AppState):
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
     def user_cancel_ride(self):
-        """
-        Cancel the currently active ride.
+        """Cancel the currently active ride.
 
         Returns:
             dict[str, object]: Backend confirmation response indicating whether the
@@ -186,8 +183,7 @@ class CabRideDetail(AppState):
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
     def end_ride(self):
-        """
-        Mark the current ride as completed.
+        """Mark the current ride as completed.
 
         Returns:
             dict[str, object]: Backend response indicating final ride completion
@@ -222,8 +218,7 @@ class CabServiceOptions(AppState):
     @user_tool()
     @pas_event_registered()
     def list_service_types(self) -> list[str]:
-        """
-        List all available ride service categories.
+        """List all available ride service categories.
 
         Returns:
             list[str]: Sorted list of service type names supported by the cab backend.
@@ -234,8 +229,7 @@ class CabServiceOptions(AppState):
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
     def view_quotation(self, service_type: str):
-        """
-        Retrieve a quotation for a specific service type on the selected route.
+        """Retrieve a quotation for a specific service type on the selected route.
 
         Args:
             service_type (str): Ride service category selected by the user.
@@ -258,7 +252,7 @@ class CabServiceOptions(AppState):
 class CabQuotationDetail(AppState):
     """Screen displaying quotation details before placing a ride order."""
 
-    def __init__(self, ride_obj):
+    def __init__(self, ride_obj: Any) -> None:
         super().__init__()
         self.ride = ride_obj
 
@@ -271,8 +265,7 @@ class CabQuotationDetail(AppState):
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
     def show_quotation(self):
-        """
-        Return the full quotation object for user inspection.
+        """Return the full quotation object for user inspection.
 
         Returns:
             CabRideQuotation: Complete quotation metadata including cost estimate,
@@ -283,8 +276,7 @@ class CabQuotationDetail(AppState):
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
     def confirm_order(self):
-        """
-        Confirm the quotation and create a final ride order.
+        """Confirm the quotation and create a final ride order.
 
         Returns:
             CabRide: A newly created ride object containing ride ID, route details,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -29,7 +31,7 @@ class AppCombinationAgent:
         total_scenarios: int,
         apps_per_scenario: int,
         app_tools_info: dict[str, list[AppTool]],
-        example_scenarios: list["Scenario"] | None = None,
+        example_scenarios: list[Scenario] | None = None,
     ) -> tuple[list[frozenset[str]], list[str]]:
         """Generate all app combinations for scenario generation at once.
 
@@ -99,7 +101,7 @@ class AppCombinationAgent:
         total_scenarios: int,
         apps_per_scenario: int,
         app_tools_info: dict[str, list[AppTool]],
-        example_scenarios: list["Scenario"] | None = None,
+        example_scenarios: list[Scenario] | None = None,
     ) -> tuple[list[frozenset[str]], list[str]]:
         """Generate intelligent app combinations using LLM reasoning.
 
@@ -337,7 +339,7 @@ class AppCombinationAgent:
         apps_per_scenario: int,
         history_combinations: set[frozenset[str]],
         app_tools_info: dict[str, list[AppTool]],
-        example_scenarios: list["Scenario"] | None = None,
+        example_scenarios: list[Scenario] | None = None,
     ) -> frozenset[str]:
         """Backward compatibility method for single combination selection.
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Wrapper script to run custom scenarios with meta-ARE."""
 
+from __future__ import annotations
+
 import argparse
 import glob
 import importlib.util

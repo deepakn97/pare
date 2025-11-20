@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import textwrap
 
 SYSTEM_PROMPT_TEMPLATE = textwrap.dedent(

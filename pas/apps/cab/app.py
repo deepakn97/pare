@@ -1,16 +1,21 @@
 """Stateful cab app combining Meta-ARE cab backend with PAS navigation."""
 
-from typing import Any
-from are.simulation.apps.cab import CabApp
-from are.simulation.types import CompletedEvent
+from __future__ import annotations
 
-from pas.apps.core import StatefulApp
+from typing import TYPE_CHECKING, Any
+
+from are.simulation.apps.cab import CabApp
+
+if TYPE_CHECKING:
+    from are.simulation.types import CompletedEvent
+
 from pas.apps.cab.states import (
     CabHome,
+    CabQuotationDetail,
     CabRideDetail,
     CabServiceOptions,
-    CabQuotationDetail,
 )
+from pas.apps.core import StatefulApp
 
 
 class StatefulCabApp(StatefulApp, CabApp):
@@ -29,6 +34,40 @@ class StatefulCabApp(StatefulApp, CabApp):
         """
         return CabHome()
 
+    def _handle_list_rides(self, args: dict[str, Any]) -> None:
+        start = args.get("start_location")
+        end = args.get("end_location")
+        ride_time = args.get("ride_time")
+
+        if start and end:
+            self.set_current_state(CabServiceOptions(start, end, ride_time))
+
+    def _handle_get_quotation(self, event: CompletedEvent) -> None:
+        ride_obj = getattr(event, "result", None)
+        if ride_obj:
+            self.set_current_state(CabQuotationDetail(ride_obj))
+
+    def _handle_order_ride(self, event: CompletedEvent) -> None:
+        ride_obj = getattr(event, "result", None) or self.on_going_ride
+
+        if ride_obj and ride_obj.ride_id:
+            self.set_current_state(CabRideDetail(ride_obj.ride_id))
+
+    def _handle_finish(self) -> None:
+        self.load_root_state()
+
+    def _dispatch(self, fname: str, event: CompletedEvent, args: dict[str, Any]) -> None:
+        """Small dispatcher to remove match-case complexity."""
+        if fname == "list_rides":
+            self._handle_list_rides(args)
+        elif fname == "get_quotation":
+            self._handle_get_quotation(event)
+        elif fname == "order_ride":
+            self._handle_order_ride(event)
+        elif fname in {"user_cancel_ride", "cancel_ride", "end_ride"}:
+            self._handle_finish()
+        # confirm_order and others → no-op
+
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Update navigation state after a cab operation completes.
 
@@ -43,53 +82,9 @@ class StatefulCabApp(StatefulApp, CabApp):
         if action is None:
             return
 
-        # Extract function name (calendar convention)
         function_name = event.function_name()
         if not function_name:
             return
 
-        # Extract event args (calendar convention)
         event_args = action.args or {}
-
-        match function_name:
-
-            # User lists rides
-            case "list_rides":
-                start = event_args.get("start_location")
-                end = event_args.get("end_location")
-                ride_time = event_args.get("ride_time")
-
-                if start and end:
-                    self.set_current_state(
-                        CabServiceOptions(start, end, ride_time)
-                    )
-
-
-            # User requests a quotation
-            case "get_quotation":
-                ride_obj = getattr(event, "result", None)
-                if ride_obj:
-                    self.set_current_state(
-                        CabQuotationDetail(ride_obj)
-                    )
-
-            # Order confirmation does not change navigation
-            case "confirm_order":
-                return
-
-            # User places order, move to ride detail
-            case "order_ride":
-                ride_obj = getattr(event, "result", None) or self.on_going_ride
-
-                if ride_obj and ride_obj.ride_id:
-                    self.set_current_state(
-                        CabRideDetail(ride_obj.ride_id)
-                    )
-
-            # User or system ends/cancels ride → return to home
-            case "user_cancel_ride" | "cancel_ride" | "end_ride":
-                self.load_root_state()
-
-            # Anything else: no navigation change
-            case _:
-                return
+        self._dispatch(function_name, event, event_args)

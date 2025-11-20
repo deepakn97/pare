@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Utility to run all scenarios with mock provider and generate status report."""
 
+from __future__ import annotations
+
 import argparse
 import glob
 import logging

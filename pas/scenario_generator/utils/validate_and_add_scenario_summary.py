@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Script to generate a summary for a scenario file, validate it against existing summaries, and add it to scenario_summaries.json if it passes deduplication checks."""
 
+from __future__ import annotations
+
 import argparse
 import difflib
 import json
