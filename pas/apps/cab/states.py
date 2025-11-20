@@ -8,6 +8,8 @@ from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
+    from are.simulation.apps.cab import CabRide, CabRideQuotation
+
     from pas.apps.cab.app import StatefulCabApp
 
 
@@ -16,9 +18,11 @@ class CabHome(AppState):
     """Home view for cab operations such as listing rides, quotations, orders, and history."""
 
     def on_enter(self) -> None:
+        """Callback executed when entering this state."""
         pass
 
     def on_exit(self) -> None:
+        """Callback executed when exiting this state."""
         pass
 
     @user_tool()
@@ -28,7 +32,7 @@ class CabHome(AppState):
         start_location: str,
         end_location: str,
         ride_time: str | None = None,
-    ):
+    ) -> list[dict[str, object]]:
         """Retrieve available ride options for the given start and end locations.
 
         Args:
@@ -57,7 +61,7 @@ class CabHome(AppState):
         end_location: str,
         service_type: str,
         ride_time: str | None = None,
-    ):
+    ) -> CabRideQuotation:
         """Request a fare quotation for the selected route and service type.
 
         Args:
@@ -87,7 +91,7 @@ class CabHome(AppState):
         end_location: str,
         service_type: str,
         ride_time: str | None = None,
-    ):
+    ) -> CabRide:
         """Create a new ride order for a selected service type.
 
         Args:
@@ -111,7 +115,7 @@ class CabHome(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def get_ride_history(self, offset: int = 0, limit: int = 10):
+    def get_ride_history(self, offset: int = 0, limit: int = 10) -> list[dict[str, object]]:
         """Fetch past ride history records for the user.
 
         Args:
@@ -131,19 +135,26 @@ class CabHome(AppState):
 class CabRideDetail(AppState):
     """Detail view showing live ride status and operations for a specific ride."""
 
-    def __init__(self, ride_id: str):
+    def __init__(self, ride_id: str) -> None:
+        """Initialise the ride detail screen.
+
+        Args:
+            ride_id (str): Unique identifier of the ride to display.
+        """
         super().__init__()
         self.ride_id = ride_id
 
     def on_enter(self) -> None:
+        """Callback executed when entering this state."""
         pass
 
     def on_exit(self) -> None:
+        """Callback executed when exiting this state."""
         pass
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def get_current_ride_status(self):
+    def get_current_ride_status(self) -> dict[str, object]:
         """Retrieve the live status of the current ride.
 
         Returns:
@@ -156,7 +167,7 @@ class CabRideDetail(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def get_ride(self):
+    def get_ride(self) -> CabRide:
         """Fetch a full ride record for the ride represented by this detail screen.
 
         Returns:
@@ -169,7 +180,7 @@ class CabRideDetail(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def user_cancel_ride(self):
+    def user_cancel_ride(self) -> dict[str, object]:
         """Cancel the currently active ride.
 
         Returns:
@@ -182,7 +193,7 @@ class CabRideDetail(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def end_ride(self):
+    def end_ride(self) -> dict[str, object]:
         """Mark the current ride as completed.
 
         Returns:
@@ -203,16 +214,19 @@ class CabServiceOptions(AppState):
         start_location: str,
         end_location: str,
         ride_time: str | None = None,
-    ):
+    ) -> None:
+        """Initialise the service options screen."""
         super().__init__()
         self.start_location = start_location
         self.end_location = end_location
         self.ride_time = ride_time
 
     def on_enter(self) -> None:
+        """Callback executed when entering this state."""
         pass
 
     def on_exit(self) -> None:
+        """Callback executed when exiting this state."""
         pass
 
     @user_tool()
@@ -228,7 +242,7 @@ class CabServiceOptions(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def view_quotation(self, service_type: str):
+    def view_quotation(self, service_type: str) -> CabRideQuotation:
         """Retrieve a quotation for a specific service type on the selected route.
 
         Args:
@@ -252,19 +266,26 @@ class CabServiceOptions(AppState):
 class CabQuotationDetail(AppState):
     """Screen displaying quotation details before placing a ride order."""
 
-    def __init__(self, ride_obj: Any) -> None:
+    def __init__(self, ride_obj: CabRideQuotation) -> None:
+        """Initialise quotation detail screen.
+
+        Args:
+            ride_obj (Any): Quotation object returned from backend.
+        """
         super().__init__()
-        self.ride = ride_obj
+        self.ride: CabRideQuotation = ride_obj
 
     def on_enter(self) -> None:
+        """Callback executed when entering this state."""
         pass
 
     def on_exit(self) -> None:
+        """Callback executed when exiting this state."""
         pass
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def show_quotation(self):
+    def show_quotation(self) -> CabRideQuotation:
         """Return the full quotation object for user inspection.
 
         Returns:
@@ -275,7 +296,7 @@ class CabQuotationDetail(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def confirm_order(self):
+    def confirm_order(self) -> CabRide:
         """Confirm the quotation and create a final ride order.
 
         Returns:
