@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 # Home Screen
 class CabHome(AppState):
-    """Home view for cab operations: listing rides, quotations, orders, and history."""
+    """Home view for cab operations such as listing rides, quotations, orders, and history."""
 
     def on_enter(self) -> None:
         pass
@@ -19,22 +19,24 @@ class CabHome(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def list_rides(self, start_location: str, end_location: str,
-                   ride_time: str | None = None):
+    def list_rides(
+        self,
+        start_location: str,
+        end_location: str,
+        ride_time: str | None = None,
+    ):
         """
         Retrieve available ride options for the given start and end locations.
 
-        :param start_location: Pickup location for the ride.
-        :type start_location: str
-        :param end_location: Drop-off location for the ride.
-        :type end_location: str
-        :param ride_time: Optional desired time for the ride. If None, the backend
-            computes availability from current time.
-        :type ride_time: str | None
+        Args:
+            start_location (str): Pickup location for the ride.
+            end_location (str): Drop-off location for the ride.
+            ride_time (str | None, optional): Desired ride time. If None, the backend
+                computes availability from the current simulated time.
 
-        :return: A list of ride option dictionaries containing service type, ETA,
-            pricing information, and metadata provided by the cab backend.
-        :rtype: list[dict[str, object]]
+        Returns:
+            list[dict[str, object]]: A list of ride option dictionaries containing
+            service type, ETA, pricing information, and backend-provided metadata.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -46,23 +48,25 @@ class CabHome(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def get_quotation(self, start_location: str, end_location: str,
-                      service_type: str, ride_time: str | None = None):
+    def get_quotation(
+        self,
+        start_location: str,
+        end_location: str,
+        service_type: str,
+        ride_time: str | None = None,
+    ):
         """
         Request a fare quotation for the selected route and service type.
 
-        :param start_location: Pickup location for the quotation.
-        :type start_location: str
-        :param end_location: Destination location for the quotation.
-        :type end_location: str
-        :param service_type: Service category (e.g. Standard, Premium).
-        :type service_type: str
-        :param ride_time: Optional desired ride time. Defaults to None.
-        :type ride_time: str | None
+        Args:
+            start_location (str): Pickup location for the quotation.
+            end_location (str): Destination location for the quotation.
+            service_type (str): Service category (e.g., Standard, Premium).
+            ride_time (str | None, optional): Desired ride time. Defaults to None.
 
-        :return: A quotation object including estimated price, duration, and service
-            metadata for the requested ride.
-        :rtype: CabRideQuotation
+        Returns:
+            CabRideQuotation: A quotation object containing estimated fare, ride
+            duration, and backend metadata for the requested service type.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -75,23 +79,25 @@ class CabHome(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def order_ride(self, start_location: str, end_location: str,
-                   service_type: str, ride_time: str | None = None):
+    def order_ride(
+        self,
+        start_location: str,
+        end_location: str,
+        service_type: str,
+        ride_time: str | None = None,
+    ):
         """
         Create a new ride order for a selected service type.
 
-        :param start_location: Starting point of the ride.
-        :type start_location: str
-        :param end_location: Destination point of the ride.
-        :type end_location: str
-        :param service_type: Service type chosen by the user.
-        :type service_type: str
-        :param ride_time: Optional scheduled time for the ride.
-        :type ride_time: str | None
+        Args:
+            start_location (str): Starting point of the ride.
+            end_location (str): Destination point of the ride.
+            service_type (str): Ride service type selected by the user.
+            ride_time (str | None, optional): Scheduled time for the ride.
 
-        :return: A Ride object containing ride ID, cost, and metadata produced
-            by the backend upon order creation.
-        :rtype: CabRide
+        Returns:
+            CabRide: A Ride object containing ride ID, cost, timestamps, and metadata
+            produced by the backend upon ride creation.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -108,14 +114,13 @@ class CabHome(AppState):
         """
         Fetch past ride history records for the user.
 
-        :param offset: Pagination offset for ride history.
-        :type offset: int
-        :param limit: Maximum number of ride records to return.
-        :type limit: int
+        Args:
+            offset (int): Pagination offset for ride history retrieval.
+            limit (int): Maximum number of ride records to return.
 
-        :return: A list of ride history entries, each containing ID, cost,
-            timestamp, and status metadata.
-        :rtype: list[dict[str, object]]
+        Returns:
+            list[dict[str, object]]: A list of ride history entries containing ride ID,
+            timestamps, cost information, and status metadata.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -124,7 +129,7 @@ class CabHome(AppState):
 
 # Ride Detail Screen
 class CabRideDetail(AppState):
-    """Detail view showing status and operations for a specific ride."""
+    """Detail view showing live ride status and operations for a specific ride."""
 
     def __init__(self, ride_id: str):
         super().__init__()
@@ -140,11 +145,11 @@ class CabRideDetail(AppState):
     @pas_event_registered(operation_type=OperationType.READ)
     def get_current_ride_status(self):
         """
-        Retrieve live status updates for the currently active ride.
+        Retrieve the live status of the current ride.
 
-        :return: A dictionary containing current ride progress, driver info,
-            estimated arrival time, and other live backend data.
-        :rtype: dict[str, object]
+        Returns:
+            dict[str, object]: A dictionary containing live ride progress, driver
+            information, estimated arrival time, and backend updates.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -156,9 +161,9 @@ class CabRideDetail(AppState):
         """
         Fetch a full ride record for the ride represented by this detail screen.
 
-        :return: A ride object containing ride ID, start/end info, timestamps,
-            pricing, and completion metadata.
-        :rtype: CabRide
+        Returns:
+            CabRide: A ride object containing route details, timestamps, pricing,
+            and completion metadata.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -170,9 +175,9 @@ class CabRideDetail(AppState):
         """
         Cancel the currently active ride.
 
-        :return: Confirmation response from the backend indicating whether the
-            cancellation request was successful.
-        :rtype: dict[str, object]
+        Returns:
+            dict[str, object]: Backend confirmation response indicating whether the
+            cancellation request succeeded.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -184,21 +189,25 @@ class CabRideDetail(AppState):
         """
         Mark the current ride as completed.
 
-        :return: Backend response indicating final completion status and summary.
-        :rtype: dict[str, object]
+        Returns:
+            dict[str, object]: Backend response indicating final ride completion
+            status and summary metadata.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
             return app.end_ride()
 
 
-
 # Service Type Selection Screen
 class CabServiceOptions(AppState):
-    """Screen that displays available service categories for the selected route."""
+    """Screen that displays available ride service categories for a selected route."""
 
-    def __init__(self, start_location: str, end_location: str,
-                 ride_time: str | None = None):
+    def __init__(
+        self,
+        start_location: str,
+        end_location: str,
+        ride_time: str | None = None,
+    ):
         super().__init__()
         self.start_location = start_location
         self.end_location = end_location
@@ -214,10 +223,10 @@ class CabServiceOptions(AppState):
     @pas_event_registered()
     def list_service_types(self) -> list[str]:
         """
-        Return a sorted list of all available service category names.
+        List all available ride service categories.
 
-        :return: List of service type names supported by the backend configuration.
-        :rtype: list[str]
+        Returns:
+            list[str]: Sorted list of service type names supported by the cab backend.
         """
         app = cast("StatefulCabApp", self.app)
         return sorted(app.d_service_config.keys())
@@ -228,12 +237,12 @@ class CabServiceOptions(AppState):
         """
         Retrieve a quotation for a specific service type on the selected route.
 
-        :param service_type: Category of ride service selected by the user.
-        :type service_type: str
+        Args:
+            service_type (str): Ride service category selected by the user.
 
-        :return: A quotation object containing estimated price and details for
-            the requested service type.
-        :rtype: CabRideQuotation
+        Returns:
+            CabRideQuotation: A quotation object including estimated fare and
+            service details for the chosen ride type.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -247,7 +256,7 @@ class CabServiceOptions(AppState):
 
 # Quotation Detail Screen
 class CabQuotationDetail(AppState):
-    """Screen displaying quotation details before confirming purchase."""
+    """Screen displaying quotation details before placing a ride order."""
 
     def __init__(self, ride_obj):
         super().__init__()
@@ -265,8 +274,9 @@ class CabQuotationDetail(AppState):
         """
         Return the full quotation object for user inspection.
 
-        :return: Quotation details including cost breakdown, ETA, and service info.
-        :rtype: CabRideQuotation
+        Returns:
+            CabRideQuotation: Complete quotation metadata including cost estimate,
+            ETA, and service information.
         """
         return self.ride
 
@@ -276,9 +286,9 @@ class CabQuotationDetail(AppState):
         """
         Confirm the quotation and create a final ride order.
 
-        :return: A newly created Ride object containing ride ID, start/end metadata,
-            pricing, timestamps, and driver assignment if available.
-        :rtype: CabRide
+        Returns:
+            CabRide: A newly created ride object containing ride ID, route details,
+            pricing metadata, timestamps, and driver assignment (if available).
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
