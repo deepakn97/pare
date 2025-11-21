@@ -34,10 +34,31 @@ from are.simulation.tool_utils import AppTool, AppToolAdapter
 from pas.scenario_generator.agent.app_combination_agent import AppCombinationAgent
 from pas.scenario_generator.agent.summary_generating_agent import SummaryGeneratingAgent
 from pas.scenario_generator.prompt.scenario_generator_prompts import (
+    CONTEXT_GROUNDING_DETECT_SYSTEM_PROMPT,
+    CONTEXT_GROUNDING_DETECT_USER_PROMPT,
+    CONTEXT_GROUNDING_REPAIR_SYSTEM_PROMPT,
+    CONTEXT_GROUNDING_REPAIR_USER_PROMPT,
     DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT,
     DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT_WITH_INSTRUCTIONS,
     DEFAULT_SCENARIO_GENERATOR_SEED_TASK,
     DEFAULT_SEED_SCENARIO_GENERATOR_SYSTEM_PROMPT,
+    FABRICATED_ID_DETECT_SYSTEM_PROMPT,
+    FABRICATED_ID_DETECT_USER_PROMPT,
+    FABRICATED_ID_REPAIR_SYSTEM_PROMPT,
+    FABRICATED_ID_REPAIR_USER_PROMPT,
+    METHOD_HYGIENE_REPAIR_SYSTEM_PROMPT,
+    METHOD_HYGIENE_REPAIR_USER_PROMPT,
+    ORACLE_DIVERSITY_REPAIR_SYSTEM_PROMPT,
+    ORACLE_DIVERSITY_REPAIR_USER_PROMPT,
+    ORACLE_MEANINGFULNESS_DETECT_SYSTEM_PROMPT,
+    ORACLE_MEANINGFULNESS_DETECT_USER_PROMPT,
+    ORACLE_MEANINGFULNESS_REPAIR_SYSTEM_PROMPT,
+    ORACLE_MEANINGFULNESS_REPAIR_USER_PROMPT,
+    PAS_GROUPED_BLOCK_TEMPLATE,
+    PROACTIVE_PATTERN_REPAIR_SYSTEM_PROMPT,
+    PROACTIVE_PATTERN_REPAIR_USER_PROMPT,
+    RUNTIME_SAFETY_REPAIR_SYSTEM_PROMPT,
+    RUNTIME_SAFETY_REPAIR_USER_PROMPT,
     create_repair_note,
 )
 
@@ -97,6 +118,29 @@ class SeedScenarioGeneratingAgent:
         self._app_instances_by_classname: dict[str, object] = {}
         # Track current selected apps for validation in a generation run
         self._current_selected_apps: set[str] = set()
+        # Track recently used method combinations to avoid repeating the same flows
+        self._recently_used_method_combinations: set[frozenset[str]] = set()
+        # Track unique oracle/app methods used across generated scenarios to prioritize unused ones
+        self._used_methods: set[str] = set()
+        # Track allowed oracle methods for the currently selected app set
+        self._current_allowed_oracle_methods: set[str] = set()
+        # Track only selected-app oracle methods (excluding PAS UI/System) for diversity enforcement
+        self._current_selected_oracle_methods: set[str] = set()
+        # Track ordered oracle method usage counts across runs (for future weighting)
+        self._oracle_usage_history: Counter[str] = Counter()
+        # Track ordered method sequences from build_events_flow to enforce event-flow diversity
+        self._event_flow_signatures: list[list[str]] = []
+        # Track distinct oracle-method combinations used in previous scenarios to encourage novel mixes
+        self._recent_oracle_method_combinations: set[frozenset[str]] = set()
+        # Store the most recent PAS grouped block text for targeted prompts
+        self._current_pas_grouped_block: str = ""
+        # Max targeted repair attempts for different focused repair loops
+        self._max_fabricated_id_repairs = 3
+        self._max_method_hygiene_repairs = 3
+        self._max_oracle_diversity_repairs = 3
+        self._max_oracle_meaningfulness_repairs = 3
+        self._max_proactive_pattern_repairs = 3
+        self._max_context_grounding_repairs = 3
 
     # ===== Minimal helpers to set up tools and prompts from an example scenario =====
 
@@ -330,8 +374,16 @@ class SeedScenarioGeneratingAgent:
         first_example = example_scenarios[0]
         self.init_system_prompt(first_example)
 
-    def _setup_system_prompt(self, selected_import_instructions: str | None = None) -> str:
+    def _setup_system_prompt(
+        self,
+        selected_import_instructions: str | None = None,
+        avoid_method_combinations: set[frozenset[str]] | None = None,
+        suggested_new_methods: set[str] | None = None,
+    ) -> str:
         """Build and return the seed-specific system prompt with tool descriptions and import instructions."""
+        self._current_allowed_oracle_methods = set()
+        self._current_selected_oracle_methods = set()
+        self._current_pas_grouped_block = ""
         system_prompt = str(DEFAULT_SEED_SCENARIO_GENERATOR_SYSTEM_PROMPT)
         toolbox = Toolbox(tools=self.tools)
 
@@ -356,36 +408,20 @@ class SeedScenarioGeneratingAgent:
 
         # Append PAS tool usage rules and grouped tool descriptions
         try:
-            # Build init_allowed descriptions but SCOPE to selected apps only
-            init_allowed_all = self._tools_for_prompt_by_category.get("init_allowed", [])
-            init_allowed_selected: list[AppTool] = []
-            for t in init_allowed_all:
-                try:
-                    inst = getattr(t, "class_instance", None)
-                    cls_name = inst.__class__.__name__ if inst is not None else None
-                    if cls_name in self._current_selected_apps:
-                        init_allowed_selected.append(t)
-                except Exception:
-                    continue
-            # Use adapters so the rendered descriptions include inputs/outputs exactly like tool_descriptions
-            init_toolbox = Toolbox(tools=[AppToolAdapter(t) for t in init_allowed_selected])
-            init_desc = init_toolbox.show_tool_descriptions(DEFAULT_TOOL_DESCRIPTION_TEMPLATE)
             # Selected-app scoped allowed non-oracle methods (from notification templates)
             allowed_non_oracle = sorted(self._get_allowed_non_oracle_methods_for_selected_apps())
-            # Selected-app scoped init methods (data + event-only)
-            selected_sets = self._collect_tool_names_for_selected_apps()
-            allowed_init_selected = sorted(selected_sets.get("data", set()) | selected_sets.get("event_only", set()))
-            # Selected-app scoped oracle methods (any category)
+            # Selected-app scoped oracle methods: ONLY user + app tools
             allowed_oracle_all = sorted(self._get_allowed_oracle_methods_for_selected_apps())
+            self._current_allowed_oracle_methods = set(allowed_oracle_all)
+            self._current_selected_oracle_methods = set(
+                self._get_allowed_oracle_methods_for_selected_apps(include_pas=False)
+            )
 
             # Debug logs for allowed methods per stage
             try:
                 logger.info(
                     "[PAS Rules] Selected apps: %s",
                     ", ".join(sorted(self._current_selected_apps)) if self._current_selected_apps else "(none)",
-                )
-                logger.info(
-                    "[PAS Rules] Allowed init (data + event-only) methods: %s", ", ".join(allowed_init_selected)
                 )
                 logger.info(
                     "[PAS Rules] Allowed non-oracle (capture_mode) methods (from notification templates): %s",
@@ -404,20 +440,44 @@ class SeedScenarioGeneratingAgent:
 
             rules = PAS_RULES_BLOCK_TEMPLATE.replace("<<non_oracle_methods_flat>>", ", ".join(allowed_non_oracle))
             grouped = (
-                PAS_GROUPED_BLOCK_TEMPLATE.replace("<<init_allowed_block>>", init_desc)
+                PAS_GROUPED_BLOCK_TEMPLATE
                 # Use detailed tool descriptions (with inputs/outputs) for allowed non-oracle methods, grouped by app
                 .replace(
                     "<<allowed_non_oracle_by_app_block>>",
                     self._format_allowed_non_oracle_methods_by_app_descriptions(),
                 )
+                # Add detailed tool descriptions for allowed oracle methods (USER + APP), grouped by app
+                .replace(
+                    "<<allowed_oracle_by_app_block>>",
+                    self._format_allowed_oracle_methods_by_app_descriptions(allowed_oracle_all),
+                )
             )
+            self._current_pas_grouped_block = grouped
             # Inject PAS rules and grouped sections into the system prompt template
             system_prompt = system_prompt.replace("<<pas_rules_block>>", rules)
             system_prompt = system_prompt.replace("<<pas_grouped_block>>", grouped)
+            # Inject list of recently used method combinations (formatted)
+            try:
+                combos = []
+                if avoid_method_combinations:
+                    for combo in sorted(avoid_method_combinations, key=lambda c: (len(c), sorted(c))):
+                        combos.append(" + ".join(sorted(combo)))
+                combos_block = "\n".join(f"- {c}" for c in combos) if combos else "(none)"
+            except Exception:
+                combos_block = "(none)"
+            system_prompt = system_prompt.replace("<<avoid_method_combinations_block>>", combos_block)
+            try:
+                suggested = ", ".join(sorted(suggested_new_methods)) if suggested_new_methods else "(none)"
+            except Exception:
+                suggested = "(none)"
+            system_prompt = system_prompt.replace("<<suggested_new_methods_block>>", suggested)
         except Exception:
             # If anything goes wrong, keep default prompt without grouped sections
             system_prompt = system_prompt.replace("<<pas_rules_block>>", "")
             system_prompt = system_prompt.replace("<<pas_grouped_block>>", "")
+            system_prompt = system_prompt.replace("<<avoid_method_combinations_block>>", "(none)")
+            system_prompt = system_prompt.replace("<<suggested_new_methods_block>>", "(none)")
+            self._current_pas_grouped_block = ""
 
         # Append existing scenario summaries to help avoid duplicates
         try:
@@ -481,6 +541,37 @@ class SeedScenarioGeneratingAgent:
 
         return "\n\n".join(blocks) if blocks else "(none)"
 
+    def _format_allowed_oracle_methods_by_app_descriptions(self, allowed_oracle_all: list[str]) -> str:
+        """Return detailed descriptions for allowed oracle (USER+APP) methods, grouped by selected app."""
+        if not allowed_oracle_all:
+            return "(none)"
+        all_app_tools: list[AppTool] = self._tools_for_prompt_by_category.get("all", [])
+        names_set = set(allowed_oracle_all)
+
+        def tools_for_app_and_methods(app_name: str, method_names: set[str]) -> list[AppTool]:
+            selected: list[AppTool] = []
+            for t in all_app_tools:
+                try:
+                    inst = getattr(t, "class_instance", None)
+                    cls_name = inst.__class__.__name__ if inst is not None else None
+                    if cls_name == app_name and getattr(t, "func_name", None) in method_names:
+                        selected.append(t)
+                except Exception:
+                    continue
+            return selected
+
+        blocks: list[str] = []
+        # Include PASAgentUserInterface and HomeScreenSystemApp in the oracle listings
+        display_apps = set(self._current_selected_apps) | {"PASAgentUserInterface", "HomeScreenSystemApp"}
+        for app_name in sorted(display_apps):
+            subset_raw = tools_for_app_and_methods(app_name, names_set)
+            if not subset_raw:
+                continue
+            tb = Toolbox(tools=[AppToolAdapter(t) for t in subset_raw])
+            desc = tb.show_tool_descriptions(DEFAULT_TOOL_DESCRIPTION_TEMPLATE)
+            blocks.append(f"{app_name}\n{desc}")
+        return "\n\n".join(blocks) if blocks else "(none)"
+
     def _get_allowed_non_oracle_methods_map_for_selected_apps(self) -> dict[str, list[str]]:
         """Return mapping of selected app -> allowed non-oracle method names from notification templates."""
         result: dict[str, list[str]] = {}
@@ -531,20 +622,12 @@ class SeedScenarioGeneratingAgent:
                 allowed.update(methods.keys())
         return allowed
 
-    def _get_allowed_oracle_methods_for_selected_apps(self) -> set[str]:
-        """Return all tool method names from selected apps (any category) for oracle usage."""
-        if not self._current_selected_apps:
-            return set()
-        selected_sets = self._collect_tool_names_for_selected_apps()
-        return set().union(
-            selected_sets.get("app", set()),
-            selected_sets.get("user", set()),
-            selected_sets.get("env", set()),
-            selected_sets.get("data", set()),
-            selected_sets.get("event_only", set()),
-        )
+    def _get_allowed_oracle_methods_for_selected_apps(self, include_pas: bool = True) -> set[str]:
+        """Return tool method names from selected apps for oracle usage (ONLY user + app categories)."""
+        selected_sets = self._collect_tool_names_for_selected_apps(include_pas=include_pas)
+        return set().union(selected_sets.get("app", set()), selected_sets.get("user", set()))
 
-    def _collect_tool_names_for_selected_apps(self) -> dict[str, set[str]]:
+    def _collect_tool_names_for_selected_apps(self, include_pas: bool = True) -> dict[str, set[str]]:
         """Collect tool method names by category for selected apps only."""
         categories: dict[str, set[str]] = {
             "app": set(),
@@ -553,12 +636,14 @@ class SeedScenarioGeneratingAgent:
             "data": set(),
             "event_only": set(),
         }
-        if not self._current_selected_apps:
-            return categories
         from are.simulation.apps.app import ToolType
         from are.simulation.tool_utils import ToolAttributeName
 
-        for app_name in self._current_selected_apps:
+        apps_to_process = set(self._current_selected_apps)
+        if include_pas:
+            apps_to_process |= {"PASAgentUserInterface", "HomeScreenSystemApp"}
+
+        for app_name in apps_to_process:
             inst = self._app_instances_by_classname.get(app_name)
             if inst is None:
                 continue
@@ -668,6 +753,196 @@ class SeedScenarioGeneratingAgent:
             logger.info("==== Auto-fixing common API mistakes ====")
             code_text = self._autofix_common_api_mistakes(code_text)
 
+            method_hygiene_issues = self._detect_method_hygiene_issues(code_text)
+            if method_hygiene_issues:
+                logger.info(
+                    "==== Detected method hygiene issues (%d): %s ====",
+                    len(method_hygiene_issues),
+                    method_hygiene_issues,
+                )
+                code_text, unresolved_method = self._run_method_hygiene_repair_loop(code_text, method_hygiene_issues)
+                if unresolved_method:
+                    logger.warning(
+                        "Method hygiene issues remained after repair loop (%d): %s",
+                        len(unresolved_method),
+                        unresolved_method,
+                    )
+                    issues = unresolved_method
+                    previous_code = code_text
+                    continue
+            else:
+                logger.info("No method hygiene issues detected.")
+
+            runtime_safety_issues = self._detect_runtime_safety_issues(code_text)
+            if runtime_safety_issues:
+                logger.info(
+                    "==== Detected runtime safety issues (%d): %s ====",
+                    len(runtime_safety_issues),
+                    runtime_safety_issues,
+                )
+                code_text, unresolved_runtime = self._run_runtime_safety_repair_loop(code_text, runtime_safety_issues)
+                if unresolved_runtime:
+                    logger.warning(
+                        "Runtime safety issues remained after repair loop (%d): %s",
+                        len(unresolved_runtime),
+                        unresolved_runtime,
+                    )
+                    issues = unresolved_runtime
+                    previous_code = code_text
+                    continue
+            else:
+                logger.info("No runtime safety issues detected.")
+
+            # Early grounding pass: ensure proposals/actions are grounded before diversity shaping
+            cg_pre_issues = self._detect_context_grounding_issues(code_text)
+            if cg_pre_issues:
+                logger.info(
+                    "==== Early context-grounding issues (%d): %s ====",
+                    len(cg_pre_issues),
+                    cg_pre_issues,
+                )
+                code_text, remaining_cg_pre = self._run_context_grounding_repair_loop(code_text, cg_pre_issues)
+                if remaining_cg_pre:
+                    logger.warning(
+                        "Context-grounding issues remained after early repair (%d): %s",
+                        len(remaining_cg_pre),
+                        remaining_cg_pre,
+                    )
+                    issues = remaining_cg_pre
+                    previous_code = code_text
+                    continue
+
+            # Early fabricated-content/ID pass: remove ungrounded names/files and fabricated literals before diversity shaping
+            fab_pre_issues = self._detect_fabricated_identifier_issues(code_text)
+            if fab_pre_issues:
+                logger.info(
+                    "==== Early fabricated-content/ID issues (%d): %s ====",
+                    len(fab_pre_issues),
+                    fab_pre_issues,
+                )
+                code_text, unresolved_fab_pre = self._run_fabricated_id_repair_loop(code_text, fab_pre_issues)
+                if unresolved_fab_pre:
+                    logger.warning(
+                        "Fabricated-content/ID issues remained after early repair (%d): %s",
+                        len(unresolved_fab_pre),
+                        unresolved_fab_pre,
+                    )
+                    issues = unresolved_fab_pre
+                    previous_code = code_text
+                    continue
+
+            # Encourage breadth of oracle method usage
+            logger.info("==== Validating oracle method diversity ====")
+            oracle_diversity_issues = self._detect_oracle_diversity_issues(code_text)
+            if oracle_diversity_issues:
+                logger.info(
+                    "==== Detected oracle diversity issues (%d): %s ====",
+                    len(oracle_diversity_issues),
+                    oracle_diversity_issues,
+                )
+                code_text, unresolved_oracle = self._run_oracle_diversity_repair_loop(
+                    code_text, oracle_diversity_issues
+                )
+                if unresolved_oracle:
+                    logger.warning(
+                        "Oracle diversity issues remained after repair loop (%d): %s",
+                        len(unresolved_oracle),
+                        unresolved_oracle,
+                    )
+                    issues = unresolved_oracle
+                    previous_code = code_text
+                    break
+            else:
+                logger.info("No oracle diversity issues detected.")
+
+            # Oracle meaningfulness pass: ensure added oracle calls are grounded and impactful
+            oracle_meaning_issues = self._detect_oracle_meaningfulness_issues(code_text)
+            if oracle_meaning_issues:
+                logger.info(
+                    "==== Detected oracle meaningfulness issues (%d): %s ====",
+                    len(oracle_meaning_issues),
+                    oracle_meaning_issues,
+                )
+                code_text, remaining_meaning = self._run_oracle_meaningfulness_repair_loop(
+                    code_text, oracle_meaning_issues
+                )
+                if remaining_meaning:
+                    logger.warning(
+                        "Oracle meaningfulness issues remained after repair loop (%d): %s",
+                        len(remaining_meaning),
+                        remaining_meaning,
+                    )
+                    issues = remaining_meaning
+                    previous_code = code_text
+                    break
+            else:
+                logger.info("No oracle meaningfulness issues detected by analysis agent.")
+
+            # After oracle-related passes, eliminate fabricated IDs/handles/paths so that
+            # all identifiers used in oracle and env calls are grounded in init/tool outputs.
+            fabricated_id_issues = self._detect_fabricated_identifier_issues(code_text)
+            if fabricated_id_issues:
+                logger.info(
+                    "==== Detected fabricated identifier issues (%d): %s ====",
+                    len(fabricated_id_issues),
+                    fabricated_id_issues,
+                )
+                code_text, unresolved_fabricated = self._run_fabricated_id_repair_loop(code_text, fabricated_id_issues)
+                if unresolved_fabricated:
+                    logger.warning(
+                        "Fabricated identifier issues remained after repair loop (%d): %s",
+                        len(unresolved_fabricated),
+                        unresolved_fabricated,
+                    )
+                    issues = unresolved_fabricated
+                    previous_code = code_text
+                    break
+            else:
+                logger.info("No fabricated identifier issues detected.")
+
+            proactive_pattern_issues = self._detect_proactive_pattern_issues(code_text)
+            if proactive_pattern_issues:
+                logger.info(
+                    "==== Detected proactive pattern issues (%d): %s ====",
+                    len(proactive_pattern_issues),
+                    proactive_pattern_issues,
+                )
+                code_text, unresolved_proactive = self._run_proactive_pattern_repair_loop(
+                    code_text, proactive_pattern_issues
+                )
+                if unresolved_proactive:
+                    logger.warning(
+                        "Proactive interaction issues remained after repair loop (%d): %s",
+                        len(unresolved_proactive),
+                        unresolved_proactive,
+                    )
+                    issues = unresolved_proactive
+                    previous_code = code_text
+                    continue
+            else:
+                logger.info("No proactive interaction pattern issues detected.")
+
+            # Final pass: context-grounding corrections (best-effort, but blocking if unresolved)
+            cg_issues = self._detect_context_grounding_issues(code_text)
+            if cg_issues:
+                logger.info(
+                    "==== Detected context-grounding issues (%d): %s ====",
+                    len(cg_issues),
+                    cg_issues,
+                )
+                code_text, remaining_cg = self._run_context_grounding_repair_loop(code_text, cg_issues)
+                if remaining_cg:
+                    logger.warning(
+                        "Context-grounding issues remained after repair loop (%d): %s",
+                        len(remaining_cg),
+                        remaining_cg,
+                    )
+                    issues = remaining_cg
+                    previous_code = code_text
+                    continue
+            else:
+                logger.info("No context-grounding issues detected by analysis agent.")
+
             # Validate imports against provided instructions
             issues = self._validate_imports(code_text)
 
@@ -686,6 +961,10 @@ class SeedScenarioGeneratingAgent:
             rule_issues = self._validate_tool_usage_rules(code_text)
             issues.extend(rule_issues)
 
+            logger.info("==== Validating supported tool usage ====")
+            supported_method_issues = self._validate_supported_method_usage(code_text)
+            issues.extend(supported_method_issues)
+
             # Validate strict API correctness to prevent recurring mistakes
             # logger.info("==== Validating API correctness rules ====")
             # api_issues = self._validate_api_correctness(code_text)
@@ -696,11 +975,15 @@ class SeedScenarioGeneratingAgent:
             proactive_issues = self._validate_proactive_interaction_pattern(code_text)
             issues.extend(proactive_issues)
 
+            logger.info("==== Validating event-flow diversity ====")
+            event_flow_issues = self._validate_event_flow_diversity(code_text)
+            issues.extend(event_flow_issues)
+
             # Validate similarity against existing scenarios if no other issues
-            if not issues:
-                logger.info("==== Validating similarity against existing scenario summaries ====")
-                similarity_issues = self._validate_similarity_against_existing_scenario_summary(code_text)
-                issues.extend(similarity_issues)
+            # if not issues:
+            #     logger.info("==== Validating similarity against existing scenario summaries ====")
+            #     similarity_issues = self._validate_similarity_against_existing_scenario_summary(code_text)
+            #     issues.extend(similarity_issues)
 
             # # Validate mock run if no other issues
             # if not issues:
@@ -734,6 +1017,7 @@ class SeedScenarioGeneratingAgent:
             # Replace approvals using send_message_to_agent(...) with accept_proposal(...)
             # Heuristic: global replace is acceptable since accept_proposal mirrors signature.
             code_text = code_text.replace(".send_message_to_agent(", ".accept_proposal(")
+            code_text = self._normalize_boolean_literals(code_text)
         except Exception:
             pass
         return code_text
@@ -921,17 +1205,8 @@ class SeedScenarioGeneratingAgent:
             # 1) init_and_populate_apps: only data or event-only tool method names
             for n in ast.walk(tree):
                 if isinstance(n, ast.FunctionDef) and n.name == "init_and_populate_apps":
-                    called = collect_called_method_names(n)
-                    # Restrict to names that correspond to available tools
-                    called_tools = called & all_names
-                    # Allow a small whitelist of ENV methods needed to create initial data (e.g. conversations)
-                    init_env_allowed = {"create_group_conversation"}
-                    disallowed = called_tools - (data_names | event_only_names | init_env_allowed)
-                    if disallowed:
-                        problems.append(
-                            "init_and_populate_apps uses disallowed tools. Only data tools or event-only tools "
-                            f"(@event_registered only) are permitted. Offenders: {sorted(disallowed)}"
-                        )
+                    # New rule: init methods can use ANY available tools (no restriction)
+                    continue
 
             # 2) build_event_flow: inside capture_mode with non-oracle => only env tools;
             #    oracle chains can use any tools.
@@ -990,9 +1265,16 @@ class SeedScenarioGeneratingAgent:
                                 if not names:
                                     continue
                                 if has_oracle:
-                                    # Any tools allowed in oracle chain
+                                    # Oracle chain: ONLY user and app tools allowed
+                                    oracle_allowed = user_names | app_names
+                                    offenders = names - oracle_allowed
+                                    if offenders:
+                                        problems.append(
+                                            "Inside build_events_flow capture_mode, oracle chains may only call USER or APP tools. "
+                                            f"Offenders: {sorted(offenders)}"
+                                        )
                                     continue
-                                # Non-oracle inside capture_mode: only env tools, and must not be user/app
+                                # Non-oracle inside capture_mode: only env tools, and must not be user/app (unchanged)
                                 non_env = names - env_names
                                 offending_user = names & user_names
                                 offending_app = names & app_names
@@ -1156,7 +1438,13 @@ class SeedScenarioGeneratingAgent:
                 # Setup system prompt with selected tools and selected import instructions
                 # Track selected apps for validation/prompt scoping
                 self._current_selected_apps = set(selected_combo)
-                system_prompt = self._setup_system_prompt(selected_import_instructions)
+                system_prompt = self._setup_system_prompt(
+                    selected_import_instructions,
+                    avoid_method_combinations=self._recently_used_method_combinations,
+                    suggested_new_methods=(
+                        set(self._get_allowed_oracle_methods_for_selected_apps()) - self._used_methods
+                    ),
+                )
                 # IMPORTANT: Use the same selected-only import instructions for validation
                 original_import_instructions = self.import_instructions
                 self.import_instructions = selected_import_instructions
@@ -1164,11 +1452,17 @@ class SeedScenarioGeneratingAgent:
                 self.messages = self._create_initial_messages(system_prompt, seed_task)
 
                 # Run generation iterations
-                _, written_path = self._run_generation_iterations()
+                code_text, written_path = self._run_generation_iterations()
 
                 if written_path:
                     generated_scenarios.append(str(written_path))
                     logger.info(f"Successfully generated scenario {scenario_num + 1}: {written_path}")
+                    # Update recently used methods from the generated code for diversity in subsequent generations
+                    try:
+                        if code_text:
+                            self._update_recently_used_methods_from_code(code_text)
+                    except Exception:
+                        pass
                 else:
                     logger.warning(f"Failed to generate scenario {scenario_num + 1}")
 
@@ -1176,6 +1470,8 @@ class SeedScenarioGeneratingAgent:
                 # Restore original tools
                 self.tools = original_tools
                 self._current_selected_apps = set()
+                self._current_allowed_oracle_methods = set()
+                self._current_selected_oracle_methods = set()
                 # Restore original import instructions
                 try:
                     self.import_instructions = original_import_instructions
@@ -1439,6 +1735,890 @@ class SeedScenarioGeneratingAgent:
         # Do not block generation based on usage; return no problems
         return []
 
+    def _update_recently_used_methods_from_code(self, code_text: str) -> None:
+        """Parse the generated code to extract method names used in build_events_flow and record the combination."""
+        try:
+            import ast
+
+            tree = ast.parse(code_text)
+            combo: set[str] = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == "build_events_flow":
+                    for call in [n for n in ast.walk(node) if isinstance(n, ast.Call)]:
+                        if isinstance(call.func, ast.Attribute):
+                            method_name = call.func.attr
+                            combo.add(method_name)
+                            self._used_methods.add(method_name)
+            if combo:
+                combo_frozen = frozenset(combo)
+                self._recently_used_method_combinations.add(combo_frozen)
+                # Also track the subset of oracle methods used so we can discourage
+                # reusing the exact same oracle-method combination across scenarios.
+                if self._current_allowed_oracle_methods:
+                    oracle_combo = combo & self._current_allowed_oracle_methods
+                    if oracle_combo:
+                        self._recent_oracle_method_combinations.add(frozenset(oracle_combo))
+            signature = self._extract_build_events_flow_signature(code_text)
+            if signature:
+                self._event_flow_signatures.append(signature)
+        except Exception:
+            # Best-effort; ignore extraction errors
+            pass
+
+    def _collect_method_names_in_function(self, code_text: str, function_name: str) -> set[str]:
+        """Return attribute call names used inside the specified function."""
+        try:
+            import ast
+        except ImportError:
+            return set()
+
+        try:
+            tree = ast.parse(code_text)
+        except Exception:
+            return set()
+
+        class _CallCollector(ast.NodeVisitor):
+            def __init__(self) -> None:
+                self.names: set[str] = set()
+
+            def visit_Call(self, node: ast.Call) -> None:
+                if isinstance(node.func, ast.Attribute) and isinstance(node.func.attr, str):
+                    self.names.add(node.func.attr)
+                self.generic_visit(node)
+
+        collector = _CallCollector()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == function_name:
+                for stmt in node.body:
+                    collector.visit(stmt)
+                break
+        return collector.names
+
+    def _collect_app_variable_names(self, code_text: str) -> tuple[set[str], set[str]]:
+        """Collect variable names assigned to PAS apps for supported-method validation."""
+        alias_names: set[str] = set()
+        self_attrs: set[str] = set()
+        try:
+            import ast
+        except ImportError:
+            return alias_names, self_attrs
+
+        try:
+            tree = ast.parse(code_text)
+        except Exception:
+            return alias_names, self_attrs
+
+        class _AliasVisitor(ast.NodeVisitor):
+            def visit_Assign(self, node: ast.Assign) -> None:
+                value = node.value
+                if isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute):
+                    if value.func.attr == "get_typed_app":
+                        for target in node.targets:
+                            if isinstance(target, ast.Name):
+                                alias_names.add(target.id)
+                for target in node.targets:
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                        and isinstance(node.value, ast.Call)
+                    ):
+                        func = node.value.func
+                        func_name = ""
+                        if isinstance(func, ast.Name):
+                            func_name = func.id
+                        elif isinstance(func, ast.Attribute):
+                            func_name = func.attr
+                        if func_name.endswith("App"):
+                            self_attrs.add(target.attr)
+                self.generic_visit(node)
+
+        _AliasVisitor().visit(tree)
+        return alias_names, self_attrs
+
+    def _get_all_allowed_tool_method_names(self) -> set[str]:
+        """Return union of all tool method names available for the selected app set."""
+        allowed: set[str] = set()
+        for methods in self._tool_names_by_category.values():
+            allowed.update(methods)
+        # Allow basic capture helpers
+        allowed.update({"create_group_conversation"})  # ensure init methods present even if not categorized
+        return allowed
+
+    def _extract_build_events_flow_signature(self, code_text: str) -> list[str]:
+        """Return the ordered list of method names called inside build_events_flow."""
+        try:
+            import ast
+
+            tree = ast.parse(code_text)
+        except Exception:
+            return []
+
+        class _CallCollector(ast.NodeVisitor):
+            def __init__(self) -> None:
+                self.calls: list[str] = []
+
+            def visit_Call(self, node: ast.Call) -> None:
+                if isinstance(node.func, ast.Attribute) and isinstance(node.func.attr, str):
+                    self.calls.append(node.func.attr)
+                self.generic_visit(node)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "build_events_flow":
+                collector = _CallCollector()
+                for stmt in node.body:
+                    collector.visit(stmt)
+                filtered: list[str] = []
+                for call_name in collector.calls:
+                    if not filtered or filtered[-1] != call_name:
+                        filtered.append(call_name)
+                return filtered
+        return []
+
+    def _event_flow_similarity_score(self, sig_a: list[str], sig_b: list[str]) -> float:
+        """Compute similarity between two method sequences."""
+        if not sig_a or not sig_b:
+            return 0.0
+        seq_a = "->".join(sig_a)
+        seq_b = "->".join(sig_b)
+        try:
+            return difflib.SequenceMatcher(a=seq_a, b=seq_b, autojunk=False).ratio()
+        except Exception:
+            return 0.0
+
+    def _validate_event_flow_diversity(self, code_text: str) -> list[str]:
+        """Reject scenarios whose event-flow signature is too similar to previous ones."""
+        problems: list[str] = []
+        signature = self._extract_build_events_flow_signature(code_text)
+        if not signature:
+            return problems
+
+        for previous in self._event_flow_signatures:
+            score = self._event_flow_similarity_score(signature, previous)
+            if score >= 0.85:
+                problems.append(
+                    "Event flow is too similar to a previously generated scenario. "
+                    f"Detected similarity score {score:.2f} for method sequence {signature}. "
+                    "Introduce additional context steps, different tool combinations, or a reordered flow."
+                )
+                break
+        return problems
+
+    def _validate_supported_method_usage(self, code_text: str) -> list[str]:
+        """Ensure only supported PAS tool methods are called on app instances."""
+        problems: list[str] = []
+        allowed_methods = self._get_all_allowed_tool_method_names()
+        if not allowed_methods:
+            return problems
+
+        alias_names, self_attrs = self._collect_app_variable_names(code_text)
+        passthrough = {"oracle", "depends_on", "delayed", "capture_mode"}
+        safe_python = {
+            "append",
+            "extend",
+            "format",
+            "split",
+            "replace",
+            "lower",
+            "upper",
+            "strip",
+            "get",
+            "items",
+            "values",
+            "keys",
+            "update",
+            "copy",
+            "join",
+            "pop",
+            "setdefault",
+        }
+
+        try:
+            import ast
+        except ImportError:
+            return problems
+
+        try:
+            tree = ast.parse(code_text)
+        except Exception:
+            return problems
+
+        class _SupportVisitor(ast.NodeVisitor):
+            def __init__(self) -> None:
+                self.in_target_fn = False
+
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+                target = node.name in {"build_events_flow", "init_and_populate_apps"}
+                prev = self.in_target_fn
+                if target:
+                    self.in_target_fn = True
+                self.generic_visit(node)
+                self.in_target_fn = prev
+
+            def visit_Call(self, node: ast.Call) -> None:
+                if self.in_target_fn and isinstance(node.func, ast.Attribute):
+                    method = node.func.attr
+                    if method not in passthrough and method not in safe_python:
+                        base = node.func.value
+                        base_is_app = False
+                        if (isinstance(base, ast.Name) and base.id in alias_names) or (
+                            isinstance(base, ast.Attribute)
+                            and isinstance(base.value, ast.Name)
+                            and base.value.id == "self"
+                            and base.attr in self_attrs
+                        ):
+                            base_is_app = True
+                        if base_is_app and method not in allowed_methods:
+                            problems.append(
+                                f"Method '{method}' is not in the allowed PAS tool list. "
+                                "Use only the methods shown in the PAS grouped tool descriptions."
+                            )
+                self.generic_visit(node)
+
+        _SupportVisitor().visit(tree)
+        return problems
+
+    def _detect_fabricated_identifier_issues(self, code_text: str) -> list[str]:
+        """Ask a dedicated analysis agent (LLM) to detect fabricated IDs and attachment paths."""
+        try:
+            system_prompt = FABRICATED_ID_DETECT_SYSTEM_PROMPT
+            user_prompt = FABRICATED_ID_DETECT_USER_PROMPT.format(code=code_text)
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            llm_output_tuple = self.llm_engine(
+                messages,
+                stop_sequences=[],
+                additional_trace_tags=["fabricated_id_detect"],
+                schema=None,
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+            if not isinstance(llm_output, str):
+                return []
+            text = llm_output.strip()
+            logger.info(
+                "Fabricated-ID detect agent raw output (first 300 chars): %s",
+                text[:300].replace("\n", " "),
+            )
+            if "NO_FABRICATED_IDENTIFIER_ISSUES" in text:
+                return []
+            issues: list[str] = []
+            for line in text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                # Strip leading bullets if present
+                if line.startswith(("-", "*")):
+                    line = line.lstrip("-* ").strip()
+                issues.append(line)
+            if issues:
+                logger.debug("Fabricated identifier detector parsed issues: %s", issues)
+        except Exception:
+            # If detection fails, fall back to no issues to avoid blocking generation
+            return []
+        else:
+            return issues
+
+    def _detect_method_hygiene_issues(self, code_text: str) -> list[str]:
+        """Detect incorrect tool signatures or misuse of capture-mode results."""
+        issues: list[str] = []
+        if re.search(r"\.get_user_id\s*\((?![^)]*user_name\s*=)", code_text):
+            issues.append("messaging.get_user_id must include user_name=... in every call.")
+        if "return_value" in code_text:
+            issues.append("Do not access Event.return_value; capture lookup results directly when calling the tool.")
+        # if re.search(r"\.output\b", code_text):
+        #     issues.append("Do not access Event.output; capture IDs/results directly when calling the tool or store them earlier.")
+        if "new_title=" in code_text:
+            issues.append("change_conversation_title expects title=..., not new_title=....")
+        if issues:
+            logger.debug("Method hygiene detector found issues: %s", issues)
+        return issues
+
+    def _normalize_boolean_literals(self, code_text: str) -> str:
+        """Replace lowercase true/false with Python True/False."""
+        code_text = re.sub(r"\btrue\b", "True", code_text)
+        code_text = re.sub(r"\bfalse\b", "False", code_text)
+        return code_text
+
+    def _detect_runtime_safety_issues(self, code_text: str) -> list[str]:
+        """Detect invalid booleans, unsupported helpers, or validation mistakes."""
+        issues: list[str] = []
+        if ".assign(" in code_text:
+            issues.append("Do not call Event.assign(...). Capture IDs directly from tool return values instead.")
+        if re.search(r"EventType\.USER[\s\S]{0,120}accept_proposal", code_text):
+            issues.append(
+                "accept_proposal events are logged as EventType.AGENT; update validation to check AGENT entries."
+            )
+        if issues:
+            logger.debug("Runtime safety detector found issues: %s", issues)
+        return issues
+
+    def _detect_oracle_diversity_issues(self, code_text: str) -> list[str]:
+        """Detect missing or insufficient diversity in oracle (USER/APP) tool usage."""
+        issues: list[str] = []
+
+        # If we don't know which oracle methods are allowed for this run, skip checks.
+        allowed = self._current_selected_oracle_methods
+        if not allowed:
+            return issues
+
+        used_names = self._collect_method_names_in_function(code_text, "build_events_flow")
+        used_oracle = used_names & allowed
+        allowed_count = len(allowed)
+
+        # Require at least some oracle usage.
+        if not used_oracle:
+            issues.append(
+                "No oracle USER/APP tools are used in build_events_flow. "
+                "After the proactive proposal, call multiple allowed oracle methods (at least 3 distinct USER/APP tools) "
+                "from the selected apps so the scenario demonstrates rich oracle behavior."
+            )
+            logger.debug("Oracle diversity detector found issues (no oracle usage): %s", issues)
+            return issues
+
+        # Enforce minimum distinct oracle methods, with a floor of 3 when available.
+        required = min(3, allowed_count) if allowed_count <= 3 else min(5, max(3, allowed_count // 2))
+
+        if len(used_oracle) < required:
+            missing = sorted(allowed - used_oracle)
+            issues.append(
+                "Insufficient oracle method diversity: "
+                f"used {len(used_oracle)} of {allowed_count} allowed USER/APP methods "
+                f"in build_events_flow (requires ≥{required}, with at least 3 distinct methods when available). "
+                "Add more approved actions that exercise additional oracle methods. "
+                f"Unused examples include: {', '.join(missing[:10])}"
+            )
+
+        # Enforce that the combination of oracle methods differs from prior scenarios.
+        oracle_combo = frozenset(used_oracle)
+        if oracle_combo and oracle_combo in self._recent_oracle_method_combinations:
+            issues.append(
+                "Oracle method combination in build_events_flow matches a previously generated scenario. "
+                "Use a different mix of oracle USER/APP methods so each scenario demonstrates a novel oracle tool combination."
+            )
+
+        if issues:
+            logger.debug("Oracle diversity detector found issues: %s", issues)
+        return issues
+
+    def _detect_proactive_pattern_issues(self, code_text: str) -> list[str]:
+        """Detect missing proactive interaction steps."""
+        issues: list[str] = []
+        if "send_message_to_user" not in code_text:
+            issues.append("Missing agent proposal: add aui.send_message_to_user(...) with a question/proposal.")
+        if "accept_proposal" not in code_text and "reject_proposal" not in code_text:
+            issues.append(
+                "Missing user response: include a meaningful aui.accept_proposal(...) or reject_proposal(...)."
+            )
+        if issues:
+            logger.debug("Proactive interaction detector found issues: %s", issues)
+        return issues
+
+    def _detect_context_grounding_issues(self, code_text: str) -> list[str]:
+        """Ask a dedicated analysis agent (LLM) to detect grounding problems."""
+        try:
+            system_prompt = CONTEXT_GROUNDING_DETECT_SYSTEM_PROMPT
+            user_prompt = CONTEXT_GROUNDING_DETECT_USER_PROMPT.format(code=code_text)
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            llm_output_tuple = self.llm_engine(
+                messages, stop_sequences=[], additional_trace_tags=["context_grounding_detect"], schema=None
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+            if not isinstance(llm_output, str):
+                return []
+            text = llm_output.strip()
+            logger.info(
+                "Context-grounding detect agent raw output (first 300 chars): %s",
+                text[:300].replace("\n", " "),
+            )
+            if "NO_CONTEXT_GROUNDING_ISSUES" in text:
+                return []
+            issues: list[str] = []
+            for line in text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                # Strip leading bullets if present
+                if line.startswith(("-", "*")):
+                    line = line.lstrip("-* ").strip()
+                issues.append(line)
+            if issues:
+                logger.debug("Context-grounding detector parsed issues: %s", issues)
+        except Exception:
+            # If detection fails, fall back to no issues to avoid blocking generation
+            return []
+        else:
+            return issues
+
+    def _detect_oracle_meaningfulness_issues(self, code_text: str) -> list[str]:
+        """Ask a dedicated analysis agent (LLM) to detect superficial oracle usage."""
+        try:
+            system_prompt = ORACLE_MEANINGFULNESS_DETECT_SYSTEM_PROMPT
+            user_prompt = ORACLE_MEANINGFULNESS_DETECT_USER_PROMPT.format(code=code_text)
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            llm_output_tuple = self.llm_engine(
+                messages,
+                stop_sequences=[],
+                additional_trace_tags=["oracle_meaning_detect"],
+                schema=None,
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+            if not isinstance(llm_output, str):
+                return []
+            text = llm_output.strip()
+            logger.info(
+                "Oracle-meaningfulness detect agent raw output (first 300 chars): %s",
+                text[:300].replace("\n", " "),
+            )
+            if "NO_ORACLE_MEANINGFULNESS_ISSUES" in text:
+                return []
+            issues: list[str] = []
+            for line in text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith(("-", "*")):
+                    line = line.lstrip("-* ").strip()
+                issues.append(line)
+            if issues:
+                logger.debug("Oracle-meaningfulness detector parsed issues: %s", issues)
+        except Exception:
+            return []
+        else:
+            return issues
+
+    def _run_fabricated_id_repair_loop(self, code_text: str, issues: list[str]) -> tuple[str, list[str]]:
+        """Run targeted repair iterations to eliminate fabricated identifier usage."""
+        pas_grouped_block = self._get_pas_grouped_block_text()
+        system_prompt = FABRICATED_ID_REPAIR_SYSTEM_PROMPT.replace("<<pas_grouped_block>>", pas_grouped_block)
+
+        def build_user_note(current_code: str, current_issues: list[str]) -> str:
+            logger.info(
+                "[fabricated_id_repair] Building repair note with %d issues: %s",
+                len(current_issues),
+                current_issues,
+            )
+            issue_lines = "\n".join(f"- {msg}" for msg in current_issues)
+            return FABRICATED_ID_REPAIR_USER_PROMPT.format(issues=issue_lines, code=current_code)
+
+        note = build_user_note(code_text, issues)
+        updated_code = code_text
+        for attempt in range(self._max_fabricated_id_repairs):
+            logger.info("[fabricated_id_repair] Attempt %d/%d", attempt + 1, self._max_fabricated_id_repairs)
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": note}]
+            llm_output_tuple = self.llm_engine(
+                messages, stop_sequences=[], additional_trace_tags=["fabricated_id_repair"], schema=None
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+
+            new_code = None
+            if isinstance(llm_output, str):
+                match = re.search(r"```(?:python)?\s*([\s\S]*?)```", llm_output)
+                if match:
+                    new_code = match.group(1).strip()
+            if not new_code:
+                note = (
+                    "The previous response did not contain a fenced python block. "
+                    "Return the entire scenario as a single fenced python code block."
+                )
+                updated_code = llm_output if isinstance(llm_output, str) else updated_code
+                continue
+
+            updated_code = new_code
+            remaining = self._detect_fabricated_identifier_issues(updated_code)
+            if not remaining:
+                logger.info("[fabricated_id_repair] All fabricated ID issues fixed.")
+                return updated_code, []
+            note = build_user_note(updated_code, remaining)
+
+        remaining = self._detect_fabricated_identifier_issues(updated_code)
+        if remaining:
+            remaining.append(
+                "Fabricated identifier issues persist after targeted repair attempts. Provide concrete IDs from init_and_populate_apps."
+            )
+            logger.warning("[fabricated_id_repair] Unresolved fabricated ID issues after max attempts: %s", remaining)
+        return updated_code, remaining
+
+    def _run_method_hygiene_repair_loop(self, code_text: str, issues: list[str]) -> tuple[str, list[str]]:
+        """Run targeted repair iterations to fix common method-usage mistakes."""
+        pas_grouped_block = self._get_pas_grouped_block_text()
+        system_prompt = METHOD_HYGIENE_REPAIR_SYSTEM_PROMPT.replace("<<pas_grouped_block>>", pas_grouped_block)
+
+        def build_user_note(current_code: str, current_issues: list[str]) -> str:
+            logger.info(
+                "[method_hygiene_repair] Building repair note with %d issues: %s",
+                len(current_issues),
+                current_issues,
+            )
+            issue_lines = "\n".join(f"- {msg}" for msg in current_issues)
+            return METHOD_HYGIENE_REPAIR_USER_PROMPT.format(issues=issue_lines, code=current_code)
+
+        note = build_user_note(code_text, issues)
+        updated_code = code_text
+        for attempt in range(self._max_method_hygiene_repairs):
+            logger.info("[method_hygiene_repair] Attempt %d/%d", attempt + 1, self._max_method_hygiene_repairs)
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": note}]
+            llm_output_tuple = self.llm_engine(
+                messages, stop_sequences=[], additional_trace_tags=["method_hygiene_repair"], schema=None
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+
+            new_code = None
+            if isinstance(llm_output, str):
+                match = re.search(r"```(?:python)?\s*([\s\S]*?)```", llm_output)
+                if match:
+                    new_code = match.group(1).strip()
+            if not new_code:
+                note = "Your response must contain a single fenced python block with the entire scenario file."
+                updated_code = llm_output if isinstance(llm_output, str) else updated_code
+                continue
+
+            updated_code = new_code
+            remaining = self._detect_method_hygiene_issues(updated_code)
+            if not remaining:
+                logger.info("[method_hygiene_repair] All method hygiene issues fixed.")
+                return updated_code, []
+            note = build_user_note(updated_code, remaining)
+
+        remaining = self._detect_method_hygiene_issues(updated_code)
+        if remaining:
+            remaining.append(
+                "Method usage issues persist after targeted repair attempts. Fix tool signatures and capture lookup outputs correctly."
+            )
+            logger.warning("[method_hygiene_repair] Unresolved method hygiene issues after max attempts: %s", remaining)
+        return updated_code, remaining
+
+    def _run_runtime_safety_repair_loop(self, code_text: str, issues: list[str]) -> tuple[str, list[str]]:
+        """Run targeted repair iterations for booleans/validation/runtime mistakes."""
+        pas_grouped_block = self._get_pas_grouped_block_text()
+        system_prompt = RUNTIME_SAFETY_REPAIR_SYSTEM_PROMPT.replace("<<pas_grouped_block>>", pas_grouped_block)
+
+        def build_user_note(current_code: str, current_issues: list[str]) -> str:
+            logger.info(
+                "[runtime_safety_repair] Building repair note with %d issues: %s",
+                len(current_issues),
+                current_issues,
+            )
+            issue_lines = "\n".join(f"- {msg}" for msg in current_issues)
+            return RUNTIME_SAFETY_REPAIR_USER_PROMPT.format(issues=issue_lines, code=current_code)
+
+        note = build_user_note(code_text, issues)
+        updated_code = code_text
+        for attempt in range(2):
+            logger.info("[runtime_safety_repair] Attempt %d/%d", attempt + 1, 2)
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": note}]
+            llm_output_tuple = self.llm_engine(
+                messages, stop_sequences=[], additional_trace_tags=["runtime_safety_repair"], schema=None
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+
+            new_code = None
+            if isinstance(llm_output, str):
+                match = re.search(r"```(?:python)?\s*([\s\S]*?)```", llm_output)
+                if match:
+                    new_code = match.group(1).strip()
+            if not new_code:
+                note = "Return the entire file as a single fenced python block."
+                updated_code = llm_output if isinstance(llm_output, str) else updated_code
+                continue
+
+            updated_code = new_code
+            remaining = self._detect_runtime_safety_issues(updated_code)
+            if not remaining:
+                logger.info("[runtime_safety_repair] All runtime safety issues fixed.")
+                return updated_code, []
+            note = build_user_note(updated_code, remaining)
+
+        remaining = self._detect_runtime_safety_issues(updated_code)
+        if remaining:
+            remaining.append(
+                "Runtime safety issues persist after targeted repair attempts. Fix booleans, remove unsupported helpers, and adjust validation types."
+            )
+            logger.warning("[runtime_safety_repair] Unresolved runtime safety issues after max attempts: %s", remaining)
+        return updated_code, remaining
+
+    def _run_oracle_diversity_repair_loop(self, code_text: str, issues: list[str]) -> tuple[str, list[str]]:
+        """Run targeted repair iterations to add oracle tool usage."""
+        pas_grouped_block = self._get_pas_grouped_block_text()
+        system_prompt = ORACLE_DIVERSITY_REPAIR_SYSTEM_PROMPT.replace("<<pas_grouped_block>>", pas_grouped_block)
+
+        def build_user_note(current_code: str, current_issues: list[str]) -> str:
+            logger.info(
+                "[oracle_diversity_repair] Building repair note with %d issues: %s",
+                len(current_issues),
+                current_issues,
+            )
+            issue_lines = "\n".join(f"- {msg}" for msg in current_issues)
+            return ORACLE_DIVERSITY_REPAIR_USER_PROMPT.format(
+                issues=issue_lines,
+                code=current_code,
+                suggested=", ".join(sorted(self._current_selected_oracle_methods)) or "(see block above)",
+            )
+
+        note = build_user_note(code_text, issues)
+        updated_code = code_text
+        for attempt in range(self._max_oracle_diversity_repairs):
+            logger.info("[oracle_diversity_repair] Attempt %d/%d", attempt + 1, self._max_oracle_diversity_repairs)
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": note}]
+            llm_output_tuple = self.llm_engine(
+                messages, stop_sequences=[], additional_trace_tags=["oracle_diversity_repair"], schema=None
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+
+            new_code = None
+            if isinstance(llm_output, str):
+                match = re.search(r"```(?:python)?\s*([\s\S]*?)```", llm_output)
+                if match:
+                    new_code = match.group(1).strip()
+            if not new_code:
+                note = "Return the entire file as a single fenced python block."
+                updated_code = llm_output if isinstance(llm_output, str) else updated_code
+                continue
+
+            updated_code = new_code
+            remaining = self._detect_oracle_diversity_issues(updated_code)
+            if not remaining:
+                logger.info("[oracle_diversity_repair] Oracle diversity issues fixed.")
+                return updated_code, []
+            note = build_user_note(updated_code, remaining)
+
+        remaining = self._detect_oracle_diversity_issues(updated_code)
+        if remaining:
+            remaining.append(
+                "Oracle method diversity issues persist after targeted repair attempts. Use multiple allowed USER/APP tools."
+            )
+            logger.warning(
+                "[oracle_diversity_repair] Unresolved oracle diversity issues after max attempts: %s", remaining
+            )
+        return updated_code, remaining
+
+    def _run_proactive_pattern_repair_loop(self, code_text: str, issues: list[str]) -> tuple[str, list[str]]:
+        """Run targeted repair to enforce the proposal → approval → action pattern."""
+        pas_grouped_block = self._get_pas_grouped_block_text()
+        system_prompt = PROACTIVE_PATTERN_REPAIR_SYSTEM_PROMPT.replace("<<pas_grouped_block>>", pas_grouped_block)
+
+        def build_user_note(current_code: str, current_issues: list[str]) -> str:
+            logger.info(
+                "[proactive_pattern_repair] Building repair note with %d issues: %s",
+                len(current_issues),
+                current_issues,
+            )
+            issue_lines = "\n".join(f"- {msg}" for msg in current_issues)
+            return PROACTIVE_PATTERN_REPAIR_USER_PROMPT.format(issues=issue_lines, code=current_code)
+
+        note = build_user_note(code_text, issues)
+        updated_code = code_text
+        for attempt in range(self._max_proactive_pattern_repairs):
+            logger.info(
+                "[proactive_pattern_repair] Attempt %d/%d",
+                attempt + 1,
+                self._max_proactive_pattern_repairs,
+            )
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": note}]
+            llm_output_tuple = self.llm_engine(
+                messages, stop_sequences=[], additional_trace_tags=["proactive_pattern_repair"], schema=None
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+
+            new_code = None
+            if isinstance(llm_output, str):
+                match = re.search(r"```(?:python)?\s*([\s\S]*?)```", llm_output)
+                if match:
+                    new_code = match.group(1).strip()
+            if not new_code:
+                note = "Return the entire file as a single fenced python block."
+                updated_code = llm_output if isinstance(llm_output, str) else updated_code
+                continue
+
+            updated_code = new_code
+            remaining = self._detect_proactive_pattern_issues(updated_code)
+            if not remaining:
+                logger.info("[proactive_pattern_repair] Proactive interaction pattern issues fixed.")
+                return updated_code, []
+            note = build_user_note(updated_code, remaining)
+
+        remaining = self._detect_proactive_pattern_issues(updated_code)
+        if remaining:
+            remaining.append(
+                "Proactive interaction issues persist after targeted repair attempts. Include proposal, approval, and follow-up actions."
+            )
+            logger.warning(
+                "[proactive_pattern_repair] Unresolved proactive interaction issues after max attempts: %s",
+                remaining,
+            )
+        return updated_code, remaining
+
+    def _run_context_grounding_repair_loop(self, code_text: str, issues: list[str]) -> tuple[str, list[str]]:
+        """Best-effort repair to improve context grounding of proactive inferences.
+
+        Returns:
+            A tuple of (updated_code, remaining_issues). If remaining_issues is non-empty
+            after max attempts, the caller should treat these as blocking problems and
+            trigger another generation iteration.
+        """
+        pas_grouped_block = self._get_pas_grouped_block_text()
+        system_prompt = CONTEXT_GROUNDING_REPAIR_SYSTEM_PROMPT.replace("<<pas_grouped_block>>", pas_grouped_block)
+
+        updated_code = code_text
+        current_issues = issues
+
+        for attempt in range(self._max_context_grounding_repairs):
+            logger.info(
+                "[context_grounding_repair] Attempt %d/%d with %d issues",
+                attempt + 1,
+                self._max_context_grounding_repairs,
+                len(current_issues),
+            )
+            issue_lines = "\n".join(f"- {msg}" for msg in current_issues)
+            note = CONTEXT_GROUNDING_REPAIR_USER_PROMPT.format(issues=issue_lines, code=updated_code)
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": note}]
+            llm_output_tuple = self.llm_engine(
+                messages, stop_sequences=[], additional_trace_tags=["context_grounding_repair"], schema=None
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+
+            new_code = None
+            if isinstance(llm_output, str):
+                match = re.search(r"```(?:python)?\s*([\s\S]*?)```", llm_output)
+                if match:
+                    new_code = match.group(1).strip()
+            if not new_code:
+                logger.warning(
+                    "[context_grounding_repair] Response missing fenced python block; aborting context-grounding repair."
+                )
+                break
+
+            updated_code = new_code
+            remaining = self._detect_context_grounding_issues(updated_code)
+            if not remaining:
+                logger.info(
+                    "[context_grounding_repair] Context-grounding detect agent reports no remaining issues after repair."
+                )
+                return updated_code, []
+            logger.info(
+                "[context_grounding_repair] Context-grounding issues still detected after repair attempt: %s",
+                remaining,
+            )
+            current_issues = remaining
+
+        if current_issues:
+            logger.warning(
+                "[context_grounding_repair] Context-grounding issues may remain after max attempts: %s",
+                current_issues,
+            )
+        return updated_code, current_issues
+
+    def _run_oracle_meaningfulness_repair_loop(self, code_text: str, issues: list[str]) -> tuple[str, list[str]]:
+        """Blocking repair to remove or ground superficial oracle usage. Returns (updated_code, remaining_issues)."""
+        pas_grouped_block = self._get_pas_grouped_block_text()
+        system_prompt = ORACLE_MEANINGFULNESS_REPAIR_SYSTEM_PROMPT.replace("<<pas_grouped_block>>", pas_grouped_block)
+
+        updated_code = code_text
+        current_issues = issues
+
+        for attempt in range(self._max_oracle_meaningfulness_repairs):
+            logger.info(
+                "[oracle_meaning_repair] Attempt %d/%d with %d issues",
+                attempt + 1,
+                self._max_oracle_meaningfulness_repairs,
+                len(current_issues),
+            )
+            issue_lines = "\n".join(f"- {msg}" for msg in current_issues)
+            note = ORACLE_MEANINGFULNESS_REPAIR_USER_PROMPT.format(issues=issue_lines, code=updated_code)
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": note}]
+            llm_output_tuple = self.llm_engine(
+                messages,
+                stop_sequences=[],
+                additional_trace_tags=["oracle_meaning_repair"],
+                schema=None,
+            )
+            if isinstance(llm_output_tuple, tuple) and len(llm_output_tuple) == 2:
+                llm_output, _ = llm_output_tuple
+            else:
+                llm_output = llm_output_tuple
+
+            new_code = None
+            if isinstance(llm_output, str):
+                match = re.search(r"```(?:python)?\s*([\s\S]*?)```", llm_output)
+                if match:
+                    new_code = match.group(1).strip()
+            if not new_code:
+                logger.warning(
+                    "[oracle_meaning_repair] Response missing fenced python block; aborting oracle-meaningfulness repair."
+                )
+                break
+
+            updated_code = new_code
+            remaining = self._detect_oracle_meaningfulness_issues(updated_code)
+            if not remaining:
+                logger.info(
+                    "[oracle_meaning_repair] Oracle-meaningfulness detect agent reports no remaining issues after repair."
+                )
+                return updated_code, []
+            logger.info(
+                "[oracle_meaning_repair] Oracle-meaningfulness issues still detected after repair attempt: %s",
+                remaining,
+            )
+            current_issues = remaining
+
+        if current_issues:
+            logger.warning(
+                "[oracle_meaning_repair] Oracle meaningfulness issues may remain after max attempts: %s",
+                current_issues,
+            )
+        return updated_code, current_issues
+
+    def _get_pas_grouped_block_text(self) -> str:
+        """Return the latest PAS grouped block text for prompt rendering."""
+        if self._current_pas_grouped_block:
+            return self._current_pas_grouped_block
+
+        grouped = PAS_GROUPED_BLOCK_TEMPLATE.replace(
+            "<<allowed_non_oracle_by_app_block>>",
+            self._format_allowed_non_oracle_methods_by_app_descriptions(),
+        ).replace(
+            "<<allowed_oracle_by_app_block>>",
+            self._format_allowed_oracle_methods_by_app_descriptions(
+                sorted(self._get_allowed_oracle_methods_for_selected_apps())
+            ),
+        )
+        self._current_pas_grouped_block = grouped
+        return grouped
+
     def _validate_proactive_interaction_pattern(self, code_text: str) -> list[str]:
         """Validate that the generated scenario includes the mandatory proactive interaction pattern."""
         problems: list[str] = []
@@ -1616,6 +2796,7 @@ class SeedScenarioGeneratingAgent:
             "from are.simulation.scenarios.utils.registry import register_scenario",
             "from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType",
             "from typing import Any",
+            "from datetime import datetime, timezone",
         ]
 
         # Combine basic imports with app-specific imports, avoiding duplicates
@@ -1632,6 +2813,8 @@ class SeedScenarioGeneratingAgent:
             "from are.simulation.types import AbstractEnvironment",
             "from are.simulation.types import EventRegisterer",
             "from are.simulation.types import EventType",
+            "from datetime import datetime",
+            "from datetime import timezone",
         ]
         for token in per_symbol_required:
             if token not in full_import_instructions:
