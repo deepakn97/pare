@@ -1,59 +1,61 @@
-"""
-Stateful Apartment App
-======================
+# Stateful Apartment App
 
 `pas.apps.apartment.app.StatefulApartmentApp` layers PAS navigation on top of
 the Meta-ARE `ApartmentListingApp`. It begins in the `ApartmentHome` state and
 transitions into search, saved-list view, or apartment detail screens depending
 on which user tool completes.
 
----------------------------------------------------------------------
-Navigation States
----------------------------------------------------------------------
+---
 
-ApartmentHome
--------------
+## Navigation States
 
-| Tool                                      | Backend call(s)                                       | Returns                       | Navigation effect                                              |
-| ----------------------------------------- | ------------------------------------------------------ | ----------------------------- | -------------------------------------------------------------- |
-| `list_apartments()`                       | `ApartmentListingApp.list_all_apartments()`            | List of all apartments        | Remains in `ApartmentHome`                                     |
-| `view_apartment(apartment_id)`            | `ApartmentListingApp.get_apartment_details(...)`       | Apartment object              | → `ApartmentDetail(apartment_id)`                              |
-| `open_search()`                           | None                                                   | "open_search"                 | → `ApartmentSearch()`                                          |
-| `open_saved()`                            | None                                                   | "open_saved"                  | → `ApartmentSaved()`                                           |
+---
 
-ApartmentSearch
----------------
+## ApartmentHome
 
-| Tool                                      | Backend call(s)                                       | Returns                       | Navigation effect                                              |
-| ----------------------------------------- | ------------------------------------------------------ | ----------------------------- | -------------------------------------------------------------- |
-| `search(filter_args…)`                    | `ApartmentListingApp.search_apartments(...)`           | Filtered list                 | Remains in `ApartmentSearch`                                   |
-| `view_apartment(apartment_id)`            | `ApartmentListingApp.get_apartment_details(...)`       | Apartment object              | → `ApartmentDetail(apartment_id)`                              |
-| `go_back()`                               | None                                                   | "go_back"                     | → `ApartmentHome()`                                            |
+| Tool | Backend call(s) | Returns | Navigation effect |
+| --- | --- | --- | --- |
+| `list_apartments()` | `ApartmentListingApp.list_all_apartments()` | List of all apartments | Remains in `ApartmentHome` |
+| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(...)` | Apartment object | → `ApartmentDetail(apartment_id)` |
+| `open_search()` | None | Indicator | → `ApartmentSearch()` |
+| `open_saved()` | None | Indicator | → `ApartmentSaved()` |
 
-ApartmentSaved
---------------
+---
 
-| Tool                                      | Backend call(s)                                       | Returns                       | Navigation effect                                              |
-| ----------------------------------------- | ------------------------------------------------------ | ----------------------------- | -------------------------------------------------------------- |
-| `list_saved_apartments()`                 | `ApartmentListingApp.list_saved_apartments()`          | Saved apartment list          | Remains in `ApartmentSaved`                                    |
-| `remove_saved_apartment(apartment_id)`    | `ApartmentListingApp.remove_saved_apartment(...)`      | Status                        | Remains in `ApartmentSaved`                                    |
-| `view_apartment(apartment_id)`            | `ApartmentListingApp.get_apartment_details(...)`       | Apartment object              | → `ApartmentDetail(apartment_id)`                              |
-| `go_back()`                               | None                                                   | "go_back"                     | → `ApartmentHome()`                                            |
+## ApartmentSearch
 
-ApartmentDetail
----------------
+| Tool | Backend call(s) | Returns | Navigation effect |
+| --- | --- | --- | --- |
+| `search(filters…)` | `ApartmentListingApp.search_apartments(...)` | Filtered list | Remains in `ApartmentSearch` |
+| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(...)` | Apartment object | → `ApartmentDetail(apartment_id)` |
+| `go_back()` | None | Indicator | → `ApartmentHome()` |
 
-| Tool                                      | Backend call(s)                                       | Returns                       | Navigation effect                                              |
-| ----------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
-| `get_apartment_details(apartment_id)`     | `ApartmentListingApp.get_apartment_details(...)`       | Apartment object              | Remains in `ApartmentDetail`                                   |
-| `save_apartment(apartment_id)`            | `ApartmentListingApp.save_apartment(...)`              | Status                        | Remains in `ApartmentDetail`                                   |
-| `update_apartment(apartment_id, attrs…)`  | `ApartmentListingApp.update_apartment(...)`            | Updated object                | Remains in `ApartmentDetail`                                   |
-| `delete_apartment(apartment_id)`          | `ApartmentListingApp.delete_apartment(...)`            | Status                        | → `ApartmentHome()`                                            |
-| `go_back()`                               | None                                                   | "go_back"                     | → `ApartmentHome()`                                            |
+---
 
----------------------------------------------------------------------
-Navigation Summary
----------------------------------------------------------------------
+## ApartmentSaved
+
+| Tool | Backend call(s) | Returns | Navigation effect |
+| --- | --- | --- | --- |
+| `list_saved_apartments()` | `ApartmentListingApp.list_saved_apartments()` | Saved apartment list | Remains in `ApartmentSaved` |
+| `remove_saved_apartment(apartment_id)` | `ApartmentListingApp.remove_saved_apartment(...)` | Status | Remains in `ApartmentSaved` |
+| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(...)` | Apartment object | → `ApartmentDetail(apartment_id)` |
+| `go_back()` | None | Indicator | → `ApartmentHome()` |
+
+---
+
+## ApartmentDetail
+
+| Tool | Backend call(s) | Returns | Navigation effect |
+| --- | --- | --- | --- |
+| `get_apartment_details(apartment_id)` | `ApartmentListingApp.get_apartment_details(...)` | Apartment object | Remains in `ApartmentDetail` |
+| `save_apartment(apartment_id)` | `ApartmentListingApp.save_apartment(...)` | Status | Remains in `ApartmentDetail` |
+| `update_apartment(apartment_id, attrs…)` | `ApartmentListingApp.update_apartment(...)` | Updated object | Remains in `ApartmentDetail` |
+| `delete_apartment(apartment_id)` | `ApartmentListingApp.delete_apartment(...)` | Status | → `ApartmentHome()` |
+| `go_back()` | None | Indicator | → `ApartmentHome()` |
+
+---
+
+## Navigation Summary
 
 - `ApartmentHome → ApartmentDetail` via `view_apartment`
 - `ApartmentHome → ApartmentSearch` via `open_search`
@@ -63,16 +65,13 @@ Navigation Summary
 - `ApartmentSaved → ApartmentDetail` via `view_apartment`
 - `ApartmentSaved → ApartmentHome` via `go_back`
 - `ApartmentDetail → ApartmentHome` via `delete_apartment` or `go_back`
-- `update_apartment` keeps user in `ApartmentDetail`
-- `save_apartment` / `remove_saved_apartment` keep user in current state
+- `save_apartment` / `update_apartment` remain in `ApartmentDetail`
+- `remove_saved_apartment` remains in `ApartmentSaved`
 
----------------------------------------------------------------------
-Navigation Helpers
----------------------------------------------------------------------
+---
 
-- `load_root_state()` resets to `ApartmentHome`
+## Navigation Helpers
+
+- `load_root_state()` resets app to `ApartmentHome`
 - `set_current_state(...)` pushes a new state instance
-- `go_back()` implemented via user tool, returns to root
-- `_run_backend_if_needed(...)` triggers backend operations during tests
-- `_navigate(...)` maps completed actions to navigation transitions
-"""
+- `go_back()` returns to root from Search/Saved/Detail
