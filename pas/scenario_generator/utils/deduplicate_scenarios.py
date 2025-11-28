@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # save as deduplicate_scenarios.py
+from __future__ import annotations
+
 import argparse
 import difflib
 import os

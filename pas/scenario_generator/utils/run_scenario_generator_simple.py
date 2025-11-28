@@ -5,6 +5,8 @@ This script runs the scenario_generator.py command multiple times with the same 
 providing a reliable way to generate multiple scenario variations.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging

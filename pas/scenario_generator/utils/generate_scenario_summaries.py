@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Script to generate summaries for scenario files and save them to a JSON file."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging

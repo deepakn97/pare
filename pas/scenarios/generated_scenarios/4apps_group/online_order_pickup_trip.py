@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.cab import CabApp
 from are.simulation.apps.shopping import ShoppingApp

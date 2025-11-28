@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .scenario_generator_prompts import (
     DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT,
     DEFAULT_SCENARIO_GENERATOR_REPAIR_SYSTEM_PROMPT_WITH_INSTRUCTIONS,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import textwrap
 
 from .system_prompt import SYSTEM_PROMPT_TEMPLATE

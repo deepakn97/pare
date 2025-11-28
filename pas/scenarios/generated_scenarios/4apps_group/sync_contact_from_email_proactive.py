@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.contacts import ContactsApp, Gender, Status
 from are.simulation.apps.email_client import Email, EmailClientApp

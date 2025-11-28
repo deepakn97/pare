@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from are.simulation.apps.agent_user_interface import AgentUserInterface
 from are.simulation.apps.contacts import ContactsApp
 from are.simulation.apps.messaging import MessagingApp
