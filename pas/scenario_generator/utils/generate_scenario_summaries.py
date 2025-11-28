@@ -23,8 +23,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def get_generated_scenarios_dir() -> Path:
-    """Get the path to the generated scenarios directory."""
+def get_generated_scenarios_dir(dir_arg: str | None = None) -> Path:
+    """Get the path to the generated scenarios directory.
+
+    Args:
+        dir_arg: Optional directory path or name. If absolute, use as-is.
+                 If relative (no leading slash), it is resolved under pas/scenarios/.
+                 If None, defaults to 'generated_scenarios'.
+    """
+    if dir_arg:
+        dir_path = Path(dir_arg)
+        if dir_path.is_absolute():
+            return dir_path
+        # treat as subdir under pas/scenarios
+        return Path(__file__).resolve().parents[2] / "scenarios" / dir_arg
     return Path(__file__).resolve().parents[2] / "scenarios" / "generated_scenarios"
 
 
@@ -142,7 +154,7 @@ def generate_summaries_for_all(
     return generated_count
 
 
-def main() -> None:
+def main() -> None:  # noqa: C901
     """Main function to run the summary generation script."""
     parser = argparse.ArgumentParser(
         description="Generate summaries for scenario files and save them to a JSON file.",
@@ -152,8 +164,11 @@ Examples:
   # Generate summary for a single file
   python generate_scenario_summaries.py --file pas/scenarios/generated_scenarios/meeting_invite_coordination.py
 
-  # Generate summaries for all scenarios
+  # Generate summaries for all scenarios in the default ARE dir
   python generate_scenario_summaries.py --all
+
+  # Generate summaries for all scenarios in the PAS dir
+  python generate_scenario_summaries.py --all --dir generated_scenarios_w_pas_apps
 
   # Force update existing summaries
   python generate_scenario_summaries.py --all --force
@@ -172,6 +187,18 @@ Examples:
     # All files option
     parser.add_argument(
         "--all", action="store_true", help="Generate summaries for all scenario files in generated_scenarios/ directory"
+    )
+
+    # Target directory option
+    parser.add_argument(
+        "--dir",
+        dest="scenarios_dir",
+        type=str,
+        default=None,
+        help=(
+            "Scenarios directory to scan. Absolute path or relative folder name under pas/scenarios/. "
+            "Examples: 'generated_scenarios' (default) or 'generated_scenarios_w_pas_apps'"
+        ),
     )
 
     # Force update option
@@ -206,7 +233,7 @@ Examples:
     if args.output_file:
         output_path = Path(args.output_file)
     else:
-        output_path = get_generated_scenarios_dir() / "scenario_summaries.json"
+        output_path = get_generated_scenarios_dir(args.scenarios_dir) / "scenario_summaries.json"
 
     # Load existing summaries
     summaries = load_existing_summaries(output_path)
@@ -236,7 +263,36 @@ Examples:
     else:
         # All files mode
         logger.info("Generating summaries for all scenario files...")
-        generated_count = generate_summaries_for_all(agent, summaries, args.force)
+        # Temporarily override the directory getter by passing dir through
+        scenarios_dir = get_generated_scenarios_dir(args.scenarios_dir)
+        if not scenarios_dir.exists():
+            logger.error(f"Generated scenarios directory does not exist: {scenarios_dir}")
+            sys.exit(1)
+
+        # Walk scenarios_dir instead of default
+        def generate_summaries_for_all_in_dir(the_dir: Path) -> int:
+            scenario_files = []
+            for py_file in the_dir.rglob("*.py"):
+                if "__pycache__" in str(py_file):
+                    continue
+                if py_file.name == "__init__.py":
+                    continue
+                if py_file.name.startswith("__"):
+                    continue
+                if py_file.is_file():
+                    scenario_files.append(py_file)
+
+            logger.info(f"Found {len(scenario_files)} scenario files to process (including subdirectories)")
+
+            generated = 0
+            for scenario_file in scenario_files:
+                rel_path = scenario_file.relative_to(the_dir)
+                logger.info(f"Processing {rel_path}...")
+                if generate_summary_for_file(scenario_file, agent, summaries, args.force):
+                    generated += 1
+            return generated
+
+        generated_count = generate_summaries_for_all_in_dir(scenarios_dir)
         logger.info(f"Generated {generated_count} summaries")
 
     # Save summaries to JSON file

@@ -140,7 +140,8 @@ def _extract_exports_from_all(tree: ast.Module) -> set[str]:
                 ):
                     for elt in node.value.elts:
                         if isinstance(elt, ast.Str):
-                            exports.add(elt.s)
+                            # mypy: ast.Str.s is str, but cast to be explicit for older typeshed
+                            exports.add(str(elt.s))
     return exports
 
 
@@ -241,9 +242,13 @@ def scan_package(
 
         import_modules.add(f"import {mod_name}")
         for item in classes:
-            from_imports.add(f"from {mod_name} import {item['name']}")
+            name = item.get("name")
+            if isinstance(name, str):
+                from_imports.add(f"from {mod_name} import {name}")
         for item in funcs:
-            from_imports.add(f"from {mod_name} import {item['name']}")
+            name = item.get("name")
+            if isinstance(name, str):
+                from_imports.add(f"from {mod_name} import {name}")
 
     return {
         "package": pkg_name,
@@ -302,8 +307,14 @@ def make_import_instructions(
 
     # Fallback example if the agent needs a template
     lines.append("EXAMPLE:")
-    lines.append("  from are.simulation.apps.app import App")
-    lines.append("  from are.simulation.apps.contacts import ContactsApp, Contact")
+    if str(pkg).startswith("pas.apps"):
+        lines.append("  from pas.apps import PASAgentUserInterface, HomeScreenSystemApp")
+        lines.append(
+            "  from pas.apps import StatefulMessagingApp, StatefulCalendarApp, StatefulContactsApp, StatefulEmailApp"
+        )
+    else:
+        lines.append("  from are.simulation.apps.app import App")
+        lines.append("  from are.simulation.apps.contacts import ContactsApp, Contact")
     return "\n".join(lines).rstrip()  # trim trailing newline
 
 
