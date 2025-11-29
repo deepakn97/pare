@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+
+from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
+from are.simulation.scenarios.utils.registry import register_scenario
 
 # PAS apps
 from pas.apps import (
@@ -13,15 +17,14 @@ from pas.apps import (
     StatefulEmailApp,
     StatefulMessagingApp,
 )
+from pas.scenarios import PASScenario
 
 if TYPE_CHECKING:
     from are.simulation.types import AbstractEnvironment
-from are.simulation.scenarios.scenario import Scenario, ScenarioValidationResult
-from are.simulation.scenarios.utils.registry import register_scenario
 
 
 @register_scenario("scenario_with_all_pas_apps")
-class ScenarioWithAllPASApps(Scenario):
+class ScenarioWithAllPASApps(PASScenario):
     """Scenario with ALL PAS applications initialized.
 
     Initializes all applications defined under pas.apps, which provide stateful,
@@ -33,8 +36,9 @@ class ScenarioWithAllPASApps(Scenario):
     - Organization: StatefulCalendarApp, StatefulContactsApp
     """
 
-    start_time: float | None = 0
-    duration: float | None = 20
+    start_time = datetime(2025, 11, 18, 9, 0, 0, tzinfo=UTC).timestamp()
+    status = ScenarioStatus.Draft
+    is_benchmark_ready = False
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize and populate applications with data."""
@@ -42,15 +46,15 @@ class ScenarioWithAllPASApps(Scenario):
         # PAS APPS
         # =============================================================================
         self.agui = PASAgentUserInterface()  # Proactive agent-user interface
-        self.system = HomeScreenSystemApp()  # PAS system app with navigation helpers
+        self.system = HomeScreenSystemApp(name="System")  # PAS system app with navigation helpers
 
         # Communication apps
-        self.email = StatefulEmailApp()
-        self.messaging = StatefulMessagingApp()
+        self.email = StatefulEmailApp(name="Emails")
+        self.messaging = StatefulMessagingApp(name="Messages")
 
         # Organization and productivity apps
-        self.calendar = StatefulCalendarApp()
-        self.contacts = StatefulContactsApp()
+        self.calendar = StatefulCalendarApp(name="Calendar")
+        self.contacts = StatefulContactsApp(name="Contacts")
 
         # =============================================================================
         # REGISTER ALL INITIALIZED APPLICATIONS
@@ -71,6 +75,12 @@ class ScenarioWithAllPASApps(Scenario):
         """Build the flow of events for the scenario."""
         # This scenario serves as an initialization example, so no specific events are needed
         # All the work is done in init_and_populate_apps() where all apps are initialized
+        aui = self.get_typed_app(PASAgentUserInterface)
+        email = self.get_typed_app(StatefulEmailApp, "Emails")
+        calendar = self.get_typed_app(StatefulCalendarApp, "Calendar")
+        messaging = self.get_typed_app(StatefulMessagingApp, "Messages")
+        contacts = self.get_typed_app(StatefulContactsApp, "Contacts")
+
         self.events: list[Any] = []  # Empty events list since this is just an initialization scenario
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:

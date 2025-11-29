@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import importlib
 import importlib.util
 import logging
 import os
@@ -42,6 +43,34 @@ def import_temporary_scenario(temp_file_path: str) -> None:
         print(f"❌ Error importing temporary scenario: {e}")
 
 
+def import_scenario_modules(directory_path: str, module_prefix: str, label: str) -> None:
+    """Import every scenario module from the given directory so decorators run."""
+    if not os.path.exists(directory_path):
+        print(f"Warning: {label} directory not found: {directory_path}")
+        return
+
+    pattern = os.path.join(directory_path, "*.py")
+    scenario_files = [f for f in glob.glob(pattern) if not os.path.basename(f).startswith("__")]
+
+    for scenario_file_path in scenario_files:
+        module_name = os.path.basename(scenario_file_path)[:-3]
+        module = f"{module_prefix}.{module_name}"
+
+        if importlib.util.find_spec(module):
+            try:
+                importlib.import_module(module)
+                print(f"Imported {label} scenario: {module}")
+            except ImportError as e:
+                print(f"Warning: Could not import {label} scenario {module}: {e}")
+            except Exception as e:
+                import traceback
+
+                print(f"❌ Failed to load {label} scenario from {module}: {e}")
+                print(f"Full traceback:\n{traceback.format_exc()}")
+        else:
+            print(f"Warning: Module spec not found for {label} scenario: {module}")
+
+
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Run scenario validation")
 parser.add_argument("-s", "--scenario", required=True, help="Scenario ID to run")
@@ -51,48 +80,27 @@ parser.add_argument("--temp-file", help="Path to temporary scenario file to impo
 
 args = parser.parse_args()
 
-# Check if our custom scenario modules are available and import them to register scenarios
-if importlib.util.find_spec("pas.scenario_generator.example_proactive_scenarios.scenario"):
-    try:
-        import pas.scenario_generator.example_proactive_scenarios.scenario  # noqa: F401
+# Import our custom scenario modules so they can register themselves
+base_dir = os.path.dirname(__file__)
+example_dir = os.path.join(base_dir, "..", "example_proactive_scenarios")
+import_scenario_modules(example_dir, "pas.scenario_generator.example_proactive_scenarios", "example")
 
-        print("Imported custom scenario module")
-    except ImportError as e:
-        print(f"Warning: Could not import custom scenario module: {e}")
+scenario_generator_generated_dir = os.path.join(base_dir, "..", "generated_scenarios")
+import_scenario_modules(
+    scenario_generator_generated_dir,
+    "pas.scenario_generator.generated_scenarios",
+    "scenario_generator generated",
+)
+
+generated_dir = os.path.join(base_dir, "..", "..", "scenarios", "generated_scenarios")
+import_scenario_modules(generated_dir, "pas.scenarios.generated_scenarios", "generated")
+
+user_scenarios_dir = os.path.join(base_dir, "..", "..", "scenarios", "user_scenarios")
+import_scenario_modules(user_scenarios_dir, "pas.scenarios.user_scenarios", "user")
 
 # Import temporary scenario file if provided (this registers it before main validation)
 if args.temp_file:
     import_temporary_scenario(args.temp_file)
-
-# Import generated scenario files dynamically
-
-generated_dir = os.path.join(os.path.dirname(__file__), "..", "..", "scenarios", "generated_scenarios")
-if os.path.exists(generated_dir):
-    pattern = os.path.join(generated_dir, "*.py")
-    generated_files = glob.glob(pattern)
-    # Filter out __pycache__ and other non-scenario files
-    generated_files = [f for f in generated_files if not os.path.basename(f).startswith("__")]
-
-    for scenario_file_path in generated_files:
-        scenario_file = os.path.basename(scenario_file_path)[:-3]  # Remove .py extension
-        scenario_module = f"pas.scenarios.generated_scenarios.{scenario_file}"
-
-        if importlib.util.find_spec(scenario_module):
-            try:
-                importlib.import_module(scenario_module)
-                print(f"Imported generated scenario file: {scenario_module}")
-            except ImportError as e:
-                print(f"Warning: Could not import generated scenario file {scenario_module}: {e}")
-            except Exception as e:
-                import traceback
-
-                error_details = f"Failed to load scenario from {scenario_module}: {e}"
-                error_traceback = traceback.format_exc()
-                print(f"❌ {error_details}")
-                print(f"Full traceback:\n{error_traceback}")
-                # Continue with other scenarios even if one fails
-else:
-    print(f"Warning: Generated scenarios directory not found: {generated_dir}")
 
 
 # Verify that scenarios are properly registered
