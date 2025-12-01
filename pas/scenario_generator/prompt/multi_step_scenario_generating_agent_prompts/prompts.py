@@ -99,6 +99,30 @@ APP_INITIALIZATION_SNIPPETS = {
     },
 }
 
+APP_IMPORT_INSTRUCTIONS = {
+    "HomeScreenSystemApp": {
+        "import instruction": "from pas.apps import HomeScreenSystemApp",
+    },
+    "PASAgentUserInterface": {
+        "import instruction": "from pas.apps import PASAgentUserInterface",
+    },
+    "StatefulEmailApp": {
+        "import instruction": "from pas.apps import StatefulEmailApp",
+    },
+    "StatefulCalendarApp": {
+        "import instruction": "from pas.apps import StatefulCalendarApp",
+    },
+    "StatefulContactsApp": {
+        "import instruction": {
+            "from pas.apps import StatefulContactsApp",
+            "from are.simulation.apps.contacts import Contact",
+        },
+    },
+    "StatefulMessagingApp": {
+        "import instruction": "from pas.apps import StatefulMessagingApp",
+    },
+}
+
 
 def build_app_initialization_block(app_names: list[str]) -> str:
     """Return a formatted cheat-sheet describing how each selected app is initialized."""

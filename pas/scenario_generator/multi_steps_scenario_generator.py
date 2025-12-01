@@ -7,7 +7,7 @@ import logging
 from collections.abc import Iterable  # noqa: TC003
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, get_type_hints  # noqa: UP035
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, cast, get_type_hints  # noqa: UP035
 
 import docstring_parser
 from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
@@ -25,11 +25,8 @@ from pas.scenario_generator.example_proactive_scenarios.scenario_with_all_pas_ap
     ScenarioWithAllPASApps,
 )
 from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts.prompts import (
+    APP_IMPORT_INSTRUCTIONS,
     build_app_initialization_block,
-)
-from pas.scenario_generator.utils.list_all_app_imports import (
-    make_import_instructions,
-    scan_package,
 )
 
 if TYPE_CHECKING:
@@ -44,6 +41,44 @@ def build_engine(model: str, provider: str | None, endpoint: str | None) -> LLME
     """Build an `LLMEngine` instance from simple CLI arguments."""
     config = LLMEngineConfig(model_name=model, provider=provider, endpoint=endpoint)
     return LLMEngineBuilder().create_engine(engine_config=config)
+
+
+def build_import_instructions_block(app_names: list[str]) -> str:
+    """Return a formatted block with import instructions for the selected apps.
+
+    Uses the hard-coded `APP_IMPORT_INSTRUCTIONS` mapping so prompts stay stable
+    even if the underlying packages change.
+    """
+    ordered: list[str] = []
+    for name in app_names:
+        if name not in ordered:
+            ordered.append(name)
+
+    lines: list[str] = []
+    for name in ordered:
+        spec_obj = APP_IMPORT_INSTRUCTIONS.get(name)
+        if spec_obj is None:
+            continue
+        spec = cast("Mapping[str, object]", spec_obj)
+        instr = spec.get("import instruction")
+        if not instr:
+            continue
+
+        # Normalize to a list of strings to support single or multiple imports.
+        if isinstance(instr, str):
+            imports = [instr]
+        elif isinstance(instr, (list, tuple, set)):
+            imports = [str(item) for item in instr]
+        else:
+            imports = [str(instr)]
+
+        lines.append(f"{name}:")
+        for imp in imports:
+            lines.append(f"  - {imp}")
+
+    if not lines:
+        return "(none)"
+    return "\n".join(lines)
 
 
 def determine_selected_apps(app_instances: dict[str, object], requested: Iterable[str] | None) -> list[str]:
@@ -63,12 +98,6 @@ def determine_selected_apps(app_instances: dict[str, object], requested: Iterabl
     if invalid:
         logging.warning("Ignoring unknown apps: %s (available: %s)", ", ".join(invalid), ", ".join(available))
     return valid or available
-
-
-def build_import_instructions() -> str:
-    """Return import snippets describing how to load PAS apps and tools."""
-    catalog = scan_package("pas.apps", include_sigs=True, doclen=140)
-    return make_import_instructions(catalog, max_mods=18, max_per_mod=10, include_sigs=True)
 
 
 def build_tool_descriptions(app_def_scenario: object, target_apps: list[str]) -> str:
@@ -572,8 +601,8 @@ def build_selected_tools_block(app_instances: dict[str, object], target_apps: li
 def prepare_prompt_context_data(app_def_scenario: object, selected_apps: list[str]) -> dict[str, str]:
     """Assemble all dynamic prompt blocks used by the multi-step generator."""
     app_instances = {app.__class__.__name__: app for app in getattr(app_def_scenario, "apps", [])}
-    import_instructions = build_import_instructions()
     selected_plus_system = selected_apps + [name for name in SYSTEM_APPS if name in app_instances]
+    import_instructions = build_import_instructions_block(selected_plus_system)
     tool_descriptions = build_tool_descriptions(app_def_scenario, selected_plus_system)
     allowed_non_oracle = build_non_oracle_block(app_instances, selected_apps)
     allowed_oracle = build_oracle_block(app_instances, selected_apps)
@@ -633,6 +662,16 @@ def main() -> None:
         help="Maximum number of attempts per step.",
     )
     parser.add_argument(
+        "--resume-from-step2",
+        dest="resume_from_step2",
+        action="store_true",
+        default=True,
+        help=(
+            "Reuse an existing Step 1 description from the output directory and "
+            "start the pipeline at Step 2 (apps & data)."
+        ),
+    )
+    parser.add_argument(
         "--debug-prompts",
         dest="debug_prompts",
         action="store_true",
@@ -666,6 +705,7 @@ def main() -> None:
         max_iterations=args.max_iterations,
         prompt_context=prompt_context,
         debug_prompts=args.debug_prompts,
+        resume_from_step2=args.resume_from_step2,
     )
 
     result = agent.run()

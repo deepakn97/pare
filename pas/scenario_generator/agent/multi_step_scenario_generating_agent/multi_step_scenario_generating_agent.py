@@ -20,12 +20,7 @@ from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts 
 )
 
 from .scenario_uniqueness_agent import ScenarioUniquenessCheckAgent
-from .step_agents import (
-    AppsAndDataSetupAgent,
-    EventsFlowAgent,
-    ScenarioDescriptionAgent,
-    ValidationAgent,
-)
+from .step_agents import AppsAndDataSetupAgent, EventsFlowAgent, ScenarioDescriptionAgent, StepResult, ValidationAgent
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +47,13 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         max_iterations: int = 3,
         prompt_context: dict[str, str] | None = None,
         debug_prompts: bool = False,
+        resume_from_step2: bool = False,
     ) -> None:
         """Initialize the orchestrator and supporting step agents."""
         self.llm_engine = llm_engine
         self.max_iterations = max_iterations
         self.debug_prompts = debug_prompts
+        self.resume_from_step2 = resume_from_step2
         base_dir = Path(__file__).resolve().parents[2]
         self.repo_root = base_dir.parent
         self.output_dir = Path(output_dir or base_dir / "multi_step_outputs")
@@ -118,24 +115,28 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         try:
             step1_path = self.output_dir / "step1_scenario_description.md"
 
-            def step1_check(description: str, iteration: int) -> tuple[bool, str]:
-                self._write_output(
-                    content=description,
-                    path=step1_path,
-                    header="Step 1 - Scenario Description",
-                    append=False,
+            if self.resume_from_step2 and not self.debug_prompts:
+                step1 = self._load_existing_step1_result(step1_path)
+            else:
+
+                def step1_check(description: str, iteration: int) -> tuple[bool, str]:
+                    self._write_output(
+                        content=description,
+                        path=step1_path,
+                        header="Step 1 - Scenario Description",
+                        append=False,
+                    )
+                    return True, ""
+
+                check1 = None if self.debug_prompts else step1_check
+
+                history_block = self.uniqueness_agent.get_recent_history()
+                step1 = self.step1_agent.run(
+                    historical_descriptions=history_block,
+                    check_callback=check1,
                 )
-                return True, ""
-
-            check1 = None if self.debug_prompts else step1_check
-
-            history_block = self.uniqueness_agent.get_recent_history()
-            step1 = self.step1_agent.run(
-                historical_descriptions=history_block,
-                check_callback=check1,
-            )
-            if not self.debug_prompts:
-                self._append_valid_description(step1.content)
+                if not self.debug_prompts:
+                    self._append_valid_description(step1.content)
 
             scenario_seed_content = self._get_or_initialize_scenario_file()
 
@@ -267,6 +268,34 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         else:
             path.write_text(text_to_write, encoding="utf-8")
 
+    def _load_existing_step1_result(self, step1_path: Path) -> StepResult:
+        """Load a previously generated Step 1 description from disk.
+
+        This is used when resuming the pipeline from Step 2 after fixing issues
+        downstream, so we can reuse the narrative without re-running the LLM.
+        """
+        raw = self._safe_read_text(step1_path)
+        if not raw.strip():
+            raise RuntimeError(f"Cannot resume from Step 2: missing or empty file at {step1_path}")
+
+        lines = raw.splitlines()
+        # Drop header/comment lines (e.g., "# Step 1 - Scenario Description")
+        content_lines = [line for line in lines if not line.lstrip().startswith("#")]
+        description = "\n".join(content_lines).strip()
+        if not description:
+            raise RuntimeError(f"Cannot resume from Step 2: failed to extract description from {step1_path}")
+
+        return StepResult(
+            name="Step 1: Scenario Description (resumed)",
+            content=description,
+            iterations=0,
+            notes={
+                "resumed_from_disk": True,
+                "source_path": str(step1_path),
+            },
+            conversation=[],
+        )
+
     def _run_step_check(
         self,
         label: str,
@@ -288,7 +317,7 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
 
         cmd = [
             sys.executable,
-            "pas/scenario_generator/utils/run_scenario.py",
+            "/Users/jasonz/Projects/ucsb/proactiveGoalInference/pas/scenario_generator/utils/run_scenario.py",
             "-s",
             scenario_id,
             "-a",
