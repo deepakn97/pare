@@ -137,6 +137,7 @@ _TOOLS_BLOCK = ""
 _NON_ORACLE_BLOCK = ""
 _ORACLE_BLOCK = ""
 _ALL_TOOLS_BLOCK = ""
+_SELECTED_TOOLS_BLOCK = ""
 _APP_INIT_BLOCK = ""
 
 # Base bodies for system prompts (used to rebuild prompts when dynamic context changes)
@@ -224,6 +225,7 @@ def configure_dynamic_context(
     allowed_oracle_block: str,
     allowed_all_tools_block: str,
     app_initialization_block: str,
+    selected_tools_description: str,
 ) -> None:
     """Inject run-time app/tool instructions into the global prompt."""
     global \
@@ -233,6 +235,7 @@ def configure_dynamic_context(
         _NON_ORACLE_BLOCK, \
         _ORACLE_BLOCK, \
         _ALL_TOOLS_BLOCK, \
+        _SELECTED_TOOLS_BLOCK, \
         _APP_INIT_BLOCK
     global \
         SCENARIO_DESCRIPTION_SYSTEM_PROMPT, \
@@ -253,12 +256,13 @@ def configure_dynamic_context(
     _NON_ORACLE_BLOCK = _make_block("Allowed Non-Oracle Environment Methods", allowed_non_oracle_block)
     _ORACLE_BLOCK = _make_block("Allowed Oracle Methods", allowed_oracle_block)
     _ALL_TOOLS_BLOCK = _make_block("Event-Registered App APIs", allowed_all_tools_block)
+    _SELECTED_TOOLS_BLOCK = _make_block("Event-Registered App APIs", selected_tools_description)
     _APP_INIT_BLOCK = _make_block("App Initialization Blueprint", app_initialization_block)
 
     # Rebuild system prompts so they include the latest dynamic context blocks.
     SCENARIO_DESCRIPTION_SYSTEM_PROMPT = _with_context(
         _SCENARIO_DESCRIPTION_BODY,
-        include_all_tools=True,
+        include_selected_tools=True,
     )
     SCENARIO_UNIQUENESS_SYSTEM_PROMPT = _with_context(_SCENARIO_UNIQUENESS_BODY)
     APPS_AND_DATA_SYSTEM_PROMPT = _with_context(
@@ -288,6 +292,7 @@ def _with_context(
     include_imports: bool = False,
     include_tools: bool = False,
     include_all_tools: bool = False,
+    include_selected_tools: bool = False,
     include_env_methods: bool = False,
     include_oracle_methods: bool = False,
 ) -> str:
@@ -300,7 +305,9 @@ def _with_context(
         sections.append(_IMPORT_BLOCK)
     if include_tools and _TOOLS_BLOCK:
         sections.append(_TOOLS_BLOCK)
-    if include_all_tools and _ALL_TOOLS_BLOCK:
+    if include_selected_tools and _SELECTED_TOOLS_BLOCK:
+        sections.append(_SELECTED_TOOLS_BLOCK)
+    elif include_all_tools and _ALL_TOOLS_BLOCK:
         sections.append(_ALL_TOOLS_BLOCK)
     if include_env_methods and _NON_ORACLE_BLOCK:
         sections.append(_NON_ORACLE_BLOCK)
@@ -312,7 +319,7 @@ def _with_context(
 
 SCENARIO_DESCRIPTION_SYSTEM_PROMPT = _with_context(
     _SCENARIO_DESCRIPTION_BODY,
-    include_all_tools=True,
+    include_selected_tools=True,
     include_app_init=True,
 )
 

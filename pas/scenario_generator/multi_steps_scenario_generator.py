@@ -490,6 +490,57 @@ def _gather_event_registered_entries(inst: object) -> list[str]:
     return sorted(entries)
 
 
+def _format_brief_tool_entry(signature: str, *, description: str) -> str:
+    """Return a single-line, narrative-friendly summary for a tool."""
+    desc = description.strip() if description else "No description provided."
+    if not desc:
+        desc = "No description provided."
+    return f"{signature}: {desc}"
+
+
+def _gather_event_registered_brief_entries(inst: object) -> list[str]:
+    """Gather concise entries for event-registered tools, omitting args/returns/notes."""
+    entries: list[str] = []
+    seen: set[str] = set()
+    registry_specs = [
+        (ToolAttributeName.USER, ToolType.USER),
+        (ToolAttributeName.APP, ToolType.APP),
+    ]
+    for attr, tool_type in registry_specs:
+        try:
+            tools = inst.get_tools_with_attribute(attr, tool_type)  # type: ignore[attr-defined]  # naq
+        except Exception as exc:
+            logging.debug("Skipping tools for %s due to error: %s", inst, exc)
+            continue
+        for tool in tools:
+            func_name = getattr(tool, "func_name", None)
+            if not func_name:
+                continue
+            if func_name in seen:
+                continue
+            seen.add(func_name)
+            method = getattr(inst, func_name, None)
+            if method is not None:
+                description, _, _ = _describe_callable(method)
+                signature = _signature_from_callable(func_name, method)
+            else:
+                description = _summarize_docstring(getattr(tool, "function_description", None))
+                arg_names = [arg.name for arg in getattr(tool, "args", []) if getattr(arg, "name", None)]
+                signature = _format_signature(func_name, arg_names)
+            entries.append(_format_brief_tool_entry(signature, description=description))
+
+    for state_name, func_name, func in _state_user_tool_specs(inst):
+        cache_key = f"{state_name}.{func_name}"
+        if cache_key in seen:
+            continue
+        seen.add(cache_key)
+        description, _, _ = _describe_callable(func)
+        signature = _signature_from_callable(func_name, func)
+        entries.append(_format_brief_tool_entry(signature, description=description))
+
+    return sorted(entries)
+
+
 def build_all_tools_block(app_instances: dict[str, object], target_apps: list[str]) -> str:
     """Describe all event-registered tools for the selected apps."""
     lines = []
@@ -498,6 +549,20 @@ def build_all_tools_block(app_instances: dict[str, object], target_apps: list[st
         if inst is None:
             continue
         entries = _gather_event_registered_entries(inst)
+        if entries:
+            formatted_entries = "\n".join(f"  - {entry}" for entry in entries)
+            lines.append(f"{app_name}:\n{formatted_entries}")
+    return "\n\n".join(lines) if lines else "(none)"
+
+
+def build_selected_tools_block(app_instances: dict[str, object], target_apps: list[str]) -> str:
+    """Describe event-registered tools for the selected apps in a brief, narrative-oriented format."""
+    lines = []
+    for app_name in target_apps:
+        inst = app_instances.get(app_name)
+        if inst is None:
+            continue
+        entries = _gather_event_registered_brief_entries(inst)
         if entries:
             formatted_entries = "\n".join(f"  - {entry}" for entry in entries)
             lines.append(f"{app_name}:\n{formatted_entries}")
@@ -513,6 +578,7 @@ def prepare_prompt_context_data(app_def_scenario: object, selected_apps: list[st
     allowed_non_oracle = build_non_oracle_block(app_instances, selected_apps)
     allowed_oracle = build_oracle_block(app_instances, selected_apps)
     allowed_all_tools = build_all_tools_block(app_instances, selected_plus_system)
+    selected_tools_description = build_selected_tools_block(app_instances, selected_apps)
     app_init_block = build_app_initialization_block(selected_plus_system)
     selected_display = ", ".join(selected_plus_system) if selected_plus_system else "(none)"
     return {
@@ -523,6 +589,7 @@ def prepare_prompt_context_data(app_def_scenario: object, selected_apps: list[st
         "allowed_oracle_block": allowed_oracle,
         "allowed_all_tools_block": allowed_all_tools,
         "app_initialization_block": app_init_block,
+        "selected_tools_description": selected_tools_description,
     }
 
 
