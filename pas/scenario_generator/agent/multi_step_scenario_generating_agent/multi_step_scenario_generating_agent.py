@@ -10,15 +10,13 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from are.simulation.agents.llm.llm_engine import LLMEngine
+from typing import Any
 
 from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts import (
     configure_dynamic_context,
 )
 
+from .claude_backend import ClaudeAgentRuntimeConfig, ClaudeFilesystemConfig
 from .scenario_uniqueness_agent import ScenarioUniquenessCheckAgent
 from .step_agents import AppsAndDataSetupAgent, EventsFlowAgent, ScenarioDescriptionAgent, StepResult, ValidationAgent
 
@@ -42,23 +40,25 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
     def __init__(
         self,
         *,
-        llm_engine: "LLMEngine",  # noqa: UP037
         output_dir: str | Path | None = None,
         max_iterations: int = 3,
         prompt_context: dict[str, str] | None = None,
         debug_prompts: bool = False,
         resume_from_step2: bool = False,
+        claude_filesystem_config: ClaudeFilesystemConfig | None = None,
     ) -> None:
         """Initialize the orchestrator and supporting step agents."""
-        self.llm_engine = llm_engine
         self.max_iterations = max_iterations
         self.debug_prompts = debug_prompts
         self.resume_from_step2 = resume_from_step2
         base_dir = Path(__file__).resolve().parents[2]
         self.repo_root = base_dir.parent
-        self.output_dir = Path(output_dir or base_dir / "multi_step_outputs")
+        self.output_dir = Path(output_dir or base_dir / "generated_scenarios")
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.scenario_file = self.output_dir / "scenario_draft.py"
+        # Use a seed_scenario-based working file so Claude Agent can repeatedly
+        # edit a single, stable filename. The final successful scenario will
+        # still be persisted into the generated_scenarios directory.
+        self.scenario_file = self.output_dir / "seed_scenario.py"
         self.generated_dir = base_dir / "generated_scenarios"
         self.valid_descriptions_path = self.generated_dir / "valid_descriptions.json"
         self.success_dir = self.generated_dir / "successful_scenarios"
@@ -68,45 +68,96 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         self.failed_dir.mkdir(parents=True, exist_ok=True)
         self.failed_no_runtime_dir.mkdir(parents=True, exist_ok=True)
         self._last_check_result: RunCheckResult | None = None
+        # Declarative filesystem policy for Claude Agent SDK usage. Enforcement
+        # will be wired via hooks and tool options in a follow-up change.
+        if claude_filesystem_config is None:
+            self.claude_filesystem_config = ClaudeFilesystemConfig(
+                read_only_roots=[self.repo_root],
+                editable_files=[self.scenario_file],
+            )
+        else:
+            self.claude_filesystem_config = claude_filesystem_config
         self._historical_descriptions = self._read_valid_descriptions()
+
+        # Per-step Claude runtime configurations. Narrative and uniqueness
+        # checks do not need code-editing tools, while Steps 2-4 use Read/Write
+        # to modify the seed_scenario file.
+        self._claude_config_uniqueness = ClaudeAgentRuntimeConfig(
+            cwd=self.repo_root,
+            allowed_tools=["Read"],
+            permission_mode="acceptEdits",
+            filesystem=self.claude_filesystem_config,
+        )
+        self._claude_config_step1 = ClaudeAgentRuntimeConfig(
+            cwd=self.repo_root,
+            allowed_tools=["Read"],
+            permission_mode="acceptEdits",
+            filesystem=self.claude_filesystem_config,
+        )
+        self._claude_config_code_steps = ClaudeAgentRuntimeConfig(
+            cwd=self.repo_root,
+            allowed_tools=["Read", "Write"],
+            permission_mode="acceptEdits",
+            filesystem=self.claude_filesystem_config,
+        )
 
         if prompt_context is not None:
             configure_dynamic_context(**prompt_context)
 
+        if self.debug_prompts:
+            logger.info(
+                "Debug prompts mode enabled for multi-step scenario generator; "
+                "all Claude calls will be skipped. Prompts and planned "
+                "file operations will be logged instead.",
+            )
+            # Note: seed_template_path is assigned below; log after initialization.
+
+        self.seed_template_path = base_dir / "example_proactive_scenarios" / "seed_scenario.py"
+        self.seed_template_text = self._safe_read_text(self.seed_template_path)
+
+        if self.debug_prompts:
+            logger.info("Scenario working file: %s", self.scenario_file)
+            logger.info("Seed template path: %s", self.seed_template_path)
+            logger.info("Valid descriptions path: %s", self.valid_descriptions_path)
+            logger.info(
+                "Claude filesystem config: read_only_roots=%s, editable_files=%s",
+                self.claude_filesystem_config.read_only_roots,
+                self.claude_filesystem_config.editable_files,
+            )
+            if prompt_context is not None:
+                logger.info("Selected apps for this run: %s", prompt_context.get("selected_apps", "(unknown)"))
+
         self.uniqueness_agent = ScenarioUniquenessCheckAgent(
-            llm_engine,
             historical_descriptions=self._historical_descriptions,
             debug_prompts=debug_prompts,
             debug_printer=self._debug_print if debug_prompts else None,
+            claude_runtime_config=self._claude_config_uniqueness,
         )
         self.step1_agent = ScenarioDescriptionAgent(
-            llm_engine=llm_engine,
             max_iterations=max_iterations,
             uniqueness_agent=self.uniqueness_agent,
             debug_prompts=debug_prompts,
             debug_printer=self._debug_print if debug_prompts else None,
+            claude_runtime_config=self._claude_config_step1,
         )
         self.step2_agent = AppsAndDataSetupAgent(
-            llm_engine=llm_engine,
             max_iterations=max_iterations,
             debug_prompts=debug_prompts,
             debug_printer=self._debug_print if debug_prompts else None,
+            claude_runtime_config=self._claude_config_code_steps,
         )
         self.step3_agent = EventsFlowAgent(
-            llm_engine=llm_engine,
             max_iterations=max_iterations,
             debug_prompts=debug_prompts,
             debug_printer=self._debug_print if debug_prompts else None,
+            claude_runtime_config=self._claude_config_code_steps,
         )
         self.step4_agent = ValidationAgent(
-            llm_engine=llm_engine,
             max_iterations=max_iterations,
             debug_prompts=debug_prompts,
             debug_printer=self._debug_print if debug_prompts else None,
+            claude_runtime_config=self._claude_config_code_steps,
         )
-
-        self.seed_template_path = base_dir / "example_proactive_scenarios" / "seed_scenario.py"
-        self.seed_template_text = self._safe_read_text(self.seed_template_path)
 
     def run(self) -> dict[str, Any]:
         """Execute the four-step pipeline and return artifact metadata."""
@@ -120,12 +171,8 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
             else:
 
                 def step1_check(description: str, iteration: int) -> tuple[bool, str]:
-                    self._write_output(
-                        content=description,
-                        path=step1_path,
-                        header="Step 1 - Scenario Description",
-                        append=False,
-                    )
+                    # Intentionally do NOT write any new files for Step 1.
+                    # Step 1 is allowed to affect only `valid_descriptions.json`.
                     return True, ""
 
                 check1 = None if self.debug_prompts else step1_check
@@ -221,7 +268,7 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
 
             logger.info("Multi-step scenario generation pipeline complete.")
             return {
-                "description_path": str(step1_path),
+                "description_path": str(self.valid_descriptions_path),
                 "scenario_file_path": str(self.scenario_file),
                 "steps": [
                     step1,
@@ -274,16 +321,28 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         This is used when resuming the pipeline from Step 2 after fixing issues
         downstream, so we can reuse the narrative without re-running the LLM.
         """
+        # Prefer the legacy markdown path if present and non-empty (backward compatible),
+        # otherwise fall back to the most recent entry in `valid_descriptions.json`.
         raw = self._safe_read_text(step1_path)
-        if not raw.strip():
-            raise RuntimeError(f"Cannot resume from Step 2: missing or empty file at {step1_path}")
-
-        lines = raw.splitlines()
-        # Drop header/comment lines (e.g., "# Step 1 - Scenario Description")
-        content_lines = [line for line in lines if not line.lstrip().startswith("#")]
-        description = "\n".join(content_lines).strip()
+        description: str | None = None
+        if raw.strip():
+            lines = raw.splitlines()
+            # Drop header/comment lines (e.g., "# Step 1 - Scenario Description")
+            content_lines = [line for line in lines if not line.lstrip().startswith("#")]
+            candidate = "\n".join(content_lines).strip()
+            if candidate:
+                description = candidate
+        if description is None:
+            history = self._read_valid_descriptions()
+            if history:
+                last = history[-1]
+                candidate = (last.get("description") or "").strip()
+                if candidate:
+                    description = candidate
         if not description:
-            raise RuntimeError(f"Cannot resume from Step 2: failed to extract description from {step1_path}")
+            raise RuntimeError(
+                "Cannot resume from Step 2: missing markdown and no valid description found in valid_descriptions.json"
+            )
 
         return StepResult(
             name="Step 1: Scenario Description (resumed)",
@@ -302,6 +361,13 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         artifact_path: Path,
         require_validation_success: bool = False,
     ) -> RunCheckResult:
+        """Run the generated scenario via `run_scenario.py` and summarize the result.
+
+        This helper is the canonical integration point between the Claude-backed
+        step agents (which edit the scenario file) and the meta-ARE runner,
+        which validates that the scenario can be imported, executed, and passes
+        its `validate()` checks.
+        """
         code = self._safe_read_text(artifact_path)
         scenario_id = self._extract_scenario_id(code)
         if scenario_id is None:

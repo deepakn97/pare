@@ -7,11 +7,9 @@ import logging
 from collections.abc import Iterable  # noqa: TC003
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, cast, get_type_hints  # noqa: UP035
+from typing import Any, Callable, Mapping, Sequence, cast, get_type_hints  # noqa: UP035
 
 import docstring_parser
-from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
-from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
 from are.simulation.apps.app import ToolType
 from are.simulation.tool_box import DEFAULT_TOOL_DESCRIPTION_TEMPLATE, Toolbox
 from are.simulation.tool_utils import AppTool, AppToolAdapter, OperationType, ToolAttributeName, format_type_name
@@ -29,18 +27,16 @@ from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts.
     build_app_initialization_block,
 )
 
-if TYPE_CHECKING:
-    from are.simulation.agents.llm.llm_engine import LLMEngine
-
-
 SYSTEM_APPS = {"PASAgentUserInterface", "HomeScreenSystemApp"}
 _STATE_USER_TOOL_CACHE: dict[type, list[tuple[str, str, Any]]] = {}
 
 
-def build_engine(model: str, provider: str | None, endpoint: str | None) -> LLMEngine:
-    """Build an `LLMEngine` instance from simple CLI arguments."""
-    config = LLMEngineConfig(model_name=model, provider=provider, endpoint=endpoint)
-    return LLMEngineBuilder().create_engine(engine_config=config)
+def build_engine(model: str, provider: str | None, endpoint: str | None) -> None:
+    """Deprecated: the multi-step generator now uses `claude-agent-sdk` directly."""
+    raise RuntimeError(
+        "build_engine() is deprecated for the multi-step scenario generator. "
+        "Claude Agent SDK is used instead of the Meta-ARE LLMEngine.",
+    )
 
 
 def build_import_instructions_block(app_names: list[str]) -> str:
@@ -665,7 +661,7 @@ def main() -> None:
         "--resume-from-step2",
         dest="resume_from_step2",
         action="store_true",
-        default=True,
+        default=False,
         help=(
             "Reuse an existing Step 1 description from the output directory and "
             "start the pipeline at Step 2 (apps & data)."
@@ -698,9 +694,7 @@ def main() -> None:
         logging.warning("No selectable apps found; continuing with system apps only.")
     prompt_context = prepare_prompt_context_data(app_def_scenario, selected_apps)
 
-    engine = build_engine(args.model, args.provider, args.endpoint)
     agent = MultiStepScenarioGeneratingAgentsOrchestrator(
-        llm_engine=engine,
         output_dir=args.output_dir,
         max_iterations=args.max_iterations,
         prompt_context=prompt_context,

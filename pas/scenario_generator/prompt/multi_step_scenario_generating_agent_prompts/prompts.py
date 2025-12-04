@@ -1,11 +1,27 @@
 from __future__ import annotations
 
 import textwrap
+from importlib import import_module
 from pathlib import Path
 
 PROMPTS_DIR = Path(__file__).resolve().parent
 SCENARIO_GENERATOR_DIR = PROMPTS_DIR.parent
 PAS_DIR = SCENARIO_GENERATOR_DIR.parent
+
+
+def _discover_meta_are_apps_dir() -> Path | None:
+    """Best-effort discovery of the Meta-ARE apps directory for prompt context.
+
+    This is used only to surface a filesystem hint to the Claude Agent in
+    system prompts; it does not affect imports or runtime behavior.
+    """
+    try:
+        are_module = import_module("are")
+    except ModuleNotFoundError:
+        return None
+    base = Path(getattr(are_module, "__file__", "")).resolve().parent
+    candidate = base / "simulation" / "apps"
+    return candidate if candidate.exists() else None
 
 
 def _safe_read_text(path: Path) -> str:
@@ -20,14 +36,47 @@ EXAMPLE_SCENARIO_PATH = PAS_DIR / "example_proactive_scenarios" / "email_notific
 # if not EXAMPLE_SCENARIO_SOURCE:
 EXAMPLE_SCENARIO_SOURCE = "# Example PAS scenario file is missing."
 
+PAS_APPS_DIR = PAS_DIR / "apps"
+META_ARE_APPS_DIR = _discover_meta_are_apps_dir()
+META_ARE_APPS_DIR_DISPLAY = str(META_ARE_APPS_DIR) if META_ARE_APPS_DIR is not None else "(not found on disk)"
+SCENARIOS_DIR = PAS_DIR / "scenarios" / "user_scenarios"
+SCENARIOS_DIR_DISPLAY = str(SCENARIOS_DIR)
+
 PROJECT_CONTEXT_SUMMARY = textwrap.dedent(
-    """\
+    f"""\
     - Proactive Agent Sandbox (PAS) extends Meta-ARE with stateful, navigation-aware app wrappers so LLM planners can reason about realistic mobile workflows.
     - Scenarios seed deterministic baseline data inside PAS apps, then drive environment + oracle events so the proactive agent can infer goals and act.
     - The multi-step generator edits a single scenario file cloned from the PAS seed template; each step agent only touches its dedicated TODO block and preserves WARNING comments.
     - Use provided helpers (`get_typed_app`, `EventRegisterer`, `ScenarioValidationResult`) and keep PAS plus Meta-ARE APIs aligned with the state they expose.
+    - PAS app implementations are available under: {PAS_APPS_DIR}
+    - Meta-ARE app implementations are available under: {META_ARE_APPS_DIR_DISPLAY}
+    - Existing PAS user scenarios live under: {SCENARIOS_DIR_DISPLAY}
+    - Only design scenarios that use apps actually present in the PAS apps directory, even if Meta-ARE exposes additional base apps.
     """
 ).strip()
+
+_ = PROJECT_CONTEXT_SUMMARY  # keep mypy happy about usage
+
+PROJECT_CONTEXT_SUMMARY = (
+    textwrap.dedent(
+        """\
+    - Proactive Agent Sandbox (PAS) extends Meta-ARE with stateful, navigation-aware app wrappers so LLM planners can reason about realistic mobile workflows.
+    - Scenarios seed deterministic baseline data inside PAS apps, then drive environment + oracle events so the proactive agent can infer goals and act.
+    - The multi-step generator edits a single scenario file cloned from the PAS seed template; each step agent only touches its dedicated TODO block and preserves WARNING comments.
+    - Use provided helpers (`get_typed_app`, `EventRegisterer`, `ScenarioValidationResult`) and keep PAS plus Meta-ARE APIs aligned with the state they expose.
+    - PAS app implementations are available under: {pas_apps_dir}
+    - Meta-ARE app implementations are available under: {meta_are_apps_dir}
+    - Existing PAS user scenarios live under: {scenarios_dir}
+    - Only design scenarios that use apps actually present in the PAS apps directory, even if Meta-ARE exposes additional base apps.
+    """
+    )
+    .format(
+        pas_apps_dir=str(PAS_APPS_DIR),
+        meta_are_apps_dir=META_ARE_APPS_DIR_DISPLAY,
+        scenarios_dir=SCENARIOS_DIR_DISPLAY,
+    )
+    .strip()
+)
 
 GLOBAL_CONTEXT_PROMPT = textwrap.dedent(
     f"""\
@@ -180,14 +229,28 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
     - Only involve apps and tools that appear in the Selected Apps list and the Event-Registered App APIs block below.
     - Do NOT introduce new app types or tools that are not present in those context sections.
 
-    Output exactly 2-3 short sentences in plain text. Avoid implementation details.
+    Output 2-3 short sentences in plain text that together describe the full scenario flow. Avoid implementation details.
     """
 )
 
 _SCENARIO_UNIQUENESS_BODY = textwrap.dedent(
-    """\
+    f"""\
     You review new scenario descriptions to ensure they are unique compared to existing PAS scenarios.
     Consider triggers, cross-app interactions, constraints, and tool usage patterns.
+
+    Before deciding, you may use the Read tool to:
+    - List and inspect existing PAS user scenarios under: {SCENARIOS_DIR_DISPLAY}
+    - Skim example scenarios to understand their trigger patterns, complexity, and tool usage.
+
+    What makes a scenario unique:
+    - Novel trigger patterns and cross-app combinations, not just another generic "incoming email" case.
+    - Different complexity/constraints (e.g., coordinating multiple people, resolving conflicts, multi-step reasoning).
+    - Exercising different app capabilities and tools than prior scenarios.
+
+    What is NOT sufficient for uniqueness:
+    - Merely swapping names or dates in an otherwise identical flow.
+    - Using the same apps with only superficial changes to the task.
+
     Reply with:
       - "PASS" if the scenario is substantively different.
       - "RETRY: <short reason>" if it overlaps with prior scenarios.
@@ -205,7 +268,7 @@ _APPS_AND_DATA_BODY = textwrap.dedent(
     - Only modify the import section and `init_and_populate_apps()` body. Keep WARNING comments and other TODO blocks untouched.
     - Reference the "Import Instructions" block for permissible imports.
     - Mirror the "App Initialization Blueprint" so attribute names and `get_typed_app()` lookups stay aligned with later steps.
-    - The "Event-Registered App APIs" block lists every method you may call (including those without `@app_tool`); stay within that set when seeding state.
+    - Use the PAS app classes under `pas/apps/` and their Meta-ARE bases under `are/simulation/apps/` as the source of truth for which methods exist; do not invent new APIs.
     """
 )
 
@@ -221,8 +284,8 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - ONLY modify the `build_events_flow()` section of the template while keeping WARNING comments and other sections
       unchanged, except for inserting the concrete implementation in the TODO area.
     Output should be the full updated python file with only the build_events_flow section changed.
-    - Use only the environment methods listed in the "Allowed Non-Oracle Environment Methods" block below for context events.
-    - Use only the functions listed in "Allowed Oracle Methods" for oracle/user actions; do not call other app APIs here.
+    - For non-oracle environment events, only use methods that have notification templates in `pas/apps/notification_templates.py` (see the NOTIFICATION_TEMPLATES dict).
+    - For oracle/user actions, use app tools defined on the PAS apps and their Meta-ARE bases; do not invent new methods.
     - Mirror the "App Initialization Blueprint" so your local variables match how apps were seeded in Step 2.
     """
 )
@@ -293,13 +356,13 @@ def configure_dynamic_context(
         _APPS_AND_DATA_BODY,
         include_imports=True,
         include_tools=False,
-        include_all_tools=True,
+        include_all_tools=False,
         include_app_init=True,
     )
     EVENTS_FLOW_SYSTEM_PROMPT = _with_context(
         _EVENTS_FLOW_BODY,
-        include_env_methods=True,
-        include_oracle_methods=True,
+        include_env_methods=False,
+        include_oracle_methods=False,
         include_app_init=True,
     )
     VALIDATION_SYSTEM_PROMPT = _with_context(
@@ -379,7 +442,7 @@ APPS_AND_DATA_SYSTEM_PROMPT = _with_context(
     _APPS_AND_DATA_BODY,
     include_imports=True,
     include_tools=False,
-    include_all_tools=True,
+    include_all_tools=False,
     include_app_init=True,
 )
 
@@ -404,8 +467,8 @@ except to keep their TODO placeholders. Maintain the register_scenario metadata,
 
 EVENTS_FLOW_SYSTEM_PROMPT = _with_context(
     _EVENTS_FLOW_BODY,
-    include_env_methods=True,
-    include_oracle_methods=True,
+    include_env_methods=False,
+    include_oracle_methods=False,
     include_app_init=True,
 )
 

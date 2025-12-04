@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable  # noqa: TC003
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts.prompts import (
     SCENARIO_UNIQUENESS_SYSTEM_PROMPT,
     SCENARIO_UNIQUENESS_USER_PROMPT,
 )
 
-if TYPE_CHECKING:
-    from are.simulation.agents.llm.llm_engine import LLMEngine
+from .claude_backend import ClaudeAgentRuntimeConfig, run_claude_conversation
 
 
 class ScenarioUniquenessCheckAgent:
@@ -17,17 +16,17 @@ class ScenarioUniquenessCheckAgent:
 
     def __init__(
         self,
-        llm_engine: LLMEngine,
         historical_descriptions: list[dict[str, Any]] | None = None,
         *,
         debug_prompts: bool = False,
         debug_printer: Callable[[str], None] | None = None,
+        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
     ) -> None:
         """Configure the LLM engine and historical description buffer."""
-        self.llm_engine = llm_engine
         self.historical_descriptions: list[dict[str, Any]] = historical_descriptions or []
         self.debug_prompts = debug_prompts
         self._debug_printer = debug_printer
+        self._claude_config = claude_runtime_config
 
     def evaluate(self, scenario_description: str) -> tuple[bool, str]:
         """Return (is_unique, verdict_text)."""
@@ -70,18 +69,19 @@ class ScenarioUniquenessCheckAgent:
         return "\n".join(lines)
 
     def _invoke_llm(self, *, system_prompt: str, user_prompt: str, trace_tag: str) -> str:
-        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
-        raw = self.llm_engine(
-            messages,
-            stop_sequences=[],
-            additional_trace_tags=[trace_tag],
-            schema=None,
+        if self._claude_config is None:
+            raise TypeError("Scenario uniqueness check is misconfigured: missing Claude runtime config.")
+        conversation = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        return run_claude_conversation(
+            conversation,
+            system_prompt=system_prompt,
+            config=self._claude_config,
+            step_tag=trace_tag,
+            iteration=1,
         )
-        if isinstance(raw, tuple) and len(raw) == 2:
-            raw = raw[0]
-        if not isinstance(raw, str):
-            raise TypeError("Scenario uniqueness check did not return textual output.")
-        return raw.strip()
 
     def _emit_debug_prompts(self, *, system_prompt: str, user_prompt: str) -> None:
         printer = self._debug_printer or print

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable  # noqa: TC003
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -18,9 +19,11 @@ from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts 
     prompts as prompt_context,
 )
 
-if TYPE_CHECKING:
-    from are.simulation.agents.llm.llm_engine import LLMEngine
+from .claude_backend import ClaudeAgentRuntimeConfig, run_claude_conversation
 
+logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
     from .scenario_uniqueness_agent import ScenarioUniquenessCheckAgent
 
 
@@ -46,21 +49,21 @@ class BaseStepAgent:
         self,
         *,
         name: str,
-        llm_engine: LLMEngine,
         system_prompt: str,
         max_iterations: int = 3,
         uniqueness_agent: ScenarioUniquenessCheckAgent | None = None,
         debug_prompts: bool = False,
         debug_printer: Callable[[str], None] | None = None,
+        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
     ) -> None:
         """Configure shared settings for a single multi-step generation phase."""
         self.name = name
-        self.llm_engine = llm_engine
         self.system_prompt = system_prompt
         self.max_iterations = max_iterations
         self.uniqueness_agent = uniqueness_agent
         self.debug_prompts = debug_prompts
         self._debug_printer = debug_printer
+        self._claude_config = claude_runtime_config
 
     def _run_with_prompt(
         self,
@@ -87,6 +90,13 @@ class BaseStepAgent:
                 unique, verdict = self.uniqueness_agent.evaluate(response)
                 notes["uniqueness_verdict"] = verdict
                 if not unique:
+                    logger.info(
+                        "%s uniqueness rejection (iteration %s): %s\nCandidate description:\n%s",
+                        self.name,
+                        iteration,
+                        verdict,
+                        response,
+                    )
                     conversation.extend([
                         assistant_msg,
                         {
@@ -124,17 +134,15 @@ class BaseStepAgent:
         raise StepExecutionError(f"{self.name} failed after {self.max_iterations} attempts.")
 
     def _invoke_llm(self, conversation: list[dict[str, str]], iteration: int) -> str:
-        raw = self.llm_engine(
+        if self._claude_config is None:
+            raise StepExecutionError(f"{self.name} is misconfigured: missing Claude runtime config.")
+        return run_claude_conversation(
             conversation,
-            stop_sequences=[],
-            additional_trace_tags=[f"multi_step_{self.name.lower().replace(' ', '_')}_{iteration}"],
-            schema=None,
+            system_prompt=self.system_prompt,
+            config=self._claude_config,
+            step_tag=self.name,
+            iteration=iteration,
         )
-        if isinstance(raw, tuple) and len(raw) == 2:
-            raw = raw[0]
-        if not isinstance(raw, str):
-            raise StepExecutionError(f"{self.name} did not return textual output.")
-        return raw.strip()
 
     def _run_in_debug_mode(
         self,
@@ -179,16 +187,15 @@ class ScenarioDescriptionAgent(BaseStepAgent):
     def __init__(
         self,
         *,
-        llm_engine: LLMEngine,
         max_iterations: int,
         uniqueness_agent: ScenarioUniquenessCheckAgent,
         debug_prompts: bool = False,
         debug_printer: Callable[[str], None] | None = None,
+        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
     ) -> None:
         """Initialize the narrative step agent."""
         super().__init__(
             name="Step 1: Scenario Description",
-            llm_engine=llm_engine,
             # Pull the system prompt from the dynamic context module so that
             # updates from `configure_dynamic_context()` are reflected here.
             system_prompt=prompt_context.SCENARIO_DESCRIPTION_SYSTEM_PROMPT,
@@ -196,6 +203,7 @@ class ScenarioDescriptionAgent(BaseStepAgent):
             uniqueness_agent=uniqueness_agent,
             debug_prompts=debug_prompts,
             debug_printer=debug_printer,
+            claude_runtime_config=claude_runtime_config,
         )
 
     def run(
@@ -224,19 +232,19 @@ class AppsAndDataSetupAgent(BaseStepAgent):
     def __init__(
         self,
         *,
-        llm_engine: LLMEngine,
         max_iterations: int,
         debug_prompts: bool = False,
         debug_printer: Callable[[str], None] | None = None,
+        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
     ) -> None:
         """Initialize the apps-and-data step agent."""
         super().__init__(
             name="Step 2: Apps & Data Setup",
-            llm_engine=llm_engine,
             system_prompt=prompt_context.APPS_AND_DATA_SYSTEM_PROMPT,
             max_iterations=max_iterations,
             debug_prompts=debug_prompts,
             debug_printer=debug_printer,
+            claude_runtime_config=claude_runtime_config,
         )
 
     def run(
@@ -274,19 +282,19 @@ class EventsFlowAgent(BaseStepAgent):
     def __init__(
         self,
         *,
-        llm_engine: LLMEngine,
         max_iterations: int,
         debug_prompts: bool = False,
         debug_printer: Callable[[str], None] | None = None,
+        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
     ) -> None:
         """Initialize the events-flow step agent."""
         super().__init__(
             name="Step 3: Events Flow",
-            llm_engine=llm_engine,
             system_prompt=prompt_context.EVENTS_FLOW_SYSTEM_PROMPT,
             max_iterations=max_iterations,
             debug_prompts=debug_prompts,
             debug_printer=debug_printer,
+            claude_runtime_config=claude_runtime_config,
         )
 
     def run(
@@ -320,19 +328,19 @@ class ValidationAgent(BaseStepAgent):
     def __init__(
         self,
         *,
-        llm_engine: LLMEngine,
         max_iterations: int,
         debug_prompts: bool = False,
         debug_printer: Callable[[str], None] | None = None,
+        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
     ) -> None:
         """Initialize the validation step agent."""
         super().__init__(
             name="Step 4: Validation Conditions",
-            llm_engine=llm_engine,
             system_prompt=prompt_context.VALIDATION_SYSTEM_PROMPT,
             max_iterations=max_iterations,
             debug_prompts=debug_prompts,
             debug_printer=debug_printer,
+            claude_runtime_config=claude_runtime_config,
         )
 
     def run(
