@@ -1,4 +1,4 @@
-"""A template to build scenario for Proactive Agent."""
+"""start of the template to build scenario for Proactive Agent."""
 
 from __future__ import annotations
 
@@ -18,11 +18,10 @@ from pas.scenarios import PASScenario
 from pas.scenarios.utils.registry import register_scenario
 
 
-@register_scenario("seed_scenario")
+@register_scenario("original_scenario_id_1")
 class ScenarioName(PASScenario):
     """<<scenario_description>>."""
 
-    # you can just reuse the start_time below
     start_time = datetime(2025, 11, 18, 9, 0, 0, tzinfo=UTC).timestamp()
     status = ScenarioStatus.Draft
     is_benchmark_ready = False
@@ -82,3 +81,6 @@ class ScenarioName(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
+
+
+"""end of the template to build scenario for Proactive Agent."""
