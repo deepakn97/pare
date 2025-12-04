@@ -45,20 +45,23 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         prompt_context: dict[str, str] | None = None,
         debug_prompts: bool = False,
         resume_from_step2: bool = False,
+        resume_from_step: str | None = None,
         claude_filesystem_config: ClaudeFilesystemConfig | None = None,
     ) -> None:
         """Initialize the orchestrator and supporting step agents."""
         self.max_iterations = max_iterations
         self.debug_prompts = debug_prompts
-        self.resume_from_step2 = resume_from_step2
+        # Backwards compatibility: boolean resume_from_step2 maps to "step2" unless
+        # an explicit resume_from_step value is provided.
+        self.resume_from_step = resume_from_step or ("step2" if resume_from_step2 else None)
         base_dir = Path(__file__).resolve().parents[2]
         self.repo_root = base_dir.parent
         self.output_dir = Path(output_dir or base_dir / "generated_scenarios")
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        # Use a seed_scenario-based working file so Claude Agent can repeatedly
-        # edit a single, stable filename. The final successful scenario will
-        # still be persisted into the generated_scenarios directory.
-        self.scenario_file = self.output_dir / "seed_scenario.py"
+        # Use the editable_seed_scenario-based working file so Claude Agent can
+        # repeatedly edit a single, stable filename. The original seed template
+        # remains read-only for reference.
+        self.scenario_file = self.output_dir / "editable_seed_scenario.py"
         self.generated_dir = base_dir / "generated_scenarios"
         self.valid_descriptions_path = self.generated_dir / "valid_descriptions.json"
         self.success_dir = self.generated_dir / "successful_scenarios"
@@ -110,9 +113,11 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
                 "all Claude calls will be skipped. Prompts and planned "
                 "file operations will be logged instead.",
             )
-            # Note: seed_template_path is assigned below; log after initialization.
 
-        self.seed_template_path = base_dir / "example_proactive_scenarios" / "seed_scenario.py"
+        # Use the canonical original seed template with explicit start/end markers
+        # so we can safely strip any natural-language preamble/epilogue that Claude
+        # might emit around the template body.
+        self.seed_template_path = base_dir / "example_proactive_scenarios" / "original_seed_scenario.py"
         self.seed_template_text = self._safe_read_text(self.seed_template_path)
 
         if self.debug_prompts:
@@ -159,14 +164,16 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
             claude_runtime_config=self._claude_config_code_steps,
         )
 
-    def run(self) -> dict[str, Any]:
+    def run(self) -> dict[str, Any]:  # noqa: C901
         """Execute the four-step pipeline and return artifact metadata."""
         logger.info("Starting multi-step scenario generation.")
 
         try:
             step1_path = self.output_dir / "step1_scenario_description.md"
 
-            if self.resume_from_step2 and not self.debug_prompts:
+            resume_mode = self.resume_from_step
+
+            if resume_mode in {"step2", "step3", "step4"} and not self.debug_prompts:
                 step1 = self._load_existing_step1_result(step1_path)
             else:
 
@@ -182,64 +189,146 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
                     historical_descriptions=history_block,
                     check_callback=check1,
                 )
+                logger.info("Step 1 completed with %s iterations.", step1.iterations)
                 if not self.debug_prompts:
                     self._append_valid_description(step1.content)
 
-            scenario_seed_content = self._get_or_initialize_scenario_file()
-
-            def step2_check(code: str, iteration: int) -> tuple[bool, str]:
-                self._write_output(
-                    content=code,
-                    path=self.scenario_file,
-                    header="Step 2 - init_and_populate_apps plan",
-                    append=False,
-                    include_header=False,
+            # Step 2: Apps & Data Setup
+            if resume_mode in {"step3", "step4"} and not self.debug_prompts:
+                logger.info("Resuming from %s: skipping Step 2 generation.", resume_mode)
+                scenario_seed_content = self._safe_read_text(self.scenario_file)
+                scenario_after_step2 = scenario_seed_content
+                step2 = StepResult(
+                    name="Step 2: Apps & Data Setup (resumed)",
+                    content=scenario_seed_content,
+                    iterations=0,
+                    notes={"resumed_from_disk": True},
+                    conversation=[],
                 )
-                result = self._run_step_check("apps-data-check", self.scenario_file)
-                return result.passed, result.feedback
+            else:
+                # Always start each multi-step run from the pristine seed template, so that
+                # Step 2 is constrained to edit only its designated regions.
+                if not self.debug_prompts and self.seed_template_text:
+                    self.scenario_file.write_text(self.seed_template_text, encoding="utf-8")
+                    scenario_seed_content = self.seed_template_text
+                else:
+                    scenario_seed_content = self._get_or_initialize_scenario_file()
 
-            check2 = None if self.debug_prompts else step2_check
+                def step2_check(code: str, iteration: int) -> tuple[bool, str]:
+                    # Guardrail: ensure Validation agent returns the full scenario file,
+                    # not just a natural-language explanation of checks.
+                    if not self._looks_like_complete_scenario(code):
+                        feedback = (
+                            "[validation-check] Your previous reply did not look like a "
+                            "complete Python scenario file. Reply with ONLY the full "
+                            "updated file contents between the existing "
+                            '"""start of the template to build scenario for Proactive Agent.""" '
+                            'and """end of the template to build scenario for Proactive Agent.""" '
+                            "markers, with no natural-language explanation or markdown."
+                        )
+                        return False, feedback
 
-            step2 = self.step2_agent.run(
-                scenario_description=step1.content,
-                scenario_file_path=str(self.scenario_file),
-                scenario_file_contents=scenario_seed_content,
-                check_callback=check2,
-            )
+                    self._write_output(
+                        content=code,
+                        path=self.scenario_file,
+                        header="Step 2 - init_and_populate_apps plan",
+                        append=False,
+                        include_header=False,
+                    )
+                    result = self._run_step_check("apps-data-check", self.scenario_file)
+                    return result.passed, result.feedback
 
-            scenario_after_step2 = (
-                self._debug_placeholder_content("scenario_after_step2", step2.content)
-                if self.debug_prompts
-                else self._safe_read_text(self.scenario_file)
-            )
+                check2 = None if self.debug_prompts else step2_check
 
-            def step3_check(code: str, iteration: int) -> tuple[bool, str]:
-                self._write_output(
-                    content=code,
-                    path=self.scenario_file,
-                    header="Step 3 - build_events_flow outline",
-                    append=False,
-                    include_header=False,
+                step2 = self.step2_agent.run(
+                    scenario_description=step1.content,
+                    scenario_file_path=str(self.scenario_file),
+                    scenario_file_contents=scenario_seed_content,
+                    check_callback=check2,
                 )
-                result = self._run_step_check("events-flow-check", self.scenario_file)
-                return result.passed, result.feedback
+                logger.info("Step 2 completed with %s iterations.", step2.iterations)
 
-            check3 = None if self.debug_prompts else step3_check
+                scenario_after_step2 = (
+                    self._debug_placeholder_content("scenario_after_step2", step2.content)
+                    if self.debug_prompts
+                    else self._safe_read_text(self.scenario_file)
+                )
 
-            step3 = self.step3_agent.run(
-                scenario_description=step1.content,
-                apps_and_data=step2.content,
-                scenario_file_contents=scenario_after_step2,
-                check_callback=check3,
-            )
+                # Snapshot the scenario after Step 2 completes successfully.
+                if not self.debug_prompts:
+                    self._snapshot_scenario("step2")
 
-            scenario_after_step3 = (
-                self._debug_placeholder_content("scenario_after_step3", step3.content)
-                if self.debug_prompts
-                else self._safe_read_text(self.scenario_file)
-            )
+            # Step 3: Events Flow
+            if resume_mode == "step4" and not self.debug_prompts:
+                logger.info("Resuming from step4: skipping Step 3 generation.")
+                scenario_after_step3 = self._safe_read_text(self.scenario_file)
+                step3 = StepResult(
+                    name="Step 3: Events Flow (resumed)",
+                    content=scenario_after_step3,
+                    iterations=0,
+                    notes={"resumed_from_disk": True},
+                    conversation=[],
+                )
+            else:
+
+                def step3_check(code: str, iteration: int) -> tuple[bool, str]:
+                    # Guardrail: don't let natural-language thoughts clobber the
+                    # scenario file. Ensure the response looks like a full scenario.
+                    if not self._looks_like_complete_scenario(code):
+                        feedback = (
+                            "[events-flow-check] Your previous reply did not look like a "
+                            "complete Python scenario file. Reply with ONLY the full "
+                            "updated file contents between the existing "
+                            '"""start of the template to build scenario for Proactive Agent.""" '
+                            'and """end of the template to build scenario for Proactive Agent.""" '
+                            "markers, with no natural-language explanation or markdown."
+                        )
+                        return False, feedback
+
+                    self._write_output(
+                        content=code,
+                        path=self.scenario_file,
+                        header="Step 3 - build_events_flow outline",
+                        append=False,
+                        include_header=False,
+                    )
+                    result = self._run_step_check("events-flow-check", self.scenario_file)
+                    return result.passed, result.feedback
+
+                check3 = None if self.debug_prompts else step3_check
+
+                step3 = self.step3_agent.run(
+                    scenario_description=step1.content,
+                    apps_and_data=step2.content,
+                    scenario_file_contents=scenario_after_step2,
+                    check_callback=check3,
+                )
+                logger.info("Step 3 completed with %s iterations.", step3.iterations)
+
+                scenario_after_step3 = (
+                    self._debug_placeholder_content("scenario_after_step3", step3.content)
+                    if self.debug_prompts
+                    else self._safe_read_text(self.scenario_file)
+                )
+
+                # Snapshot the scenario after Step 3 completes successfully.
+                if not self.debug_prompts:
+                    self._snapshot_scenario("step3")
 
             def step4_check(code: str, iteration: int) -> tuple[bool, str]:
+                # Guardrail: ensure Validation agent returns the full scenario file,
+                # not just a natural-language explanation of checks.
+                if not self._looks_like_complete_scenario(code):
+                    feedback = (
+                        "[validation-check] Your previous reply did not look like a "
+                        "complete Python scenario file. Reply with ONLY the full "
+                        "updated file contents between the existing "
+                        '"""start of the template to build scenario for Proactive Agent.""" '
+                        'and """end of the template to build scenario for Proactive Agent.""" '
+                        "markers, with no natural-language explanation or markdown."
+                    )
+                    return False, feedback
+
                 self._write_output(
                     content=code,
                     path=self.scenario_file,
@@ -262,6 +351,7 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
                 scenario_file_contents=scenario_after_step3,
                 check_callback=check4,
             )
+            logger.info("Step 4 completed with %s iterations.", step4.iterations)
 
             if not self.debug_prompts:
                 self._persist_scenario(self.success_dir)
@@ -300,6 +390,11 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         path.parent.mkdir(parents=True, exist_ok=True)
         normalized = content.strip()
 
+        # For the working scenario file, defensively strip any natural-language
+        # preamble or epilogue that might have been emitted around the template.
+        if path == self.scenario_file:
+            normalized = self._strip_outside_template_markers(normalized)
+
         if include_header:
             block = f"# {header}\n{normalized}\n"
             text_to_write = block
@@ -314,6 +409,65 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
                 file.write(text_to_write)
         else:
             path.write_text(text_to_write, encoding="utf-8")
+
+    @staticmethod
+    def _strip_outside_template_markers(text: str) -> str:
+        """Keep only the portion of the file between the template start/end markers.
+
+        This allows Claude to think "out loud" in its response while ensuring that
+        the persisted Python file remains importable by trimming any prose that
+        appears before or after the canonical template body.
+        """
+        start_marker = '"""start of the template to build scenario for Proactive Agent."""'
+        end_marker = '"""end of the template to build scenario for Proactive Agent."""'
+
+        lines = text.splitlines()
+        start_idx: int | None = None
+        end_idx: int | None = None
+
+        for idx, line in enumerate(lines):
+            if start_marker in line and start_idx is None:
+                start_idx = idx
+            if end_marker in line:
+                end_idx = idx
+
+        if start_idx is not None and end_idx is not None and start_idx <= end_idx:
+            kept = lines[start_idx : end_idx + 1]
+            return "\n".join(kept).strip()
+
+        # Fallback: if markers are missing (e.g., older templates), leave text as-is.
+        return text
+
+    @staticmethod
+    def _looks_like_complete_scenario(text: str) -> bool:
+        """Heuristic check that a Claude reply is a full scenario file, not just prose."""
+        stripped = text.strip()
+        if not stripped:
+            return False
+
+        # Require our template markers and a register_scenario decorator as signs
+        # that the model is returning an edited scenario, not only analysis.
+        has_start = '"""start of the template to build scenario for Proactive Agent."""' in stripped
+        has_end = '"""end of the template to build scenario for Proactive Agent."""' in stripped
+        has_register = "@register_scenario(" in stripped
+        return has_start and has_end and has_register
+
+    def _snapshot_scenario(self, step_label: str) -> None:
+        """Save a point-in-time copy of the editable seed scenario after a step.
+
+        For example, after Step 2 and Step 3 complete successfully we capture
+        `editable_seed_scenario_step2.py` and `editable_seed_scenario_step3.py`
+        so users can inspect or resume from those artifacts if needed.
+        """
+        try:
+            import shutil
+
+            snapshot_name = f"editable_seed_scenario_{step_label}.py"
+            snapshot_path = self.output_dir / snapshot_name
+            shutil.copy2(self.scenario_file, snapshot_path)
+            logger.info("Snapshot for %s written to %s", step_label, snapshot_path)
+        except Exception:  # pragma: no cover - snapshot failures are non-fatal
+            logger.exception("Failed to snapshot scenario after %s", step_label)
 
     def _load_existing_step1_result(self, step1_path: Path) -> StepResult:
         """Load a previously generated Step 1 description from disk.
@@ -381,6 +535,12 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
             self._last_check_result = result
             return result
 
+        logger.info(
+            "Running scenario check '%s' for scenario_id='%s' using artifact '%s'",
+            label,
+            scenario_id,
+            artifact_path,
+        )
         cmd = [
             sys.executable,
             "/Users/jasonz/Projects/ucsb/proactiveGoalInference/pas/scenario_generator/utils/run_scenario.py",

@@ -635,7 +635,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         dest="model",
-        default="gpt-5-chat-latest",
+        default="gpt-5-mini-2025-08-07",
         help="LLM model identifier supported by the configured provider.",
     )
     parser.add_argument(
@@ -663,8 +663,22 @@ def main() -> None:
         action="store_true",
         default=False,
         help=(
-            "Reuse an existing Step 1 description from the output directory and "
-            "start the pipeline at Step 2 (apps & data)."
+            "[DEPRECATED] Reuse an existing Step 1 description from the output "
+            "directory and start the pipeline at Step 2 (apps & data). "
+            "Prefer --resume-from-step step2 instead."
+        ),
+    )
+    parser.add_argument(
+        "--resume-from-step",
+        dest="resume_from_step",
+        choices=["step2", "step3", "step4"],
+        default=None,
+        help=(
+            "Resume the pipeline from a specific step. "
+            "Valid values: step2 (reuse Step 1 narrative), "
+            "step3 (reuse Step 1 narrative and Step 2 code), "
+            "step4 (reuse narrative and code from Steps 2 and 3). "
+            "Takes precedence over --resume-from-step2 if both are provided."
         ),
     )
     parser.add_argument(
@@ -694,12 +708,19 @@ def main() -> None:
         logging.warning("No selectable apps found; continuing with system apps only.")
     prompt_context = prepare_prompt_context_data(app_def_scenario, selected_apps)
 
+    # Emit a warning if the deprecated flag is used without the new one.
+    if args.resume_from_step2 and args.resume_from_step is None:
+        logging.warning(
+            "--resume-from-step2 is deprecated; prefer --resume-from-step step2 instead.",
+        )
+
     agent = MultiStepScenarioGeneratingAgentsOrchestrator(
         output_dir=args.output_dir,
         max_iterations=args.max_iterations,
         prompt_context=prompt_context,
         debug_prompts=args.debug_prompts,
         resume_from_step2=args.resume_from_step2,
+        resume_from_step=args.resume_from_step,
     )
 
     result = agent.run()

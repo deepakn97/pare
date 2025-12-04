@@ -114,6 +114,12 @@ class BaseStepAgent:
                     notes["check_feedback"] = feedback
 
             if not check_passed:
+                logger.warning(
+                    "%s check_callback failed at iteration %s. Feedback:\n%s",
+                    self.name,
+                    iteration,
+                    feedback,
+                )
                 conversation.extend([
                     assistant_msg,
                     {
@@ -124,6 +130,11 @@ class BaseStepAgent:
                 continue
 
             full_conversation = [*conversation, assistant_msg]
+            logger.info(
+                "%s succeeded at iteration %s",
+                self.name,
+                iteration,
+            )
             return StepResult(
                 name=self.name,
                 content=response,

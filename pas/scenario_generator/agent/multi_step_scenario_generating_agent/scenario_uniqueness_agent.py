@@ -47,9 +47,19 @@ class ScenarioUniquenessCheckAgent:
             user_prompt=user_prompt,
             trace_tag="multi_step_step1_uniqueness",
         )
-        normalized = verdict.strip().upper()
-        is_unique = normalized.startswith("PASS")
-        return is_unique, verdict.strip()
+        text = verdict.strip()
+        # Make the PASS/RETRY classification robust to extra prose around the signal.
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        is_unique = False
+        for line in lines:
+            normalized = line.upper().lstrip("* ").strip()
+            if normalized.startswith("RETRY"):
+                is_unique = False
+                break
+            if normalized.startswith("PASS"):
+                is_unique = True
+                break
+        return is_unique, text
 
     def get_recent_history(self, limit: int = 8) -> str:
         """Return a human-friendly summary of previously accepted descriptions."""

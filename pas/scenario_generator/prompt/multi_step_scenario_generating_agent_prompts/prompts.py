@@ -266,9 +266,21 @@ _APPS_AND_DATA_BODY = textwrap.dedent(
     - Structure the output per app with clear subsections.
     - Do NOT invent runtime events; those belong to Step 3.
     - Only modify the import section and `init_and_populate_apps()` body. Keep WARNING comments and other TODO blocks untouched.
+      This means:
+        - In the import section, you may replace the "TODO: import all Apps" area with concrete imports.
+        - In `init_and_populate_apps()`, you may initialize apps, populate their data, and register them in `self.apps`.
+        - You MUST NOT change any other function, class, decorator, or comment outside those two regions.
+        - You MUST preserve the `@register_scenario(...)` decorator, class name, docstring, `start_time`, status fields,
+          `build_events_flow()`, `validate()`, and all WARNING comments exactly as they appear.
     - Reference the "Import Instructions" block for permissible imports.
     - Mirror the "App Initialization Blueprint" so attribute names and `get_typed_app()` lookups stay aligned with later steps.
     - Use the PAS app classes under `pas/apps/` and their Meta-ARE bases under `are/simulation/apps/` as the source of truth for which methods exist; do not invent new APIs.
+    - CRITICAL: Before constructing any object or calling any method from these apps (for example `Contact` from `are.simulation.apps.contacts`),
+      use the `Read` tool to open the defining Python file and inspect the initializer signature and type hints.
+      Do NOT guess field names or argument order; copy them exactly from the class definition.
+    - When you need to check available methods or attributes on an app, use the Read tool to open the corresponding Python files in the PAS apps directory
+      and the Meta-ARE apps directory mentioned in the project context. Prefer reading the source over inferring from memory and avoid mistakes like
+      unexpected keyword arguments or missing required parameters.
     """
 )
 
@@ -287,6 +299,10 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - For non-oracle environment events, only use methods that have notification templates in `pas/apps/notification_templates.py` (see the NOTIFICATION_TEMPLATES dict).
     - For oracle/user actions, use app tools defined on the PAS apps and their Meta-ARE bases; do not invent new methods.
     - Mirror the "App Initialization Blueprint" so your local variables match how apps were seeded in Step 2.
+    - CRITICAL: Before calling any email, calendar, contacts, or messaging API (for example `send_email_to_user_with_id`, `reply_to_email`,
+      or calendar event helpers), use the Read tool to open the PAS app class and its Meta-ARE base and copy the exact method signatures
+      and required arguments. Do NOT guess enum members (like folder names) or omit required parameters (such as `email_id` or `email`).
+      If a method takes a complex object (like `Email`), construct it using the exact field names from the class definition.
     """
 )
 
@@ -460,8 +476,25 @@ APPS_AND_DATA_USER_PROMPT = textwrap.dedent(
     ```
 
     Incorporate the scenario description into the template above by returning a COMPLETE python file that
-focuses on `init_and_populate_apps()` and the TODO in the import part. Update docstrings/comments as needed, but do NOT change any other function
-except to keep their TODO placeholders. Maintain the register_scenario metadata, WARNING comments, and class structure.
+    focuses on `init_and_populate_apps()` and the TODO in the import part.
+
+    Apply STRICT edit boundaries:
+    - You may only change:
+      - The imports section around the "TODO: import all Apps that will be used in this scenario" comment.
+      - The body of `init_and_populate_apps()` between its WARNING comment and the end of that method.
+    - You must NOT change ANY code, comments, or whitespace outside those regions.
+      - Do not alter the module docstring, `from __future__ import ...` line, or any other imports.
+      - Do not change the `@register_scenario(...)` decorator, class name, docstring, `start_time`, status fields,
+        `build_events_flow()`, `validate()`, or their WARNING comments.
+      - Do not reorder, add, or delete lines outside the allowed regions.
+
+    Update docstrings/comments inside the allowed regions as needed, but preserve all WARNING comments verbatim.
+
+    Your response must be ONLY the updated Python file contents:
+    - Do NOT include any natural-language explanation, summaries, or markdown headings.
+    - Do NOT wrap the file in triple backticks or any other fencing.
+    - The first line of your response should be the first line of the Python file (e.g., `from __future__ import annotations`),
+      and the last line should be the end of the file.
     """
 )
 
@@ -483,12 +516,18 @@ EVENTS_FLOW_USER_PROMPT = textwrap.dedent(
     {apps_and_data}
     ---
 
-Current scenario file (after Step 2):
-```python
-{scenario_file_contents}
-```
+    Current scenario file (after Step 2):
+    ```python
+    {scenario_file_contents}
+    ```
 
-Produce the updated python file with a fully implemented `build_events_flow()` following the TODO guidance.
+    Produce the updated python file with a fully implemented `build_events_flow()` following the TODO guidance.
+
+    Your response must be ONLY the updated Python file contents:
+    - Do NOT include any natural-language explanation, summaries, or markdown headings.
+    - Do NOT wrap the file in triple backticks or any other fencing.
+    - The first line of your response should be the first line of the Python file (for example, the existing module docstring),
+      and the last line should be the end of the file, including the template end marker.
     """
 )
 
@@ -514,5 +553,11 @@ Current scenario file (after Step 3):
 ```
 
 Return the updated python file with the `validate()` function fully implemented per the warning comments.
+
+Your response must be ONLY the updated Python file contents:
+- Do NOT include any natural-language explanation, summaries, or markdown headings.
+- Do NOT wrap the file in triple backticks or any other fencing.
+- The first line of your response should be the first line of the Python file (for example, the existing module docstring),
+  and the last line should be the end of the file, including the template end marker.
     """
 )
