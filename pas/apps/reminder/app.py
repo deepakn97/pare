@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class StatefulReminderApp(StatefulApp, ReminderApp):
-    """Stateful wrapper for ReminderApp with PAS navigation."""
+    """ReminderApp with PAS navigation."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialise reminder app with root state."""

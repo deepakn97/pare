@@ -19,10 +19,7 @@ from pas.apps.reminder.states import (
 )
 
 
-# --------------------------------------------------------
 # Utility to create a CompletedEvent for state transitions
-# --------------------------------------------------------
-
 def _make_event(app: StatefulReminderApp, func: callable, **kwargs: Any) -> CompletedEvent:
     """Utility to build a minimal CompletedEvent for testing."""
     action = Action(function=func, args={"self": app, **kwargs}, app=app)
@@ -35,10 +32,7 @@ def _make_event(app: StatefulReminderApp, func: callable, **kwargs: Any) -> Comp
     )
 
 
-# --------------------------------------------------------
 # Fixtures
-# --------------------------------------------------------
-
 @pytest.fixture
 def reminder_app() -> StatefulReminderApp:
     """Create a fresh reminder app."""
@@ -46,10 +40,7 @@ def reminder_app() -> StatefulReminderApp:
     return app
 
 
-# --------------------------------------------------------
 # Tests
-# --------------------------------------------------------
-
 def test_starts_in_list(reminder_app: StatefulReminderApp):
     """App should start in ReminderList."""
     assert isinstance(reminder_app.current_state, ReminderList)
