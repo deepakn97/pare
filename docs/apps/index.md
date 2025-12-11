@@ -12,6 +12,8 @@ Use these pages to explore the current user-facing tool surface for each PAS sta
 - [Stateful Apartment App](./apartment.md)
 - [Stateful Reminder App](./reminder.md)
 - [Stateful Shopping App](./shopping.md)
+- [Stateful Note App](./note.md)
+
 
 ## Navigation Framework Recap
 - Every stateful app inherits from `pas.apps.core.StatefulApp`, which binds a navigation state (`AppState`) before surfacing its tools.
