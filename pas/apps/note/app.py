@@ -237,18 +237,13 @@ class StatefulNoteApp(StatefulApp):
         """
         return self.notes[note_id].attachments
 
-    # ============================================================
-    # C901 FIX: reduced complexity using dynamic dispatch
-    # ============================================================
+
     def _apply_transition(self, func: str, args: dict[str, object], result: str | None) -> None:
         """Apply navigation transition for the given function name."""
         handler = getattr(self, f"_transition_{func}", None)
         if callable(handler):
             handler(args, result)
 
-    # ------------------------
-    # transition handlers
-    # ------------------------
 
     def _transition_new(self, args: dict[str, object], result: str | None) -> None:
         if isinstance(result, str):
@@ -314,3 +309,4 @@ class StatefulNoteApp(StatefulApp):
         result = event.metadata.return_value
 
         self._apply_transition(func, args, result)
+
