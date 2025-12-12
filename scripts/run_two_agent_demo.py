@@ -108,16 +108,19 @@ def run_demo(
     user_config = ARESimulationReactBaseAgentConfig(
         llm_engine_config=LLMEngineConfig(model_name=user_model, provider="openai"),
         max_iterations=1,  # User agent typically takes fewer iterations per turn
+        use_custom_logger=False,
     )
 
     proactive_observe_config = ARESimulationReactBaseAgentConfig(
         llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider="openai"),
-        max_iterations=1,  # Observation might need more reasoning
+        max_iterations=10,  # Observation might need more reasoning
+        use_custom_logger=False,
     )
 
     proactive_execute_config = ARESimulationReactBaseAgentConfig(
         llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider="openai"),
-        max_iterations=5,  # Execution might need multiple tool calls
+        max_iterations=20,  # Execution might need multiple tool calls
+        use_custom_logger=False,
     )
 
     # Create runner configuration
@@ -129,6 +132,7 @@ def run_demo(
         output_dir=str(output_path),
         dump_agent_logs=True,
         dump_world_logs=True,
+        use_custom_logger=False,
     )
 
     # Create and run the scenario runner
@@ -227,6 +231,8 @@ def main(argv: list[str] | None = None) -> None:
     # Setup logging
     setup_logging(level="INFO", use_tqdm=True)
     suppress_noisy_loggers()
+    logging.getLogger("pas.agents").setLevel(logging.WARNING)
+    logging.getLogger("are.simulation.agents").setLevel(logging.WARNING)
 
     # Load environment variables
     load_dotenv()

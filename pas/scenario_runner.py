@@ -20,7 +20,7 @@ from pas.agents import ProactiveAgent, UserAgent
 from pas.agents.proactive.prompts.execute_prompt import (
     DEFAULT_PROACTIVE_EXECUTE_PROMPT_WITH_HINTS,
 )
-from pas.agents.proactive.prompts.observe_prompt import DEFAULT_PROACTIVE_OBSERVE_PROMPT
+from pas.agents.proactive.prompts.observe_prompt import DEFAULT_PROACTIVE_OBSERVE_PROMPT_WITH_HINTS
 from pas.agents.proactive.steps import get_proactive_agent_pre_step
 from pas.agents.user.prompts.system_prompt import DEFAULT_USER_AGENT_SYSTEM_PROMPT
 from pas.agents.user.steps import get_user_agent_pre_step
@@ -179,7 +179,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
                 tools={},
                 use_custom_logger=proactive_observe_config.use_custom_logger,
             ),
-            system_prompts={"system_prompt": DEFAULT_PROACTIVE_OBSERVE_PROMPT},
+            system_prompts={"system_prompt": DEFAULT_PROACTIVE_OBSERVE_PROMPT_WITH_HINTS},
         )
 
         execute_llm_engine = LLMEngineBuilder().create_engine(proactive_execute_config.llm_engine_config)
