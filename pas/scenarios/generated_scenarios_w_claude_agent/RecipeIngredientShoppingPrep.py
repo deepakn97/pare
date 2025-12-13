@@ -195,7 +195,7 @@ The two-hour timeline accounts for the slow rendering of guanciale fat, which is
 
 Buon appetito!
 - Chef Marco, Authentic Italian Cooking""",
-            ).delayed(seconds=5)
+            ).delayed(5)
 
             # Event 2: Agent sends proposal after correlating recipe with dinner plans (oracle)
             proposal_event = (
@@ -236,7 +236,7 @@ This way you'll have time to shop before they close and start cooking with enoug
 
             # Event 5: Agent retrieves Bella Italia contact details for calendar event (oracle)
             contacts_check_event = (
-                contacts_app.search_contacts_by_keyword(keyword="Bella Italia")
+                contacts_app.search_contacts(query="Bella Italia")
                 .oracle()
                 .depends_on(calendar_check_event, delay_seconds=1)
             )
@@ -351,8 +351,8 @@ Your Friday evening is free, so you'll have plenty of time to shop for the speci
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulContactsApp"
-                and e.action.function_name == "search_contacts_by_keyword"
-                and "bella italia" in e.action.args.get("keyword", "").lower()
+                and e.action.function_name == "search_contacts"
+                and "bella italia" in e.action.args.get("query", "").lower()
                 for e in log_entries
             )
 

@@ -754,6 +754,22 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         class_name = match.group(1)
         target_path = self.seed_scenarios_dir / f"{class_name}.py"
 
+        # Safety guard: never export into `generated_scenarios_w_claude_agent/`
+        # unless the most recent run check reached validation and succeeded.
+        if (
+            self._last_check_result is None
+            or self._last_check_result.runtime_error
+            or not self._last_check_result.validation_reached
+            or not self._last_check_result.validation_success
+        ):
+            logger.warning(
+                "Skipping final scenario export for class %s: last run check did not validate successfully.",
+                class_name,
+            )
+            # Still reset the working file so subsequent runs start clean.
+            self._initialize_working_scenario_from_seed()
+            return
+
         try:
             shutil.copy2(self.scenario_file, target_path)
             logger.info(

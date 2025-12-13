@@ -244,7 +244,9 @@ class LabResultsAppointmentScheduling(PASScenario):
 
             # Oracle Event 3: Agent checks messaging history with Michael
             check_messages_event = (
-                messaging_app.list_conversations().oracle().depends_on(check_calendar_event, delay_seconds=2)
+                messaging_app.list_recent_conversations(limit=10)
+                .oracle()
+                .depends_on(check_calendar_event, delay_seconds=2)
             )
 
             # Oracle Event 4: Agent sends proposal to user
@@ -274,13 +276,12 @@ class LabResultsAppointmentScheduling(PASScenario):
             )
 
             # Oracle Event 7: Agent sends message to Michael about transportation
-            # Get Michael's conversation ID from the messaging app
+            # Message Michael about transportation
             michael_id = messaging_app.name_to_id["Michael Rodriguez"]
-            michael_conv_id = "conv_michael_old"
 
             send_michael_message_event = (
                 messaging_app.send_message(
-                    conversation_id=michael_conv_id,
+                    user_id=michael_id,
                     content="Hey Michael! I have a doctor's appointment this Thursday afternoon (Nov 21). You mentioned you're free on Thursday afternoons - would you still be able to give me a ride?",
                 )
                 .oracle()
@@ -358,7 +359,7 @@ class LabResultsAppointmentScheduling(PASScenario):
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "list_conversations"
+                and e.action.function_name == "list_recent_conversations"
                 for e in log_entries
             )
 

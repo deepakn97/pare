@@ -12,7 +12,7 @@ from are.simulation.apps.contacts import Contact
 from are.simulation.apps.email_client import Email, EmailFolderName
 from are.simulation.apps.messaging_v2 import ConversationV2, MessageV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
-from are.simulation.types import AbstractEnvironment, Event, EventRegisterer
+from are.simulation.types import AbstractEnvironment, Action, Event, EventRegisterer, EventType
 
 from pas.apps import (
     HomeScreenSystemApp,
@@ -341,77 +341,91 @@ class TeammateCoverageUrgentAbsence(PASScenario):
             # Check Step 1: Agent sent proposal to the user
             # The agent should detect the sick day message and urgent client email, then offer help
             proposal_found = any(
-                "PASAgentUserInterface" in entry.get("app", "")
-                and "send_message_to_user" in entry.get("tool", "")
-                and "coordinate coverage" in entry.get("args", {}).get("content", "").lower()
-                and "three important commitments" in entry.get("args", {}).get("content", "").lower()
-                for entry in log_entries
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "PASAgentUserInterface"
+                and e.action.function_name == "send_message_to_user"
+                and "coordinate coverage" in e.action.args.get("content", "").lower()
+                and "three important commitments" in e.action.args.get("content", "").lower()
+                for e in log_entries
             )
 
             # Check Step 2: Agent detected calendar conflicts by querying calendar
             # The agent should call get_calendar_events_from_to to identify today's meetings
             calendar_check_found = any(
-                "Calendar" in entry.get("app", "")
-                and "get_calendar_events_from_to" in entry.get("tool", "")
-                and "2025-11-18" in str(entry.get("args", {}))
-                for entry in log_entries
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "get_calendar_events_from_to"
+                and "2025-11-18" in str(e.action.args)
+                for e in log_entries
             )
 
             # Check Step 3a: Agent sent message to Michael Chen for presentation coverage
             # Strict check: must message Michael and mention the client presentation
             michael_message_found = any(
-                "Messages" in entry.get("app", "")
-                and "send_message" in entry.get("tool", "")
-                and "Michael Chen" in str(entry.get("args", {}))
-                and "presentation" in entry.get("args", {}).get("content", "").lower()
-                for entry in log_entries
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulMessagingApp"
+                and e.action.function_name == "send_message"
+                and "michael" in e.action.args.get("content", "").lower()
+                and "presentation" in e.action.args.get("content", "").lower()
+                for e in log_entries
             )
 
             # Check Step 3b: Agent sent message to Emily Rodriguez for project review
             # Flexible check: should message Emily about the 2 PM meeting
             emily_message_found = any(
-                "Messages" in entry.get("app", "")
-                and "send_message" in entry.get("tool", "")
-                and "Emily Rodriguez" in str(entry.get("args", {}))
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulMessagingApp"
+                and e.action.function_name == "send_message"
+                and "emily" in e.action.args.get("content", "").lower()
                 and (
-                    "project review" in entry.get("args", {}).get("content", "").lower()
-                    or "sprint 23" in entry.get("args", {}).get("content", "").lower()
-                    or "2 pm" in entry.get("args", {}).get("content", "").lower()
+                    "project review" in e.action.args.get("content", "").lower()
+                    or "sprint 23" in e.action.args.get("content", "").lower()
+                    or "2 pm" in e.action.args.get("content", "").lower()
                 )
-                for entry in log_entries
+                for e in log_entries
             )
 
             # Check Step 3c: Agent sent message to Jennifer Lee for interview rescheduling
             # Flexible check: should message Jennifer about the interview
             jennifer_message_found = any(
-                "Messages" in entry.get("app", "")
-                and "send_message" in entry.get("tool", "")
-                and "Jennifer Lee" in str(entry.get("args", {}))
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulMessagingApp"
+                and e.action.function_name == "send_message"
+                and "jennifer" in e.action.args.get("content", "").lower()
                 and (
-                    "interview" in entry.get("args", {}).get("content", "").lower()
-                    or "reschedule" in entry.get("args", {}).get("content", "").lower()
+                    "interview" in e.action.args.get("content", "").lower()
+                    or "reschedule" in e.action.args.get("content", "").lower()
                 )
-                for entry in log_entries
+                for e in log_entries
             )
 
             # Check Step 3d: Agent replied to client email introducing Michael
             # Strict check: must reply to the client email and mention Michael Chen
             client_reply_found = any(
-                "Emails" in entry.get("app", "")
-                and "reply_to_email" in entry.get("tool", "")
-                and "client_presentation_confirmation_001" in str(entry.get("args", {}))
-                and "michael" in entry.get("args", {}).get("content", "").lower()
-                for entry in log_entries
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulEmailApp"
+                and e.action.function_name == "reply_to_email"
+                and e.action.args.get("email_id") == "client_presentation_confirmation_001"
+                and "michael" in e.action.args.get("content", "").lower()
+                for e in log_entries
             )
 
             # Check Step 3e: Agent sent confirmation summary to user
             # Flexible check: should summarize the coordination actions
             confirmation_found = any(
-                "PASAgentUserInterface" in entry.get("app", "")
-                and "send_message_to_user" in entry.get("tool", "")
-                and "coordinated coverage" in entry.get("args", {}).get("content", "").lower()
-                and "three meetings" in entry.get("args", {}).get("content", "").lower()
-                for entry in log_entries
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "PASAgentUserInterface"
+                and e.action.function_name == "send_message_to_user"
+                and "coordinated coverage" in e.action.args.get("content", "").lower()
+                and "three meetings" in e.action.args.get("content", "").lower()
+                for e in log_entries
             )
 
             # Success requires all critical checks to pass
