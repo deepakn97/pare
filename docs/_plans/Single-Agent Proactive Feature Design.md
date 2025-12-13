@@ -1,12 +1,35 @@
 # Enhanced Observe Agent with Read-Only Tools
 
 **GitHub Issue**: #37 - Enhanced observe agent capabilities
+**Status**: Phases 1-4 Complete
 
 ## Summary
 
 Enhance the existing `ProactiveAgent` class to give the observe agent access to all read-only tools (in addition to `wait` and `send_message_to_user`). This allows the observe agent to explore the environment before making proposals. Also implement turn termination logic where turns end only when specific tools are called.
 
 **Architecture Decision**: Keep the two-agent architecture (observe + execute agents) rather than creating a single unified agent. Future work will add history sharing between agents.
+
+---
+
+## Implementation Summary (Completed)
+
+### Phase 1: Read-Only Tools for Observe Agent ✅
+Updated `init_tools()` in `pas/agents/proactive/agent.py` to give the observe agent access to all `OperationType.READ` tools in addition to `wait` and `send_message_to_user`. Tools are filtered using the `__operation_type__` attribute on tool functions.
+
+### Phase 2: Turn Termination Logic ✅
+- Increased `observe_max_iterations` default from 1 to 10 to allow exploration
+- Implemented `get_proactive_agent_termination_step()` in `pas/agents/proactive/agent.py` that terminates the observe agent's turn only when `wait` or `send_message_to_user` is called
+- The termination step checks the agent's logs for `ToolCallLog` entries matching turn-ending tool names
+
+### Phase 3: Updated Observe Prompt ✅
+Updated `pas/agents/proactive/prompts/observe_prompt.py` to inform the agent about its expanded tool access and the turn termination behavior.
+
+### Phase 4: Testing ✅
+Tested the observe agent with expanded tools and verified turn termination works correctly. Also resolved a logging configuration issue where DEBUG logs from ARE's `base_agent.py` were appearing despite log level being set to INFO.
+
+**Logging Fix**: Updated `suppress_noisy_are_loggers()` in `pas/logging_config.py` to also remove any handlers that might have been added by ARE's `get_default_logger()` function, which could bypass the log level settings.
+
+---
 
 ## Key Design Decisions
 
@@ -185,9 +208,19 @@ You have access to:
 
 ---
 
+## Learnings & Notes for Future Work
+
+1. **ARE Logging Architecture**: ARE's `get_default_logger()` creates isolated loggers with DEBUG level and custom handlers. When `use_custom_logger=False` is passed to `BaseAgent`, it uses `get_parent_logger()` which respects the parent logging configuration. Ensure all `BaseAgent` instances in PAS use `use_custom_logger=False` to respect PAS's logging setup.
+
+2. **History Access**: The observe agent's history can be accessed via `self.observe_agent.get_agent_logs()` which returns a list of `BaseAgentLog` objects including `ToolCallLog`, `ObservationLog`, `TaskLog`, etc. This will be useful for Phase 5's history transfer.
+
+3. **Termination Step Pattern**: The termination step receives the agent and the last log entry. It can inspect `agent.get_agent_logs()` to check for specific tool calls. This pattern could be reused for execute agent termination.
+
+---
+
 ## Future Work
 
-### Phase 4 (Future): History Transfer to Execute Agent
+### Phase 5 (Future): History Transfer to Execute Agent
 
 Feed observe agent's history to execute agent when transitioning to execute mode. This provides context about what was observed before the proposal.
 
@@ -206,7 +239,7 @@ def _transfer_history_to_execute_agent(self) -> None:
     # TBD: exact mechanism
 ```
 
-### Phase 5 (Future): History Summarizer
+### Phase 6 (Future): History Summarizer
 
 Implement an LLM-based summarizer that takes agent history and generates a concise summary.
 
@@ -253,11 +286,11 @@ Focus on:
 
 ## Implementation Order
 
-1. Update `init_tools()` in `agent.py` to give observe agent read-only tools
-2. Update `observe_max_iterations` default to 10
-3. Implement turn termination logic (turn ends on `wait`/`send_message_to_user`)
-4. Update observe prompt to reflect new capabilities
-5. Test observe agent with expanded tool access and turn termination
+1. ~~Update `init_tools()` in `agent.py` to give observe agent read-only tools~~ ✅
+2. ~~Update `observe_max_iterations` default to 10~~ ✅
+3. ~~Implement turn termination logic (turn ends on `wait`/`send_message_to_user`)~~ ✅
+4. ~~Update observe prompt to reflect new capabilities~~ ✅
+5. ~~Test observe agent with expanded tool access and turn termination~~ ✅
 6. (Future) Implement history transfer mechanism
 7. (Future) Implement history summarizer
 

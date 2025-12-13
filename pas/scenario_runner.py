@@ -167,6 +167,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
                 use_custom_logger=user_config.use_custom_logger,
             ),
             system_prompts={"system_prompt": DEFAULT_USER_AGENT_SYSTEM_PROMPT},
+            use_custom_logger=user_config.use_custom_logger,
         )
 
         observe_llm_engine = LLMEngineBuilder().create_engine(proactive_observe_config.llm_engine_config)
@@ -180,6 +181,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
                 use_custom_logger=proactive_observe_config.use_custom_logger,
             ),
             system_prompts={"system_prompt": DEFAULT_PROACTIVE_OBSERVE_PROMPT_WITH_HINTS},
+            use_custom_logger=proactive_observe_config.use_custom_logger,
         )
 
         execute_llm_engine = LLMEngineBuilder().create_engine(proactive_execute_config.llm_engine_config)
@@ -193,6 +195,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
                 use_custom_logger=proactive_execute_config.use_custom_logger,
             ),
             system_prompts={"system_prompt": DEFAULT_PROACTIVE_EXECUTE_PROMPT_WITH_HINTS},
+            use_custom_logger=proactive_execute_config.use_custom_logger,
         )
 
         user_agent = UserAgent(

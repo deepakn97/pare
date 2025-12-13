@@ -42,7 +42,7 @@ def pull_notifications_and_tools(agent: BaseAgent) -> None:
     messages_to_put_back = [m for m in unhandled_notifications if m not in agent_messages + env_notifications]
     for message in messages_to_put_back:
         agent.notification_system.message_queue.put(message)
-    logger.info(
+    logger.debug(
         f"User agent pre-step -> message types to put back: {'; '.join([m.message_type.value for m in messages_to_put_back])}"
     )
 
