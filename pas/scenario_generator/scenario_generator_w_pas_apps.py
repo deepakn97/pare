@@ -219,7 +219,7 @@ def main() -> None:  # noqa: C901
     # Use live registry snapshots from BOTH ARE and PAS registries
     from are.simulation.scenarios.utils.registry import registry as are_registry
 
-    from pas.scenarios.registry import registry as pas_registry
+    from pas.scenarios.utils.registry import registry as pas_registry
 
     ALL_SCENARIOS = {**are_registry.get_all_scenarios(), **pas_registry.get_all_scenarios()}
 
