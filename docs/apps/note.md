@@ -1,75 +1,74 @@
-# Stateful Note App
-
-`pas.apps.note.app.StatefulNoteApp` pairs PAS navigation with an in-memory note backend.
-It starts in `NoteList("All")` and pushes additional states for note detail, editing, and folder selection.
-
----
-
-## Navigation States
+# Note App State & Tool Specification
 
 ---
 
 ## NoteList
 
+State representing a list of notes within a folder or search mode.
+
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `list()` | `StatefulNoteApp.list_notes(folder=self.folder)` | `list[Note]` | Remains in `NoteList(folder)` |
-| `open(note_id)` | `StatefulNoteApp.get_note(note_id)` | `Note` | Completed event transitions to `NoteDetail(note_id)` |
-| `new()` | `StatefulNoteApp.create_note(folder=self.folder)` | Newly created note id | Completed event transitions to `EditNote(new_id)` |
-| `search(keyword)` | `StatefulNoteApp.search_notes(keyword)` | `list[Note]` | Completed event transitions to `NoteList(search_mode=True)` |
-| `folders()` | `StatefulNoteApp.list_folders()` | `list[str]` | Completed event transitions to `FolderList()` |
+| `list(offset=0, limit=10)` | `StatefulNoteApp.list_notes(folder=self.folder, offset, limit)` | `ReturnedNotes` | No transition (remains in `NoteList(folder)`) |
+| `open(note_id)` | `StatefulNoteApp.get_note(note_id)` | `Note` | → `NoteDetail(note_id)` |
+| `new()` | `StatefulNoteApp.create_note(folder=self.folder)` | `note_id: str` | → `EditNote(note_id)` |
+| `search(keyword)` | `StatefulNoteApp.search_notes(keyword, folder=self.folder)` | `list[Note]` | → `NoteList(search_mode=True)` |
+| `folders()` | `StatefulNoteApp.list_folders()` | `list[str]` | → `FolderList()` |
 
 ---
 
 ## NoteDetail
 
+State showing detailed view of a single note.
+
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `refresh()` | `StatefulNoteApp.get_note(note_id)` | Updated `Note` | Remains in `NoteDetail` |
-| `attachments()` | `StatefulNoteApp.list_attachments(note_id)` | `list[str]` | Remains in `NoteDetail` |
-| `add_attachment(path)` | `StatefulNoteApp.add_attachment(note_id, path)` | `"OK"` | Remains in `NoteDetail` |
-| `remove_attachment(path)` | `StatefulNoteApp.remove_attachment(note_id, path)` | `"OK"` | Remains in `NoteDetail` |
-| `delete()` | `StatefulNoteApp.delete_note(note_id)` | `"OK"` | Completed event transitions back to `NoteList("All")` |
-| `edit()` | *Frontend op only* — returns `EditNote(note_id)` | `EditNote` | Completed event transitions to `EditNote(note_id)` |
+| `refresh()` | `StatefulNoteApp.get_note(note_id)` | `Note` | No transition (remains in `NoteDetail`) |
+| `attachments()` | `StatefulNoteApp.list_attachments(note_id)` | `list[str]` | No transition |
+| `add_attachment(attachment)` | `StatefulNoteApp.add_attachment(note_id, attachment)` | `"OK"` | No transition |
+| `remove_attachment(attachment)` | `StatefulNoteApp.remove_attachment(note_id, attachment)` | `"OK"` | No transition |
+| `delete()` | `StatefulNoteApp.delete_note(note_id)` | `"OK"` | → `NoteList("All")` |
+| `edit()` | Frontend-only (no backend call) | `str` | → `EditNote(note_id)` |
 
 ---
 
 ## EditNote
 
+State enabling editing capabilities for an existing note.
+
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `update(title, content)` | `StatefulNoteApp.update_note(note_id, title, content)` | Updated note id | Completed event transitions to `NoteDetail(note_id)` |
+| `update(title, content)` | `StatefulNoteApp.update_note(note_id, title, content)` | `note_id: str` | → `NoteDetail(note_id)` |
 
 ---
 
 ## FolderList
 
+State displaying all available folders.
+
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `list()` | `StatefulNoteApp.list_folders()` | `list[str]` | Remains in `FolderList` |
-| `open(folder)` | *Frontend op only* — returns `NoteList(folder)` | `NoteList(folder)` | Completed event transitions to `NoteList(folder)` |
+| `list_folders()` | `StatefulNoteApp.list_folders()` | `list[str]` | No transition (remains in `FolderList`) |
+| `open(folder)` | Frontend-only (no backend call) | `str` | → `NoteList(folder)` |
 
 ---
 
-## Navigation Helpers (App-Level)
+## Backend-only Operations
 
-- Creating a note (`new`, `create_note`) always transitions into the editing screen.
-- Opening a note (`open`, `get_note`) transitions into `NoteDetail`.
-- Updating a note returns the user to `NoteDetail`.
-- Deleting a note returns the user to `NoteList("All")`.
-- Listing folders transitions to `FolderList`.
-- Selecting a folder transitions to the corresponding `NoteList(folder)`.
-- Searching transitions into `NoteList(search_mode=True)` regardless of original folder.
+Operations not directly exposed as UI tools but participating in navigation.
+
+| Backend method | Returns | Navigation effect |
+| --- | --- | --- |
+| `move_note(note_id, new_folder)` | `"OK"` | → `NoteList(new_folder)` |
+| `duplicate_note(note_id)` | `note_id: str` | → `NoteDetail(note_id)` |
+| `get_note(note_id)` | `Note` | → `NoteDetail(note_id)` |
+| `list_notes(folder, offset, limit)` | `ReturnedNotes` | → `NoteList(folder)` |
+| `list_folders()` | `list[str]` | → `FolderList()` |
 
 ---
 
-## Summary
+## Navigation Rules
 
-The Stateful Note App follows a simple CRUD-driven navigation model:
-
-- **NoteList** → list, open, create, search, folders
-- **NoteDetail** → view, refresh, delete, attachments, edit
-- **EditNote** → update and return
-- **FolderList** → choose a folder to enter its NoteList
-
-PAS Completed Events fully control state transitions based on the backend operation invoked.
+- Navigation is driven by `CompletedEvent` and `_transition_<function>` handlers.
+- Return values do not directly trigger navigation.
+- Frontend-only tools still emit PAS events.
+- `disable_events()` prevents nested event emission within state tools.

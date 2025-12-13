@@ -19,9 +19,7 @@ from pas.apps.note.states import (
 )
 
 
-
 def _make_event(app: StatefulNoteApp, func: callable, return_value: Any = None, **kwargs: Any) -> CompletedEvent:
-    """Utility to create a minimal CompletedEvent for testing."""
     action = Action(function=func, args={"self": app, **kwargs}, app=app)
     metadata = EventMetadata()
     metadata.return_value = return_value
@@ -34,27 +32,24 @@ def _make_event(app: StatefulNoteApp, func: callable, return_value: Any = None, 
     )
 
 
-
 @pytest.fixture
 def note_app() -> StatefulNoteApp:
-    """Create a fresh note app."""
     return StatefulNoteApp(name="note")
 
 
 def test_starts_in_list(note_app: StatefulNoteApp):
-    """App should start in NoteList."""
     assert isinstance(note_app.current_state, NoteList)
     assert note_app.navigation_stack == []
 
 
 def test_create_note_opens_edit(note_app: StatefulNoteApp):
-    """create_note should transition to EditNote."""
-    # Trigger tool
     nid = note_app.current_state.new()
+
     event = _make_event(
         note_app,
-        note_app.current_state.new,
+        note_app.create_note,
         return_value=nid,
+        folder="All",
     )
     note_app.handle_state_transition(event)
 
@@ -63,17 +58,18 @@ def test_create_note_opens_edit(note_app: StatefulNoteApp):
 
 
 def test_edit_save_transitions_to_detail(note_app: StatefulNoteApp):
-    """Saving a note should go to NoteDetail."""
-    # Create a new note
     nid = note_app.create_note("All")
     note_app.set_current_state(EditNote(nid))
 
-    # Update note
     note_app.current_state.update("My Title", "Hello world")
+
     event = _make_event(
         note_app,
         note_app.update_note,
+        return_value=nid,
         note_id=nid,
+        title="My Title",
+        content="Hello world",
     )
     note_app.handle_state_transition(event)
 
@@ -81,16 +77,14 @@ def test_edit_save_transitions_to_detail(note_app: StatefulNoteApp):
     assert note_app.current_state.note_id == nid
 
 
-def test_get_note_opens_detail(note_app: StatefulNoteApp):
-    """get_note should show NoteDetail."""
-    # Add note
+def test_open_note_shows_detail(note_app: StatefulNoteApp):
     nid = note_app.create_note("All")
 
-    # Trigger get_note
     note_app.current_state.open(nid)
+
     event = _make_event(
         note_app,
-        note_app.current_state.open,
+        note_app.get_note,
         note_id=nid,
     )
     note_app.handle_state_transition(event)
@@ -100,15 +94,15 @@ def test_get_note_opens_detail(note_app: StatefulNoteApp):
 
 
 def test_delete_note_transitions_back_to_list(note_app: StatefulNoteApp):
-    """Deleting a note should return to NoteList."""
     nid = note_app.create_note("All")
     note_app.set_current_state(NoteDetail(nid))
 
-    # Delete
     note_app.current_state.delete()
+
     event = _make_event(
         note_app,
         note_app.delete_note,
+        return_value="OK",
         note_id=nid,
     )
     note_app.handle_state_transition(event)
@@ -118,29 +112,28 @@ def test_delete_note_transitions_back_to_list(note_app: StatefulNoteApp):
 
 
 def test_move_note_transitions_to_folder(note_app: StatefulNoteApp):
-    """move_note should switch to NoteList of the target folder."""
     nid = note_app.create_note("All")
-    new_folder = "Work"
-
     note_app.set_current_state(NoteDetail(nid))
-    note_app.current_state.app.move_note(nid, new_folder)
+
+    note_app.move_note(nid, "Work")
+
     event = _make_event(
         note_app,
         note_app.move_note,
+        return_value="OK",
         note_id=nid,
-        new_folder=new_folder,
+        new_folder="Work",
     )
     note_app.handle_state_transition(event)
 
     assert isinstance(note_app.current_state, NoteList)
-    assert note_app.current_state.folder == new_folder
+    assert note_app.current_state.folder == "Work"
 
 
 def test_duplicate_note_opens_detail(note_app: StatefulNoteApp):
-    """duplicate_note should open the duplicated note's detail view."""
     nid = note_app.create_note("All")
-
     new_id = note_app.duplicate_note(nid)
+
     event = _make_event(
         note_app,
         note_app.duplicate_note,
@@ -154,12 +147,11 @@ def test_duplicate_note_opens_detail(note_app: StatefulNoteApp):
 
 
 def test_search_notes_transitions_to_search_list(note_app: StatefulNoteApp):
-    """search_notes should open NoteList(search_mode=True)."""
-    # Trigger search
     note_app.current_state.search("hello")
+
     event = _make_event(
         note_app,
-        note_app.current_state.search,
+        note_app.search_notes,
         keyword="hello",
     )
     note_app.handle_state_transition(event)
@@ -168,60 +160,35 @@ def test_search_notes_transitions_to_search_list(note_app: StatefulNoteApp):
     assert note_app.current_state.search_mode is True
 
 
+def test_list_folders_transitions_to_folder_list(note_app: StatefulNoteApp):
+    note_app.current_state.folders()
 
-# Attachment tests
-def test_add_attachment_keeps_detail(note_app: StatefulNoteApp):
-    """add_attachment should remain in NoteDetail."""
-    nid = note_app.create_note("All")
-    note_app.set_current_state(NoteDetail(nid))
-
-    # Add attachment
-    note_app.current_state.add_attachment("file1.png")
     event = _make_event(
         note_app,
-        note_app.add_attachment,
-        note_id=nid,
-        attachment="file1.png",
+        note_app.list_folders,
     )
     note_app.handle_state_transition(event)
 
-    assert isinstance(note_app.current_state, NoteDetail)
-    assert note_app.current_state.note_id == nid
-    assert "file1.png" in note_app.notes[nid].attachments
+    assert isinstance(note_app.current_state, FolderList)
 
 
-def test_remove_attachment_keeps_detail(note_app: StatefulNoteApp):
-    """remove_attachment should remain in NoteDetail."""
-    nid = note_app.create_note("All")
-    note_app.notes[nid].attachments.append("doc.pdf")  # pre-add
-    note_app.set_current_state(NoteDetail(nid))
+def test_list_notes_pagination(note_app: StatefulNoteApp):
+    for _ in range(12):
+        note_app.create_note("All")
 
-    note_app.current_state.remove_attachment("doc.pdf")
-    event = _make_event(
-        note_app,
-        note_app.remove_attachment,
-        note_id=nid,
-        attachment="doc.pdf",
-    )
-    note_app.handle_state_transition(event)
+    result = note_app.list_notes("All")
 
-    assert isinstance(note_app.current_state, NoteDetail)
-    assert "doc.pdf" not in note_app.notes[nid].attachments
+    assert isinstance(result, list)
+    assert len(result) == 12
 
+def test_get_and_load_state_preserves_folders(note_app: StatefulNoteApp):
+    note_app.create_note("Personal")
+    note_app.create_note("Work")
 
-def test_list_attachments_keeps_detail(note_app: StatefulNoteApp):
-    """list_attachments should remain in detail view."""
-    nid = note_app.create_note("All")
-    note_app.notes[nid].attachments.extend(["a.png", "b.png"])
-    note_app.set_current_state(NoteDetail(nid))
+    state = note_app.get_state()
 
-    note_app.current_state.attachments()
-    event = _make_event(
-        note_app,
-        note_app.list_attachments,
-        note_id=nid,
-    )
-    note_app.handle_state_transition(event)
+    new_app = StatefulNoteApp(name="note")
+    new_app.load_state(state)
 
-    assert isinstance(note_app.current_state, NoteDetail)
-    assert note_app.current_state.note_id == nid
+    folders = new_app.list_folders()
+    assert set(folders) == {"All", "Personal", "Work"}

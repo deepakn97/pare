@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from are.simulation.types import OperationType
+from are.simulation.types import OperationType, disable_events
 
 from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
-    from pas.apps.note.app import Note, StatefulNoteApp
+    from pas.apps.note.app import Note, ReturnedNotes, StatefulNoteApp
 
 
 class NoteList(AppState):
@@ -34,17 +34,22 @@ class NoteList(AppState):
         pass
 
     @user_tool()
-    @pas_event_registered()
-    def list_notes(self) -> list[Note]:
-        """Return all notes under the current folder.
+    @pas_event_registered(operation_type=OperationType.READ)
+    def list_notes(self, offset: int = 0, limit: int = 10) -> ReturnedNotes:
+        """Return paginated notes under the current folder.
+
+        Args:
+            offset (int): Starting index for pagination.
+            limit (int): Maximum number of notes to return.
 
         Returns:
-            list[Note]: Notes returned by backend.
+            ReturnedNotes: Paginated notes container.
         """
-        return cast("StatefulNoteApp", self.app).list_notes(self.folder)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).list_notes(self.folder, offset, limit)
 
     @user_tool()
-    @pas_event_registered()
+    @pas_event_registered(operation_type=OperationType.READ)
     def open(self, note_id: str) -> Note:
         """Open a note detail view.
 
@@ -54,20 +59,22 @@ class NoteList(AppState):
         Returns:
             Note: Note object from backend.
         """
-        return cast("StatefulNoteApp", self.app).get_note(note_id)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).get_note(note_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def new(self) -> Note:
+    def new(self) -> str:
         """Create a new note in the current folder.
 
         Returns:
-            Note: Newly created note object.
+            str: ID of newly created note.
         """
-        return cast("StatefulNoteApp", self.app).create_note(self.folder)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).create_note(self.folder)
 
     @user_tool()
-    @pas_event_registered()
+    @pas_event_registered(operation_type=OperationType.READ)
     def search(self, keyword: str) -> list[Note]:
         """Search notes by keyword.
 
@@ -77,17 +84,19 @@ class NoteList(AppState):
         Returns:
             list[Note]: List of matched notes.
         """
-        return cast("StatefulNoteApp", self.app).search_notes(keyword)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).search_notes(keyword, self.folder)
 
     @user_tool()
-    @pas_event_registered()
+    @pas_event_registered(operation_type=OperationType.READ)
     def folders(self) -> list[str]:
         """List all folders.
 
         Returns:
             list[str]: Folder names.
         """
-        return cast("StatefulNoteApp", self.app).list_folders()
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).list_folders()
 
 
 class NoteDetail(AppState):
@@ -111,70 +120,75 @@ class NoteDetail(AppState):
         pass
 
     @user_tool()
-    @pas_event_registered()
+    @pas_event_registered(operation_type=OperationType.READ)
     def refresh(self) -> Note:
         """Reload the note content.
 
         Returns:
             Note: Updated note object.
         """
-        return cast("StatefulNoteApp", self.app).get_note(self.note_id)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).get_note(self.note_id)
 
     @user_tool()
-    @pas_event_registered()
+    @pas_event_registered(operation_type=OperationType.READ)
     def attachments(self) -> list[str]:
         """List attachments associated with the note.
 
         Returns:
             list[str]: Attachment names.
         """
-        return cast("StatefulNoteApp", self.app).list_attachments(self.note_id)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).list_attachments(self.note_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def add_attachment(self, attachment: str) -> bool:
+    def add_attachment(self, attachment: str) -> str:
         """Add an attachment to the note.
 
         Args:
             attachment (str): Attachment identifier.
 
         Returns:
-            bool: Backend update success.
+            str: Backend confirmation "OK".
         """
-        return cast("StatefulNoteApp", self.app).add_attachment(self.note_id, attachment)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).add_attachment(self.note_id, attachment)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def remove_attachment(self, attachment: str) -> bool:
+    def remove_attachment(self, attachment: str) -> str:
         """Remove an attachment from the note.
 
         Args:
             attachment (str): Attachment identifier.
 
         Returns:
-            bool: Backend update success.
+            str: Backend confirmation "OK".
         """
-        return cast("StatefulNoteApp", self.app).remove_attachment(self.note_id, attachment)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).remove_attachment(self.note_id, attachment)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def delete(self) -> bool:
+    def delete(self) -> str:
         """Delete the note.
 
         Returns:
-            bool: Backend deletion result.
+            str: Backend deletion confirmation "OK".
         """
-        return cast("StatefulNoteApp", self.app).delete_note(self.note_id)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).delete_note(self.note_id)
 
     @user_tool()
-    @pas_event_registered()
-    def edit(self) -> EditNote:
+    @pas_event_registered(operation_type=OperationType.READ)
+    def edit(self) -> str:
         """Open edit mode for this note.
 
         Returns:
-            EditNote: Editing state for this note.
+            str: Confirmation message that edit mode is activated.
         """
-        return EditNote(self.note_id)
+        return f"Edit mode activated for note {self.note_id}"
 
 
 class EditNote(AppState):
@@ -199,7 +213,7 @@ class EditNote(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def update(self, title: str, content: str) -> Note:
+    def update(self, title: str, content: str) -> str:
         """Update note content and title.
 
         Args:
@@ -207,9 +221,10 @@ class EditNote(AppState):
             content (str): Updated content.
 
         Returns:
-            Note: Backend update result.
+            str: Note ID of the updated note.
         """
-        return cast("StatefulNoteApp", self.app).update_note(self.note_id, title, content)
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).update_note(self.note_id, title, content)
 
 
 class FolderList(AppState):
@@ -224,24 +239,25 @@ class FolderList(AppState):
         pass
 
     @user_tool()
-    @pas_event_registered()
+    @pas_event_registered(operation_type=OperationType.READ)
     def list_folders(self) -> list[str]:
         """Return all folders.
 
         Returns:
             list[str]: Folder names.
         """
-        return cast("StatefulNoteApp", self.app).list_folders()
+        with disable_events():
+            return cast("StatefulNoteApp", self.app).list_folders()
 
     @user_tool()
-    @pas_event_registered()
-    def open(self, folder: str) -> NoteList:
+    @pas_event_registered(operation_type=OperationType.READ)
+    def open(self, folder: str) -> str:
         """Open the selected folder.
 
         Args:
             folder (str): Folder name.
 
         Returns:
-            NoteList: State for viewing notes in the folder.
+            str: Confirmation message that folder is opened.
         """
-        return NoteList(folder)
+        return f"Opened folder: {folder}"
