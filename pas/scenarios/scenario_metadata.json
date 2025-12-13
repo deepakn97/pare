@@ -1,0 +1,114 @@
+[
+  {
+    "scenario_id": "restaurant_booking_conflict",
+    "class_name": "RestaurantBookingConflict",
+    "description": "The user has scheduled a dinner meeting with an important client on Thursday evening at 7 PM, confirmed via a calendar event that includes the client as an attendee and lists the restaurant name in the location field. Earlier that day, the user receives an email from the restaurant apologizing for a system error and explaining that their reservation was accidentally double-booked; the restaurant offers alternative time slots at 5:30 PM or 9 PM the same evening, or the original 7 PM slot on a different day. Meanwhile, a message thread with the client shows they have explicitly mentioned Thursday evening works best for their schedule and that they are flying out Friday morning.\n\nThe proactive assistant should detect this conflict by correlating the calendar event details with the incoming email notification about the booking error. It should infer that the user needs to either reschedule the dinner to one of the offered alternative slots or find a different restaurant entirely, while considering the client's travel constraints revealed in the messaging app. The agent should proactively offer to help by suggesting it can check the client's availability for the 5:30 PM slot via the calendar, draft a message to the client proposing the time change, or search for alternative restaurants if neither backup slot works.\n\nThe user is expected to accept the assistance, directing the agent to either propose the earlier time slot to the client or help identify a comparable restaurant that can accommodate the original 7 PM booking, demonstrating the value of cross-app reasoning that connects email disruptions, calendar commitments, and conversational context about stakeholder preferences.",
+    "apps": [
+      "StatefulMessagingApp",
+      "StatefulContactsApp",
+      "StatefulCalendarApp",
+      "StatefulEmailApp",
+      "PASAgentUserInterface",
+      "HomeScreenSystemApp"
+    ],
+    "timestamp": "2025-12-11T19:04:42.727327"
+  },
+  {
+    "scenario_id": "lab_results_appointment_scheduling",
+    "class_name": "LabResultsAppointmentScheduling",
+    "description": "The user receives an email from their doctor's office containing lab test results that flag an abnormal value requiring a follow-up consultation within the next week. The email includes a link to schedule an appointment and mentions that a new prescription will be issued during the visit. The user's calendar shows they have back-to-back work commitments Monday through Wednesday, with only Thursday afternoon and Friday morning showing availability. Their contacts app contains the doctor's office phone number, the pharmacy details, and a family member who has previously helped with medical appointment transportation. A messaging thread with this family member from two weeks ago discussed their availability to provide rides on Thursdays.\n\nThe proactive agent detects the incoming lab results email and identifies the urgency keyword \"abnormal\" and the temporal constraint \"within the next week.\" It cross-references the user's calendar to find the Thursday afternoon gap that aligns with both the medical timeline and the family member's stated availability in the messaging history. The agent recognizes that medical appointments often require follow-up actions like prescription pickup, and notes the pharmacy contact information is readily available.\n\nThe agent proactively offers to draft an email reply to the doctor's office requesting a Thursday afternoon appointment slot, compose a message to the family member asking if they can still provide transportation that day, and pre-emptively add a calendar event placeholder for the appointment with a note to pick up the new prescription afterward. The user reviews the drafted communications, confirms the proposed time works, accepts the assistance, and the agent coordinates the scheduling across email, messaging, and calendar while ensuring the pharmacy contact is easily accessible for the subsequent prescription pickup.",
+    "apps": [
+      "StatefulMessagingApp",
+      "StatefulContactsApp",
+      "StatefulCalendarApp",
+      "StatefulEmailApp",
+      "PASAgentUserInterface",
+      "HomeScreenSystemApp"
+    ],
+    "timestamp": "2025-12-12T18:20:04.973706"
+  },
+  {
+    "scenario_id": "recipe_ingredient_shopping_prep",
+    "class_name": "RecipeIngredientShoppingPrep",
+    "description": "The user receives a message from a friend confirming they're coming over for dinner on Saturday evening at 6 PM, expressing excitement about trying the user's homemade pasta dish. The user's calendar shows the Saturday dinner event already exists with the friend as an attendee, tagged as \"Social.\" Several days before Saturday, the user receives an email newsletter from their favorite cooking blog featuring a new authentic carbonara recipe with a detailed ingredient list and preparation timeline. The user's contacts app contains details for their local Italian grocery store that closes at 5 PM on Saturdays, plus their regular supermarket's information.\n\nThe proactive agent identifies the approaching dinner commitment in the calendar and correlates it with the cooking context established in the messaging thread. When the recipe email arrives mid-week, the agent reasons that the user will need to acquire specialty ingredients (guanciale, Pecorino Romano, fresh pasta) before Saturday. By checking the calendar, it recognizes that the Italian market's 5 PM Saturday closing time conflicts with the 6 PM dinner start, meaning grocery shopping must happen earlier in the week or Saturday morning. The agent notes the recipe's two-hour preparation timeline also requires the user to start cooking by 4 PM.\n\nThe agent proactively offers to create a shopping checklist from the recipe email's ingredient list, suggest adding a Friday evening or Saturday morning shopping time block to the calendar with the Italian market's contact details attached, and calculate when to add a Saturday afternoon cooking reminder that accounts for the two-hour prep window before the friend's arrival. The user accepts, appreciating that the agent connected their social commitment, culinary interest, store hours, and realistic cooking timeline into a coordinated preparation plan.",
+    "apps": [
+      "StatefulMessagingApp",
+      "StatefulContactsApp",
+      "StatefulCalendarApp",
+      "StatefulEmailApp",
+      "HomeScreenSystemApp",
+      "PASAgentUserInterface"
+    ],
+    "timestamp": "2025-12-12T18:27:25.532141"
+  },
+  {
+    "scenario_id": "teammate_coverage_urgent_absence",
+    "class_name": "TeammateCoverageUrgentAbsence",
+    "description": "The user wakes up feeling ill on a Tuesday morning and sends a message to their manager explaining they need to take a sick day. Their calendar shows three important commitments for that day: a 10 AM client presentation they are leading, a 2 PM project review meeting where they were supposed to present status updates, and a 4 PM interview with a job candidate. The contacts app contains work colleagues who have the necessary expertise to cover each responsibility. Shortly after the sick day message is sent, the user receives an email from the client confirming their attendance at the morning presentation and expressing how eager they are to see the proposed solution.\n\nThe proactive agent detects the sick day notification in the messaging app and immediately cross-references the user's calendar to identify same-day commitments that now lack coverage. It analyzes each event's attendee list and matches required skills to colleagues in the contacts app who could potentially step in. The agent recognizes the email from the client indicates high stakeholder expectations for the presentation, elevating the urgency of finding coverage for that specific meeting. It understands that the interview and project review also cannot simply be canceled without coordination.\n\nThe agent proactively offers to draft three separate messages: one to a senior colleague asking if they can deliver the client presentation using the existing slide deck, another to the project lead offering to reschedule the review meeting or have a teammate present on the user's behalf, and a third to HR and the hiring manager proposing alternative interview slots later in the week. The agent also suggests sending a brief email reply to the client explaining the situation and introducing the covering colleague. The user reviews the drafted communications, makes minor adjustments, and accepts the coordination plan, allowing the agent to execute the coverage strategy across messaging, email, and calendar updates.",
+    "apps": [
+      "StatefulMessagingApp",
+      "StatefulContactsApp",
+      "StatefulCalendarApp",
+      "StatefulEmailApp",
+      "PASAgentUserInterface",
+      "HomeScreenSystemApp"
+    ],
+    "timestamp": "2025-12-12T18:55:52.538774"
+  },
+  {
+    "scenario_id": "subscription_renewal_budget_alert",
+    "class_name": "SubscriptionRenewalBudgetAlert",
+    "description": "The user receives multiple emails throughout the week from various subscription services announcing upcoming auto-renewals: a streaming platform charges $15.99 on the 28th, professional software renews at $49.99 on the 30th, and a fitness app bills $12.99 on the 1st of next month. The user's contacts app contains their accountant's information with a note that their monthly discretionary budget is $150. Meanwhile, a message thread with a friend discusses a concert happening next month, and the friend has forwarded ticket purchase details showing two tickets at $85 total, with a payment deadline of the 29th. The user's calendar shows a tagged \"Financial Review\" recurring event that hasn't been updated in three months, suggesting they haven't been actively tracking subscription costs.\n\nThe proactive agent detects the cluster of renewal notification emails arriving within a short time window and calculates that the combined subscription charges ($78.97) plus the concert tickets ($85) exceed the $150 monthly discretionary budget documented in the contacts app. It recognizes the temporal overlap\u2014all charges hitting within a four-day window\u2014creates a cash flow crunch. The agent cross-references the messaging context showing the user's social commitment to the concert and infers they must choose between maintaining all subscriptions or attending the event, or find a way to defer some renewals.\n\nThe agent proactively offers to create a summary comparing total upcoming charges against the documented budget limit, identify which subscriptions might be paused or downgraded based on their individual costs, draft replies to one or two subscription services requesting to delay renewal by two weeks, and add a properly updated financial review task to the calendar. The user accepts the assistance, directing the agent to focus on pausing the least essential subscription to free up funds for the concert tickets while maintaining their critical work software, demonstrating how cross-app awareness of spending patterns, social commitments, and documented financial constraints enables practical budget management support.",
+    "apps": [
+      "StatefulMessagingApp",
+      "StatefulContactsApp",
+      "StatefulCalendarApp",
+      "StatefulEmailApp",
+      "PASAgentUserInterface",
+      "HomeScreenSystemApp"
+    ],
+    "timestamp": "2025-12-12T19:02:27.737875"
+  },
+  {
+    "scenario_id": "conference_travel_teaching_conflict",
+    "class_name": "ConferenceTravelTeachingConflict",
+    "description": "The user receives an email notification that their research paper has been accepted to an academic conference scheduled for March 15-17, with a mandatory presentation slot on March 16 at 2 PM. The email requires confirmation of attendance by March 1st and includes registration details. The user's calendar reveals they have a recurring weekly seminar they teach every Thursday at 3 PM, and March 16 falls on a Thursday. Meanwhile, their contacts app contains their department chair's information, a co-author colleague who shares credit on the accepted paper, and several graduate students who have previously served as guest lecturers. A messaging thread with the co-author from two weeks earlier shows them mentioning they can only attend conferences during the first half of March due to a family commitment starting March 18.\n\nThe proactive agent detects the conference acceptance email and cross-references the March 16 presentation time against the user's calendar, immediately identifying the collision with the recurring Thursday teaching commitment. It recognizes that academic presentations typically require the presenter's physical presence and cannot be easily rescheduled, while teaching duties require formal coverage arrangements through department administration. The agent notes the co-author's March availability window from the messaging history aligns with the conference dates, suggesting collaborative attendance is feasible. It also identifies potential guest lecturer candidates from the contacts app who have relevant teaching experience notations.\n\nThe agent proactively offers to draft an email to the department chair requesting approval for a substitute lecturer on March 16, compose a message to the co-author proposing they both attend and coordinate travel arrangements together, generate a list of graduate students from contacts who could cover the seminar, and add provisional calendar blocks for conference travel dates with a reminder about the March 1st registration deadline. The user reviews the coordination plan, confirms the approach, and accepts the agent's assistance in managing the multi-party communication across email and messaging while updating the calendar to reflect both the conference commitment and the teaching coverage arrangement.",
+    "apps": [
+      "StatefulMessagingApp",
+      "StatefulContactsApp",
+      "StatefulCalendarApp",
+      "StatefulEmailApp",
+      "PASAgentUserInterface",
+      "HomeScreenSystemApp"
+    ],
+    "timestamp": "2025-12-12T23:54:38.033496"
+  },
+  {
+    "scenario_id": "volunteer_shift_emergency_fill",
+    "class_name": "VolunteerShiftEmergencyFill",
+    "description": "The user volunteers regularly at a local animal shelter and receives an urgent email from the shelter coordinator on Friday afternoon explaining that two volunteers scheduled for the critical Saturday morning feeding shift (6 AM - 10 AM) have both called in sick due to flu. The email emphasizes that the shelter cannot legally operate that shift without at least two certified volunteers present, and asks if anyone can help fill the gaps. The user's calendar shows they are already scheduled for their regular Saturday afternoon shift (2 PM - 6 PM) and have a personal appointment at 11 AM, making the morning shift impossible for them personally. Their contacts app contains a dozen fellow volunteers with detailed notes indicating each person's certification status, pet handling specialties, and past availability patterns. A messaging group chat with several volunteers from last month discusses weekend availability preferences, where three members mentioned being flexible on Saturday mornings.\n\nThe proactive agent detects the urgent shelter email and recognizes the user cannot personally fill the morning shift due to calendar conflicts, but identifies this as a coordination problem rather than a personal scheduling issue. It cross-references the contacts database to filter for volunteers who hold the required certifications, then checks the messaging history to identify who previously expressed Saturday morning availability. The agent reasons that the user, as an active community member, would want to help solve this crisis by connecting the coordinator with qualified candidates rather than simply declining.\n\nThe agent proactively offers to draft personalized messages to the three volunteers who mentioned Saturday morning flexibility, explaining the emergency and asking if they can cover the 6 AM shift. It also suggests composing a reply to the shelter coordinator's email identifying these potential candidates and offering to coordinate responses, plus adding a calendar reminder to follow up if no one responds within two hours. The user reviews the outreach strategy, appreciates that the agent understood their implicit role as a community connector, and accepts the assistance to facilitate the emergency coverage through targeted volunteer recruitment rather than personal obligation.",
+    "apps": [
+      "StatefulMessagingApp",
+      "StatefulContactsApp",
+      "StatefulCalendarApp",
+      "StatefulEmailApp",
+      "PASAgentUserInterface",
+      "HomeScreenSystemApp"
+    ],
+    "timestamp": "2025-12-13T00:01:34.521669"
+  },
+  {
+    "scenario_id": "package_delivery_access_coordination",
+    "class_name": "PackageDeliveryAccessCoordination",
+    "description": "The user receives an email notification from a shipping carrier stating that a high-value package requiring signature confirmation will arrive on Tuesday between 1-5 PM at their home address. The user's calendar shows they have an all-day offsite work meeting on Tuesday located 45 minutes away from home, with no breaks scheduled. Their contacts app contains their building superintendent who holds spare keys, a trusted neighbor who has previously accepted packages for them, and the sender (their elderly parent) whose contact notes mention this package contains important estate documents that cannot be left unattended or rescheduled beyond this week due to legal deadlines. A messaging thread with the neighbor from last month shows they work from home on Tuesdays and Wednesdays.\n\nThe proactive agent correlates the delivery window with the user's calendar absence and recognizes the signature requirement prevents standard drop-off solutions. It identifies from the email content and contact notes that the package has both high value and time sensitivity, making it critical to arrange authorized reception. By reviewing the messaging history, the agent discovers the neighbor's Tuesday work-from-home pattern aligns perfectly with the delivery window and recalls their previous willingness to help with package acceptance. The agent understands this requires coordination across multiple parties: authorizing the neighbor with the carrier, informing the sender that alternative arrangements are being made, and confirming the neighbor's availability.\n\nThe agent proactively offers to draft a message to the neighbor asking if they can accept the signature-required delivery on Tuesday afternoon, compose an email to the shipping carrier providing the neighbor's name for authorized delivery release, send a reply to the parent explaining the secure reception arrangement to ease their concern about the documents, and add a calendar reminder to retrieve the package from the neighbor Tuesday evening. The user accepts this multi-party coordination plan, recognizing the agent successfully connected delivery logistics, legal urgency, trusted relationship context, and scheduling conflicts into a practical solution that ensures the time-sensitive documents are received securely despite their unavoidable absence.",
+    "apps": [
+      "StatefulMessagingApp",
+      "StatefulContactsApp",
+      "StatefulCalendarApp",
+      "StatefulEmailApp",
+      "PASAgentUserInterface",
+      "HomeScreenSystemApp"
+    ],
+    "timestamp": "2025-12-13T00:16:03.620439"
+  }
+]
