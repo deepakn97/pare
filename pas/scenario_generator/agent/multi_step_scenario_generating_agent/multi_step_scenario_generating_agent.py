@@ -64,8 +64,20 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         base_dir = Path(__file__).resolve().parents[2]
         self.repo_root = base_dir.parent
 
-        # Directory where intermediate JSON/markdown artifacts live.
-        self.output_dir = Path(output_dir or base_dir / "generated_scenarios")
+        # Directory that tracks the per-step trajectory for this run, e.g.,
+        # pas/scenario_generator/step_trajectory/trajectory_YYYYMMDDTHHMMSS.
+        trajectory_root = base_dir / "step_trajectory"
+        if trajectory_dir is not None:
+            self.trajectory_dir = Path(trajectory_dir)
+        else:
+            timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+            self.trajectory_dir = trajectory_root / f"trajectory_{timestamp}"
+        self.trajectory_dir.mkdir(parents=True, exist_ok=True)
+
+        # Directory where intermediate markdown artifacts live. We no longer write
+        # to `pas/scenario_generator/generated_scenarios/`; keep artifacts scoped
+        # to the trajectory directory by default.
+        self.output_dir = Path(output_dir) if output_dir is not None else self.trajectory_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Directory that holds the canonical seed scenario plus the single
@@ -80,30 +92,10 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         # remains read-only for reference.
         self.scenario_file = self.seed_scenarios_dir / "editable_seed_scenario.py"
 
-        # Directory that holds success/failure exports; kept under the
-        # scenario_generator package.
-        self.generated_dir = base_dir / "generated_scenarios"
-        self.success_dir = self.generated_dir / "successful_scenarios"
-        self.failed_dir = self.generated_dir / "failed_scenarios"
-        self.failed_no_runtime_dir = self.generated_dir / "failed_scenarios_no_runtime_errors"
-        self.success_dir.mkdir(parents=True, exist_ok=True)
-        self.failed_dir.mkdir(parents=True, exist_ok=True)
-        self.failed_no_runtime_dir.mkdir(parents=True, exist_ok=True)
-
         # Global scenario metadata used for uniqueness checks and analysis.
         # Stored under `pas/scenarios/scenario_metadata.json` so it is shared
         # across runs and not tied to a particular output directory.
         self.scenario_metadata_path = self.repo_root / "scenarios" / "scenario_metadata.json"
-
-        # Directory that tracks the per-step trajectory for this run, e.g.,
-        # pas/scenario_generator/step_trajectory/trajectory_YYYYMMDDTHHMMSS.
-        trajectory_root = base_dir / "step_trajectory"
-        if trajectory_dir is not None:
-            self.trajectory_dir = Path(trajectory_dir)
-        else:
-            timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
-            self.trajectory_dir = trajectory_root / f"trajectory_{timestamp}"
-        self.trajectory_dir.mkdir(parents=True, exist_ok=True)
 
         self._last_check_result: RunCheckResult | None = None
         # Declarative filesystem policy for Claude Agent SDK usage. Enforcement
@@ -404,11 +396,9 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
 
             if not self.debug_prompts:
                 self._append_step_trajectory("step4", step4)
-                # Persist the final editable_seed_scenario.py into the success
-                # directory, then export a class-named copy and reset the
-                # working file back to the pristine seed template so the next
-                # run starts from a clean slate.
-                self._persist_scenario(self.success_dir)
+                # Export a class-named copy (guarded by validation success) and
+                # reset the working file back to the pristine seed template so
+                # the next run starts from a clean slate.
                 self._export_final_scenario_and_reset()
 
             logger.info("Multi-step scenario generation pipeline complete.")
@@ -1078,28 +1068,25 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         self.scenario_metadata_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
         self._historical_descriptions = existing
 
-    def _persist_scenario(self, target_dir: Path) -> None:
-        if not self.scenario_file.exists():
-            return
-        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
-        target_path = target_dir / f"scenario_{timestamp}.py"
-        shutil.copy2(self.scenario_file, target_path)
-
     def _persist_failed_scenario(
         self, reason: str, runtime_error: bool = True, validation_reached: bool = False
     ) -> None:
-        if not self.scenario_file.exists():
-            return
-        with self.scenario_file.open("a", encoding="utf-8") as handle:
-            handle.write(f"\n# FAILED SCENARIO REASON: {reason}\n")
-        target = self.failed_dir if runtime_error or not validation_reached else self.failed_no_runtime_dir
-        self._persist_scenario(target)
-        # Also snapshot the failed working scenario into the trajectory
-        # directory so users can inspect the final on-disk contents that caused
-        # the failure (e.g., after Step 2/3 guardrails reject the edits).
+        """Persist failure details under the trajectory directory.
+
+        NOTE: We intentionally do NOT write into `pas/scenario_generator/generated_scenarios/`
+        anymore (that directory is noisy to clean up). The working scenario file
+        and per-step snapshots already live under the trajectory directory.
+        """
+        _ = runtime_error
+        _ = validation_reached
+        # Snapshot the failed working scenario into the trajectory directory so
+        # users can inspect the final on-disk contents that caused the failure
+        # (e.g., after Step 2/3 guardrails reject the edits).
         try:
             failed_snapshot = self.trajectory_dir / "editable_seed_scenario_failed.py"
-            shutil.copy2(self.scenario_file, failed_snapshot)
+            if self.scenario_file.exists():
+                shutil.copy2(self.scenario_file, failed_snapshot)
+            (self.trajectory_dir / "failure_reason.txt").write_text(f"{reason}\n", encoding="utf-8")
             logger.info("Snapshot for failed scenario written to %s", failed_snapshot)
         except Exception:  # pragma: no cover - trajectory snapshots are best-effort
             logger.exception("Failed to snapshot failed scenario to trajectory directory")
