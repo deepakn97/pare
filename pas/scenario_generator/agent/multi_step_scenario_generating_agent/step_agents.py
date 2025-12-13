@@ -15,10 +15,6 @@ from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts 
 # Import the underlying `prompts` module directly so that updates from
 # `configure_dynamic_context()` (which mutates module-level globals) are
 # visible here.
-from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts import (
-    prompts as prompt_context,
-)
-
 from .claude_backend import ClaudeAgentRuntimeConfig, run_claude_conversation
 
 logger = logging.getLogger(__name__)
@@ -53,7 +49,6 @@ class BaseStepAgent:
         max_iterations: int = 3,
         uniqueness_agent: ScenarioUniquenessCheckAgent | None = None,
         debug_prompts: bool = False,
-        debug_printer: Callable[[str], None] | None = None,
         claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
     ) -> None:
         """Configure shared settings for a single multi-step generation phase."""
@@ -62,7 +57,6 @@ class BaseStepAgent:
         self.max_iterations = max_iterations
         self.uniqueness_agent = uniqueness_agent
         self.debug_prompts = debug_prompts
-        self._debug_printer = debug_printer
         self._claude_config = claude_runtime_config
 
     def _run_with_prompt(
@@ -183,194 +177,103 @@ class BaseStepAgent:
         return f"[DEBUG MOCK OUTPUT for {self.name}]"
 
     def _emit_debug_prompts(self, conversation: list[dict[str, str]]) -> None:
-        printer = self._debug_printer or print
         header = f"\n=== DEBUG PROMPTS :: {self.name} ==="
-        printer(header)
+        logger.info(header)
         for message in conversation:
             role = message.get("role", "unknown").upper()
-            printer(f"[{role}]")
-            printer(message.get("content", ""))
+            logger.info("[%s]\n%s", role, message.get("content", ""))
 
 
-class ScenarioDescriptionAgent(BaseStepAgent):
-    """Step 1 agent that drafts the high-level narrative description."""
+class StepEditAgent(BaseStepAgent):
+    """Unified multi-step scenario agent parametrized by step kind."""
 
     def __init__(
         self,
         *,
+        step_name: str,
+        step_kind: str,
+        system_prompt: str,
         max_iterations: int,
-        uniqueness_agent: ScenarioUniquenessCheckAgent,
         debug_prompts: bool = False,
-        debug_printer: Callable[[str], None] | None = None,
         claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
+        uniqueness_agent: ScenarioUniquenessCheckAgent | None = None,
     ) -> None:
-        """Initialize the narrative step agent."""
+        """Initialize a generic scenario step agent."""
+        self.step_kind = step_kind
         super().__init__(
-            name="Step 1: Scenario Description",
-            # Pull the system prompt from the dynamic context module so that
-            # updates from `configure_dynamic_context()` are reflected here.
-            system_prompt=prompt_context.SCENARIO_DESCRIPTION_SYSTEM_PROMPT,
+            name=step_name,
+            system_prompt=system_prompt,
             max_iterations=max_iterations,
             uniqueness_agent=uniqueness_agent,
             debug_prompts=debug_prompts,
-            debug_printer=debug_printer,
             claude_runtime_config=claude_runtime_config,
         )
 
-    def run(
+    def run(  # noqa: C901
         self,
         *,
-        historical_descriptions: str,
+        scenario_metadata_path: str | None = None,
+        scenario_description: str | None = None,
+        scenario_file_path: str | None = None,
+        apps_and_data: str | None = None,
+        events_flow: str | None = None,
         check_callback: Callable[[str, int], tuple[bool, str]] | None = None,
     ) -> StepResult:
-        """Generate a new scenario description, respecting uniqueness checks."""
-        history_text = historical_descriptions.strip() or "(none recorded yet)"
-        user_prompt = SCENARIO_DESCRIPTION_USER_PROMPT.format(historical_descriptions=history_text)
+        """Dispatch to the appropriate per-step prompt builder."""
+        if self.step_kind == "description":
+            metadata_path = (scenario_metadata_path or "").strip() or "pas/scenarios/scenario_metadata.json"
+            user_prompt = SCENARIO_DESCRIPTION_USER_PROMPT.format(scenario_metadata_path=metadata_path)
 
-        def debug_builder(_: str) -> str:
-            return "[DEBUG SCENARIO DESCRIPTION | novel request]"
+            def debug_builder(_: str) -> str:
+                return "[DEBUG SCENARIO DESCRIPTION | novel request]"
 
-        return self._run_with_prompt(
-            user_prompt=user_prompt,
-            check_callback=check_callback,
-            debug_response_builder=debug_builder,
-        )
-
-
-class AppsAndDataSetupAgent(BaseStepAgent):
-    """Step 2 agent that plans app initialization and seed data."""
-
-    def __init__(
-        self,
-        *,
-        max_iterations: int,
-        debug_prompts: bool = False,
-        debug_printer: Callable[[str], None] | None = None,
-        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
-    ) -> None:
-        """Initialize the apps-and-data step agent."""
-        super().__init__(
-            name="Step 2: Apps & Data Setup",
-            system_prompt=prompt_context.APPS_AND_DATA_SYSTEM_PROMPT,
-            max_iterations=max_iterations,
-            debug_prompts=debug_prompts,
-            debug_printer=debug_printer,
-            claude_runtime_config=claude_runtime_config,
-        )
-
-    def run(
-        self,
-        *,
-        scenario_description: str,
-        scenario_file_path: str,
-        scenario_file_contents: str,
-        check_callback: Callable[[str, int], tuple[bool, str]] | None = None,
-    ) -> StepResult:
-        """Produce an `init_and_populate_apps()` plan for the target scenario file."""
-        user_prompt = APPS_AND_DATA_USER_PROMPT.format(
-            scenario_description=scenario_description,
-            scenario_file_path=scenario_file_path,
-            scenario_file_contents=scenario_file_contents,
-        )
-
-        def debug_builder(_: str) -> str:
-            return (
-                "[DEBUG APPS & DATA OUTPUT placeholder]\n"
-                f"# scenario_file_path: {scenario_file_path}\n"
-                "# (LLM call skipped)"
+        elif self.step_kind == "apps_and_data":
+            if scenario_description is None or scenario_file_path is None:
+                raise StepExecutionError(
+                    "Apps & Data step requires scenario_description and scenario_file_path.",
+                )
+            user_prompt = APPS_AND_DATA_USER_PROMPT.format(
+                scenario_description=scenario_description,
+                scenario_file_path=scenario_file_path,
             )
 
-        return self._run_with_prompt(
-            user_prompt=user_prompt,
-            check_callback=check_callback,
-            debug_response_builder=debug_builder,
-        )
+            def debug_builder(_: str) -> str:
+                return (
+                    "[DEBUG APPS & DATA OUTPUT placeholder]\n"
+                    f"# scenario_file_path: {scenario_file_path}\n"
+                    "# (LLM call skipped)"
+                )
 
+        elif self.step_kind == "events_flow":
+            if scenario_description is None or apps_and_data is None or scenario_file_path is None:
+                raise StepExecutionError(
+                    "Events Flow step requires scenario_description, apps_and_data, and scenario_file_path.",
+                )
+            user_prompt = EVENTS_FLOW_USER_PROMPT.format(
+                scenario_description=scenario_description,
+                apps_and_data=apps_and_data,
+                scenario_file_path=scenario_file_path,
+            )
 
-class EventsFlowAgent(BaseStepAgent):
-    """Step 3 agent that builds the temporal sequence of events."""
+            def debug_builder(_: str) -> str:
+                return "[DEBUG EVENTS FLOW OUTPUT placeholder]\n# (LLM call skipped)"
 
-    def __init__(
-        self,
-        *,
-        max_iterations: int,
-        debug_prompts: bool = False,
-        debug_printer: Callable[[str], None] | None = None,
-        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
-    ) -> None:
-        """Initialize the events-flow step agent."""
-        super().__init__(
-            name="Step 3: Events Flow",
-            system_prompt=prompt_context.EVENTS_FLOW_SYSTEM_PROMPT,
-            max_iterations=max_iterations,
-            debug_prompts=debug_prompts,
-            debug_printer=debug_printer,
-            claude_runtime_config=claude_runtime_config,
-        )
+        elif self.step_kind == "validation":
+            if scenario_description is None or events_flow is None or scenario_file_path is None:
+                raise StepExecutionError(
+                    "Validation step requires scenario_description, events_flow, and scenario_file_path.",
+                )
+            user_prompt = VALIDATION_USER_PROMPT.format(
+                scenario_description=scenario_description,
+                events_flow=events_flow,
+                scenario_file_path=scenario_file_path,
+            )
 
-    def run(
-        self,
-        *,
-        scenario_description: str,
-        apps_and_data: str,
-        scenario_file_contents: str,
-        check_callback: Callable[[str, int], tuple[bool, str]] | None = None,
-    ) -> StepResult:
-        """Author the concrete `build_events_flow()` implementation."""
-        user_prompt = EVENTS_FLOW_USER_PROMPT.format(
-            scenario_description=scenario_description,
-            apps_and_data=apps_and_data,
-            scenario_file_contents=scenario_file_contents,
-        )
+            def debug_builder(_: str) -> str:
+                return "[DEBUG VALIDATION OUTPUT placeholder]\n# (LLM call skipped)"
 
-        def debug_builder(_: str) -> str:
-            return "[DEBUG EVENTS FLOW OUTPUT placeholder]\n# (LLM call skipped)"
-
-        return self._run_with_prompt(
-            user_prompt=user_prompt,
-            check_callback=check_callback,
-            debug_response_builder=debug_builder,
-        )
-
-
-class ValidationAgent(BaseStepAgent):
-    """Step 4 agent that designs validation checks for the scenario."""
-
-    def __init__(
-        self,
-        *,
-        max_iterations: int,
-        debug_prompts: bool = False,
-        debug_printer: Callable[[str], None] | None = None,
-        claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
-    ) -> None:
-        """Initialize the validation step agent."""
-        super().__init__(
-            name="Step 4: Validation Conditions",
-            system_prompt=prompt_context.VALIDATION_SYSTEM_PROMPT,
-            max_iterations=max_iterations,
-            debug_prompts=debug_prompts,
-            debug_printer=debug_printer,
-            claude_runtime_config=claude_runtime_config,
-        )
-
-    def run(
-        self,
-        *,
-        scenario_description: str,
-        events_flow: str,
-        scenario_file_contents: str,
-        check_callback: Callable[[str, int], tuple[bool, str]] | None = None,
-    ) -> StepResult:
-        """Fill in the `validate()` function according to the agreed pattern."""
-        user_prompt = VALIDATION_USER_PROMPT.format(
-            scenario_description=scenario_description,
-            events_flow=events_flow,
-            scenario_file_contents=scenario_file_contents,
-        )
-
-        def debug_builder(_: str) -> str:
-            return "[DEBUG VALIDATION OUTPUT placeholder]\n# (LLM call skipped)"
+        else:
+            raise StepExecutionError(f"Unknown step kind: {self.step_kind!r}")
 
         return self._run_with_prompt(
             user_prompt=user_prompt,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import inspect
-import json
 import logging
 from collections.abc import Iterable  # noqa: TC003
 from importlib import import_module
@@ -13,6 +12,7 @@ import docstring_parser
 from are.simulation.apps.app import ToolType
 from are.simulation.tool_box import DEFAULT_TOOL_DESCRIPTION_TEMPLATE, Toolbox
 from are.simulation.tool_utils import AppTool, AppToolAdapter, OperationType, ToolAttributeName, format_type_name
+from dotenv import load_dotenv
 
 from pas.apps.core import AppState
 from pas.apps.notification_templates import NOTIFICATION_TEMPLATES
@@ -682,6 +682,28 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--trajectory-dir",
+        dest="trajectory_dir",
+        type=Path,
+        default=None,
+        help=(
+            "Optional path to a step trajectory directory "
+            "(e.g., pas/scenario_generator/step_trajectory/trajectory_YYYYMMDDTHHMMSS). "
+            "If not provided, a new directory will be created under "
+            "pas/scenario_generator/step_trajectory for this run."
+        ),
+    )
+    parser.add_argument(
+        "--num-scenarios",
+        dest="num_scenarios",
+        type=int,
+        default=1,
+        help=(
+            "Number of distinct scenarios to generate in this invocation. "
+            "Each scenario runs a separate multi-step pipeline. Defaults to 1."
+        ),
+    )
+    parser.add_argument(
         "--debug-prompts",
         dest="debug_prompts",
         action="store_true",
@@ -700,6 +722,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Load environment variables
+    load_dotenv()
+
     app_def_scenario = ScenarioWithAllPASApps()
     app_def_scenario.initialize()
     app_instances = {app.__class__.__name__: app for app in getattr(app_def_scenario, "apps", [])}
@@ -714,17 +739,58 @@ def main() -> None:
             "--resume-from-step2 is deprecated; prefer --resume-from-step step2 instead.",
         )
 
-    agent = MultiStepScenarioGeneratingAgentsOrchestrator(
-        output_dir=args.output_dir,
-        max_iterations=args.max_iterations,
-        prompt_context=prompt_context,
-        debug_prompts=args.debug_prompts,
-        resume_from_step2=args.resume_from_step2,
-        resume_from_step=args.resume_from_step,
-    )
+    num_scenarios = max(1, args.num_scenarios)
+    results: list[dict[str, Any]] = []
+    for idx in range(num_scenarios):
+        # For multiple scenarios with an explicit trajectory_dir, create
+        # per-run subdirectories so snapshots and JSONL logs do not collide.
+        if args.trajectory_dir is None:
+            trajectory_dir = None
+        else:
+            trajectory_dir = args.trajectory_dir
+            if num_scenarios > 1:
+                trajectory_dir = trajectory_dir / f"run_{idx + 1}"
 
-    result = agent.run()
-    print(json.dumps(result, default=_json_serializer, indent=2))
+        agent = MultiStepScenarioGeneratingAgentsOrchestrator(
+            output_dir=args.output_dir,
+            max_iterations=args.max_iterations,
+            trajectory_dir=trajectory_dir,
+            prompt_context=prompt_context,
+            debug_prompts=args.debug_prompts,
+            resume_from_step2=args.resume_from_step2,
+            resume_from_step=args.resume_from_step,
+        )
+        try:
+            result = agent.run()
+        except Exception as exc:
+            logging.exception(
+                "Scenario generation failed for run %s/%s (trajectory_dir=%s). Continuing.",
+                idx + 1,
+                num_scenarios,
+                trajectory_dir,
+            )
+            results.append({
+                "run_index": idx + 1,
+                "status": "failed",
+                "error": str(exc),
+                "trajectory_dir": str(trajectory_dir) if trajectory_dir is not None else None,
+            })
+            continue
+
+        results.append({
+            "run_index": idx + 1,
+            "status": "success",
+            **result,
+        })
+
+    if num_scenarios > 1:
+        failed = [r for r in results if r.get("status") != "success"]
+        logging.info(
+            "Completed %s scenario runs: %s success, %s failed.",
+            num_scenarios,
+            num_scenarios - len(failed),
+            len(failed),
+        )
 
 
 def _json_serializer(obj: object) -> object:

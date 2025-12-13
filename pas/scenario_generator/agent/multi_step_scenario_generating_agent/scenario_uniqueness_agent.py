@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable  # noqa: TC003
+import logging
 from typing import Any
 
 from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts.prompts import (
@@ -10,6 +10,8 @@ from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts.
 
 from .claude_backend import ClaudeAgentRuntimeConfig, run_claude_conversation
 
+logger = logging.getLogger(__name__)
+
 
 class ScenarioUniquenessCheckAgent:
     """Lightweight reviewer that enforces the Step 0 uniqueness requirement."""
@@ -18,22 +20,21 @@ class ScenarioUniquenessCheckAgent:
         self,
         historical_descriptions: list[dict[str, Any]] | None = None,
         *,
+        scenario_metadata_path: str | None = None,
         debug_prompts: bool = False,
-        debug_printer: Callable[[str], None] | None = None,
         claude_runtime_config: ClaudeAgentRuntimeConfig | None = None,
     ) -> None:
         """Configure the LLM engine and historical description buffer."""
         self.historical_descriptions: list[dict[str, Any]] = historical_descriptions or []
+        self.scenario_metadata_path = scenario_metadata_path or "pas/scenarios/scenario_metadata.json"
         self.debug_prompts = debug_prompts
-        self._debug_printer = debug_printer
         self._claude_config = claude_runtime_config
 
     def evaluate(self, scenario_description: str) -> tuple[bool, str]:
         """Return (is_unique, verdict_text)."""
-        history_block = self.get_recent_history()
         user_prompt = SCENARIO_UNIQUENESS_USER_PROMPT.format(
             scenario_description=scenario_description.strip(),
-            historical_descriptions=history_block,
+            scenario_metadata_path=self.scenario_metadata_path,
         )
         if self.debug_prompts:
             self._emit_debug_prompts(
@@ -94,10 +95,6 @@ class ScenarioUniquenessCheckAgent:
         )
 
     def _emit_debug_prompts(self, *, system_prompt: str, user_prompt: str) -> None:
-        printer = self._debug_printer or print
-        header = "\n=== DEBUG PROMPTS :: Scenario Uniqueness Check ==="
-        printer(header)
-        printer("[SYSTEM PROMPT]")
-        printer(system_prompt)
-        printer("[USER PROMPT]")
-        printer(user_prompt)
+        logger.info("\n=== DEBUG PROMPTS :: Scenario Uniqueness Check ===")
+        logger.info("[SYSTEM PROMPT]\n%s", system_prompt)
+        logger.info("[USER PROMPT]\n%s", user_prompt)

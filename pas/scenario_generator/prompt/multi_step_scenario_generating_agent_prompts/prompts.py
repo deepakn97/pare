@@ -24,18 +24,6 @@ def _discover_meta_are_apps_dir() -> Path | None:
     return candidate if candidate.exists() else None
 
 
-def _safe_read_text(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return ""
-
-
-EXAMPLE_SCENARIO_PATH = PAS_DIR / "example_proactive_scenarios" / "email_notification.py"
-# EXAMPLE_SCENARIO_SOURCE = _safe_read_text(EXAMPLE_SCENARIO_PATH).strip()
-# if not EXAMPLE_SCENARIO_SOURCE:
-EXAMPLE_SCENARIO_SOURCE = "# Example PAS scenario file is missing."
-
 PAS_APPS_DIR = PAS_DIR / "apps"
 META_ARE_APPS_DIR = _discover_meta_are_apps_dir()
 META_ARE_APPS_DIR_DISPLAY = str(META_ARE_APPS_DIR) if META_ARE_APPS_DIR is not None else "(not found on disk)"
@@ -105,10 +93,10 @@ GLOBAL_CONTEXT_PROMPT = textwrap.dedent(
     - Use `send_email_to_user_with_id()` when later oracle actions need the same `email_id`.
     - Chain events with `.delayed()` or `.depends_on()` to model realistic timing and user acceptances.
 
-    ## Example PAS Scenario
-    ```python
-    {EXAMPLE_SCENARIO_SOURCE}
-    ```
+    ## Reference Scenarios (use the Read tool)
+    Before writing or editing scenario code, use the Read tool to open 1-2 representative scenarios under:
+    {SCENARIOS_DIR_DISPLAY}
+    Use them only as stylistic references; do not copy their scenario narrative or event flow verbatim.
 
     ## Dynamic Context Blocks
     Each prompt below automatically appends the Selected Apps list, import instructions, tool descriptions, app-initialization blueprint, and the allowed environment/oracle APIs derived from the current CLI arguments. Rely on those sections instead of trying to inspect the repository at runtime.
@@ -217,19 +205,35 @@ _APP_INIT_BLOCK = ""
 _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
     """\
     You are the Step 1 description agent for the PAS multi-step generator.
-    Produce a concise, ecologically grounded narrative that:
-    - Explains the user's context, pain points, and why the proactive assistant should intervene.
-    - Describes what information arrives through PAS apps and when.
-    - Outlines the agent's proactive inference, proposed assistance, and expected user response.
+    Produce:
+    - A concise, machine-friendly **scenario id** suitable for a Python decorator.
+    - A short, descriptive **Python class name**.
+    - A concise, ecologically grounded **narrative description** that:
+      - Explains the user's context, pain points, and why the proactive assistant should intervene.
+      - Describes what information arrives through PAS apps and when.
+      - Outlines the agent's proactive inference, proposed assistance, and expected user response.
 
     Constraints:
-    - Treat every historical scenario description from `valid_descriptions.json` as a negative example.
+    - Treat every historical scenario description from `scenario_metadata.json` as a negative example.
     - Your new scenario MUST be clearly and substantively different in trigger, domain, app combination, and cross-app workflow from all prior descriptions.
     - Avoid reusing the same situation with only minor wording or timestamp changes; design a genuinely new situation.
     - Only involve apps and tools that appear in the Selected Apps list and the Event-Registered App APIs block below.
     - Do NOT introduce new app types or tools that are not present in those context sections.
+    - Scenario id requirements:
+      - Lowercase letters, digits, and underscores only (e.g., `vip_calendar_conflict`).
+      - No spaces, no punctuation besides underscore, and at most 40 characters.
+    - Class name requirements:
+      - Valid Python identifier in PascalCase (e.g., `VipCalendarConflict`).
+      - Starts with a letter; contains only letters and digits; no underscores or spaces.
 
-    Output 2-3 short sentences in plain text that together describe the full scenario flow. Avoid implementation details.
+    Format your final answer EXACTLY as:
+
+    Scenario ID: <short_machine_friendly_id>
+    Class Name: <ShortDescriptiveClassName>
+    Description:
+    <2-3 short paragraphs that describe the scenario narrative>
+
+    Do not add any other sections, headings, bullet points, or commentary outside this format.
     """
 )
 
@@ -428,16 +432,24 @@ SCENARIO_DESCRIPTION_SYSTEM_PROMPT = _with_context(
 
 SCENARIO_DESCRIPTION_USER_PROMPT = textwrap.dedent(
     """\
-    Draft a brand-new PAS scenario narrative that is clearly and substantively distinct from ALL recent descriptions listed below.
-    Use the prior descriptions as negative examples: do NOT reuse the same trigger, goal, cross-app pattern, or domain with only superficial changes.
+    Draft a brand-new PAS scenario narrative that is clearly and substantively distinct from ALL prior scenarios.
+    Use prior scenarios as negative examples: do NOT reuse the same trigger, goal, cross-app pattern, or domain with only superficial changes.
 
-    Recent approved descriptions (from `valid_descriptions.json`):
-    ---
-    {historical_descriptions}
-    ---
+    Historical scenario metadata path (read this file via the Read tool):
+    {scenario_metadata_path}
 
-    Write 2-3 paragraphs that describe the trigger, cross-app signals, agent inference, and expected user response.
-    Keep timestamps realistic and ensure each beat is achievable with the currently selected PAS apps.
+    Then choose:
+    - A short, machine-friendly scenario id (lowercase_with_underscores, <= 40 chars).
+    - A concise Python class name in PascalCase that matches the scenario.
+
+    Follow this exact output format:
+
+    Scenario ID: <short_machine_friendly_id>
+    Class Name: <ShortDescriptiveClassName>
+    Description:
+    <2-3 short paragraphs that describe the trigger, cross-app signals, agent inference, and expected user response>
+
+    Do not include any other text before or after these sections.
     """
 )
 
@@ -449,8 +461,9 @@ SCENARIO_UNIQUENESS_USER_PROMPT = textwrap.dedent(
     ---
     {scenario_description}
     ---
-    Recent approved descriptions (from `valid_descriptions.json`):
-    {historical_descriptions}
+
+    Historical scenario metadata path (read this file via the Read tool):
+    {scenario_metadata_path}
     """
 )
 
@@ -469,14 +482,11 @@ APPS_AND_DATA_USER_PROMPT = textwrap.dedent(
     {scenario_description}
     ---
 
-    Current scenario file path: {scenario_file_path}
-    Current scenario file contents (initially cloned from seed template):
-    ```python
-    {scenario_file_contents}
-    ```
+    Target scenario file path (read + write this exact file via tools):
+    {scenario_file_path}
 
-    Incorporate the scenario description into the template above by returning a COMPLETE python file that
-    focuses on `init_and_populate_apps()` and the TODO in the import part.
+    Use the Read tool to open the file above. Incorporate the scenario description into the template by
+    editing ONLY `init_and_populate_apps()` and the imports TODO region.
 
     Apply STRICT edit boundaries:
     - You may only change:
@@ -490,11 +500,12 @@ APPS_AND_DATA_USER_PROMPT = textwrap.dedent(
 
     Update docstrings/comments inside the allowed regions as needed, but preserve all WARNING comments verbatim.
 
-    Your response must be ONLY the updated Python file contents:
-    - Do NOT include any natural-language explanation, summaries, or markdown headings.
-    - Do NOT wrap the file in triple backticks or any other fencing.
-    - The first line of your response should be the first line of the Python file (e.g., `from __future__ import annotations`),
-      and the last line should be the end of the file.
+    Use the available agent tools to apply your edits:
+    - Use the Read tool to inspect the existing scenario file and any PAS / Meta-ARE app definitions you need.
+    - Use the Write tool to update ONLY the imports section and the body of `init_and_populate_apps()` in the file at {scenario_file_path}.
+    - Do NOT paste the full updated file contents back into the chat; rely on the Write tool to persist changes.
+
+    For your assistant message, return a brief summary of the edits you applied (1-3 sentences) without including any code.
     """
 )
 
@@ -516,18 +527,15 @@ EVENTS_FLOW_USER_PROMPT = textwrap.dedent(
     {apps_and_data}
     ---
 
-    Current scenario file (after Step 2):
-    ```python
-    {scenario_file_contents}
-    ```
+    Target scenario file path (read + write this exact file via tools):
+    {scenario_file_path}
 
-    Produce the updated python file with a fully implemented `build_events_flow()` following the TODO guidance.
+    Use the available agent tools to apply your edits:
+    - Use the Read tool to inspect the existing scenario file at {scenario_file_path} and any PAS / Meta-ARE app definitions you need.
+    - Use the Write tool to update ONLY the `build_events_flow()` implementation in the file at {scenario_file_path}, preserving all WARNING comments and structure.
+    - Do NOT paste the full updated file contents back into the chat; rely on the Write tool to persist changes.
 
-    Your response must be ONLY the updated Python file contents:
-    - Do NOT include any natural-language explanation, summaries, or markdown headings.
-    - Do NOT wrap the file in triple backticks or any other fencing.
-    - The first line of your response should be the first line of the Python file (for example, the existing module docstring),
-      and the last line should be the end of the file, including the template end marker.
+    For your assistant message, return a brief summary of the event flow you implemented (1-3 sentences) without including any code.
     """
 )
 
@@ -547,17 +555,14 @@ VALIDATION_USER_PROMPT = textwrap.dedent(
     {events_flow}
     ---
 
-Current scenario file (after Step 3):
-```python
-{scenario_file_contents}
-```
+Target scenario file path (read + write this exact file via tools):
+{scenario_file_path}
 
-Return the updated python file with the `validate()` function fully implemented per the warning comments.
+Use the available agent tools to apply your edits:
+- Use the Read tool to inspect the existing scenario file at {scenario_file_path} and any PAS / Meta-ARE app definitions you need.
+- Use the Write tool to update ONLY the `validate()` implementation in the file at {scenario_file_path}, preserving all WARNING comments and structure.
+- Do NOT paste the full updated file contents back into the chat; rely on the Write tool to persist changes.
 
-Your response must be ONLY the updated Python file contents:
-- Do NOT include any natural-language explanation, summaries, or markdown headings.
-- Do NOT wrap the file in triple backticks or any other fencing.
-- The first line of your response should be the first line of the Python file (for example, the existing module docstring),
-  and the last line should be the end of the file, including the template end marker.
+For your assistant message, return a brief summary of the key validation checks you implemented (1-3 sentences) without including any code.
     """
 )

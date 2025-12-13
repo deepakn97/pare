@@ -70,8 +70,9 @@ Key responsibilities:
    - Computes `base_dir` (scenario generator root) and `self.repo_root`.
    - Sets:
      - `self.output_dir` (CLI `--output-dir`; defaults to `base_dir / "generated_scenarios"`).
-     - `self.scenario_file = self.output_dir / "editable_seed_scenario.py"` (single working file that Claude edits).
-     - `self.generated_dir`, `valid_descriptions_path`, `success_dir`, `failed_dir`, `failed_no_runtime_dir`.
+     - `self.scenario_file` (single working file that Claude edits, now under `pas/scenarios/generated_scenarios_w_claude_agent/editable_seed_scenario.py`).
+     - `self.generated_dir`, `success_dir`, `failed_dir`, `failed_no_runtime_dir`.
+     - `self.scenario_metadata_path` (`pas/scenarios/scenario_metadata.json`) which stores description, apps used, and other metadata for each scenario.
 
 2. **Filesystem policy for Claude Agent SDK**
    - Builds `ClaudeFilesystemConfig`:
@@ -112,14 +113,15 @@ Key responsibilities:
 6. **Step agents**
    - Instantiates:
      - `ScenarioUniquenessCheckAgent`
-     - `ScenarioDescriptionAgent` (Step 1)
-     - `AppsAndDataSetupAgent` (Step 2)
-     - `EventsFlowAgent` (Step 3)
-     - `ValidationAgent` (Step 4)
-   - Each receives:
+     - Four configured instances of `StepEditAgent`:
+       - Step 1 (Scenario Description): `step_kind="description"`
+       - Step 2 (Apps & Data Setup): `step_kind="apps_and_data"`
+       - Step 3 (Events Flow): `step_kind="events_flow"`
+       - Step 4 (Validation): `step_kind="validation"`
+   - Each `StepEditAgent` instance receives:
      - A step-specific system prompt from `prompts.py`.
      - `max_iterations`
-     - `debug_prompts` / `debug_printer`
+     - `debug_prompts`
      - The appropriate `ClaudeAgentRuntimeConfig`.
 
 ---
@@ -206,7 +208,7 @@ Key responsibilities:
    - This is where the Agent SDK is actually invoked; everything else is orchestration and validation.
 
 5. **Post-Step 1**
-   - On success, `_append_valid_description(step1.content)` stores the narrative in `valid_descriptions.json` as a new historical description.
+   - On success, `_append_scenario_metadata(...)` stores a metadata record (scenario id, class name, description, apps used, timestamp) in `scenario_metadata.json` as a new historical entry.
 
 #### 3.3. Step 2 – Apps & Data Setup
 

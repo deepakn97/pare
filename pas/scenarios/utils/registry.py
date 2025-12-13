@@ -10,12 +10,7 @@ import importlib.metadata as importlib_metadata
 import logging
 from typing import TYPE_CHECKING, TypeVar
 
-from are.simulation.scenarios.utils.registry import (
-    ScenarioRegistry as BaseScenarioRegistry,
-)
-from are.simulation.scenarios.utils.registry import (
-    register_scenario as meta_register_scenario,
-)
+from are.simulation.scenarios.utils.registry import ScenarioRegistry as BaseScenarioRegistry
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -78,17 +73,23 @@ registry = ScenarioRegistry()
 
 
 def register_scenario(scenario_id: str) -> Callable[[type[T]], type[T]]:
-    """Decorator to register scenarios with both PAS and Meta-ARE registries.
+    """Decorator to register a scenario with PAS registry.
 
-    This keeps PAS's standalone registry in sync with Meta-ARE's global registry so
-    scenarios can be discovered by either runtime.
+    This decorator is PAS's standalone alternative to Meta-ARE's @register_scenario.
+    It registers scenarios exclusively to the PAS registry, keeping it separate from
+    Meta-ARE's global registry.
+
+    Usage:
+        from pas.scenarios.registry import register_scenario
+
+        @register_scenario('my_scenario_id')
+        class MyScenario(Scenario):
+            ...
+
+    Args:
+        scenario_id: The ID to register the scenario under.
+
+    Returns:
+        A decorator function that registers the scenario class.
     """
-    pas_register = registry.register(scenario_id)
-    meta_register = meta_register_scenario(scenario_id)
-
-    def decorator(cls: type[T]) -> type[T]:
-        cls = pas_register(cls)
-        cls = meta_register(cls)
-        return cls
-
-    return decorator
+    return registry.register(scenario_id)
