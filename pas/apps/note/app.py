@@ -233,7 +233,6 @@ class StatefulNoteApp(StatefulApp):
         if folder in self.folders:
             self.folders[folder].add_note(note)
 
-        # Always add to "All" folder if not already
         if folder != "All" and "All" in self.folders:
             self.folders["All"].add_note(note)
 
@@ -282,7 +281,6 @@ class StatefulNoteApp(StatefulApp):
         note.content = content
         note.updated_at = time.time()
 
-        # Re-sort in all folders containing this note
         for folder in self.folders.values():
             if folder.get_note_by_id(note_id):
                 folder.notes.sort(key=lambda n: n.updated_at, reverse=True)
@@ -506,73 +504,106 @@ class StatefulNoteApp(StatefulApp):
             folder.load_state(folder_state)
             self.folders[folder_name] = folder
 
-    def _apply_transition(self, func: str, args: dict[str, object], result: str | None) -> None:
-        """Apply navigation transition for the given function name."""
-        handler = getattr(self, f"_transition_{func}", None)
-        if callable(handler):
-            handler(args, result)
+    def _resolve_note_id(self, args: dict[str, Any], metadata: object | None) -> str | None:
+        """Extract note_id from args or metadata.
 
-    def _transition_new(self, args: dict[str, object], result: str | None) -> None:
-        if isinstance(result, str):
-            self.set_current_state(EditNote(result))
+        Args:
+            args: Function arguments dictionary.
+            metadata: Return value from the completed event.
 
-    def _transition_create_note(self, args: dict[str, object], result: str | None) -> None:
-        if isinstance(result, str):
-            self.set_current_state(EditNote(result))
-
-    def _transition_open(self, args: dict[str, object], result: str | None) -> None:
-        nid = args.get("note_id")
-        if isinstance(nid, str):
-            self.set_current_state(NoteDetail(nid))
-
-    def _transition_edit(self, args: dict[str, object], result: str | None) -> None:
-        nid = args.get("note_id")
-        if isinstance(nid, str):
-            self.set_current_state(EditNote(nid))
-
-    def _transition_search(self, args: dict[str, object], result: str | None) -> None:
-        self.set_current_state(NoteList(search_mode=True))
-
-    def _transition_search_notes(self, args: dict[str, object], result: str | None) -> None:
-        self.set_current_state(NoteList(search_mode=True))
-
-    def _transition_get_note(self, args: dict[str, object], result: str | None) -> None:
-        nid = args.get("note_id")
-        if isinstance(nid, str):
-            self.set_current_state(NoteDetail(nid))
-
-    def _transition_update_note(self, args: dict[str, object], result: str | None) -> None:
-        nid = args.get("note_id")
-        if isinstance(nid, str):
-            self.set_current_state(NoteDetail(nid))
-
-    def _transition_delete_note(self, args: dict[str, object], result: str | None) -> None:
-        self.set_current_state(NoteList("All"))
-
-    def _transition_move_note(self, args: dict[str, object], result: str | None) -> None:
-        folder = args.get("new_folder")
-        if isinstance(folder, str):
-            self.set_current_state(NoteList(folder))
-
-    def _transition_duplicate_note(self, args: dict[str, object], result: str | None) -> None:
-        if isinstance(result, str):
-            self.set_current_state(NoteDetail(result))
-
-    def _transition_list_notes(self, args: dict[str, object], result: str | None) -> None:
-        folder = args.get("folder")
-        if isinstance(folder, str):
-            self.set_current_state(NoteList(folder))
-
-    def _transition_list_folders(self, args: dict[str, object], result: str | None) -> None:
-        self.set_current_state(FolderList())
+        Returns:
+            str | None: Extracted note ID or None.
+        """
+        note_id = args.get("note_id")
+        if isinstance(note_id, str):
+            return note_id
+        if isinstance(metadata, str):
+            return metadata
+        return None
 
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Core navigation handler mapping backend operations to state transitions."""
-        func = event.function_name()
-        if func is None:
+        current_state = self.current_state
+        fname = event.function_name()
+
+        if current_state is None or fname is None:
             return
 
-        args = getattr(event.action, "args", {})
-        result = event.metadata.return_value
+        action = event.action
+        args = action.resolved_args or action.args
 
-        self._apply_transition(func, args, result)
+        metadata_value = event.metadata.return_value if event.metadata else None
+
+        if isinstance(current_state, NoteList):
+            self._handle_note_list_transition(fname, args, metadata_value)
+        elif isinstance(current_state, NoteDetail):
+            self._handle_note_detail_transition(fname, args, metadata_value)
+        elif isinstance(current_state, EditNote):
+            self._handle_edit_note_transition(fname, args, metadata_value)
+        elif isinstance(current_state, FolderList):
+            self._handle_folder_list_transition(fname, args, metadata_value)
+
+    def _handle_note_list_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
+        """Process transitions from the note list view."""
+        if fname in {"create_note", "new"}:
+            note_id = self._resolve_note_id(args, metadata)
+            if note_id:
+                self.set_current_state(EditNote(note_id))
+            return
+
+        if fname in {"get_note", "open"}:
+            note_id = self._resolve_note_id(args, metadata)
+            if note_id:
+                self.set_current_state(NoteDetail(note_id))
+            return
+
+        if fname in {"search", "search_notes"}:
+            self.set_current_state(NoteList(search_mode=True))
+            return
+
+        if fname == "list_folders":
+            self.set_current_state(FolderList())
+
+    def _handle_note_detail_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
+        """Process transitions from the note detail view."""
+        if fname == "edit":
+            note_id = self._resolve_note_id(args, metadata)
+            if note_id:
+                self.set_current_state(EditNote(note_id))
+            return
+
+        if fname == "delete_note" and self.navigation_stack:
+            self.go_back()
+            return
+
+        if fname == "duplicate_note":
+            note_id = self._resolve_note_id(args, metadata)
+            if note_id:
+                self.set_current_state(NoteDetail(note_id))
+            return
+
+        if fname == "move_note":
+            folder = args.get("new_folder")
+            if isinstance(folder, str):
+                self.set_current_state(NoteList(folder))
+
+    def _handle_edit_note_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
+        """Process transitions from the edit note view."""
+        if fname == "update_note":
+            if self.navigation_stack:
+                self.go_back()
+            else:
+                note_id = self._resolve_note_id(args, metadata)
+                if note_id:
+                    self.set_current_state(NoteDetail(note_id))
+
+    def _handle_folder_list_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
+        """Process transitions from the folder list view."""
+        if fname == "list_notes":
+            folder = args.get("folder")
+            if isinstance(folder, str):
+                self.set_current_state(NoteList(folder))
+        if fname == "open":
+            folder = args.get("folder")
+            if isinstance(folder, str):
+                self.set_current_state(NoteList(folder))

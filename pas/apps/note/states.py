@@ -49,7 +49,7 @@ class NoteList(AppState):
             return cast("StatefulNoteApp", self.app).list_notes(self.folder, offset, limit)
 
     @user_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def open(self, note_id: str) -> Note:
         """Open a note detail view.
 
@@ -181,14 +181,15 @@ class NoteDetail(AppState):
             return cast("StatefulNoteApp", self.app).delete_note(self.note_id)
 
     @user_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def edit(self) -> str:
         """Open edit mode for this note.
 
         Returns:
             str: Confirmation message that edit mode is activated.
         """
-        return f"Edit mode activated for note {self.note_id}"
+        with disable_events():
+            return f"Edit mode activated for note {self.note_id}"
 
 
 class EditNote(AppState):
@@ -260,4 +261,5 @@ class FolderList(AppState):
         Returns:
             str: Confirmation message that folder is opened.
         """
-        return f"Opened folder: {folder}"
+        with disable_events():
+            return f"Opened folder: {folder}"
