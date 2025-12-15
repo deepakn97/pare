@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from are.simulation.agents.are_simulation_agent_config import (
     ARESimulationReactBaseAgentConfig,
@@ -30,6 +31,9 @@ from dotenv import load_dotenv
 from pas.scenario_runner import TwoAgentScenarioRunner
 from pas.scenarios.utils.registry import registry
 from pas.scenarios.utils.scenario_expander import default_weight_per_app_class
+
+if TYPE_CHECKING:
+    from are.simulation.scenarios.scenario import ScenarioValidationResult
 
 # Scenarios are auto-registered via entry points in pyproject.toml
 # See: [project.entry-points."pas.scenarios"]
@@ -59,7 +63,7 @@ def run_demo(
     tool_failure_prob: float = 0.0,
     env_events_per_min: float = 0.0,
     env_events_seed: int = 42,
-) -> None:
+) -> ScenarioValidationResult:
     """Run the two-agent demo with the specified configuration.
 
     Args:
@@ -160,6 +164,11 @@ def run_demo(
         logger.info(f"Trace exported to: {validation_result.export_path}")
 
     logger.info("=" * 80)
+
+    # Return the validation result so callers (e.g., the multi-step scenario
+    # generator) can programmatically inspect success/failure instead of only
+    # relying on logs.
+    return validation_result
 
 
 def main(argv: list[str] | None = None) -> None:

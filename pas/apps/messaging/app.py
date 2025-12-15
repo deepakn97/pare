@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from are.simulation.apps.messaging_v2 import MessagingAppV2
+from are.simulation.utils import uuid_hex
 
 from pas.apps.core import StatefulApp
 from pas.apps.messaging.states import ConversationList, ConversationOpened
@@ -29,6 +30,29 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
         super().__init__(*args, **kwargs)
         # Set initial state to conversation list
         self.load_root_state()
+
+    def add_users(self, user_names: list[str]) -> None:
+        """Add users to the internal name/id maps.
+
+        Args:
+            user_names: User display names to ensure exist in the mapping.
+        """
+        for user_name in user_names:
+            if user_name not in self.name_to_id:
+                user_id = uuid_hex(self.rng)
+                self.name_to_id[user_name] = user_id
+                self.id_to_name[user_id] = user_name
+
+    def add_contacts(self, contacts: list[tuple[str, str]]) -> None:
+        """Add contacts (name, phone) to the internal name/id maps.
+
+        Args:
+            contacts: Pairs of (user_name, phone).
+        """
+        for user_name, phone in contacts:
+            if user_name not in self.name_to_id:
+                self.name_to_id[user_name] = phone
+                self.id_to_name[phone] = user_name
 
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Handle state transitions based on tool events.
