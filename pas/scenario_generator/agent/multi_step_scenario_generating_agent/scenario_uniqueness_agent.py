@@ -49,18 +49,35 @@ class ScenarioUniquenessCheckAgent:
             trace_tag="multi_step_step1_uniqueness",
         )
         text = verdict.strip()
-        # Make the PASS/RETRY classification robust to extra prose around the signal.
+        # Primary rule: look at the FIRST non-empty line so any later
+        # "Comparison/Key overlap" analysis can't override a clear verdict.
+        first_line = ""
+        for line in text.splitlines():
+            if line.strip():
+                first_line = line.strip().lstrip("* ").strip()
+                break
+        if not first_line:
+            return False, text
+
+        upper = first_line.upper()
+        if upper.startswith("PASS"):
+            return True, text
+        if upper.startswith("RETRY"):
+            return False, text
+
+        # Fallback: if the model didn't follow the "first line is PASS/RETRY"
+        # contract, scan subsequent non-empty lines for a line that *starts*
+        # with PASS or RETRY. This still ignores any mention of those tokens
+        # inside later prose or bullet points.
         lines = [line.strip() for line in text.splitlines() if line.strip()]
-        is_unique = False
         for line in lines:
             normalized = line.upper().lstrip("* ").strip()
-            if normalized.startswith("RETRY"):
-                is_unique = False
-                break
             if normalized.startswith("PASS"):
-                is_unique = True
-                break
-        return is_unique, text
+                return True, text
+            if normalized.startswith("RETRY"):
+                return False, text
+
+        return False, text
 
     def get_recent_history(self, limit: int = 8) -> str:
         """Return a human-friendly summary of previously accepted descriptions."""

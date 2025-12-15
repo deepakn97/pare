@@ -255,10 +255,19 @@ _SCENARIO_UNIQUENESS_BODY = textwrap.dedent(
     - Merely swapping names or dates in an otherwise identical flow.
     - Using the same apps with only superficial changes to the task.
 
-    Reply with:
-      - "PASS" if the scenario is substantively different.
-      - "RETRY: <short reason>" if it overlaps with prior scenarios.
-    Keep responses under 50 words.
+    Output format (STRICT verdict + optional brief analysis):
+    - Your FIRST non-empty line MUST be exactly one of:
+      - PASS
+      - RETRY: <detailed reason> if it overlaps with prior scenarios.
+
+    - After the first line, you MAY include up to TWO short sections if first line is RETRY (optional):
+      Comparison to existing scenarios:
+      - <1-3 bullets referencing similar existing patterns>
+
+      Key overlap:
+      - <1-2 bullets explaining the core overlap (or why it is novel)>
+
+    - Do NOT include any other sections beyond the optional ones above.
     """
 )
 
@@ -285,6 +294,37 @@ _APPS_AND_DATA_BODY = textwrap.dedent(
     - When you need to check available methods or attributes on an app, use the Read tool to open the corresponding Python files in the PAS apps directory
       and the Meta-ARE apps directory mentioned in the project context. Prefer reading the source over inferring from memory and avoid mistakes like
       unexpected keyword arguments or missing required parameters.
+
+    Inheritance-aware API lookup (applies to ALL PAS apps):
+    - PAS apps are thin stateful wrappers around Meta-ARE base apps. For example:
+      - `StatefulEmailApp` is defined in `pas/apps/email/app.py` and inherits from `EmailClientV2` in `are/simulation/apps/email_client.py`.
+    - When you need to know what methods/fields exist on a PAS app, you MUST:
+      1. Use Read to open the PAS wrapper file under `pas/apps/.../app.py` (e.g., `StatefulEmailApp`).
+      2. Look at the base classes in the class definition (e.g., `EmailClientV2`) and then use Read again to open the Meta-ARE base module
+         (e.g., `are/simulation/apps/email_client.py`) and inspect that class definition.
+    - Do NOT assume that a method exists on a PAS app because you have seen similar names elsewhere. Only call methods that you have verified
+      either on the PAS wrapper class itself or on one of its explicit base classes in the Meta-ARE codebase.
+
+    API verification guardrails (MANDATORY):
+    - You MUST NOT invent helper methods. If you cannot find a method in source, do not call it.
+    - Before creating contacts, Read the `Contact` dataclass definition and use ONLY its declared fields.
+      Common mistake to avoid: do NOT pass fields like `organization=` unless you confirm it exists in the `Contact` dataclass.
+      (Look for `@dataclass class Contact:` in `are/simulation/apps/contacts.py` in your environment.)
+    - Before seeding messaging history, Read the PAS messaging wrapper and Meta-ARE base:
+      - `pas/apps/messaging/app.py` (Stateful wrapper)
+      - `are/simulation/apps/messaging_v2.py` (ConversationV2 / MessageV2 / send_message APIs)
+      Only use messaging methods that actually exist there. Common mistakes to avoid:
+      - Do NOT call `add_message_from_contact_to_user` (does not exist).
+      - Do NOT call `open_conversation` unless you confirm it is a real method/tool on the app class.
+      Prefer seeding baseline history by constructing `ConversationV2` / `MessageV2` and calling `add_conversation(...)` when available.
+
+    If the runtime checker reports errors like:
+    - "missing a required argument: '<arg>'"
+    - "'<App>' object has no attribute '<method>'"
+    then your code is using the wrong API. Stop and:
+    - Read the defining source file for that app/object under `pas/apps/` and/or `are/simulation/apps/`.
+    - Copy the exact signature/fields.
+    - Remove any invented helpers and rework the baseline seeding using only existing APIs.
     """
 )
 
@@ -303,10 +343,57 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - For non-oracle environment events, only use methods that have notification templates in `pas/apps/notification_templates.py` (see the NOTIFICATION_TEMPLATES dict).
     - For oracle/user actions, use app tools defined on the PAS apps and their Meta-ARE bases; do not invent new methods.
     - Mirror the "App Initialization Blueprint" so your local variables match how apps were seeded in Step 2.
-    - CRITICAL: Before calling any email, calendar, contacts, or messaging API (for example `send_email_to_user_with_id`, `reply_to_email`,
-      or calendar event helpers), use the Read tool to open the PAS app class and its Meta-ARE base and copy the exact method signatures
-      and required arguments. Do NOT guess enum members (like folder names) or omit required parameters (such as `email_id` or `email`).
-      If a method takes a complex object (like `Email`), construct it using the exact field names from the class definition.
+
+    Mandatory API verification (applies to ALL apps, now and in the future):
+    - You MUST NOT invent or assume methods, fields, or helper APIs.
+    - Before calling ANY app method or constructing ANY app-defined object (PAS or Meta-ARE), you MUST use the Read tool to open the
+      defining Python source file for that class/method and copy the exact signature + required arguments.
+      - PAS app wrappers live under `pas/apps/` (e.g., `pas/apps/<app_name>/app.py` or similar).
+      - Meta-ARE base apps live under `are/simulation/apps/`.
+    - Inheritance rule for PAS apps:
+      - PAS apps like `StatefulEmailApp`, `StatefulMessagingApp`, etc. are usually declared as subclasses of Meta-ARE bases.
+      - You MUST inspect BOTH:
+        1. The PAS wrapper file under `pas/apps/.../app.py` to see the wrapper class definition.
+        2. The Meta-ARE base class file referenced in the wrapper's `class ...(..., BaseClass)` line (for example `EmailClientV2`
+           in `are/simulation/apps/email_client.py` for `StatefulEmailApp`).
+      - Only treat methods as available on the PAS app if they are defined either directly on the wrapper class or on one of its explicit
+        base classes you have opened with Read.
+    - Navigation state tools:
+      - Some PAS apps (like email) also expose `user_tool()` methods on navigation state classes under `pas/apps/<app_name>/states.py`
+        (for example, `MailboxView.list_emails`, `EmailDetail.reply`, `ComposeEmail.send_composed_email`).
+      - These state classes describe user-level tools and flows, and their tools MAY appear as oracle/user events in your scenario
+        (for example, composing and sending an email via the compose flow).
+      - When you reference these tools in `build_events_flow()`, you must:
+        - Match their exact names and signatures from `states.py` and/or from the Event-Registered App APIs block.
+        - Not invent similarly named helpers that don't exist anywhere in source.
+    - If you cannot find a method in source (wrapper or base), do not call it. Replace it with an existing method, or redesign the event flow.
+
+    Common failure patterns to avoid (with fixes):
+    - "'Event' object is not subscriptable":
+      - You are treating an `Event` / `CompletedEvent` instance like a dict or list (e.g., `event[...]`) or passing it where a simple ID or string is expected.
+      - Fix: never subscript `Event` objects. Use their attributes (`event_type`, `action`, etc.) when reading logs, and pass only simple values (IDs, strings, timestamps) into app methods as documented in their signatures.
+    - "Argument 'start_datetime' must be of type str | None, got <class 'float'>":
+      - You are passing a UNIX timestamp float into a tool API that expects a string (for example, `add_calendar_event(title=..., start_datetime=\"YYYY-MM-DD HH:MM:SS\", ...)`).
+      - Fix: use Read on the PAS calendar wrapper at `pas/apps/calendar/` (for `StatefulCalendarApp`) and the Meta-ARE calendar base under `are/simulation/apps/` (for example, `calendar_v2.py` / `calendar.py`), confirm the exact parameter types, and pass properly formatted strings instead of raw floats. Keep using timestamp floats only where the dataclass explicitly documents them (such as the `CalendarEvent` dataclass in `are/simulation/apps/calendar.py`).
+    - "AbstractEvent.delayed() got an unexpected keyword argument 'seconds'/'hours'":
+      - You have invented keyword arguments on the `.delayed()` API that do not exist in the real signature.
+      - Fix: use Read on the underlying event types in `are/simulation/types.py` (look for `AbstractEvent` / `CompletedEvent`), copy the exact `.delayed(...)` signature, and only call it with the documented positional/keyword arguments (for example, a single positional delay in seconds). Do NOT add new kwargs like `seconds=` or `hours=` unless they are explicitly defined in source.
+    - Common failure patterns to avoid:
+      - Missing required argument errors (e.g., forgetting `user_id=`) → always confirm signature.
+      - AttributeError / “object has no attribute …” → the method does not exist; remove it and use an existing API.
+      - Using UI-like methods that are not part of the tool API (e.g., “open_*”, “start_compose”) unless you confirm they exist in source.
+
+    If the runtime checker reports errors like "missing a required argument" or "has no attribute", treat that as proof of wrong API usage.
+    Go back to source (`pas/apps/` + `are/simulation/apps/`), verify signatures, and rewrite using only existing methods.
+
+    CRITICAL: Before calling any email, calendar, contacts, messaging or other app API, use the Read tool to open the PAS app class and its Meta-ARE base
+    and copy the exact method signatures and required arguments. Do NOT guess enum members or omit required parameters. If a method takes a
+    complex object, construct it using the exact field names from the class definition.
+
+    Oracle content brevity:
+    - Keep oracle messages (for example, PASAgentUserInterface.send_message_to_user content or long email bodies) concise and focused on the minimum
+      information needed for the agent/user to act. Prefer 1-2 short paragraphs or a compact bullet-style summary instead of essay-length text.
+    - Avoid repeating the full narrative; reference only the key facts (times, dates, parties, constraints) that are strictly necessary for this step.
     """
 )
 
@@ -315,9 +402,19 @@ _VALIDATION_BODY = textwrap.dedent(
     You are the Step 4 validation agent.
     Design the checks for `validate()` that prove the proactive agent detected the right signals and executed the promised help.
     - Reference key events and arguments that prove success.
-    - Distinguish strict vs flexible checks.
+    - Distinguish strict vs flexible checks:
+      - STRICT: core reasoning and coordination must be present (e.g., the agent proposal referencing the right parties, key follow-up actions like messages/emails, calendar reminders actually created).
+      - FLEXIBLE: wording details (exact subject/body strings), cosmetic fields, or small variations in time ranges and titles should not cause failure if the logical behavior is equivalent.
+      - Follow the "Validation Flexibility Guidelines" from the multi-step design doc: be strict on logic and data relationships, flexible on surface phrasing and minor formatting.
     - Mention the relevant EventType and tool/function each check expects in the log.
+      - Before using EventType, use Read to open `are/simulation/types.py` and inspect which enum members exist; do NOT invent members like `ORACLE` if they are not defined.
+      - In oracle-mode runs (like those used by this pipeline), many tool invocations are recorded as `EventType.ENV` in `env.event_log.list_view()`. Inspect a few log entries first and match on the actual `event_type` values you see (for example, allow both `ENV` and `AGENT` where appropriate) instead of assuming one fixed enum.
+      - Treat entries from `env.event_log.list_view()` as event objects (for example, `CompletedEvent` instances) with attributes such as `event_type` and `action`; do NOT subscript them like dictionaries or lists.
     - ONLY modify the `validate()` function, keeping other sections intact and preserving WARNING comments.
+    - When building the final `ScenarioValidationResult`, set:
+      - `success=True` only if all strict checks pass.
+      - `success=False` otherwise, and include a short `rationale` string that summarizes which critical checks were missing (for example, "no payment reminder email to TechStart found in log" or "calendar reminder event not created").
+      This rationale will be surfaced back to you in future iterations to help you refine the validation logic.
     Output must be the full python file with only the validate TODO replaced by executable code.
     """
 )
@@ -488,6 +585,11 @@ APPS_AND_DATA_USER_PROMPT = textwrap.dedent(
     Use the Read tool to open the file above. Incorporate the scenario description into the template by
     editing ONLY `init_and_populate_apps()` and the imports TODO region.
 
+    IMPORTANT: You must verify APIs from source before writing code.
+    - Use Read to inspect `are/simulation/apps/contacts.py` before creating any `Contact(...)`.
+    - Use Read to inspect `pas/apps/messaging/app.py` and `are/simulation/apps/messaging_v2.py` before seeding any messaging state.
+    - If you cannot confirm a field/method in source, do not use it.
+
     Apply STRICT edit boundaries:
     - You may only change:
       - The imports section around the "TODO: import all Apps that will be used in this scenario" comment.
@@ -529,6 +631,13 @@ EVENTS_FLOW_USER_PROMPT = textwrap.dedent(
 
     Target scenario file path (read + write this exact file via tools):
     {scenario_file_path}
+
+    IMPORTANT: verify APIs from source before writing code.
+    - Use Read to inspect the PAS app wrappers under `pas/apps/` for every app you will call in `build_events_flow()`.
+    - Use Read to inspect the corresponding Meta-ARE base apps under `are/simulation/apps/` for method signatures and dataclasses.
+    - Do not call any method unless you have confirmed it exists and copied its signature from source.
+    - If the runtime check reports a missing argument or missing attribute, treat it as proof your API usage is incorrect: go back to source,
+      find the right method/signature, and update only `build_events_flow()` accordingly.
 
     Use the available agent tools to apply your edits:
     - Use the Read tool to inspect the existing scenario file at {scenario_file_path} and any PAS / Meta-ARE app definitions you need.

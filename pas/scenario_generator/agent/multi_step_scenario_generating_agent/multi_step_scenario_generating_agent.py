@@ -524,14 +524,25 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
         _ = response  # unused: Claude's text reply is not the source of truth for code steps
         scenario_text = self._safe_read_text(self.scenario_file)
         if not self._looks_like_complete_scenario(scenario_text):
+            # Structural guardrail only; no runtime feedback available yet.
             return False, guardrail_feedback
 
+        # Run the dynamic scenario check (TwoAgentScenarioRunner) and, if it
+        # fails, thread the concrete runtime error back into the feedback so
+        # the next iteration has a precise signal about what went wrong.
         result = self._run_step_check(
             step_label,
             self.scenario_file,
             require_validation_success=require_validation_success,
         )
-        return result.passed, result.feedback
+
+        if result.passed:
+            return True, result.feedback
+
+        # For runtime/validation failures, return ONLY the concrete summary from
+        # `_run_step_check`. The static guardrail text about "complete Python
+        # scenario files" is only relevant when the structural check fails.
+        return False, result.feedback
 
     @staticmethod
     def _sanitize_docstring_text(text: str) -> str:
@@ -900,9 +911,12 @@ class MultiStepScenarioGeneratingAgentsOrchestrator:
             validation_reached = False
             validation_success = False
             passed = False
+            # Ensure we always surface a meaningful message, even when the
+            # exception has an empty string representation.
+            exc_msg = str(exc).strip() or repr(exc)
             feedback = (
                 f"[{label}] FAILED run for scenario '{scenario_id}'.\n"
-                f"Runtime error while executing scenario via TwoAgentScenarioRunner: {exc}"
+                f"Runtime error while executing scenario via TwoAgentScenarioRunner: {exc_msg}"
             )
             result = RunCheckResult(
                 passed=passed,
