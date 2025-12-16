@@ -19,13 +19,11 @@ from pas.apps.notification_templates import NOTIFICATION_TEMPLATES
 from pas.scenario_generator.agent.multi_step_scenario_generating_agent import (
     MultiStepScenarioGeneratingAgentsOrchestrator,
 )
-from pas.scenario_generator.example_proactive_scenarios.scenario_with_all_pas_apps import (
-    ScenarioWithAllPASApps,
-)
 from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts.prompts import (
     APP_IMPORT_INSTRUCTIONS,
     build_app_initialization_block,
 )
+from pas.scenario_generator.scenario_with_all_pas_apps import ScenarioWithAllPASApps
 
 SYSTEM_APPS = {"PASAgentUserInterface", "HomeScreenSystemApp"}
 _STATE_USER_TOOL_CACHE: dict[type, list[tuple[str, str, Any]]] = {}
