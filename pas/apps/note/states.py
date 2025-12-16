@@ -8,13 +8,13 @@ from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
-    from pas.apps.note.app import Note, ReturnedNotes, StatefulNoteApp
+    from pas.apps.note.app import Note, ReturnedNotes, StatefulNotesApp
 
 
 class NoteList(AppState):
     """State representing a list of notes within a folder or search mode."""
 
-    def __init__(self, folder: str = "All", search_mode: bool = False) -> None:
+    def __init__(self, folder: str = "Inbox", search_mode: bool = False) -> None:
         """Initialize the list view.
 
         Args:
@@ -23,6 +23,7 @@ class NoteList(AppState):
         """
         super().__init__()
         self.folder = folder
+        # @HuanCC666: What is the purpose of search_mode?
         self.search_mode = search_mode
 
     def on_enter(self) -> None:
@@ -46,12 +47,12 @@ class NoteList(AppState):
             ReturnedNotes: Paginated notes container.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).list_notes(self.folder, offset, limit)
+            return cast("StatefulNotesApp", self.app).list_notes(self.folder, offset, limit)
 
     @user_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
+    @pas_event_registered(operation_type=OperationType.READ)
     def open(self, note_id: str) -> Note:
-        """Open a note detail view.
+        """Open a note by ID.
 
         Args:
             note_id (str): ID of the note to open.
@@ -60,18 +61,18 @@ class NoteList(AppState):
             Note: Note object from backend.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).get_note(note_id)
+            return cast("StatefulNotesApp", self.app).get_note_by_id(note_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def new(self) -> str:
+    def new_note(self) -> str:
         """Create a new note in the current folder.
 
         Returns:
             str: ID of newly created note.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).create_note(self.folder)
+            return cast("StatefulNotesApp", self.app).create_note(folder=self.folder)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
@@ -85,18 +86,18 @@ class NoteList(AppState):
             list[Note]: List of matched notes.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).search_notes(keyword, self.folder)
+            return cast("StatefulNotesApp", self.app).search_notes_in_folder(keyword, self.folder)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def folders(self) -> list[str]:
+    def list_folders(self) -> list[str]:
         """List all folders.
 
         Returns:
             list[str]: Folder names.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).list_folders()
+            return cast("StatefulNotesApp", self.app).list_folders()
 
 
 class NoteDetail(AppState):
@@ -110,10 +111,12 @@ class NoteDetail(AppState):
         """
         super().__init__()
         self.note_id = note_id
+        self._note: Note | None = None
 
     def on_enter(self) -> None:
         """Lifecycle hook when entering NoteDetail."""
-        pass
+        with disable_events():
+            self._note = self.app.get_note_by_id(self.note_id)
 
     def on_exit(self) -> None:
         """Lifecycle hook when leaving NoteDetail."""
@@ -128,32 +131,34 @@ class NoteDetail(AppState):
             Note: Updated note object.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).get_note(self.note_id)
+            _refreshed_note = cast("StatefulNotesApp", self.app).get_note_by_id(self.note_id)
+        self._note = _refreshed_note
+        return self._note
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def attachments(self) -> list[str]:
+    def list_attachments(self) -> list[str]:
         """List attachments associated with the note.
 
         Returns:
             list[str]: Attachment names.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).list_attachments(self.note_id)
+            return cast("StatefulNotesApp", self.app).list_attachments(self.note_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def add_attachment(self, attachment: str) -> str:
-        """Add an attachment to the note.
+    def add_attachment(self, attachment_path: str) -> str:
+        """Add a file attachment to the note.
 
         Args:
-            attachment (str): Attachment identifier.
+            attachment_path (str): Path to the attachment to add.
 
         Returns:
             str: Backend confirmation "OK".
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).add_attachment(self.note_id, attachment)
+            return cast("StatefulNotesApp", self.app).add_attachment_to_note(self.note_id, attachment_path)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -167,7 +172,7 @@ class NoteDetail(AppState):
             str: Backend confirmation "OK".
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).remove_attachment(self.note_id, attachment)
+            return cast("StatefulNotesApp", self.app).remove_attachment(self.note_id, attachment)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -178,7 +183,7 @@ class NoteDetail(AppState):
             str: Backend deletion confirmation "OK".
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).delete_note(self.note_id)
+            return cast("StatefulNotesApp", self.app).delete_note(self.note_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -203,10 +208,12 @@ class EditNote(AppState):
         """
         super().__init__()
         self.note_id = note_id
+        self._note: Note | None = None
 
     def on_enter(self) -> None:
         """Lifecycle hook when entering EditNote."""
-        pass
+        with disable_events():
+            self._note = self.app.get_note_by_id(self.note_id)
 
     def on_exit(self) -> None:
         """Lifecycle hook when leaving EditNote."""
@@ -225,7 +232,7 @@ class EditNote(AppState):
             str: Note ID of the updated note.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).update_note(self.note_id, title, content)
+            return cast("StatefulNotesApp", self.app).update_note(self.note_id, title, content)
 
 
 class FolderList(AppState):
@@ -248,11 +255,11 @@ class FolderList(AppState):
             list[str]: Folder names.
         """
         with disable_events():
-            return cast("StatefulNoteApp", self.app).list_folders()
+            return cast("StatefulNotesApp", self.app).list_folders()
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def open(self, folder: str) -> str:
+    def open(self, folder: str) -> list[Note]:
         """Open the selected folder.
 
         Args:
@@ -261,5 +268,4 @@ class FolderList(AppState):
         Returns:
             str: Confirmation message that folder is opened.
         """
-        with disable_events():
-            return f"Opened folder: {folder}"
+        return cast("StatefulNotesApp", self.app).open_folder(folder)

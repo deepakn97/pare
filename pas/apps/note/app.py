@@ -1,18 +1,32 @@
 from __future__ import annotations
 
+import base64
+import logging
+import textwrap
 import time
 import uuid
+from copy import deepcopy
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from are.simulation.tool_utils import OperationType, app_tool
+from are.simulation.apps.app import Protocol
+from are.simulation.tool_utils import OperationType, app_tool, data_tool, env_tool
+from are.simulation.types import EventType, disable_events
+from are.simulation.utils import get_state_dict, uuid_hex
+from are.simulation.utils.type_utils import type_check
 
 if TYPE_CHECKING:
     from are.simulation.types import CompletedEvent
 
+from are.simulation.apps import SandboxLocalFileSystem, VirtualFileSystem
+
 from pas.apps.core import StatefulApp
 from pas.apps.note.states import EditNote, FolderList, NoteDetail, NoteList
 from pas.apps.tool_decorators import pas_event_registered
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -22,11 +36,48 @@ class Note:
     note_id: str
     title: str
     content: str
-    folder: str
     pinned: bool = False
-    attachments: list[str] = field(default_factory=list)
+    attachments: dict[str, bytes] | None = field(default_factory=dict)
     created_at: float = field(default_factory=lambda: time.time())
     updated_at: float = field(default_factory=lambda: time.time())
+
+    def __str__(self) -> str:
+        return textwrap.dedent(
+            f"""
+            ID: {self.note_id}
+            Title: {self.title}
+            Content: {self.content}
+            Pinned: {self.pinned}
+            Created At: {datetime.fromtimestamp(self.created_at, tz=UTC).strftime("%Y-%m-%d %H:%M:%S")}
+            Updated At: {datetime.fromtimestamp(self.updated_at, tz=UTC).strftime("%Y-%m-%d %H:%M:%S")}
+            """
+        )
+
+    def __post_init__(self) -> None:
+        if self.note_id is None or len(self.note_id) == 0:
+            self.note_id = uuid.uuid4().hex
+
+        if self.attachments is None:
+            self.attachments = {}
+
+    def add_attachment(self, path: str) -> None:
+        """Add an attachment to the note.
+
+        Args:
+            path (str): Path to the attachment.
+        """
+        if not isinstance(path, str):
+            raise TypeError(f"Path must be a string, got {type(path)}.")
+        if len(path) == 0:
+            raise ValueError("Path must be non-empty.")
+        if not Path(path).exists():
+            raise ValueError(f"File does not exist: {path}")
+        with open(path, "rb") as f:
+            file_content = base64.b64encode(f.read())
+            file_name = Path(path).name
+            if not self.attachments:
+                self.attachments = {}
+            self.attachments[file_name] = file_content
 
 
 @dataclass
@@ -39,7 +90,7 @@ class ReturnedNotes:
     total_notes: int
 
 
-class NoteFolder:
+class NotesFolder:
     """Container managing notes within a single folder."""
 
     def __init__(self, folder_name: str) -> None:
@@ -49,7 +100,7 @@ class NoteFolder:
             folder_name (str): Name of the folder.
         """
         self.folder_name = folder_name
-        self.notes: list[Note] = []
+        self.notes: dict[str, Note] = {}
 
     def add_note(self, note: Note) -> None:
         """Add a note and sort by timestamp.
@@ -57,8 +108,9 @@ class NoteFolder:
         Args:
             note (Note): Note to add.
         """
-        self.notes.append(note)
-        self.notes.sort(key=lambda n: n.updated_at, reverse=True)
+        if not isinstance(note, Note):
+            raise TypeError(f"Note must be an instance of Note, got {type(note)}.")
+        self.notes[note.note_id] = note
 
     def remove_note(self, note_id: str) -> bool:
         """Remove a note by ID.
@@ -69,14 +121,13 @@ class NoteFolder:
         Returns:
             bool: True if removed, False if not found.
         """
-        for i, note in enumerate(self.notes):
-            if note.note_id == note_id:
-                del self.notes[i]
-                return True
-        return False
+        if note_id not in self.notes:
+            return False
+        del self.notes[note_id]
+        return True
 
-    def get_notes(self, offset: int = 0, limit: int = 10) -> ReturnedNotes:
-        """Retrieve paginated notes.
+    def get_notes(self, offset: int = 0, limit: int = 5) -> ReturnedNotes:
+        """Retrieve paginated notes with the most recently updated notes first.
 
         Args:
             offset (int): Starting index.
@@ -85,13 +136,38 @@ class NoteFolder:
         Returns:
             ReturnedNotes: Paginated result container.
         """
+        if not isinstance(offset, int):
+            raise TypeError(f"Offset must be an integer, got {type(offset)}.")
+        if offset < 0:
+            raise ValueError("Offset must be non-negative.")
+        if offset > len(self.notes):
+            raise ValueError("Offset must be less than the number of notes.")
+
         total = len(self.notes)
         end = min(offset + limit, total)
-        returned = self.notes[offset:end]
+        returned = list(self.notes.values())[offset:end]
+        returned = sorted(returned, key=lambda n: n.updated_at, reverse=True)
 
         return ReturnedNotes(
             notes=returned, notes_range=(offset, end), total_returned_notes=len(returned), total_notes=total
         )
+
+    def get_note(self, idx: int) -> Note:
+        """Get a note by index.
+
+        Args:
+            idx (int): Index of the note.
+
+        Returns:
+            Note: The note at the given index.
+        """
+        if not isinstance(idx, int):
+            raise TypeError(f"Index must be an integer, got {type(idx)}.")
+        if idx < 0:
+            raise ValueError("Index must be non-negative.")
+        if int(idx) >= len(self.notes):
+            raise ValueError(f"Index {idx} is out of range.")
+        return list(self.notes.values())[idx]
 
     def get_note_by_id(self, note_id: str) -> Note | None:
         """Lookup a note by ID.
@@ -100,24 +176,23 @@ class NoteFolder:
             note_id (str): Target note ID.
 
         Returns:
-            Note | None: Found note or None.
+            Note: Found note.
         """
-        for note in self.notes:
-            if note.note_id == note_id:
-                return note
-        return None
+        if note_id not in self.notes:
+            return None
+        return self.notes[note_id]
 
-    def search_notes(self, keyword: str) -> list[Note]:
-        """Search notes within this folder.
+    def search_notes(self, query: str) -> list[Note]:
+        """Search notes within this folder using a query string.
 
         Args:
-            keyword (str): Search keyword.
+            query (str): Search query.
 
         Returns:
             list[Note]: Matched notes.
         """
-        keyword_lower = keyword.lower()
-        return [n for n in self.notes if keyword_lower in n.title.lower() or keyword_lower in n.content.lower()]
+        query_lower = query.lower()
+        return [n for n in self.notes.values() if query_lower in n.title.lower() or query_lower in n.content.lower()]
 
     def get_state(self) -> dict[str, Any]:
         """Serialize folder state.
@@ -125,22 +200,7 @@ class NoteFolder:
         Returns:
             dict[str, Any]: Serialized state.
         """
-        return {
-            "folder_name": self.folder_name,
-            "notes": [
-                {
-                    "note_id": n.note_id,
-                    "title": n.title,
-                    "content": n.content,
-                    "folder": n.folder,
-                    "pinned": n.pinned,
-                    "attachments": n.attachments,
-                    "created_at": n.created_at,
-                    "updated_at": n.updated_at,
-                }
-                for n in self.notes
-            ],
-        }
+        return get_state_dict(self, ["folder_name", "notes"])
 
     def load_state(self, state_dict: dict[str, Any]) -> None:
         """Deserialize folder state.
@@ -149,40 +209,61 @@ class NoteFolder:
             state_dict (dict[str, Any]): State to load.
         """
         self.folder_name = state_dict["folder_name"]
-        self.notes = [
-            Note(
-                note_id=n["note_id"],
-                title=n["title"],
-                content=n["content"],
-                folder=n["folder"],
-                pinned=n["pinned"],
-                attachments=n["attachments"],
-                created_at=n["created_at"],
-                updated_at=n["updated_at"],
-            )
-            for n in state_dict["notes"]
-        ]
-        self.notes.sort(key=lambda n: n.updated_at, reverse=True)
+        self.notes = {note.note_id: Note(**note) for note in state_dict["notes"]}
+        self.notes = dict(sorted(self.notes.items(), key=lambda item: item[1].updated_at, reverse=True))
 
 
 @dataclass
-class StatefulNoteApp(StatefulApp):
-    """Stateful note-taking application with PAS navigation."""
+class StatefulNotesApp(StatefulApp):
+    """A Notes application that manages user's notes and folder organization. This class provides comprehensive functionality for handling notes including creating, updating, deleting, and searching notes.
+
+    This app maintains the notes in different folders. Default folders are "Inbox", "Personal", and "Work". New folders can be created by the user.
+
+    Key Features:
+    - Note Management: Create, update, move and delete notes
+    - Folder Management: Create, delete, and search folders (Default folders cannot be deleted)
+    - Attachment Management: Handle note attachments (upload and download)
+    - Search Functionality: Search notes across folders with text-based queries
+    - State Management: Save and load application state
+
+    Key Components:
+    - Folders: Each NotesFolder instance maintains its own collection of notes
+    - View Limits: Configurable limit for note viewing and pagination
+    - Event Registration: All operations are tracked through event registration
+
+    Notes:
+    - Note IDs are automatically generated when creating new notes.
+    - Attachments are handled using base64 encoding.
+    - Search operations are case-insensitive.
+    - All notes operations maintain folder integrity.
+    """
 
     name: str | None = None
-    folders: dict[str, NoteFolder] = field(default_factory=dict)
+    view_limit: int = 5
+    folders: dict[str, NotesFolder] = field(default_factory=dict)
+    internal_fs: SandboxLocalFileSystem | VirtualFileSystem | None = None
 
     def __post_init__(self) -> None:
         """Initialize app with default folders."""
         super().__init__(self.name or "note")
 
         # Initialize default folders
-        default_folders = ["All", "Personal", "Work"]
-        for folder_name in default_folders:
+        self.default_folders = ["Inbox", "Personal", "Work"]
+        for folder_name in self.default_folders:
             if folder_name not in self.folders:
-                self.folders[folder_name] = NoteFolder(folder_name)
+                self.folders[folder_name] = NotesFolder(folder_name)
 
         self.load_root_state()
+
+    def connect_to_protocols(self, protocols: dict[Protocol, Any]) -> None:
+        """Connect to the given list of protocols.
+
+        Args:
+            protocols (dict[Protocol, Any]): Dictionary of protocols.
+        """
+        file_system = protocols.get(Protocol.FILE_SYSTEM)
+        if isinstance(file_system, (SandboxLocalFileSystem, VirtualFileSystem)):
+            self.internal_fs = file_system
 
     def create_root_state(self) -> NoteList:
         """Return the root navigation state.
@@ -190,57 +271,243 @@ class StatefulNoteApp(StatefulApp):
         Returns:
             NoteList: Default folder view.
         """
-        return NoteList("All")
+        return NoteList("Inbox")
 
-    def _gen(self) -> str:
-        """Generate a unique note ID.
+    def get_state(self) -> dict[str, Any]:
+        """Serialize app state.
 
         Returns:
-            str: Newly generated ID.
+            dict[str, Any]: Complete app state.
         """
-        return uuid.uuid4().hex
+        return {
+            "view_limit": self.view_limit,
+            "folders": {k: v.get_state() for k, v in self.folders.items()},
+        }
 
-    def _get_note_from_any_folder(self, note_id: str) -> Note | None:
+    def load_state(self, state_dict: dict[str, Any]) -> None:
+        """Deserialize app state.
+
+        Args:
+            state_dict (dict[str, Any]): State to restore.
+        """
+        self.view_limit = state_dict["view_limit"]
+        self.folders.clear()
+        for folder_name, folder_state in state_dict.get("folders", {}).items():
+            folder = NotesFolder(folder_name)
+            folder.load_state(folder_state)
+            self.folders[folder_name] = folder
+
+    def reset(self) -> None:
+        """Reset the app to empty state."""
+        super().reset()
+        for folder in self.folders:
+            self.folders[folder].notes.clear()
+
+    def _get_note_from_any_folder(self, note_id: str) -> tuple[str, Note] | None:
         """Find a note across all folders.
 
         Args:
             note_id (str): Note ID to find.
 
         Returns:
-            Note | None: Found note or None.
+            tuple[str, Note] | None: Folder Name and Note object if found, None otherwise.
         """
-        for folder in self.folders.values():
+        for name, folder in self.folders.items():
             note = folder.get_note_by_id(note_id)
-            if note:
-                return note
+            if note is not None:
+                return (name, note)
         return None
 
+    def open_folder(self, folder: str) -> list[Note]:
+        """Open a folder and return the notes in the folder.
+
+        Args:
+            folder (str): Name of the folder to open.
+
+        Returns:
+            list[Note]: List of notes in the folder.
+
+        Raises:
+            KeyError: If folder does not exist.
+            ValueError: If folder name is empty.
+        """
+        if folder not in self.folders:
+            raise KeyError(f"Folder {folder} does not exist")
+        if len(folder) == 0:
+            raise ValueError("Folder name must be non-empty")
+        return list(self.folders[folder].notes.values())
+
+    @type_check
     @app_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
+    def new_folder(self, folder_name: str) -> str:
+        """Create a new empty folder with the given name.
+
+        Args:
+            folder_name (str): Name of the new folder.
+
+        Returns:
+            str: Name of the newly created folder.
+
+        Raises:
+            KeyError: If folder already exists.
+        """
+        if folder_name in self.folders:
+            raise KeyError(f"Folder {folder_name} already exists")
+        self.folders[folder_name] = NotesFolder(folder_name)
+        return folder_name
+
+    @type_check
+    @env_tool()
+    @app_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
+    def delete_folder(self, folder_name: str) -> str:
+        """Delete a folder and all it's notes. Default folders "Inbox", "Personal", and "Work" cannot be deleted.
+
+        Args:
+            folder_name (str): Name of the folder to delete.
+
+        Returns:
+            str: Name of the deleted folder if successful.
+
+        Raises:
+            KeyError: If folder does not exist, or if the folder to be deleted is one of the default folders.
+        """
+        if folder_name not in self.folders:
+            raise KeyError(f"Folder {folder_name} does not exist")
+        if folder_name in self.default_folders:
+            raise KeyError(f"Cannot delete default folder {folder_name}")
+
+        self.folders[folder_name].notes.clear()
+        del self.folders[folder_name]
+        logger.debug(f"Deleted folder {folder_name}")
+        return folder_name
+
+    @type_check
+    @app_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
+    def rename_folder(self, folder: str, new_folder: str) -> str:
+        """Rename an already existing folder. Default folders "Inbox", "Personal", and "Work" cannot be renamed.
+
+        Args:
+            folder (str): Name of the folder to rename.
+            new_folder(str): New name for the folder.
+
+        Returns:
+            str: Name of the renamed folder.
+
+        Raises:
+            KeyError: If folder_name does not exist, a folder with the new name already exists or if the folder to be renamed is one of the default folders.
+        """
+        if folder not in self.folders:
+            raise KeyError(f"Folder {folder} does not exist")
+        if new_folder in self.folders:
+            raise KeyError(f"Folder {new_folder} already exists")
+        if folder in self.default_folders:
+            raise KeyError(f"Cannot rename default folder {folder}")
+        self.folders[new_folder] = deepcopy(self.folders[folder])
+        del self.folders[folder]
+        logger.debug(f"Renamed folder {folder} to {new_folder}")
+        return new_folder
+
+    @data_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def create_note(self, folder: str = "All") -> str:
-        """Create a new empty note in a given folder.
+    def create_note_with_time(
+        self,
+        folder: str = "Inbox",
+        title: str = "",
+        content: str = "",
+        pinned: bool = False,
+        created_at: str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+        updated_at: str | None = None,
+    ) -> str:
+        """Create a new note with title and content at a specific time. If title string is empty, it will be set to the first 50 characters of the content. If specified folder is not found, a new folder will be created.
 
         Args:
             folder (str): Folder to create the note under.
+            title (str): Title of the note.
+            content (str): Content of the note.
+            pinned (bool): Whether the note should be pinned.
+            created_at (str): Time of the note creation. Defaults to the current time.
+            updated_at (str): Time of the note update. Defaults to the creation time.
 
         Returns:
-            str: Newly created note ID.
+            str: ID of the newly created note.
+
+        Raises:
+            ValueError: If creation or update time is invalid, or if updated time is before creation time.
         """
-        nid = self._gen()
-        note = Note(nid, "", "", folder)
+        try:
+            creation_time = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC).timestamp()
+        except ValueError as e:
+            raise ValueError("Invalid datetime format for the creation time. Please use YYYY-MM-DD HH:MM:SS") from e
+        if updated_at is not None:
+            try:
+                update_time = datetime.strptime(updated_at, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC).timestamp()
+            except ValueError as e:
+                raise ValueError("Invalid datetime format for the update time. Please use YYYY-MM-DD HH:MM:SS") from e
+        else:
+            update_time = creation_time
 
-        # Add to specified folder
-        if folder in self.folders:
-            self.folders[folder].add_note(note)
+        if folder not in self.folders:
+            with disable_events():
+                self.new_folder(folder)
 
-        if folder != "All" and "All" in self.folders:
-            self.folders["All"].add_note(note)
+        if update_time < creation_time:
+            raise ValueError(
+                "Updated time cannot be before creation time. Creation Time: {creation_time}, Updated Time: {update_time}"
+            )
+        note_id = uuid_hex(self.rng)
+        note = Note(
+            note_id=note_id,
+            title=title,
+            content=content,
+            pinned=pinned,
+            created_at=creation_time,
+            updated_at=update_time,
+        )
+        self.folders[folder].add_note(note)
+        return note.note_id
 
-        return nid
-
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
-    def get_note(self, note_id: str) -> Note:
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
+    def create_note(self, folder: str = "Inbox", title: str = "", content: str = "", pinned: bool = False) -> str:
+        """Create a new note with title and content. If title string is empty, it will be set to the first 50 characters of the content.
+
+        Args:
+            folder (str): Folder to create the note under.
+            title (str): Title of the note.
+            content (str): Content of the note.
+            pinned (bool): Whether the note should be pinned.
+
+        Returns:
+            str: ID of the newly created note.
+
+        Raises:
+            KeyError: If specified folder is not found.
+        """
+        if folder not in self.folders:
+            raise KeyError(f"Folder {folder} does not exist")
+        if title is None or len(title.strip()) == 0:
+            title = content[:50]
+        note_id = uuid_hex(self.rng)
+        note = Note(
+            note_id=note_id,
+            title=title,
+            content=content,
+            pinned=False,
+            created_at=self.time_manager.time(),
+            updated_at=self.time_manager.time(),
+        )
+        self.folders[folder].add_note(note)
+        return note.note_id
+
+    @type_check
+    @data_tool()
+    @app_tool()
+    @pas_event_registered(operation_type=OperationType.READ, event_type=EventType.AGENT)
+    def get_note_by_id(self, note_id: str) -> Note:
         """Retrieve a note by ID.
 
         Args:
@@ -252,76 +519,113 @@ class StatefulNoteApp(StatefulApp):
         Raises:
             KeyError: If note not found.
         """
-        note = self._get_note_from_any_folder(note_id)
-        if note is None:
+        if not isinstance(note_id, str):
+            raise TypeError(f"Note ID must be a string, got {type(note_id)}.")
+        if len(note_id) == 0:
+            raise ValueError("Note ID must be non-empty.")
+        result = self._get_note_from_any_folder(note_id)
+        if result is None:
             raise KeyError(f"Note {note_id} not found")
-        return note
+        return result[1]
 
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
-    def update_note(self, note_id: str, title: str, content: str) -> str:
-        """Update note title and content.
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
+    def update_note(self, note_id: str, title: str | None = None, content: str | None = None) -> str:
+        """Update the title or the content of the note. At least one of title or content must be provided.
+
+        Notes:
+        - If both title and content are provided, both will be updated.
+        - If the note has no title and new title is provided, the title will be set to the new title.
+        - If the note has no title and content is provided, the title will be set to the first 50 characters of the content.
 
         Args:
             note_id (str): Target note ID.
-            title (str): New title.
-            content (str): Updated note body.
+            title (str | None): New title for the note.
+            content (str | None): New content for the note.
 
         Returns:
-            str: Same note ID.
+            str: Note ID of the updated note.
 
         Raises:
             KeyError: If note not found.
+            ValueError: If both title and content are empty.
         """
-        note = self._get_note_from_any_folder(note_id)
-        if note is None:
+        result = self._get_note_from_any_folder(note_id)
+        if result is None:
             raise KeyError(f"Note {note_id} not found")
 
-        note.title = title or content[:50]
-        note.content = content
-        note.updated_at = time.time()
+        folder, note = result
 
-        for folder in self.folders.values():
-            if folder.get_note_by_id(note_id):
-                folder.notes.sort(key=lambda n: n.updated_at, reverse=True)
+        if (title is None or len(title.strip()) == 0) and (content is None or len(content.strip()) == 0):
+            raise ValueError(
+                "Both title and content cannot be empty. At least one of title or content must be provided."
+            )
+
+        if title is not None and len(title.strip()) > 0:
+            note.title = title
+
+        # Title was not provided, content was provided
+        if content is not None and len(content.strip()) > 0:
+            if note.title is None or len(note.title.strip()) == 0:
+                note.title = content[:50]
+            note.content = content
+
+        note.updated_at = self.time_manager.time()
+        self.folders[folder].notes[note.note_id] = note
 
         return note_id
 
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
     def delete_note(self, note_id: str) -> str:
-        """Delete a note from all folders.
+        """Delete a note with the specified ID. Deleted Note ID is returned.
 
         Args:
             note_id (str): ID of note to delete.
 
         Returns:
-            str: Confirmation string "OK".
-        """
-        for folder in self.folders.values():
-            folder.remove_note(note_id)
-        return "OK"
+            str: ID of the deleted note.
 
+        Raises:
+            TypeError: If note ID is not a string.
+            ValueError: If note ID is empty.
+            KeyError: If note not found.
+        """
+        if not isinstance(note_id, str):
+            raise TypeError(f"Note ID must be a string, got {type(note_id)}.")
+        if len(note_id) == 0:
+            raise ValueError("Note ID must be non-empty.")
+        result = self._get_note_from_any_folder(note_id)
+        if result is None:
+            raise KeyError(f"Note {note_id} not found")
+        folder, _ = result
+        self.folders[folder].remove_note(note_id)
+        return note_id
+
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
+    @pas_event_registered(operation_type=OperationType.READ, event_type=EventType.AGENT)
     def list_notes(self, folder: str, offset: int = 0, limit: int = 10) -> ReturnedNotes:
-        """List notes under a specific folder with pagination.
+        """List notes in the specific folder with a specified offset.
 
         Args:
-            folder (str): Folder name.
-            offset (int): Starting index.
-            limit (int): Maximum notes to return.
+            folder (str): The folder to list notes from.
+            offset (int): The offset of the first note to return.
+            limit (int): The maximum number of notes to return.
 
         Returns:
-            ReturnedNotes: Paginated notes result.
+            ReturnedNotes: Notes with additional metadata about the range of notes retrieved and total number of notes
         """
         if folder not in self.folders:
-            return ReturnedNotes(notes=[], notes_range=(0, 0), total_returned_notes=0, total_notes=0)
+            raise ValueError(f"Folder {folder} not found")
 
         return self.folders[folder].get_notes(offset, limit)
 
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
+    @pas_event_registered(operation_type=OperationType.READ, event_type=EventType.AGENT)
     def list_folders(self) -> list[str]:
         """List all folder names.
 
@@ -330,116 +634,157 @@ class StatefulNoteApp(StatefulApp):
         """
         return list(self.folders.keys())
 
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
-    def move_note(self, note_id: str, new_folder: str) -> str:
-        """Move a note to another folder.
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
+    def move_note(self, note_id: str, source_folder_name: str = "Inbox", dest_folder_name: str = "Personal") -> str:
+        """Move a note with the specified ID to the specified folder.
 
         Args:
-            note_id (str): ID of note to move.
-            new_folder (str): Destination folder.
+            note_id (str): The ID of the note to move.
+            source_folder_name (str): The folder to move the note from. Defaults to Inbox.
+            dest_folder_name (str): The folder to move the note to. Defaults to Personal.
 
         Returns:
-            str: Confirmation "OK".
+            str: The ID of the moved note
 
         Raises:
-            KeyError: If note not found.
+            KeyError: If source or destination folder not found or note not found in source folder.
         """
-        note = self._get_note_from_any_folder(note_id)
+        if source_folder_name not in self.folders:
+            raise KeyError(f"Folder {source_folder_name} not found.")
+        if dest_folder_name not in self.folders:
+            raise KeyError(f"Folder {dest_folder_name} not found.")
+        note = self.folders[source_folder_name].get_note_by_id(note_id)
         if note is None:
-            raise KeyError(f"Note {note_id} not found")
+            raise KeyError(f"Note {note_id} not found in folder {source_folder_name}.")
+        self.folders[dest_folder_name].add_note(note)
+        self.folders[source_folder_name].remove_note(note_id)
+        return note_id
 
-        old_folder = note.folder
-        note.folder = new_folder
-
-        # Remove from old folder (except "All")
-        if old_folder != "All" and old_folder in self.folders:
-            self.folders[old_folder].remove_note(note_id)
-
-        # Add to new folder (except "All", it already has it)
-        if new_folder != "All" and new_folder in self.folders and not self.folders[new_folder].get_note_by_id(note_id):
-            self.folders[new_folder].add_note(note)
-
-        return "OK"
-
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
-    def duplicate_note(self, note_id: str) -> str:
-        """Create a duplicated copy of a note.
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
+    def duplicate_note(self, folder_name: str, note_id: str) -> str:
+        """Create a duplicated copy of a note. The new note is added to the same folder as the original note and the title is "Copy of <original title>".
 
         Args:
-            note_id (str): ID of the note to copy.
+            folder_name (str): The folder of the original note. Defaults to Inbox.
+            note_id (str): The ID of the note to copy.
 
         Returns:
-            str: ID of newly created duplicate.
+            str: The ID of the newly created duplicate.
 
         Raises:
-            KeyError: If note not found.
+            KeyError: If folder not found or note not found in folder.
         """
-        old = self._get_note_from_any_folder(note_id)
-        if old is None:
-            raise KeyError(f"Note {note_id} not found")
+        if folder_name not in self.folders:
+            raise KeyError(f"Folder {folder_name} not found.")
+        current_note = self.folders[folder_name].get_note_by_id(note_id)
+        if current_note is None:
+            raise KeyError(f"Note {note_id} not found in folder {folder_name}.")
 
-        nid = self._gen()
+        new_note_id = uuid_hex(self.rng)
         new_note = Note(
-            note_id=nid,
-            title=old.title + " Copy",
-            content=old.content,
-            folder=old.folder,
+            note_id=new_note_id,
+            title=f"Copy of {current_note.title}",
+            content=current_note.content,
             pinned=False,
-            attachments=old.attachments.copy(),
+            attachments=deepcopy(current_note.attachments),
         )
+        self.folders[folder_name].add_note(new_note)
 
-        # Add to same folders as original
-        if old.folder in self.folders:
-            self.folders[old.folder].add_note(new_note)
+        return new_note_id
 
-        if old.folder != "All" and "All" in self.folders:
-            self.folders["All"].add_note(new_note)
-
-        return nid
-
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
-    def search_notes(self, keyword: str, folder: str = "All") -> list[Note]:
-        """Search notes by keyword in title or body.
+    @pas_event_registered(operation_type=OperationType.READ, event_type=EventType.AGENT)
+    def search_notes(self, query: str) -> list[Note]:
+        """Search for notes across all folders based on a query string. The search looks for partial matches in title, and content.
 
         Args:
-            keyword (str): Search pattern.
-            folder (str): Folder to search within.
+            query (str): The search query string.
 
         Returns:
-            list[Note]: Matched notes.
+            list[Note]: A list of notes that match the query.
         """
-        if folder not in self.folders:
-            return []
+        results = []
+        for folder in self.folders:
+            results.extend(self.folders[folder].search_notes(query))
+        return results
 
-        return self.folders[folder].search_notes(keyword)
-
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
-    def add_attachment(self, note_id: str, attachment: str) -> str:
-        """Attach a file reference to a note.
+    @pas_event_registered(operation_type=OperationType.READ, event_type=EventType.AGENT)
+    def search_notes_in_folder(self, query: str, folder_name: str) -> list[Note]:
+        """Search for notes in a specific folder based on a query string. The search looks for partial matches in title, and content.
 
         Args:
-            note_id (str): Note to modify.
-            attachment (str): Attachment identifier.
+            query (str): The search query string.
+            folder_name (str): The folder to search in. Defaults to Inbox.
 
         Returns:
-            str: "OK".
+            list[Note]: A list of notes that match the query.
 
         Raises:
-            KeyError: If note not found.
+            KeyError: If folder not found.
         """
-        note = self._get_note_from_any_folder(note_id)
-        if note is None:
-            raise KeyError(f"Note {note_id} not found")
+        if folder_name not in self.folders:
+            raise KeyError(f"Folder {folder_name} not found.")
+        return self.folders[folder_name].search_notes(query)
 
-        note.attachments.append(attachment)
-        return "OK"
+    def add_attachment(self, note: Note, attachment_path: str) -> Note:
+        """Add a file attachment to a note.
 
+        Args:
+            note (Note): The note to add the attachment to.
+            attachment_path (str): The path to the attachment to add.
+
+        Returns:
+            Note: The updated note object.
+
+        Raises:
+            ValueError: If file does not exist.
+        """
+        if self.internal_fs is not None:
+            if not self.internal_fs.exists(attachment_path):
+                raise ValueError(f"File does not exist: {attachment_path}")
+            with disable_events(), self.internal_fs.open(attachment_path, "rb") as f:
+                file_content = base64.b64encode(f.read())
+                file_name = Path(attachment_path).name
+                if not note.attachments:
+                    note.attachments = {}
+                note.attachments[file_name] = file_content
+        else:
+            note.add_attachment(attachment_path)
+
+        return note
+
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
+    def add_attachment_to_note(self, note_id: str, attachment_path: str) -> str:
+        """Add a file attachment to a note.
+
+        Args:
+            note_id (str): The ID of the note to add the attachment to.
+            attachment_path (str): The path to the attachment to add.
+
+        Returns:
+            str: The ID of the note that the attachment was added to.
+        """
+        result = self._get_note_from_any_folder(note_id)
+        if result is None:
+            raise KeyError(f"Note {note_id} not found in any folder.")
+        folder_name, note = result
+        note = self.add_attachment(note, attachment_path)
+        note.updated_at = self.time_manager.time()
+        self.folders[folder_name].notes[note.note_id] = note
+        return note.note_id
+
+    @type_check
+    @app_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE, event_type=EventType.AGENT)
     def remove_attachment(self, note_id: str, attachment: str) -> str:
         """Remove an attachment from a note.
 
@@ -448,22 +793,31 @@ class StatefulNoteApp(StatefulApp):
             attachment (str): Attachment to remove.
 
         Returns:
-            str: "OK".
+            str: The ID of the note that the attachment was removed from.
 
         Raises:
-            KeyError: If note not found.
+            KeyError: If note not found in any folder or attachment not found in note.
         """
-        note = self._get_note_from_any_folder(note_id)
-        if note is None:
-            raise KeyError(f"Note {note_id} not found")
+        result = self._get_note_from_any_folder(note_id)
+        if result is None:
+            raise KeyError(f"Note {note_id} not found in any folder.")
+        folder_name, note = result
+        # code path is not reachable
+        if note.attachments is None:
+            raise KeyError(f"Note {note_id} has no attachments.")
 
-        if attachment in note.attachments:
-            note.attachments.remove(attachment)
+        if attachment not in note.attachments:
+            raise KeyError(f"Attachment {attachment} not found in note {note_id}")
 
-        return "OK"
+        del note.attachments[attachment]
+        note.updated_at = self.time_manager.time()
+        self.folders[folder_name].notes[note.note_id] = note
 
+        return note.note_id
+
+    @type_check
     @app_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
+    @pas_event_registered(operation_type=OperationType.READ, event_type=EventType.AGENT)
     def list_attachments(self, note_id: str) -> list[str]:
         """List attachment identifiers for a note.
 
@@ -476,36 +830,18 @@ class StatefulNoteApp(StatefulApp):
         Raises:
             KeyError: If note not found.
         """
-        note = self._get_note_from_any_folder(note_id)
-        if note is None:
+        result = self._get_note_from_any_folder(note_id)
+        if result is None:
             raise KeyError(f"Note {note_id} not found")
+        _, note = result
+        # code path is not reachable
+        if note.attachments is None:
+            return []
 
-        return note.attachments
-
-    def get_state(self) -> dict[str, Any]:
-        """Serialize app state.
-
-        Returns:
-            dict[str, Any]: Complete app state.
-        """
-        return {
-            "folders": {k: v.get_state() for k, v in self.folders.items()},
-        }
-
-    def load_state(self, state_dict: dict[str, Any]) -> None:
-        """Deserialize app state.
-
-        Args:
-            state_dict (dict[str, Any]): State to restore.
-        """
-        self.folders.clear()
-        for folder_name, folder_state in state_dict.get("folders", {}).items():
-            folder = NoteFolder(folder_name)
-            folder.load_state(folder_state)
-            self.folders[folder_name] = folder
+        return list(note.attachments.keys())
 
     def _resolve_note_id(self, args: dict[str, Any], metadata: object | None) -> str | None:
-        """Extract note_id from args or metadata.
+        """Extract note_id from args or metadata. Assumes that note_id is either in args or return value of the completed event.
 
         Args:
             args: Function arguments dictionary.
@@ -523,6 +859,7 @@ class StatefulNoteApp(StatefulApp):
 
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Core navigation handler mapping backend operations to state transitions."""
+        # @HuanCC666: Missing handling the go_back action for all states.
         current_state = self.current_state
         fname = event.function_name()
 
@@ -545,19 +882,20 @@ class StatefulNoteApp(StatefulApp):
 
     def _handle_note_list_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
         """Process transitions from the note list view."""
-        if fname in {"create_note", "new"}:
+        if fname == "new_note":
             note_id = self._resolve_note_id(args, metadata)
             if note_id:
                 self.set_current_state(EditNote(note_id))
             return
 
-        if fname in {"get_note", "open"}:
+        if fname == "open":
             note_id = self._resolve_note_id(args, metadata)
             if note_id:
                 self.set_current_state(NoteDetail(note_id))
             return
 
-        if fname in {"search", "search_notes"}:
+        # @HuanCC666 What happens when user searches for a note? The current state does not preserve the current folder the user was on.
+        if fname == "search":
             self.set_current_state(NoteList(search_mode=True))
             return
 
@@ -572,16 +910,18 @@ class StatefulNoteApp(StatefulApp):
                 self.set_current_state(EditNote(note_id))
             return
 
-        if fname == "delete_note" and self.navigation_stack:
+        if fname == "delete" and self.navigation_stack:
             self.go_back()
             return
 
+        # @HuanCC666 There is no user action called duplicate note.
         if fname == "duplicate_note":
             note_id = self._resolve_note_id(args, metadata)
             if note_id:
                 self.set_current_state(NoteDetail(note_id))
             return
 
+        # @HuanCC666 There is no user action called move note.
         if fname == "move_note":
             folder = args.get("new_folder")
             if isinstance(folder, str):
@@ -589,7 +929,7 @@ class StatefulNoteApp(StatefulApp):
 
     def _handle_edit_note_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
         """Process transitions from the edit note view."""
-        if fname == "update_note":
+        if fname == "update":
             if self.navigation_stack:
                 self.go_back()
             else:
@@ -599,6 +939,7 @@ class StatefulNoteApp(StatefulApp):
 
     def _handle_folder_list_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
         """Process transitions from the folder list view."""
+        # @HuanCC666 There is no user action called list notes on folder list.
         if fname == "list_notes":
             folder = args.get("folder")
             if isinstance(folder, str):
