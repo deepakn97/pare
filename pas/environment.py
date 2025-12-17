@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from are.simulation.environment import Environment, EnvironmentConfig, EnvironmentType
+from are.simulation.types import EventType
 
 from pas.apps import PASAgentUserInterface
 from pas.apps.core import StatefulApp
@@ -215,6 +216,7 @@ class StateAwareEnvironmentWrapper(Environment):
         // RL NOTE: This is where the environment processes actions and transitions to next state.
         // Log (s, a, r, s') tuples here for RL dataset generation.
         """
+        # ! FIXME: I don't understand where add_to_log is called from. Is it called automatically at each event or do we need to call it manually somewhere?
         event_list = events if isinstance(events, list) else [events]
         super().add_to_log(event_list)  # Call Meta ARE's native event processing
 
@@ -224,8 +226,8 @@ class StateAwareEnvironmentWrapper(Environment):
                 f"function={event.function_name()} type={event.event_type}"
             )
 
-            # Handle state transitions for StatefulApps
-            # ! FIXME: This is wrong. The state transition should only be triggered by a user action.
-            app = self.get_app(event.app_name())
-            if isinstance(app, StatefulApp):
-                app.handle_state_transition(event)
+            # Handle state transitions for StatefulApps only triggered by a user action.
+            if event.event_type == EventType.USER:
+                app = self.get_app(event.app_name())
+                if isinstance(app, StatefulApp):
+                    app.handle_state_transition(event)
