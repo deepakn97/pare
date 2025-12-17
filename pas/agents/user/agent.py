@@ -135,7 +135,7 @@ class UserAgent:
         self.tools = are_simulation_tools
         self.react_agent.tools = {tool.name: tool for tool in self.tools}
         self.react_agent.init_tools()
-        logger.info(f"Initialized {len(self.tools)} tools: {[tool.name for tool in self.tools]}")
+        logger.debug(f"Initialized {len(self.tools)} tools: {[tool.name for tool in self.tools]}")
 
     def remove_aui_irrelevant_tools(self, tools: list[AppTool]) -> list[AppTool]:
         """Remove irrelevant tools from the tools.
@@ -162,7 +162,7 @@ class UserAgent:
             scenario: Scenario to initialize the system prompt for.
         """
         additional_system_prompt = scenario.additional_system_prompt
-        logger.info(f"Additional System Prompt: {additional_system_prompt}")
+        logger.debug(f"Additional System Prompt: {additional_system_prompt}")
 
         task_description = additional_system_prompt if additional_system_prompt is not None else ""
         self.react_agent.init_system_prompts["system_prompt"] = self.react_agent.init_system_prompts[
@@ -196,7 +196,7 @@ class UserAgent:
             notification_system: Notification system to initialize.
         """
         if notification_system is not None:
-            logger.info(f"Setting notification system for User Agent to provided one {notification_system}")
+            logger.debug(f"Setting notification system for User Agent to provided one {notification_system}")
             self.react_agent.notification_system = notification_system
 
     def prepare_user_agent_run(
@@ -254,7 +254,7 @@ class UserAgent:
         # Reinsert the env notifications for user and agent, agent messages and any extra messages back into the notification system.
         # This is important because the preprocessing step and the next agent will use the same notification system.
         messages_to_put_back = [m for m in new_messages if m not in env_stop_messages]
-        logger.info(
+        logger.debug(
             f"User agent get_notifications() -> message types to put back: {'; '.join([m.message_type.value for m in messages_to_put_back])}"
         )
 
@@ -276,7 +276,7 @@ class UserAgent:
             Task string for the User Agent.
         """
         if len(agent_messages) > 0:
-            logger.info(f"Agent Messages: {agent_messages}")
+            logger.debug(f"Agent Messages: {agent_messages}")
         task = "\n".join([message.message for message in agent_messages])
         return task
 

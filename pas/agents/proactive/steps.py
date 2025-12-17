@@ -32,7 +32,7 @@ def pull_proactive_agent_messages(agent: BaseAgent) -> None:
     env_notifications = []
     user_actions = []
     for notification in unhandled_notifications:
-        logger.info(f"Proactive pre-step recieved: {notification.message_type}")
+        logger.debug(f"Proactive pre-step recieved: {notification.message_type}")
         if notification.message_type == PASMessageType.ENVIRONMENT_NOTIFICATION_AGENT:
             env_notifications.append(notification)
         elif notification.message_type == PASMessageType.USER_ACTION:
@@ -43,7 +43,7 @@ def pull_proactive_agent_messages(agent: BaseAgent) -> None:
     messages_to_put_back = [m for m in unhandled_notifications if m not in env_notifications + user_actions]
     for message in messages_to_put_back:
         agent.notification_system.message_queue.put(message)
-    logger.info(
+    logger.debug(
         f"Proactive agent pre-step -> message types to put back: {'; '.join([m.message_type.value for m in messages_to_put_back])}"
     )
 

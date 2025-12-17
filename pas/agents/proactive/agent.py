@@ -9,18 +9,17 @@ from __future__ import annotations
 import logging
 import time
 from datetime import UTC, datetime
-from enum import Enum
 from typing import TYPE_CHECKING
 
-from are.simulation.agents.agent_log import ToolCallLog
-from are.simulation.agents.default_agent.base_agent import DEFAULT_STEP_2_MESSAGE, DEFAULT_STEP_2_ROLE
-from are.simulation.agents.llm.types import MessageRole
+from are.simulation.agents.agent_log import TaskLog, ToolCallLog
+from are.simulation.agents.default_agent.base_agent import TerminationStep
 from are.simulation.notification_system import Message
-from are.simulation.tool_utils import AppTool, AppToolAdapter
+from are.simulation.tool_utils import AppTool, AppToolAdapter, OperationType
 
 from pas.notification_system import PASMessageType
 
 from .prompts.notification_system import get_execute_notification_system_prompt, get_observe_notification_system_prompt
+from .utils import DEFAULT_PROACTIVE_STEP_2_MESSAGE, DEFAULT_PROACTIVE_STEP_2_ROLE, ProactiveAgentMode
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -38,18 +37,27 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_PROACTIVE_STEP_2_ROLE = DEFAULT_STEP_2_ROLE.copy()
-DEFAULT_PROACTIVE_STEP_2_MESSAGE = DEFAULT_STEP_2_MESSAGE.copy()
-DEFAULT_PROACTIVE_STEP_2_ROLE["user_action"] = MessageRole.USER
-DEFAULT_PROACTIVE_STEP_2_MESSAGE["user_action"] = "[User Actions]:\n***\n{content}\n***\n"
+def stop_condition(agent: BaseAgent) -> bool:
+    """Stop the agent if a turn ending tool is called or max iterations is reached.
+
+    Args:
+        agent: The agent to stop.
+    """
+    logs = agent.get_agent_logs()
+    turn_ending_tools = ["wait", "send_message_to_user"]
+    if agent.iterations >= agent.max_iterations:
+        logger.debug(f"TERMINATING AGENT {agent.name} DUE TO MAX ITERATIONS {agent.max_iterations}")
+        return True
+    for log in reversed(logs):
+        if isinstance(log, ToolCallLog) and any(name.lower() in log.tool_name.lower() for name in turn_ending_tools):
+            logger.debug(f"TERMINATING AGENT {agent.name} DUE TO TURN ENDING TOOL {log.tool_name}")
+            return True
+        if isinstance(log, TaskLog):
+            break
+    return False
 
 
-class ProactiveAgentMode(Enum):
-    """Runtime state of the Proactive Agent."""
-
-    OBSERVE = "observe"
-    AWAITING_CONFIRMATION = "awaiting_confirmation"
-    EXECUTE = "execute"  # Execute the confirmed goal
+termination_step = TerminationStep(condition=stop_condition)
 
 
 class ProactiveAgent:
@@ -71,7 +79,7 @@ class ProactiveAgent:
         execute_agent: BaseAgent,
         time_manager: TimeManager,
         tools: list[Tool] | None = None,
-        observe_max_iterations: int = 1,
+        observe_max_iterations: int = 10,
         execute_max_iterations: int = 20,
         max_turns: int | None = None,
         simulated_generation_time_config: SimulatedGenerationTimeConfig | None = None,
@@ -115,6 +123,7 @@ class ProactiveAgent:
         self.observe_agent.log_callback = log_callback
         self.observe_agent.role_dict = DEFAULT_PROACTIVE_STEP_2_ROLE
         self.observe_agent.message_dict = DEFAULT_PROACTIVE_STEP_2_MESSAGE
+        self.observe_agent.termination_step = termination_step
 
         # Execute Agent arguments
         self.execute_llm_engine = execute_llm_engine
@@ -126,6 +135,7 @@ class ProactiveAgent:
         self.execute_agent.log_callback = log_callback
         self.execute_agent.role_dict = DEFAULT_PROACTIVE_STEP_2_ROLE
         self.execute_agent.message_dict = DEFAULT_PROACTIVE_STEP_2_MESSAGE
+        self.execute_agent.termination_step = termination_step
 
         # Environment methods to handle simulation time.
         self.simulated_generation_time_config = simulated_generation_time_config
@@ -160,16 +170,35 @@ class ProactiveAgent:
         """
         app_tools = self.remove_aui_irrelevant_tools(scenario.get_tools())
         logger.info(f"Found {len(app_tools)} tools: {[tool.name for tool in app_tools]}")
+
         are_simulation_tools = [AppToolAdapter(tool) for tool in app_tools]
+
         self.tools += are_simulation_tools
 
         observe_tool_names = ["PASAgentUserInterface__wait", "PASAgentUserInterface__send_message_to_user"]
 
-        observe_tools = [tool for tool in app_tools if tool.name in observe_tool_names]
+        observe_tools: list[AppToolAdapter] = []
+        execute_tools: list[AppToolAdapter] = []
+        for tool in are_simulation_tools:
+            if (
+                tool.name in observe_tool_names
+                or getattr(tool.app_tool.function, "__operation_type__", OperationType.READ) == OperationType.READ
+            ):
+                observe_tools.append(tool)
+            if tool.name != "PASAgentUserInterface__wait":
+                execute_tools.append(tool)
+
         if len(observe_tools) == 0:
             raise ValueError("No observe tools found. The observe agent must have the send_message_to_user tool.")
+        if len(execute_tools) == 0:
+            raise ValueError(
+                "No execute tools found. The execute agent must have at least the send_message_to_user tool."
+            )
         self.observe_agent.tools = {tool.name: tool for tool in observe_tools}
-        self.execute_agent.tools = {tool.name: tool for tool in self.tools}
+        self.execute_agent.tools = {tool.name: tool for tool in execute_tools}
+
+        logger.debug(f"Observe agent has {len(observe_tools)} tools: {[tool.name for tool in observe_tools]}")
+        logger.debug(f"Execute agent has {len(execute_tools)} tools: {[tool.name for tool in execute_tools]}")
 
     def init_observe_system_prompt(self, scenario: Scenario) -> None:
         """Initialize the observe system prompt.
@@ -327,7 +356,7 @@ class ProactiveAgent:
         # Here we don't need to reinsert the user messages because they are consumed while building the task.
         messages_to_put_back = [m for m in new_messages if m not in user_messages + env_stop_messages]
 
-        logger.info(
+        logger.debug(
             f"Proactive agent get_notifications() -> message types to put back: {'; '.join([m.message_type.value for m in messages_to_put_back])}"
         )
         for message in messages_to_put_back:
@@ -348,29 +377,35 @@ class ProactiveAgent:
             Task string for the User Agent.
         """
         if len(user_messages) > 0:
-            logger.info(f"User Messages: {user_messages}")
+            logger.debug(f"User Messages: {user_messages}")
         task = "\n".join([message.message for message in user_messages])
         return task
 
-    def check_for_proposal(self) -> tuple[bool, str | None]:
-        """Check if the Proactive Agent sent a proposal to the user.
+    def get_turn_ending_tool(self, agent: BaseAgent) -> dict[str, str | None]:
+        """Get the turn ending tool from the agent logs.
 
-        Inspect observe_agent_logs for send_message_to_user calls.
+        Args:
+            agent: The agent to get the turn ending tool for.
 
         Returns:
-            Returns (True, proposal content) if a proposal was sent, (False, None) otherwise.
+            The turn ending tool name.
         """
-        logs = self.observe_agent.get_agent_logs()
-
+        logs = agent.get_agent_logs()
         for log in reversed(logs):
-            if isinstance(log, ToolCallLog) and "send_message_to_user" in log.tool_name.lower():
-                if isinstance(log.tool_arguments, dict):
-                    content = log.tool_arguments.get("content", "")
-                else:
-                    content = str(log.tool_arguments)
-                logger.info(f"Proactive Agent sent a proposal: {content}")
-                return True, content
-        return False, None
+            if isinstance(log, ToolCallLog):
+                tool_name_lower = log.tool_name.lower()
+                if "wait" in tool_name_lower:
+                    return {"tool_name": "wait", "tool_arguments": None}
+                elif "send_message_to_user" in tool_name_lower:
+                    content = (
+                        log.tool_arguments.get("content", "")
+                        if isinstance(log.tool_arguments, dict)
+                        else str(log.tool_arguments)
+                    )
+                    return {"tool_name": "send_message_to_user", "tool_arguments": content}
+            if isinstance(log, TaskLog):
+                break
+        return {}
 
     def agent_loop(
         self,
@@ -403,31 +438,28 @@ class ProactiveAgent:
             )
 
         new_user_messages, new_env_notifications, env_stop_messages = self.get_notifications()
-        logger.info(f"New user messages: {new_user_messages}")
-        logger.info(f"New environment notifications: {new_env_notifications}")
-        logger.info(f"Environment stop messages: {env_stop_messages}")
+        logger.debug(f"New user messages: {new_user_messages}")
+        logger.debug(f"New environment notifications: {new_env_notifications}")
+        logger.debug(f"Environment stop messages: {env_stop_messages}")
 
         if len(env_stop_messages) > 0:
             logger.warning(f"Environment stop message received - Stopping Agent: {env_stop_messages}")
             return None
 
         task = ""
-        if len(new_user_messages) > 0 or len(new_env_notifications) > 0:
-            if self.mode == ProactiveAgentMode.OBSERVE:
-                result = self._run_observe_mode(new_user_messages, new_env_notifications, reset)
-                return result
-            elif self.mode == ProactiveAgentMode.AWAITING_CONFIRMATION:
-                accepted, _ = self._check_confirmation(new_user_messages)
-                if accepted:
-                    self.mode = ProactiveAgentMode.EXECUTE
-                    return self._run_execute_mode(new_user_messages, new_env_notifications)
-            elif self.mode == ProactiveAgentMode.EXECUTE:
+        if self.mode == ProactiveAgentMode.OBSERVE:
+            result = self._run_observe_mode(new_user_messages, new_env_notifications, reset)
+            return result
+        elif self.mode == ProactiveAgentMode.AWAITING_CONFIRMATION:
+            accepted, _ = self._check_confirmation(new_user_messages)
+            if accepted:
+                self.mode = ProactiveAgentMode.EXECUTE
                 return self._run_execute_mode(new_user_messages, new_env_notifications)
-            else:
-                raise RuntimeError(f"Unknown mode: {self.mode}")
+        elif self.mode == ProactiveAgentMode.EXECUTE:
+            return self._run_execute_mode(new_user_messages, new_env_notifications)
         else:
-            logger.info("No new messages from user agent or environment. Sleeping for 2 seconds.")
-            time.sleep(2)
+            raise RuntimeError(f"Unknown mode: {self.mode}")
+        time.sleep(2)
         return None
 
     def _check_confirmation(self, user_messages: list[Message]) -> tuple[bool, str | None]:
@@ -440,7 +472,7 @@ class ProactiveAgent:
             Tuple of (True, response) if user accepted the proposal, (False, None) if user rejected the proposal, (False, None) if response is unclear.
         """
         if not user_messages:
-            logger.info("No user response yet, still awaiting confirmation")
+            logger.debug("No user response yet, still awaiting confirmation")
             return False, None
 
         response = user_messages[-1].message
@@ -482,11 +514,13 @@ class ProactiveAgent:
             task=task, hint=None, reset=reset, attachments=attachments if attachments else None
         )
 
-        proposal_made, proposal_content = self.check_for_proposal()
-        if proposal_made:
-            logger.info(f"Proactive Agent sent a proposal: {proposal_content}")
+        turn_end_reason = self.get_turn_ending_tool(self.observe_agent)
+        if turn_end_reason.get("tool_name", "") == "send_message_to_user":
+            logger.info(f"Proactive Agent sent a proposal: {turn_end_reason.get('tool_arguments', '')}")
             self.mode = ProactiveAgentMode.AWAITING_CONFIRMATION
-            self.pending_goal = proposal_content
+            self.pending_goal = turn_end_reason.get("tool_arguments", "")
+        elif turn_end_reason.get("tool_name", "") == "wait":
+            logger.info("Proactive Agent waited for more information")
 
         return result
 

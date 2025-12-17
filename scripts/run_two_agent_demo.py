@@ -22,12 +22,12 @@ from are.simulation.agents.are_simulation_agent_config import (
     ARESimulationReactBaseAgentConfig,
     LLMEngineConfig,
 )
-from are.simulation.cli.utils import setup_logging, suppress_noisy_loggers
 from are.simulation.scenario_runner import ScenarioRunnerConfig
 from are.simulation.scenarios.utils.scenario_expander import EnvEventsConfig
 from are.simulation.types import ToolAugmentationConfig
 from dotenv import load_dotenv
 
+from pas.cli.utils import setup_logging
 from pas.scenario_runner import TwoAgentScenarioRunner
 from pas.scenarios.utils.registry import registry
 from pas.scenarios.utils.scenario_expander import default_weight_per_app_class
@@ -40,17 +40,6 @@ if TYPE_CHECKING:
 # PAS uses its own standalone registry, completely independent of Meta-ARE
 
 logger = logging.getLogger(__name__)
-
-
-# def setup_logging() -> None:
-#     """Configure logging for the demo."""
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-#     )
-#     # Set specific loggers to appropriate levels
-#     logging.getLogger("pas").setLevel(logging.DEBUG)
-#     logging.getLogger("are.simulation").setLevel(logging.INFO)
 
 
 def run_demo(
@@ -112,16 +101,19 @@ def run_demo(
     user_config = ARESimulationReactBaseAgentConfig(
         llm_engine_config=LLMEngineConfig(model_name=user_model, provider="openai"),
         max_iterations=1,  # User agent typically takes fewer iterations per turn
+        use_custom_logger=False,
     )
 
     proactive_observe_config = ARESimulationReactBaseAgentConfig(
         llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider="openai"),
-        max_iterations=1,  # Observation might need more reasoning
+        max_iterations=10,  # Observation might need more reasoning
+        use_custom_logger=False,
     )
 
     proactive_execute_config = ARESimulationReactBaseAgentConfig(
         llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider="openai"),
-        max_iterations=5,  # Execution might need multiple tool calls
+        max_iterations=20,  # Execution might need multiple tool calls
+        use_custom_logger=False,
     )
 
     # Create runner configuration
@@ -133,6 +125,7 @@ def run_demo(
         output_dir=str(output_path),
         dump_agent_logs=True,
         dump_world_logs=True,
+        use_custom_logger=False,
     )
 
     # Create and run the scenario runner
@@ -230,12 +223,50 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Run in oracle mode (executes predefined oracle events without agents)",
     )
+    # Logging Configuration
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        help="Logging level",
+    )
+    parser.add_argument(
+        "--use-tqdm",
+        action="store_true",
+        help="Use tqdm for progress bars",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Include logging from Meta-ARE. LiteLLM, httpx, httpcore, openai loggers are still suppressed.",
+    )
+    parser.add_argument(
+        "--log-dir",
+        default="logs",
+        help="Directory to log to",
+    )
+    parser.add_argument(
+        "--log-to-file",
+        action="store_true",
+        help="Log to file",
+    )
+    parser.add_argument(
+        "--experiment-name",
+        default="demo",
+        help="Name of the experiment",
+    )
 
     args = parser.parse_args(argv)
 
     # Setup logging
-    setup_logging(level="INFO", use_tqdm=True)
-    suppress_noisy_loggers()
+    setup_logging(
+        scenario_id=args.scenario,
+        level=args.log_level,
+        log_dir=args.log_dir,
+        experiment_name=args.experiment_name,
+        use_tqdm=args.use_tqdm,
+        log_to_file=args.log_to_file,
+        verbose=args.verbose,
+    )
 
     # Load environment variables
     load_dotenv()
