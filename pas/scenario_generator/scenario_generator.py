@@ -16,10 +16,10 @@ from dotenv import load_dotenv
 
 from pas.apps.core import AppState
 from pas.apps.notification_templates import NOTIFICATION_TEMPLATES
-from pas.scenario_generator.agent.multi_step_scenario_generating_agent import (
-    MultiStepScenarioGeneratingAgentsOrchestrator,
+from pas.scenario_generator.agent.scenario_generating_agent import (
+    ScenarioGeneratingAgentOrchestrator,
 )
-from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts.prompts import (
+from pas.scenario_generator.prompt.scenario_generating_agent_prompts.prompts import (
     APP_IMPORT_INSTRUCTIONS,
     build_app_initialization_block,
 )
@@ -749,7 +749,7 @@ def main() -> None:
             if num_scenarios > 1:
                 trajectory_dir = trajectory_dir / f"run_{idx + 1}"
 
-        agent = MultiStepScenarioGeneratingAgentsOrchestrator(
+        agent = ScenarioGeneratingAgentOrchestrator(
             output_dir=args.output_dir,
             max_iterations=args.max_iterations,
             trajectory_dir=trajectory_dir,

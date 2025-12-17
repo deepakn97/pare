@@ -209,9 +209,14 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
     - A concise, machine-friendly **scenario id** suitable for a Python decorator.
     - A short, descriptive **Python class name**.
     - A concise, ecologically grounded **narrative description** that:
-      - Explains the user's context, pain points, and why the proactive assistant should intervene.
-      - Describes what information arrives through PAS apps and when.
-      - Outlines the agent's proactive inference, proposed assistance, and expected user response.
+      - Focuses on ONE clear, primary coordination/assistive challenge for the proactive agent (do not try to cover multiple unrelated subplots).
+      - Explains the user's context, pain point, and why the proactive assistant should intervene.
+      - Describes what information arrives through PAS apps and when, at a similar level of detail and brevity as the existing user scenarios under `pas/scenarios/user_scenarios/`.
+      - Outlines the agent's proactive inference, proposed assistance, and expected user response without unnecessary digressions.
+      - Follows the docstring structure of the existing PAS scenarios (e.g. `calendar_conflict_urgent_reschedule.py`, `contact_update_from_new_number.py`):
+        * First line: one-sentence summary of what the agent does (e.g. "Agent updates contact information from messages received from unknown number.").
+        * Middle: 1-2 short paragraphs describing the concrete situation and numbered steps the agent must perform.
+        * Final lines: a brief paragraph starting with "This scenario exercises ..." that lists the main capabilities being tested.
 
     Constraints:
     - Treat every historical scenario description from `scenario_metadata.json` as a negative example.
@@ -225,13 +230,17 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
     - Class name requirements:
       - Valid Python identifier in PascalCase (e.g., `VipCalendarConflict`).
       - Starts with a letter; contains only letters and digits; no underscores or spaces.
+    - Complexity and style:
+      - Aim for the same level of complexity and conciseness as the hand-written PAS user scenarios in `pas/scenarios/user_scenarios/` (for example, `calendar_conflict_urgent_reschedule.py`).
+      - Avoid redundant background details that do not affect the agent's reasoning or the event flow.
+      - Keep the description tightly centered on the single main coordination problem and how PAS apps + the agent resolve it.
 
     Format your final answer EXACTLY as:
 
     Scenario ID: <short_machine_friendly_id>
     Class Name: <ShortDescriptiveClassName>
     Description:
-    <2-3 short paragraphs that describe the scenario narrative>
+    <2-3 short paragraphs (or ~6-10 sentences) that describe the scenario narrative, focused on one main task>
 
     Do not add any other sections, headings, bullet points, or commentary outside this format.
     """
@@ -343,6 +352,13 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - For non-oracle environment events, only use methods that have notification templates in `pas/apps/notification_templates.py` (see the NOTIFICATION_TEMPLATES dict).
     - For oracle/user actions, use app tools defined on the PAS apps and their Meta-ARE bases; do not invent new methods.
     - Mirror the "App Initialization Blueprint" so your local variables match how apps were seeded in Step 2.
+
+    Explicit oracle events for agent behavior (IMPORTANT):
+    - For every major agent behavior that you expect Step 4 to validate (for example: sending a proposal to the user, searching the calendar, updating a contact, sending a reply email, adding a reminder), you MUST create a concrete oracle event in `build_events_flow()`.
+      - Follow the patterns used in the hand-written scenarios under `pas/scenarios/user_scenarios/`, such as:
+        - `calendar_conflict_urgent_reschedule.py` (explicit `get_calendar_events_from_to`, `edit_calendar_event`, `add_calendar_event`, `reply_to_email` calls, each with `.oracle().depends_on(...)`).
+        - `contact_update_from_new_number.py` (explicit `search_contacts`, `edit_contact`, `send_message` calls with `.oracle().depends_on(...)`).
+    - Do NOT rely on "implicit" agent behavior that you only describe in comments. If a behavior matters for validation, represent it as an actual oracle event by calling the appropriate PAS app tools, chaining them with `.oracle()` / `.depends_on(...)`, and registering them in `self.events`.
 
     Mandatory API verification (applies to ALL apps, now and in the future):
     - You MUST NOT invent or assume methods, fields, or helper APIs.
@@ -534,6 +550,13 @@ SCENARIO_DESCRIPTION_USER_PROMPT = textwrap.dedent(
 
     Historical scenario metadata path (read this file via the Read tool):
     {scenario_metadata_path}
+
+    Stylistic reference (docstring pattern ONLY, not scenario content):
+    - Use the Read tool to open the following existing user scenarios and observe how their docstrings are structured:
+      - `pas/scenarios/user_scenarios/contact_update_from_new_number.py`
+      - `pas/scenarios/user_scenarios/calendar_conflict_urgent_reschedule.py`
+    - Follow their docstring pattern (high-level summary line, concrete context + numbered steps, final "This scenario exercises ..." paragraph),
+      but you MUST design a completely new scenario with different triggers, goals, and app usage.
 
     Then choose:
     - A short, machine-friendly scenario id (lowercase_with_underscores, <= 40 chars).
