@@ -8,7 +8,10 @@ from are.simulation.notification_system import Message
 from are.simulation.scenarios.scenario import Scenario
 
 from pas.agents.user.agent import UserAgent
+from pas.agents.user.steps import pull_notifications_and_tools
+from pas.agents.agent_log import AvailableToolsLog, CurrentAppStateLog, AgentMessageLog
 from pas.notification_system import PASMessageType, PASNotificationSystem
+from are.simulation.agents.agent_log import TaskLog, ObservationLog
 
 
 @pytest.fixture
@@ -177,6 +180,25 @@ def test_get_notifications_puts_env_notifications_back(user_agent, mock_notifica
 
     # Verify message was put back in queue
     mock_notification_system.message_queue.put.assert_called_once_with(env_msg)
+
+
+def test_get_notifications_does_not_put_agent_messages_back(user_agent, mock_notification_system):
+    """Test get_notifications consumes agent_messages (does not put them back in queue)."""
+    agent_msg = Mock(spec=Message)
+    agent_msg.message_type = PASMessageType.AGENT_MESSAGE
+
+    env_msg = Mock(spec=Message)
+    env_msg.message_type = PASMessageType.ENVIRONMENT_NOTIFICATION_USER
+
+    mock_notification_system.message_queue.get_by_timestamp.return_value = [agent_msg, env_msg]
+    user_agent.react_agent.notification_system = mock_notification_system
+
+    user_agent.get_notifications()
+
+    # Verify only env_msg was put back, NOT agent_msg
+    calls = mock_notification_system.message_queue.put.call_args_list
+    assert len(calls) == 1
+    assert calls[0][0][0] == env_msg
 
 
 def test_get_notifications_raises_without_system(user_agent):
@@ -433,3 +455,170 @@ def test_agent_loop_handles_failed_state(user_agent, mock_notification_system):
 
     with pytest.raises(RuntimeError, match="User agent failed"):
         user_agent.agent_loop(current_tools=[])
+
+
+# ==================== pull_notifications_and_tools Tests ====================
+
+
+def test_pull_notifications_filters_old_available_tools_logs(mock_notification_system, mock_time_manager):
+    """Test that only the latest AvailableToolsLog is kept."""
+    agent = Mock(spec=BaseAgent)
+    agent.logs = [
+        AvailableToolsLog(content="old tools", timestamp=1.0, agent_id="test"),
+        TaskLog(content="task", timestamp=2.0, agent_id="test"),
+        AvailableToolsLog(content="newer tools", timestamp=3.0, agent_id="test"),
+    ]
+    agent.notification_system = mock_notification_system
+    agent.make_timestamp.return_value = mock_time_manager.time()
+    agent.tools = {}
+    agent.custom_state = {}
+    agent.append_agent_log = lambda log: agent.logs.append(log)
+
+    mock_notification_system.message_queue.get_by_timestamp.return_value = []
+
+    pull_notifications_and_tools(agent)
+
+    available_tools_logs = [log for log in agent.logs if log.get_type() == "available_tools"]
+    assert len(available_tools_logs) == 1
+
+
+def test_pull_notifications_filters_old_current_app_state_logs(mock_notification_system, mock_time_manager):
+    """Test that only the latest CurrentAppStateLog is kept."""
+    agent = Mock(spec=BaseAgent)
+    agent.logs = [
+        CurrentAppStateLog(content="old state", timestamp=1.0, agent_id="test"),
+        TaskLog(content="task", timestamp=2.0, agent_id="test"),
+        CurrentAppStateLog(content="newer state", timestamp=3.0, agent_id="test"),
+    ]
+    agent.notification_system = mock_notification_system
+    agent.make_timestamp.return_value = mock_time_manager.time()
+    agent.tools = {}
+    agent.custom_state = {}
+    agent.append_agent_log = lambda log: agent.logs.append(log)
+
+    mock_notification_system.message_queue.get_by_timestamp.return_value = []
+
+    pull_notifications_and_tools(agent)
+
+    app_state_logs = [log for log in agent.logs if log.get_type() == "current_app_state"]
+    assert len(app_state_logs) == 1
+
+
+def test_pull_notifications_filters_old_agent_message_logs(mock_notification_system, mock_time_manager):
+    """Test that only the latest AgentMessageLog is kept."""
+    agent = Mock(spec=BaseAgent)
+    agent.logs = [
+        AgentMessageLog(content="old message", timestamp=1.0, agent_id="test"),
+        TaskLog(content="task", timestamp=2.0, agent_id="test"),
+        AgentMessageLog(content="newer message", timestamp=3.0, agent_id="test"),
+    ]
+    agent.notification_system = mock_notification_system
+    agent.make_timestamp.return_value = mock_time_manager.time()
+    agent.tools = {}
+    agent.custom_state = {}
+    agent.append_agent_log = lambda log: agent.logs.append(log)
+
+    mock_notification_system.message_queue.get_by_timestamp.return_value = []
+
+    pull_notifications_and_tools(agent)
+
+    agent_message_logs = [log for log in agent.logs if log.get_type() == "agent_message"]
+    assert len(agent_message_logs) == 1
+
+
+def test_pull_notifications_preserves_non_dynamic_logs(mock_notification_system, mock_time_manager):
+    """Test that non-dynamic logs are not filtered out."""
+    agent = Mock(spec=BaseAgent)
+    task_log = TaskLog(content="task", timestamp=1.0, agent_id="test")
+    observation_log = ObservationLog(content="observation", timestamp=2.0, agent_id="test")
+    agent.logs = [task_log, observation_log]
+    agent.notification_system = mock_notification_system
+    agent.make_timestamp.return_value = mock_time_manager.time()
+    agent.tools = {}
+    agent.custom_state = {}
+    agent.append_agent_log = lambda log: agent.logs.append(log)
+
+    mock_notification_system.message_queue.get_by_timestamp.return_value = []
+
+    pull_notifications_and_tools(agent)
+
+    assert task_log in agent.logs
+    assert observation_log in agent.logs
+
+
+def test_pull_notifications_preserves_log_order(mock_notification_system, mock_time_manager):
+    """Test that relative order of logs is preserved after filtering."""
+    agent = Mock(spec=BaseAgent)
+    task_log = TaskLog(content="task", timestamp=1.0, agent_id="test")
+    old_tools = AvailableToolsLog(content="old", timestamp=2.0, agent_id="test")
+    observation_log = ObservationLog(content="obs", timestamp=3.0, agent_id="test")
+    new_tools = AvailableToolsLog(content="new", timestamp=4.0, agent_id="test")
+    agent.logs = [task_log, old_tools, observation_log, new_tools]
+    agent.notification_system = mock_notification_system
+    agent.make_timestamp.return_value = mock_time_manager.time()
+    agent.tools = {}
+    agent.custom_state = {}
+    agent.append_agent_log = lambda log: agent.logs.append(log)
+
+    mock_notification_system.message_queue.get_by_timestamp.return_value = []
+
+    pull_notifications_and_tools(agent)
+
+    # Find positions of remaining logs
+    task_idx = agent.logs.index(task_log)
+    obs_idx = agent.logs.index(observation_log)
+
+    # TaskLog should come before ObservationLog
+    assert task_idx < obs_idx
+
+
+def test_pull_notifications_handles_empty_logs(mock_notification_system, mock_time_manager):
+    """Test filtering works with empty logs list."""
+    agent = Mock(spec=BaseAgent)
+    agent.logs = []
+    agent.notification_system = mock_notification_system
+    agent.make_timestamp.return_value = mock_time_manager.time()
+    agent.tools = {}
+    agent.custom_state = {}
+    agent.append_agent_log = lambda log: agent.logs.append(log)
+
+    mock_notification_system.message_queue.get_by_timestamp.return_value = []
+
+    # Should not raise
+    pull_notifications_and_tools(agent)
+
+
+def test_pull_notifications_filters_multiple_dynamic_types(mock_notification_system, mock_time_manager):
+    """Test filtering works when multiple dynamic log types have duplicates."""
+    agent = Mock(spec=BaseAgent)
+    agent.logs = [
+        AvailableToolsLog(content="old tools", timestamp=1.0, agent_id="test"),
+        CurrentAppStateLog(content="old state", timestamp=2.0, agent_id="test"),
+        AgentMessageLog(content="old message", timestamp=3.0, agent_id="test"),
+        TaskLog(content="task", timestamp=4.0, agent_id="test"),
+        AvailableToolsLog(content="new tools", timestamp=5.0, agent_id="test"),
+        CurrentAppStateLog(content="new state", timestamp=6.0, agent_id="test"),
+        AgentMessageLog(content="new message", timestamp=7.0, agent_id="test"),
+    ]
+    agent.notification_system = mock_notification_system
+    agent.make_timestamp.return_value = mock_time_manager.time()
+    agent.tools = {}
+    agent.custom_state = {}
+    agent.append_agent_log = lambda log: agent.logs.append(log)
+
+    mock_notification_system.message_queue.get_by_timestamp.return_value = []
+
+    pull_notifications_and_tools(agent)
+
+    # Each dynamic type should appear exactly once
+    available_tools_logs = [log for log in agent.logs if log.get_type() == "available_tools"]
+    app_state_logs = [log for log in agent.logs if log.get_type() == "current_app_state"]
+    agent_message_logs = [log for log in agent.logs if log.get_type() == "agent_message"]
+
+    assert len(available_tools_logs) == 1
+    assert len(app_state_logs) == 1
+    assert len(agent_message_logs) == 1
+
+    # TaskLog should still be present
+    task_logs = [log for log in agent.logs if log.get_type() == "task"]
+    assert len(task_logs) == 1

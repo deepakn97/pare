@@ -437,10 +437,13 @@ class ProactiveAgent:
                 )
             )
 
+        logger.info("=" * 80)
+        logger.info(f"Proactive-Agent Mode: {self.mode}")
         new_user_messages, new_env_notifications, env_stop_messages = self.get_notifications()
         logger.debug(f"New user messages: {new_user_messages}")
         logger.debug(f"New environment notifications: {new_env_notifications}")
         logger.debug(f"Environment stop messages: {env_stop_messages}")
+        logger.info("=" * 80)
 
         if len(env_stop_messages) > 0:
             logger.warning(f"Environment stop message received - Stopping Agent: {env_stop_messages}")
@@ -503,7 +506,6 @@ class ProactiveAgent:
         Returns:
             Result from the last agent turn execution.
         """
-        logger.info("Running in OBSERVE mode")
         # Reset the internal iterations counter, otherwise after first turn, the agent will exit. And if we increase the number of max_iterations, then the agent will take multiple turns.
         # ! FIXME: Find a better solution for this iterations issue.
         self.observe_agent.iterations = 0

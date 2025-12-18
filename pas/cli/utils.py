@@ -34,24 +34,8 @@ def setup_logging(
     if isinstance(log_dir, str):
         log_dir = Path(log_dir)
 
-    if log_to_file:
-        current_timestamp = get_pst_time()
-        log_dir = log_dir if log_dir.is_absolute() else (Path.cwd() / log_dir)
-        log_dir = log_dir / experiment_name / f"{scenario_id}_{current_timestamp}"
-        log_dir.mkdir(parents=True, exist_ok=True)
-
     # Configure logging with the specified level
     configure_logging(level=numeric_level, use_tqdm=use_tqdm, log_dir=log_dir)
     suppress_noisy_loggers()
     if not verbose:
         suppress_noisy_are_loggers()
-    # print(f"ARE default_agent logger level: {logging.getLogger('are.simulation.agents.default_agent').level}")
-    # print(f"ARE base_agent logger level: {logging.getLogger('are.simulation.agents.default_agent.base_agent').level}")
-    # print(
-    #     f"base_agent effective level: {logging.getLogger('are.simulation.agents.default_agent.base_agent').getEffectiveLevel()}"
-    # )
-
-    # # Diagnostic prints - add these at the end
-    # base_agent_logger = logging.getLogger("are.simulation.agents.default_agent.base_agent")
-    # print(f"base_agent handlers: {base_agent_logger.handlers}")
-    # print(f"base_agent parent: {base_agent_logger.parent}")

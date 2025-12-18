@@ -182,3 +182,8 @@ class CurrentAppStateLog(BaseAgentLog):
     def get_type(self) -> str:
         """Return log type identifier."""
         return "current_app_state"
+
+
+# Log types where only the latest instance should appear in LLM context.
+# These are "dynamic" logs that get appended every turn but only the most recent is relevant.
+USER_AGENT_DYNAMIC_LOG_TYPES: set[str] = {"available_tools", "current_app_state", "agent_message"}

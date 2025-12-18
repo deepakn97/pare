@@ -4,11 +4,11 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from are.simulation.agents.agent_log import EnvironmentNotificationLog
+from are.simulation.agents.agent_log import BaseAgentLog, EnvironmentNotificationLog
 from are.simulation.agents.default_agent.base_agent import ConditionalStep
 from are.simulation.tool_box import DEFAULT_TOOL_DESCRIPTION_TEMPLATE, Toolbox
 
-from pas.agents.agent_log import AgentMessageLog, AvailableToolsLog, CurrentAppStateLog
+from pas.agents.agent_log import USER_AGENT_DYNAMIC_LOG_TYPES, AgentMessageLog, AvailableToolsLog, CurrentAppStateLog
 from pas.notification_system import PASMessageType
 
 if TYPE_CHECKING:
@@ -23,9 +23,26 @@ def format_notification(notif: Message) -> str:
     return f"[{notif.timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {notif.message}"
 
 
+def _filter_dynamic_logs(logs: list[BaseAgentLog]) -> list[BaseAgentLog]:
+    """Filter dynamic logs to keep only the latest instance of dynamic log types."""
+    latest_dynamic_indices: dict[str, int] = {}
+    for i, log in enumerate(logs):
+        log_type = log.get_type()
+        if log_type in USER_AGENT_DYNAMIC_LOG_TYPES:
+            latest_dynamic_indices[log_type] = i
+
+    logs = [
+        log
+        for i, log in enumerate(logs)
+        if log.get_type() not in USER_AGENT_DYNAMIC_LOG_TYPES or latest_dynamic_indices.get(log.get_type(), -1) == i
+    ]
+    return logs
+
+
 def pull_notifications_and_tools(agent: BaseAgent) -> None:
     """Pull AGENT_MESSAGE and ENVIRONMENT_NOTIFICATION from notification system."""
     # unhandled_notifications = agent.custom_state.get("notifications", [])
+
     unhandled_notifications = agent.notification_system.message_queue.get_by_timestamp(
         timestamp=datetime.fromtimestamp(agent.make_timestamp(), tz=UTC)
     )
@@ -92,6 +109,7 @@ def pull_notifications_and_tools(agent: BaseAgent) -> None:
                 agent_id=agent.agent_id,
             )
         )
+    agent.logs = _filter_dynamic_logs(agent.logs)
 
 
 def get_user_agent_pre_step() -> ConditionalStep:
