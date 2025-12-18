@@ -209,7 +209,7 @@ class NotesFolder:
             state_dict (dict[str, Any]): State to load.
         """
         self.folder_name = state_dict["folder_name"]
-        self.notes = {note.note_id: Note(**note) for note in state_dict["notes"]}
+        self.notes = {note_id: Note(**note_data) for note_id, note_data in state_dict["notes"].items()}
         self.notes = dict(sorted(self.notes.items(), key=lambda item: item[1].updated_at, reverse=True))
 
 
@@ -406,6 +406,7 @@ class StatefulNotesApp(StatefulApp):
         if folder in self.default_folders:
             raise KeyError(f"Cannot rename default folder {folder}")
         self.folders[new_folder] = deepcopy(self.folders[folder])
+        self.folders[new_folder].folder_name = new_folder
         del self.folders[folder]
         logger.debug(f"Renamed folder {folder} to {new_folder}")
         return new_folder
@@ -859,7 +860,6 @@ class StatefulNotesApp(StatefulApp):
 
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Core navigation handler mapping backend operations to state transitions."""
-        # @HuanCC666: Missing handling the go_back action for all states.
         current_state = self.current_state
         fname = event.function_name()
 
@@ -870,6 +870,11 @@ class StatefulNotesApp(StatefulApp):
         args = action.resolved_args or action.args
 
         metadata_value = event.metadata.return_value if event.metadata else None
+        # Handle go_back action for all states
+        if fname == "go_back":
+            if self.navigation_stack:
+                self.go_back()
+            return
 
         if isinstance(current_state, NoteList):
             self._handle_note_list_transition(fname, args, metadata_value)
@@ -894,11 +899,6 @@ class StatefulNotesApp(StatefulApp):
                 self.set_current_state(NoteDetail(note_id))
             return
 
-        # @HuanCC666 What happens when user searches for a note? The current state does not preserve the current folder the user was on.
-        if fname == "search":
-            self.set_current_state(NoteList(search_mode=True))
-            return
-
         if fname == "list_folders":
             self.set_current_state(FolderList())
 
@@ -914,18 +914,16 @@ class StatefulNotesApp(StatefulApp):
             self.go_back()
             return
 
-        # @HuanCC666 There is no user action called duplicate note.
-        if fname == "duplicate_note":
+        if fname == "duplicate":
             note_id = self._resolve_note_id(args, metadata)
             if note_id:
                 self.set_current_state(NoteDetail(note_id))
             return
 
-        # @HuanCC666 There is no user action called move note.
-        if fname == "move_note":
-            folder = args.get("new_folder")
-            if isinstance(folder, str):
-                self.set_current_state(NoteList(folder))
+        if fname == "move":
+            dest = args.get("dest_folder_name")
+            if isinstance(dest, str):
+                self.set_current_state(NoteList(dest))
 
     def _handle_edit_note_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
         """Process transitions from the edit note view."""
@@ -939,11 +937,6 @@ class StatefulNotesApp(StatefulApp):
 
     def _handle_folder_list_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
         """Process transitions from the folder list view."""
-        # @HuanCC666 There is no user action called list notes on folder list.
-        if fname == "list_notes":
-            folder = args.get("folder")
-            if isinstance(folder, str):
-                self.set_current_state(NoteList(folder))
         if fname == "open":
             folder = args.get("folder")
             if isinstance(folder, str):

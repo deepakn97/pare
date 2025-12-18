@@ -14,17 +14,14 @@ if TYPE_CHECKING:
 class NoteList(AppState):
     """State representing a list of notes within a folder or search mode."""
 
-    def __init__(self, folder: str = "Inbox", search_mode: bool = False) -> None:
+    def __init__(self, folder: str = "Inbox") -> None:
         """Initialize the list view.
 
         Args:
             folder (str): Folder name to filter notes.
-            search_mode (bool): Whether the view is in search mode.
         """
         super().__init__()
         self.folder = folder
-        # @HuanCC666: What is the purpose of search_mode?
-        self.search_mode = search_mode
 
     def on_enter(self) -> None:
         """Lifecycle hook when entering NoteList."""
@@ -33,6 +30,12 @@ class NoteList(AppState):
     def on_exit(self) -> None:
         """Lifecycle hook when leaving NoteList."""
         pass
+
+    @user_tool()
+    @pas_event_registered(operation_type=OperationType.READ)
+    def go_back(self) -> None:
+        """Navigate back to the previous state."""
+        return None
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
@@ -124,6 +127,12 @@ class NoteDetail(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
+    def go_back(self) -> None:
+        """Navigate back to the previous state."""
+        return None
+
+    @user_tool()
+    @pas_event_registered(operation_type=OperationType.READ)
     def refresh(self) -> Note:
         """Reload the note content.
 
@@ -196,6 +205,41 @@ class NoteDetail(AppState):
         with disable_events():
             return f"Edit mode activated for note {self.note_id}"
 
+    @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
+    def duplicate(self) -> str:
+        """Create a duplicate copy of this note in the same folder.
+
+        Returns:
+            str: Note ID of the newly created duplicate.
+        """
+        with disable_events():
+            # Get the current note's folder
+            result = cast("StatefulNotesApp", self.app)._get_note_from_any_folder(self.note_id)
+            if result is None:
+                raise KeyError(f"Note {self.note_id} not found")
+            folder_name, _ = result
+            return cast("StatefulNotesApp", self.app).duplicate_note(folder_name, self.note_id)
+
+    @user_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
+    def move(self, dest_folder_name: str) -> str:
+        """Move this note to another folder.
+
+        Args:
+            dest_folder_name (str): The destination folder name.
+
+        Returns:
+            str: Note ID of the moved note.
+        """
+        with disable_events():
+            # Get the current note's folder
+            result = cast("StatefulNotesApp", self.app)._get_note_from_any_folder(self.note_id)
+            if result is None:
+                raise KeyError(f"Note {self.note_id} not found")
+            source_folder_name, _ = result
+            return cast("StatefulNotesApp", self.app).move_note(self.note_id, source_folder_name, dest_folder_name)
+
 
 class EditNote(AppState):
     """State enabling editing capabilities for an existing note."""
@@ -218,6 +262,12 @@ class EditNote(AppState):
     def on_exit(self) -> None:
         """Lifecycle hook when leaving EditNote."""
         pass
+
+    @user_tool()
+    @pas_event_registered(operation_type=OperationType.READ)
+    def go_back(self) -> None:
+        """Navigate back to the previous state."""
+        return None
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -245,6 +295,12 @@ class FolderList(AppState):
     def on_exit(self) -> None:
         """Lifecycle hook when leaving FolderList."""
         pass
+
+    @user_tool()
+    @pas_event_registered(operation_type=OperationType.READ)
+    def go_back(self) -> None:
+        """Navigate back to the previous state."""
+        return None
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
