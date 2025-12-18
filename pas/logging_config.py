@@ -80,14 +80,14 @@ def configure_logging(level: int = logging.INFO, use_tqdm: bool = False, log_dir
 
         # Any logs other than Agents
         pas_file_handler = logging.FileHandler(log_dir / "pas.log", encoding="utf-8")
-        pas_file_handler.setLevel(level)
+        pas_file_handler.setLevel(logging.DEBUG)
         pas_file_handler.setFormatter(file_formatter)
         pas_file_handler.addFilter(_ExcludeAgentLogsFilter())
         root_logger.addHandler(pas_file_handler)
 
         # Agent logs only
         agent_file_handler = logging.FileHandler(log_dir / "agent.log", encoding="utf-8")
-        agent_file_handler.setLevel(level)
+        agent_file_handler.setLevel(logging.DEBUG)
         agent_file_handler.setFormatter(file_formatter)
 
         for logger_name in ["are.simulation.agents", "pas.agents"]:
@@ -109,6 +109,7 @@ def suppress_noisy_loggers() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("botocore").setLevel(logging.WARNING)
     logging.getLogger("are.simulation.apps").setLevel(logging.WARNING)
     logging.getLogger("are.simulation.environment").setLevel(logging.WARNING)
     logging.getLogger("are.simulation.validation.judge").setLevel(logging.WARNING)

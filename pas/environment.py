@@ -9,6 +9,7 @@ from are.simulation.types import EventType
 from pas.apps import PASAgentUserInterface
 from pas.apps.core import StatefulApp
 from pas.apps.system import HomeScreenSystemApp
+from pas.data_handler.models import PASEventMetadata
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -46,6 +47,20 @@ class StateAwareEnvironmentWrapper(Environment):
         # PAS extensions (follow Meta ARE naming: no underscores for public attributes)
         self.active_app: App | None = None
         self.background_apps: list[App] = []
+
+        # Proactive context getter (returns current mode at event time)
+        self._get_proactive_context: Callable[[], tuple[str | None, int]] | None = None
+
+    def set_proactive_context_getter(
+        self,
+        getter: Callable[[], tuple[str | None, int]] | None,
+    ) -> None:
+        """Set callback to get current proactive context at event time.
+
+        Args:
+            getter: Callable returning (proactive_mode, turn_number).
+        """
+        self._get_proactive_context = getter
 
     def get_user_tools(self) -> list[AppTool]:
         """Get tools available to the user agent from currentlly active app and system app.
@@ -211,13 +226,32 @@ class StateAwareEnvironmentWrapper(Environment):
         return f"Switched to {app_name} App successfully."
 
     def add_to_log(self, events: CompletedEvent | list[CompletedEvent]) -> None:
-        """Override to add PAS state transition handling.
+        """Override to add PAS state transition handling and proactive metadata injection.
+
+        This function is run while processing each event.
 
         // RL NOTE: This is where the environment processes actions and transitions to next state.
         // Log (s, a, r, s') tuples here for RL dataset generation.
         """
         # ! FIXME: I don't understand where add_to_log is called from. Is it called automatically at each event or do we need to call it manually somewhere?
         event_list = events if isinstance(events, list) else [events]
+
+        # Inject proactive context into event metadata (getter ensures current mode at event time)
+        if self._get_proactive_context is not None:
+            proactive_mode, turn_number = self._get_proactive_context()
+            for event in event_list:
+                event_proactive_mode = proactive_mode if event.event_type == EventType.AGENT else None
+                event.metadata = PASEventMetadata(
+                    return_value=event.metadata.return_value,
+                    exception=event.metadata.exception,
+                    exception_stack_trace=event.metadata.exception_stack_trace,
+                    completed=event.metadata.completed,
+                    proactive_mode=event_proactive_mode,
+                    turn_number=turn_number,
+                )
+        else:
+            logger.warning("Proactive context getter is None, skipping metadata injection")
+
         super().add_to_log(event_list)  # Call Meta ARE's native event processing
 
         for event in event_list:

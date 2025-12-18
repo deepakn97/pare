@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 from are.simulation.agents.default_agent.base_agent import BaseAgent
 from are.simulation.agents.default_agent.tools.json_action_executor import JsonActionExecutor
 from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
-from are.simulation.data_handler.exporter import JsonScenarioExporter
 from are.simulation.environment import EnvironmentConfig
 from are.simulation.notification_system import VerbosityLevel
 from are.simulation.scenario_runner import ScenarioRunner
@@ -25,6 +24,7 @@ from pas.agents.proactive.steps import get_proactive_agent_pre_step
 from pas.agents.user.prompts.system_prompt import DEFAULT_USER_AGENT_SYSTEM_PROMPT
 from pas.agents.user.steps import get_user_agent_pre_step
 from pas.apps import StatefulApp
+from pas.data_handler.exporter import PASJsonScenarioExporter
 from pas.environment import StateAwareEnvironmentWrapper
 from pas.notification_system import PASNotificationSystem
 
@@ -100,7 +100,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         model_id = f"user:{user_model}|observe:{observe_model}|execute:{execute_model}"
         agent_id = f"user:{user_agent}|proactive:{proactive_agent}"
 
-        scenario_exporter = JsonScenarioExporter()
+        scenario_exporter = PASJsonScenarioExporter()
         success, export_path = scenario_exporter.export_to_json_file(
             env,
             scenario,
@@ -231,6 +231,9 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         proactive_agent.prepare_proactive_agent_run(scenario, env.notification_system)
 
         turn_count = 0
+
+        # Set up proactive context getter (must be after turn_count is defined)
+        env.set_proactive_context_getter(lambda: (proactive_agent.mode.value, turn_count))
         # reset on first turn, then false for subsequent turns.
         user_reset = True
         proactive_reset = True

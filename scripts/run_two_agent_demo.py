@@ -41,12 +41,54 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+MODELS_MAP = {
+    "gpt-4o-mini": {"model_name": "gpt-4o-mini", "provider": "openai"},
+    "gpt-4o": {"model_name": "gpt-4o", "provider": "openai"},
+    "gpt-5-mini": {"model_name": "gpt-5-mini", "provider": "openai"},
+    "gpt-5": {"model_name": "gpt-5", "provider": "openai"},
+    "gpt-oss-20b": {"model_name": "accounts/fireworks/models/gpt-oss-20b", "provider": "fireworks_ai"},
+    "gpt-oss-120b": {"model_name": "accounts/fireworks/models/gpt-oss-120b", "provider": "fireworks_ai"},
+    "claude-4.5-sonnet": {
+        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "provider": "bedrock",
+    },
+    "claude-4.5-haiku": {
+        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "provider": "bedrock",
+    },
+    "claude-4.5-opus": {
+        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/us.anthropic.claude-opus-4-5-20251101-v1:0",
+        "provider": "bedrock",
+    },
+    "llama-4-scout": {
+        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/us.meta.llama4-scout-17b-instruct-v1:0",
+        "provider": "bedrock",
+    },
+    "llama-4-maverick": {
+        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/us.meta.llama4-maverick-17b-instruct-v1:0",
+        "provider": "bedrock",
+    },
+    "llama-3.3-70B": {
+        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/us.meta.llama3-3-70b-instruct-v1:0",
+        "provider": "bedrock",
+    },
+    "llama-3.2-3b": {"model_name": "accounts/fireworks/models/llama-v3p2-3b-instruct", "provider": "fireworks_ai"},
+    "gemma-4b-it": {"model_name": "accounts/fireworks/models/gemma-3-4b-it", "provider": "fireworks_ai"},
+    "deepseek-v3.2": {"model_name": "accounts/fireworks/models/deepseek-v3p2", "provider": "fireworks_ai"},
+    "qwen-3-4b-it": {"model_name": "accounts/fireworks/models/qwen3-4b-instruct-2507", "provider": "fireworks_ai"},
+}
+
 
 def run_demo(
     scenario_name: str = "email_notification",
     user_model: str = "gpt-4o-mini",
+    user_model_provider: str = "openai",
     proactive_model: str = "gpt-4o-mini",
+    proactive_model_provider: str = "openai",
     max_turns: int | None = 10,
+    user_max_iterations: int = 1,
+    observe_max_iterations: int = 10,
+    execute_max_iterations: int = 10,
     traces_dir: str = "traces/demo",
     oracle_mode: bool = False,
     tool_failure_prob: float = 0.0,
@@ -58,8 +100,13 @@ def run_demo(
     Args:
         scenario_name: Name of the registered scenario to run.
         user_model: LLM model to use for the user agent.
+        user_model_provider: Provider for user model.
         proactive_model: LLM model to use for the proactive observe and execute agents.
+        proactive_model_provider: Provider for proactive model.
         max_turns: Maximum number of agent turns to run (None for unlimited).
+        user_max_iterations: Maximum number of iterations for the user agent.
+        observe_max_iterations: Maximum number of iterations for the proactive observe agent.
+        execute_max_iterations: Maximum number of iterations for the proactive execute agent.
         traces_dir: Directory to export traces to.
         oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
         tool_failure_prob: Probability (0.0-1.0) that agent tools fail.
@@ -98,22 +145,40 @@ def run_demo(
 
     scenario.initialize(sandbox_dir=Path("sandbox"))
 
+    user_model_data = MODELS_MAP.get(user_model, {})
+    proactive_model_data = MODELS_MAP.get(proactive_model, {})
+
+    if user_model_data:
+        user_model = user_model_data["model_name"]
+        user_model_provider = user_model_data["provider"]
+    else:
+        logger.warning(
+            f"Provided user model {user_model} not found in MODELS_MAP. Provider information may be incorrect."
+        )
+    if proactive_model_data:
+        proactive_model = proactive_model_data["model_name"]
+        proactive_model_provider = proactive_model_data["provider"]
+    else:
+        logger.warning(
+            f"Provided proactive model {proactive_model} not found in MODELS_MAP. Provider information may be incorrect."
+        )
+
     # Create agent configurations
     user_config = ARESimulationReactBaseAgentConfig(
-        llm_engine_config=LLMEngineConfig(model_name=user_model, provider="openai"),
-        max_iterations=1,  # User agent typically takes fewer iterations per turn
+        llm_engine_config=LLMEngineConfig(model_name=user_model, provider=user_model_provider),
+        max_iterations=user_max_iterations,  # User agent typically takes fewer iterations per turn
         use_custom_logger=False,
     )
 
     proactive_observe_config = ARESimulationReactBaseAgentConfig(
-        llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider="openai"),
-        max_iterations=10,  # Observation might need more reasoning
+        llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider=proactive_model_provider),
+        max_iterations=observe_max_iterations,  # Observation might need more reasoning
         use_custom_logger=False,
     )
 
     proactive_execute_config = ARESimulationReactBaseAgentConfig(
-        llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider="openai"),
-        max_iterations=20,  # Execution might need multiple tool calls
+        llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider=proactive_model_provider),
+        max_iterations=execute_max_iterations,  # Execution might need multiple tool calls
         use_custom_logger=False,
     )
 
@@ -186,15 +251,43 @@ def main(argv: list[str] | None = None) -> None:
         help="LLM model for user agent",
     )
     parser.add_argument(
+        "--user-model-provider",
+        default="openai",
+        help="Provider for user model",
+    )
+    parser.add_argument(
         "--proactive-model",
         default="gpt-4o-mini",
         help="LLM model for proactive agents (observe and execute)",
+    )
+    parser.add_argument(
+        "--proactive-model-provider",
+        default="openai",
+        help="Provider for proactive model",
     )
     parser.add_argument(
         "--max-turns",
         type=int,
         default=10,
         help="Maximum number of agent turns (0 for unlimited)",
+    )
+    parser.add_argument(
+        "--user-max-iterations",
+        type=int,
+        default=1,
+        help="Maximum number of iterations for the user agent",
+    )
+    parser.add_argument(
+        "--observe-max-iterations",
+        type=int,
+        default=10,
+        help="Maximum number of iterations for the proactive observe agent",
+    )
+    parser.add_argument(
+        "--execute-max-iterations",
+        type=int,
+        default=10,
+        help="Maximum number of iterations for the proactive execute agent",
     )
     parser.add_argument(
         "--traces-dir",
@@ -262,12 +355,21 @@ def main(argv: list[str] | None = None) -> None:
     # Make log directory if it doesn't exist
     if args.log_to_file:
         log_dir = Path(args.log_dir) if Path(args.log_dir).is_absolute() else (Path.cwd() / args.log_dir)
-        log_dir = log_dir / args.experiment_name / f"{args.scenario}_{current_timestamp}"
+        log_dir = (
+            log_dir
+            / f"{args.experiment_name}_user_{args.user_model}_proactive_{args.proactive_model}_mt_{args.max_turns}_umi_{args.user_max_iterations}_omi_{args.observe_max_iterations}_emi_{args.execute_max_iterations}_enmi_{args.env_events_per_min}_es_{args.env_events_seed}_tfp_{args.tool_failure_prob}"
+            / f"{args.scenario}_{current_timestamp}"
+        )
+        print(f"Log directory: {log_dir}")
         log_dir.mkdir(parents=True, exist_ok=True)
 
     # Make traces directory if it doesn't exist
     traces_dir = Path(args.traces_dir) if Path(args.traces_dir).is_absolute() else (Path.cwd() / args.traces_dir)
-    traces_dir = traces_dir / args.experiment_name
+    traces_dir = (
+        traces_dir
+        / f"{args.experiment_name}_user_{args.user_model}_proactive_{args.proactive_model}_mt_{args.max_turns}_umi_{args.user_max_iterations}_omi_{args.observe_max_iterations}_emi_{args.execute_max_iterations}_enmi_{args.env_events_per_min}_es_{args.env_events_seed}_tfp_{args.tool_failure_prob}"
+    )
+    print(f"Traces directory: {traces_dir}")
     traces_dir.mkdir(parents=True, exist_ok=True)
 
     # Setup logging
@@ -291,8 +393,13 @@ def main(argv: list[str] | None = None) -> None:
     run_demo(
         scenario_name=args.scenario,
         user_model=args.user_model,
+        user_model_provider=args.user_model_provider,
         proactive_model=args.proactive_model,
+        proactive_model_provider=args.proactive_model_provider,
         max_turns=max_turns,
+        user_max_iterations=args.user_max_iterations,
+        observe_max_iterations=args.observe_max_iterations,
+        execute_max_iterations=args.execute_max_iterations,
         traces_dir=traces_dir,
         oracle_mode=args.oracle,
         tool_failure_prob=args.tool_failure_prob,
