@@ -14,10 +14,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts import (
+from pas.scenario_generator.prompt.scenario_generating_agent_prompts import (
     configure_dynamic_context,
 )
-from pas.scenario_generator.prompt.multi_step_scenario_generating_agent_prompts import (
+from pas.scenario_generator.prompt.scenario_generating_agent_prompts import (
     prompts as prompt_module,
 )
 from scripts.run_two_agent_demo import run_demo
@@ -40,7 +40,7 @@ class RunCheckResult:
     validation_success: bool
 
 
-class MultiStepScenarioGeneratingAgentsOrchestrator:
+class ScenarioGeneratingAgentOrchestrator:
     """Coordinates the dedicated step agents to build a proactive scenario."""
 
     def __init__(

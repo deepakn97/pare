@@ -30,11 +30,9 @@ def register_custom_scenarios(registry: ScenarioRegistry) -> None:  # noqa: C901
 
     # Import modules containing custom scenarios
     custom_scenario_modules = [
-        "pas.scenario_generator.example_proactive_scenarios.scenario",
-        "pas.scenario_generator.example_proactive_scenarios.scenario_with_all_apps_init",
-        "pas.scenario_generator.example_proactive_scenarios.scenario_with_all_pas_apps",
-        "pas.scenario_generator.example_proactive_scenarios.very_basic_demo_pas_app",
-        # Add other custom scenario modules here as needed
+        # Keep this list restricted to modules that exist in-tree. Importing the
+        # module triggers any @register_scenario decorators at import time.
+        "pas.scenario_generator.scenario_with_all_pas_apps",
     ]
 
     # Auto-discover generated scenario files by file path; import by spec (no package required)
