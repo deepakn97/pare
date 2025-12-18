@@ -27,7 +27,7 @@ from are.simulation.scenarios.utils.scenario_expander import EnvEventsConfig
 from are.simulation.types import ToolAugmentationConfig
 from dotenv import load_dotenv
 
-from pas.cli.utils import setup_logging
+from pas.cli.utils import get_pst_time, setup_logging
 from pas.scenario_runner import TwoAgentScenarioRunner
 from pas.scenarios.utils.registry import registry
 from pas.scenarios.utils.scenario_expander import default_weight_per_app_class
@@ -47,7 +47,7 @@ def run_demo(
     user_model: str = "gpt-4o-mini",
     proactive_model: str = "gpt-4o-mini",
     max_turns: int | None = 10,
-    output_dir: str | None = None,
+    traces_dir: str = "traces/demo",
     oracle_mode: bool = False,
     tool_failure_prob: float = 0.0,
     env_events_per_min: float = 0.0,
@@ -60,7 +60,7 @@ def run_demo(
         user_model: LLM model to use for the user agent.
         proactive_model: LLM model to use for the proactive observe and execute agents.
         max_turns: Maximum number of agent turns to run (None for unlimited).
-        output_dir: Directory to export traces to (None for default).
+        traces_dir: Directory to export traces to.
         oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
         tool_failure_prob: Probability (0.0-1.0) that agent tools fail.
         env_events_per_min: Average number of environmental noise events per minute.
@@ -74,6 +74,7 @@ def run_demo(
     logger.info(f"Tool failure probability: {tool_failure_prob}")
     logger.info(f"Environmental noise events per minute: {env_events_per_min}")
     logger.info(f"Environmental noise seed: {env_events_seed}")
+    logger.info(f"Traces directory: {traces_dir}")
 
     # Load the scenario using PAS registry
     scenario_class = registry.get_scenario(scenario_name)
@@ -117,14 +118,13 @@ def run_demo(
     )
 
     # Create runner configuration
-    output_path = Path(output_dir) if output_dir else Path("results/")
+    output_path = Path(traces_dir) if traces_dir else Path("results/")
     output_path.mkdir(parents=True, exist_ok=True)
 
     # ! TODO: Support dumping agent traces as well, I think right now it is only dumping the user agent logs. We also don't use this config anywhere.
     runner_config = ScenarioRunnerConfig(
         output_dir=str(output_path),
-        dump_agent_logs=True,
-        dump_world_logs=True,
+        export=True,
         use_custom_logger=False,
     )
 
@@ -139,6 +139,7 @@ def run_demo(
         proactive_execute_config=proactive_execute_config,
         max_turns=max_turns,
         oracle_mode=oracle_mode,
+        traces_dir=traces_dir,
     )
 
     # Display results
@@ -196,8 +197,8 @@ def main(argv: list[str] | None = None) -> None:
         help="Maximum number of agent turns (0 for unlimited)",
     )
     parser.add_argument(
-        "--output-dir",
-        default="traces/pas",
+        "--traces-dir",
+        default="traces",
         help="Directory to export traces to",
     )
     parser.add_argument(
@@ -237,7 +238,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Include logging from Meta-ARE. LiteLLM, httpx, httpcore, openai loggers are still suppressed.",
+        help="Include logging from Meta-ARE Default Agent. LiteLLM, httpx, httpcore, openai, and Meta-ARE Noisy (environment, apps, validation.judge) loggers are still suppressed.",
     )
     parser.add_argument(
         "--log-dir",
@@ -256,12 +257,24 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     args = parser.parse_args(argv)
+    current_timestamp = get_pst_time()
+
+    # Make log directory if it doesn't exist
+    if args.log_to_file:
+        log_dir = Path(args.log_dir) if Path(args.log_dir).is_absolute() else (Path.cwd() / args.log_dir)
+        log_dir = log_dir / args.experiment_name / f"{args.scenario}_{current_timestamp}"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Make traces directory if it doesn't exist
+    traces_dir = Path(args.traces_dir) if Path(args.traces_dir).is_absolute() else (Path.cwd() / args.traces_dir)
+    traces_dir = traces_dir / args.experiment_name
+    traces_dir.mkdir(parents=True, exist_ok=True)
 
     # Setup logging
     setup_logging(
         scenario_id=args.scenario,
         level=args.log_level,
-        log_dir=args.log_dir,
+        log_dir=log_dir,
         experiment_name=args.experiment_name,
         use_tqdm=args.use_tqdm,
         log_to_file=args.log_to_file,
@@ -280,7 +293,7 @@ def main(argv: list[str] | None = None) -> None:
         user_model=args.user_model,
         proactive_model=args.proactive_model,
         max_turns=max_turns,
-        output_dir=args.output_dir,
+        traces_dir=traces_dir,
         oracle_mode=args.oracle,
         tool_failure_prob=args.tool_failure_prob,
         env_events_per_min=args.env_events_per_min,

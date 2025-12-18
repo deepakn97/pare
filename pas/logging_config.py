@@ -109,13 +109,13 @@ def suppress_noisy_loggers() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("are.simulation.apps").setLevel(logging.WARNING)
+    logging.getLogger("are.simulation.environment").setLevel(logging.WARNING)
+    logging.getLogger("are.simulation.validation.judge").setLevel(logging.WARNING)
 
 
 def suppress_noisy_are_loggers() -> None:
     logger_names = [
-        "are.simulation.validation.judge",
-        "are.simulation.apps",
-        "are.simulation.environment",
         "are.simulation.agents",
         "are.simulation.agents.default_agent",
         "are.simulation.agents.default_agent.base_agent",

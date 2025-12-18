@@ -94,9 +94,13 @@ USER_AGENT_PROACTIVE_INTERACTION = textwrap.dedent(
     - When you receive a proposal:
       1. Evaluate if it aligns with what you were actually trying to do
       2. Check if it matches your recent action history and context
-      3. Decide if accepting it would be helpful or interrupt your actual goal
-    - You can ACCEPT a proposal if it accurately identifies your intent
-    - You can REJECT a proposal if it misunderstands your goal, would be unhelpful or if it is vague and unclear."""
+      3. Verify the proposal only uses apps listed in AVAILABLE APPS above
+      4. Decide if accepting it would be helpful or interrupt your actual goal
+    - You can ACCEPT a proposal if it accurately identifies your intent and can be completed with available apps
+    - You can REJECT a proposal if:
+      * It misunderstands your goal or would be unhelpful
+      * It is vague and unclear
+      * It requires apps or capabilities not listed in AVAILABLE APPS"""
 )
 
 PAS_USER_ENVIRONMENT_INSTRUCTIONS = textwrap.dedent(

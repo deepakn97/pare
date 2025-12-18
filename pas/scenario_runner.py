@@ -235,6 +235,10 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         user_reset = True
         proactive_reset = True
         while (max_turns is None or turn_count < max_turns) and env.state != EnvironmentState.STOPPED:
+            logger.info("=" * 80)
+            logger.info(f"Turn {turn_count} - Environment Time: {env.time_manager.time()}")
+            logger.info("=" * 80)
+
             user_tools = env.get_user_tools()
             current_app = env.active_app
             current_state = current_app.current_state if current_app and isinstance(current_app, StatefulApp) else None
@@ -253,16 +257,22 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             # logger.debug(
             #     f"Turn {turn_count} - Notifications: {json.dumps([{'Message': notification.message, 'Message Type': notification.message_type.value} for notification in all_notifications], indent=2)}"
             # )
+            logger.info("*" * 80)
+            logger.info("User-Agent - Running...")
+            logger.info("*" * 80)
             user_result = user_agent.agent_loop(
                 user_tools, current_app, current_state, reset=user_reset or not user_agent.react_agent.is_initialized()
             )
-            logger.info(f"Turn {turn_count} - User Agent Output: {user_result}")
+            logger.info(f"User-Agent Turn {turn_count} Output: {user_result}")
             user_reset = False
 
+            logger.info("*" * 80)
+            logger.info("Proactive-Agent Turn - Running...")
+            logger.info("*" * 80)
             proactive_result = proactive_agent.agent_loop(
                 reset=proactive_reset or not proactive_agent.observe_agent.is_initialized()
             )
-            logger.info(f"Turn {turn_count} - Proactive Agent Output: {proactive_result}")
+            logger.info(f"Proactive-Agent Turn {turn_count} Output: {proactive_result}")
             proactive_reset = False
 
             turn_count += 1
@@ -281,6 +291,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         proactive_execute_config: ARESimulationReactBaseAgentConfig,
         max_turns: int | None = None,
         oracle_mode: bool = False,
+        traces_dir: str = "traces/demo",
     ) -> ScenarioValidationResult:
         """Run a Proactive Agent Sandbox scenario.
 
@@ -291,9 +302,10 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             proactive_execute_config: The configuration for the proactive execute agent.
             max_turns: The maximum number of turns to cycles.
             oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
+            traces_dir: The directory to export traces to.
 
         Returns:
-            The validation result of the scenario.
+            ScenarioValidationResult: The validation result of the scenario.
         """
         env_config = EnvironmentConfig(
             oracle_mode=oracle_mode,
@@ -301,7 +313,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             wait_for_user_input_timeout=None,
             time_increment_in_seconds=scenario.time_increment_in_seconds,
             start_time=scenario.start_time,
-            dump_dir=None,
+            dump_dir=traces_dir if oracle_mode else None,
             exit_when_no_events=oracle_mode,
         )
 
@@ -363,7 +375,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
                 proactive_agent.agent_framework,
                 validation_result,
                 run_duration,
-                output_dir="traces/demo",
+                output_dir=traces_dir,
                 export_apps=not has_hf_metadata,
                 trace_dump_format="hf",
             )
@@ -371,6 +383,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         env.stop()
         return validation_result
 
+    # ! TODO: Accept a config object instead of individual arguments. See ScenarioRunnerConfig for reference.
     def run_pas_scenario(
         self,
         scenario: Scenario,
@@ -379,6 +392,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         proactive_execute_config: ARESimulationReactBaseAgentConfig,
         max_turns: int | None = None,
         oracle_mode: bool = False,
+        traces_dir: str = "traces/demo",
     ) -> ScenarioValidationResult:
         """Run a Proactive Agent Sandbox scenario.
 
@@ -389,9 +403,10 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             proactive_execute_config: The configuration for the proactive execute agent.
             max_turns: The maximum number of turns to cycles.
             oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
+            traces_dir: The directory to export traces to.
 
         Returns:
-            The validation result of the scenario.
+            ScenarioValidationResult: The validation result of the scenario.
 
         Raises:
             NotImplementedError: If scenario loading from string is not implemented yet.
@@ -410,7 +425,13 @@ class TwoAgentScenarioRunner(ScenarioRunner):
 
         try:
             result = self._run_pas_scenario(
-                scenario, user_config, proactive_observe_config, proactive_execute_config, max_turns, oracle_mode
+                scenario,
+                user_config,
+                proactive_observe_config,
+                proactive_execute_config,
+                max_turns,
+                oracle_mode,
+                traces_dir,
             )
         except Exception as exception:
             logger.exception("Failed to run scenario")

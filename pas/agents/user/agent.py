@@ -251,12 +251,10 @@ class UserAgent:
             message for message in new_messages if message.message_type == PASMessageType.ENVIRONMENT_STOP
         ]
 
-        # Reinsert the env notifications for user and agent, agent messages and any extra messages back into the notification system.
+        # Reinsert the env notifications for user and agent and any extra messages back into the notification system.
         # This is important because the preprocessing step and the next agent will use the same notification system.
-        messages_to_put_back = [m for m in new_messages if m not in env_stop_messages]
-        logger.debug(
-            f"User agent get_notifications() -> message types to put back: {'; '.join([m.message_type.value for m in messages_to_put_back])}"
-        )
+        # ! NOTE: DO NOT REINSERT THE AGENT MESSAGES AS THEY HAVE BEEN HANDLED USING TASK LOG.
+        messages_to_put_back = [m for m in new_messages if m not in env_stop_messages and m not in agent_messages]
 
         for message in messages_to_put_back:
             self.react_agent.notification_system.message_queue.put(message)
