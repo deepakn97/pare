@@ -560,8 +560,9 @@ class ScenarioGeneratingAgentOrchestrator:
         class_name: str | None = None
         description_lines: list[str] = []
         in_description = False
+        in_explanation = False
 
-        for idx, line in enumerate(lines):
+        for _idx, line in enumerate(lines):
             stripped = line.strip()
             lower = stripped.lower()
             if not in_description and lower.startswith("scenario id:"):
@@ -572,9 +573,15 @@ class ScenarioGeneratingAgentOrchestrator:
                 continue
             if not in_description and lower == "description:":
                 in_description = True
-                # Everything after this line is the narrative description.
-                description_lines = lines[idx + 1 :]
-                break
+                # Everything after this line is the narrative description, up until
+                # an optional Explanation section.
+                continue
+            if in_description and not in_explanation:
+                # Stop the description at the start of an optional Explanation section.
+                if lower.startswith("explanation:"):
+                    in_explanation = True
+                    continue
+                description_lines.append(line)
 
         if not in_description:
             # Fallback: treat the whole text as description.

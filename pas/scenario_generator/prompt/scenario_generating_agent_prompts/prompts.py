@@ -134,6 +134,21 @@ APP_INITIALIZATION_SNIPPETS = {
         "flow": 'messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")',
         "intent": "Two-way text threads where the agent can notice unread items or send follow ups.",
     },
+    "StatefulShoppingApp": {
+        "init": 'self.shopping = StatefulShoppingApp(name="Shopping")',
+        "flow": 'shopping_app = self.get_typed_app(StatefulShoppingApp, "Shopping")',
+        "intent": "Shopping app for browsing products, managing cart, and placing orders.",
+    },
+    "StatefulCabApp": {
+        "init": 'self.cab = StatefulCabApp(name="Cab")',
+        "flow": 'cab_app = self.get_typed_app(StatefulCabApp, "Cab")',
+        "intent": "Cab/ride-hailing client for getting quotations and booking rides.",
+    },
+    "StatefulApartmentApp": {
+        "init": 'self.apartment = StatefulApartmentApp(name="Apartment")',
+        "flow": 'apartment_app = self.get_typed_app(StatefulApartmentApp, "Apartment")',
+        "intent": "Apartment listing app for searching, viewing, and saving rental listings.",
+    },
 }
 
 APP_IMPORT_INSTRUCTIONS = {
@@ -157,6 +172,15 @@ APP_IMPORT_INSTRUCTIONS = {
     },
     "StatefulMessagingApp": {
         "import instruction": "from pas.apps import StatefulMessagingApp",
+    },
+    "StatefulShoppingApp": {
+        "import instruction": "from pas.apps.shopping import StatefulShoppingApp",
+    },
+    "StatefulCabApp": {
+        "import instruction": "from pas.apps.cab import StatefulCabApp",
+    },
+    "StatefulApartmentApp": {
+        "import instruction": "from pas.apps.apartment import StatefulApartmentApp",
     },
 }
 
@@ -217,12 +241,17 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
         * First line: one-sentence summary of what the agent does (e.g. "Agent updates contact information from messages received from unknown number.").
         * Middle: 1-2 short paragraphs describing the concrete situation and numbered steps the agent must perform.
         * Final lines: a brief paragraph starting with "This scenario exercises ..." that lists the main capabilities being tested.
+      - Is implementable without "magic knowledge":
+        * Do NOT rely on internal IDs/handles (e.g., `email_id`, `product_id`, `order_id`, `conversation_id`, `calendar_event_id`, `reminder_id`, `item_id` and similar handles) that the agent could not plausibly know.
+        * If later steps would need to reference a specific object, make sure the narrative provides an agent-visible basis to identify it
+          (e.g., sender+subject, human-readable product name, explicit identifier present in an email/message, or a prior list/search action).
+        * Prefer narratives where the agent can discover what it needs via natural keys (names/emails/titles) rather than opaque IDs.
 
     Constraints:
     - Treat every historical scenario description from `scenario_metadata.json` as a negative example.
     - Your new scenario MUST be clearly and substantively different in trigger, domain, app combination, and cross-app workflow from all prior descriptions.
     - Avoid reusing the same situation with only minor wording or timestamp changes; design a genuinely new situation.
-    - Only involve apps and tools that appear in the Selected Apps list and the Event-Registered App APIs block below.
+    - Only involve apps and tools that appear in the Selected Apps list (included below) and the Event-Registered App APIs block below.
     - Do NOT introduce new app types or tools that are not present in those context sections.
     - Scenario id requirements:
       - Lowercase letters, digits, and underscores only (e.g., `vip_calendar_conflict`).
@@ -235,14 +264,21 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
       - Avoid redundant background details that do not affect the agent's reasoning or the event flow.
       - Keep the description tightly centered on the single main coordination problem and how PAS apps + the agent resolve it.
 
-    Format your final answer EXACTLY as:
+    Format your final answer as:
 
     Scenario ID: <short_machine_friendly_id>
     Class Name: <ShortDescriptiveClassName>
     Description:
-    <2-3 short paragraphs (or ~6-10 sentences) that describe the scenario narrative, focused on one main task>
+    <2-3 short paragraphs (or ~3-6 sentences) that describe the scenario narrative, focused on one main task>
 
-    Do not add any other sections, headings, bullet points, or commentary outside this format.
+    Optionally, you MAY add an additional section at the end for your own reasoning:
+
+    Explanation:
+    <brief notes (up to ~3-6 sentences) explaining why this scenario is unique or interesting>
+
+    The Explanation section is only for tooling and human readers; it will NOT be stored in
+    `scenario_metadata.json` or in the scenario docstring. Only the Description block above
+    is persisted as the official scenario description.
     """
 )
 
@@ -287,6 +323,12 @@ _APPS_AND_DATA_BODY = textwrap.dedent(
     - Only include pre-existing data (contacts, calendar events, message history, etc.).
     - Structure the output per app with clear subsections.
     - Do NOT invent runtime events; those belong to Step 3.
+    - Triggering artifacts vs baseline state (IMPORTANT):
+      - If an email/message/notification is meant to *trigger* the agent during the run (i.e., the agent should notice it arriving),
+        prefer creating it as a non-oracle environment event in Step 3 (e.g., `send_email_to_user_with_id(...).delayed(...)`)
+        rather than silently seeding it in Step 2.
+      - If something truly exists before `start_time` (e.g., older emails, prior purchases, existing calendar events), it may be seeded in Step 2,
+        but Step 3 must include an early oracle "observation" action (list/read/search) so the agent has a plausible basis to know it.
     - Only modify the import section and `init_and_populate_apps()` body. Keep WARNING comments and other TODO blocks untouched.
       This means:
         - In the import section, you may replace the "TODO: import all Apps" area with concrete imports.
@@ -345,7 +387,27 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - Start with non-oracle environment events to set context.
     - Include oracle/user interactions (agent proposal → user response → agent follow-up).
     - Specify event source, method, arguments, delays, and purpose.
-    - Reference IDs and data from Step 2 exactly; do not fabricate new ones.
+    - Non-oracle environment events represent exogenous signals from the world; they MUST NOT depend on agent or oracle actions.
+      - Do NOT create `.depends_on(...)` chains where an environment event depends on an oracle/user event or other agent action.
+      - You may chain environment events together using `.depends_on(...)` only when the dependency models ordering between environment events themselves
+        (for example, a follow-up notification that depends on an earlier notification being sent).
+    - Ground every agent/oracle argument in agent-visible evidence (applies to ALL apps):
+      - The agent must not "make up" entities, targets, identifiers/handles, or free-form strings just to complete a flow.
+      - Baseline data seeded in Step 2 exists in the world, but is NOT automatically "known" to the agent unless the agent could plausibly observe it.
+      - Any agent-chosen value in an oracle event (IDs/handles like `email_id`/`product_id`, addresses, phone numbers, search queries, order numbers, etc.)
+        MUST be derivable from at least one of:
+        * prior environment event content (text shown to the user/agent), or
+        * outputs of prior agent-visible tool calls earlier in `build_events_flow()` (list/search/get that reveals it), or
+        * user-provided content (user message / `accept_proposal` content).
+      - Using Step 2 seeded artifacts in later oracle actions requires an explicit observation step:
+        * If an oracle event uses a value that would normally be extracted from seeded state (e.g., an `order_id` from an order-confirmation email,
+          a contact email address from Contacts, a calendar event identifier, a specific shopping item/product id, etc.), you MUST include a prior oracle
+          event that plausibly reveals the needed information (e.g., `list_*`, `search_*`, `get_*`, `get_*_details`, `get_email_by_id`, etc.).
+        * The observation event should happen before any downstream oracle events that depend on the extracted value.
+      - Searches/filters (any app): queries must be motivated by observed evidence; if you expect non-empty results, ensure matching data actually exists
+        (seeded in Step 2 or delivered by earlier env events). Otherwise omit the search or use a broader evidence-based query.
+      - Prefer natural-key APIs (names/emails/titles) over opaque-handle APIs; if an API only accepts an opaque handle, add a prior step that reveals it
+        to the agent (via env event content or a tool call), or redesign the flow.
     - ONLY modify the `build_events_flow()` section of the template while keeping WARNING comments and other sections
       unchanged, except for inserting the concrete implementation in the TODO area.
     Output should be the full updated python file with only the build_events_flow section changed.
@@ -394,6 +456,9 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - "AbstractEvent.delayed() got an unexpected keyword argument 'seconds'/'hours'":
       - You have invented keyword arguments on the `.delayed()` API that do not exist in the real signature.
       - Fix: use Read on the underlying event types in `are/simulation/types.py` (look for `AbstractEvent` / `CompletedEvent`), copy the exact `.delayed(...)` signature, and only call it with the documented positional/keyword arguments (for example, a single positional delay in seconds). Do NOT add new kwargs like `seconds=` or `hours=` unless they are explicitly defined in source.
+    - "App <name> of type <Class> not found in scenario":
+      - You are calling `get_typed_app(Class, "Name")` with a name that does not match how the app was initialized/registered in `self.apps`.
+      - Fix: ensure Step 2 and Step 3 both use the exact attribute + app name pair from the "App Initialization Blueprint" (for example, `self.shopping = StatefulShoppingApp(name="Shopping")` in Step 2 and `shopping_app = self.get_typed_app(StatefulShoppingApp, "Shopping")` in Step 3), and do not rename one without renaming the other.
     - Common failure patterns to avoid:
       - Missing required argument errors (e.g., forgetting `user_id=`) → always confirm signature.
       - AttributeError / “object has no attribute …” → the method does not exist; remove it and use an existing API.
@@ -417,15 +482,25 @@ _VALIDATION_BODY = textwrap.dedent(
     """\
     You are the Step 4 validation agent.
     Design the checks for `validate()` that prove the proactive agent detected the right signals and executed the promised help.
-    - Reference key events and arguments that prove success.
+    - Validation MUST be based only on agent/oracle behavior recorded as `EventType.AGENT` entries.
+      - Do NOT include any checks that require `EventType.ENV` events to appear in the log; treat them as background context only.
+      - When iterating over log entries, always filter to `e.event_type == EventType.AGENT` before applying detailed checks.
+    - Reference key agent/oracle events and arguments that prove success.
     - Distinguish strict vs flexible checks:
       - STRICT: core reasoning and coordination must be present (e.g., the agent proposal referencing the right parties, key follow-up actions like messages/emails, calendar reminders actually created).
       - FLEXIBLE: wording details (exact subject/body strings), cosmetic fields, or small variations in time ranges and titles should not cause failure if the logical behavior is equivalent.
       - Follow the "Validation Flexibility Guidelines" from the multi-step design doc: be strict on logic and data relationships, flexible on surface phrasing and minor formatting.
     - Mention the relevant EventType and tool/function each check expects in the log.
       - Before using EventType, use Read to open `are/simulation/types.py` and inspect which enum members exist; do NOT invent members like `ORACLE` if they are not defined.
-      - In oracle-mode runs (like those used by this pipeline), many tool invocations are recorded as `EventType.ENV` in `env.event_log.list_view()`. Inspect a few log entries first and match on the actual `event_type` values you see (for example, allow both `ENV` and `AGENT` where appropriate) instead of assuming one fixed enum.
       - Treat entries from `env.event_log.list_view()` as event objects (for example, `CompletedEvent` instances) with attributes such as `event_type` and `action`; do NOT subscript them like dictionaries or lists.
+    - Keep checks structurally strict but content-flexible:
+      - For message/email-like actions (such as reply emails, batched replies, and similar tools), do NOT assert on the exact text content in `action.args["content"]`
+        or other free-form strings; those may legitimately vary across successful runs.
+      - Instead, assert that:
+        - The correct app class (for example, `StatefulEmailApp`, `StatefulMessagingApp`) appears in `action.class_name`.
+        - The correct tool or method name appears in `action.function_name` (for example, `reply_to_email`, `send_message`, `send_batch_reply`).
+        - Any required identifiers or structural arguments (such as an `email_id` or a target contact/conversation identifier) are present and non-empty,
+          without over-constraining their exact values unless they must match a specific seeded artifact.
     - ONLY modify the `validate()` function, keeping other sections intact and preserving WARNING comments.
     - When building the final `ScenarioValidationResult`, set:
       - `success=True` only if all strict checks pass.
@@ -539,6 +614,7 @@ def _with_context(
 
 SCENARIO_DESCRIPTION_SYSTEM_PROMPT = _with_context(
     _SCENARIO_DESCRIPTION_BODY,
+    include_selected=True,
     include_selected_tools=True,
     include_app_init=True,
 )
@@ -562,14 +638,20 @@ SCENARIO_DESCRIPTION_USER_PROMPT = textwrap.dedent(
     - A short, machine-friendly scenario id (lowercase_with_underscores, <= 40 chars).
     - A concise Python class name in PascalCase that matches the scenario.
 
-    Follow this exact output format:
+    Follow this output format:
 
     Scenario ID: <short_machine_friendly_id>
     Class Name: <ShortDescriptiveClassName>
     Description:
     <2-3 short paragraphs that describe the trigger, cross-app signals, agent inference, and expected user response>
 
-    Do not include any other text before or after these sections.
+    Optionally, you may append a short Explanation section AFTER the Description for your own reasoning:
+
+    Explanation:
+    <brief notes (up to ~3-6 sentences) explaining why this scenario is unique or interesting>
+
+    Only the Description block will be stored in `scenario_metadata.json` and used as the scenario
+    docstring; the Explanation is treated as auxiliary commentary and ignored by storage code.
     """
 )
 
