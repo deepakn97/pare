@@ -1,8 +1,12 @@
 # Stateful Cab App
 
-`pas.apps.cab.app.StatefulCabApp` layers PAS navigation on top of the Meta-ARE `CabApp`.
-It begins in the `CabHome` state and transitions into service selection, quotation review,
-or ride detail screens depending on which user tool completes.
+`pas.apps.cab.app.StatefulCabApp` layers PAS navigation on top of the Meta-ARE
+`CabApp`. It augments the cab backend with navigation-aware state transitions
+while preserving the underlying cab semantics.
+
+The application always begins in the `CabHome` state. Navigation transitions
+are triggered **only after backend operations complete** (via
+`CompletedEvent`), ensuring deterministic and testable state changes.
 
 ---
 
@@ -12,41 +16,57 @@ or ride detail screens depending on which user tool completes.
 
 ## CabHome
 
+Initial entry point for all cab-related interactions. From this state, users
+can search for available services, request quotations, or directly order a ride.
+
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `list_rides(start_location, end_location, ride_time=None)` | `CabApp.list_rides(...)` | List of ride service options | Completed event transitions to `CabServiceOptions(start, end, ride_time)` |
-| `get_quotation(start_location, end_location, service_type, ride_time=None)` | `CabApp.get_quotation(...)` | Quotation object | Completed event transitions to `CabQuotationDetail(ride_obj)` |
-| `order_ride(start_location, end_location, service_type, ride_time=None)` | `CabApp.order_ride(...)` | Ride object / ride_id | Completed event transitions to `CabRideDetail(ride_id)` |
+| `list_rides(start_location, end_location, ride_time=None)` | `CabApp.list_rides(...)` | List of available service options | **On completion**, transitions to `CabServiceOptions(start, end, ride_time)` |
+| `get_quotation(start_location, end_location, service_type, ride_time=None)` | `CabApp.get_quotation(...)` | Quotation `Ride` object | **On completion**, transitions to `CabQuotationDetail(ride_obj)` |
+| `order_ride(start_location, end_location, service_type, ride_time=None)` | `CabApp.order_ride(...)` | Confirmed `Ride` object | **On completion**, transitions to `CabRideDetail(ride_index)` |
 | `get_ride_history(offset=0, limit=10)` | `CabApp.get_ride_history(offset, limit)` | List of past rides | No navigation change |
 
 ---
 
 ## CabServiceOptions
 
+Intermediate state representing service-type selection for a given route.
+
+This state is entered after route search and allows the user to explore
+available service tiers before booking.
+
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `list_service_types()` | Reads `d_service_config` | Sorted list of service types | Remains in `CabServiceOptions` |
-| `view_quotation(service_type)` | `CabApp.get_quotation(...)` | Quotation object | Completed event transitions to `CabQuotationDetail(ride_obj)` |
+| `list_service_types()` | Reads `CabApp.d_service_config` | Sorted list of service types | Remains in `CabServiceOptions` |
+| `view_quotation(service_type)` | `CabApp.get_quotation(...)` | Quotation `Ride` object | **On completion**, transitions to `CabQuotationDetail(ride_obj)` |
 
 ---
 
 ## CabQuotationDetail
 
+Read-only state showing a quotation prior to booking.
+
+The quotation is stored locally in the state and reused when confirming
+the order.
+
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `show_quotation()` | Local return of stored `ride_obj` | Quotation object | Remains in `CabQuotationDetail` |
-| `confirm_order()` | `CabApp.order_ride(...)` using quotation data | Confirmed ride object | Completed event transitions to `CabRideDetail(ride_id)` |
+| `show_quotation()` | Local state access | Quotation `Ride` object | Remains in `CabQuotationDetail` |
+| `confirm_order()` | `CabApp.order_ride(...)` using quotation data | Confirmed `Ride` object | **On completion**, transitions to `CabRideDetail(ride_index)` |
 
 ---
 
 ## CabRideDetail
 
+State representing an active or historical ride. All ride lifecycle actions
+are performed from this state.
+
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `get_current_ride_status()` | `CabApp.get_current_ride_status()` | Status dict | Remains in `CabRideDetail` |
-| `get_ride()` | `CabApp.get_ride(ride_id)` | Full ride object | Remains in `CabRideDetail` |
-| `user_cancel_ride()` | `CabApp.user_cancel_ride()` | Status string | Completed event resets app to `CabHome` |
-| `end_ride()` | `CabApp.end_ride()` | Status string | Completed event resets app to `CabHome` |
+| `get_current_ride_status()` | `CabApp.get_current_ride_status()` | Ride status object | Remains in `CabRideDetail` |
+| `get_ride()` | `CabApp.get_ride(ride_index)` | Full `Ride` object | Remains in `CabRideDetail` |
+| `user_cancel_ride()` | `CabApp.user_cancel_ride()` | Status message | **On completion**, resets app to `CabHome` |
+| `end_ride()` | `CabApp.end_ride()` | Status message | **On completion**, resets app to `CabHome` |
 
 ---
 
@@ -58,12 +78,20 @@ or ride detail screens depending on which user tool completes.
 - `CabServiceOptions → CabQuotationDetail` via `view_quotation`
 - `CabQuotationDetail → CabRideDetail` via `confirm_order`
 - `CabRideDetail → CabHome` via `user_cancel_ride` or `end_ride`
-- Unrecognized events: no navigation change
+- Unrecognized or read-only events result in **no navigation change**
 
 ---
 
 ## Navigation Helpers
 
-- `load_root_state()` resets app to `CabHome`
-- `set_current_state(...)` pushes a new state instance
-- `go_back()` works when navigation stack is non-empty
+- `load_root_state()`
+  Resets the application to the root `CabHome` state.
+
+- `set_current_state(state)`
+  Pushes a new navigation state instance onto the navigation stack.
+
+- Navigation transitions are **event-driven** and occur only after backend
+  operations emit a `CompletedEvent`.
+
+- `disable_events()` is used within state tools to prevent recursive or
+  duplicate event emission during backend calls.

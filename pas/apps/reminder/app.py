@@ -71,21 +71,24 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
         function_name = event.function_name()
         if function_name is None:
             return
-
+        metadata = getattr(event, "metadata", None)
+        if metadata and metadata.return_value in ("cancel", "back"):
+            self.go_back()
+            return
         action = getattr(event, "action", None)
         event_args: dict[str, Any] = {}
         if action is not None and hasattr(action, "args"):
             event_args = cast("dict[str, Any]", action.args)
 
-        if self._handle_backend_ops(function_name, event_args):
+        if self._handle_backend_transitions(function_name, event_args):
             return
-        if self._handle_list_ops(function_name, event_args):
+        if self._handle_list_transitions(function_name, event_args):
             return
-        if self._handle_detail_ops(function_name, event_args):
+        if self._handle_detail_transitions(function_name, event_args):
             return
 
     # Backend operations
-    def _handle_backend_ops(self, fname: str, args: dict[str, Any]) -> bool:
+    def _handle_backend_transitions(self, fname: str, args: dict[str, Any]) -> bool:
         """Handle transitions caused by WRITE/READ backend calls."""
         match fname:
             case "add_reminder":
@@ -113,13 +116,16 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
         return False
 
     # From list view
-    def _handle_list_ops(self, fname: str, args: dict[str, Any]) -> bool:
+    def _handle_list_transitions(self, fname: str, args: dict[str, Any]) -> bool:
         """Handle transitions originating in ReminderList."""
+        if not isinstance(self.current_state, ReminderList):
+            return False
+
         if fname == "create_new":
             self.set_current_state(AddReminder())
             return True
 
-        if fname == "view_detail":
+        if fname == "open_reminder":
             rid = args.get("reminder_id")
             if rid:
                 self.set_current_state(ReminderDetail(rid))
@@ -128,8 +134,11 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
         return False
 
     # From detail/edit views
-    def _handle_detail_ops(self, fname: str, args: dict[str, Any]) -> bool:
+    def _handle_detail_transitions(self, fname: str, args: dict[str, Any]) -> bool:
         """Handle transitions from ReminderDetail or EditReminder."""
+        if not isinstance(self.current_state, (ReminderDetail, EditReminder)):
+            return False
+
         if fname == "edit":
             rid = args.get("edit_reminder_id")
             if rid:

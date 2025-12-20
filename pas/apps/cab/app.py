@@ -50,8 +50,14 @@ class StatefulCabApp(StatefulApp, CabApp):
     def _handle_order_ride(self, event: CompletedEvent) -> None:
         ride_obj = getattr(event, "result", None) or self.on_going_ride
 
-        if ride_obj and ride_obj.ride_id:
-            self.set_current_state(CabRideDetail(ride_obj.ride_id))
+        if ride_obj:
+            # Find the ride index in ride_history
+            try:
+                ride_index = self.ride_history.index(ride_obj)
+            except ValueError:
+                # If not found, it's likely the most recent ride
+                ride_index = len(self.ride_history) - 1
+            self.set_current_state(CabRideDetail(ride_index))
 
     def _handle_finish(self) -> None:
         self.load_root_state()
@@ -82,9 +88,9 @@ class StatefulCabApp(StatefulApp, CabApp):
         if action is None:
             return
 
-        function_name = event.function_name()
-        if not function_name:
+        fname = event.function_name()
+        if not fname:
             return
 
         event_args = action.args or {}
-        self._dispatch(function_name, event, event_args)
+        self._dispatch(fname, event, event_args)

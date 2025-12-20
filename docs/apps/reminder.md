@@ -14,10 +14,9 @@ into add, edit, or detail screens depending on which user tool completes.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `get_all_reminders()` | `ReminderApp.get_all_reminders()` | List of reminders | Remains in `ReminderList` |
-| `create_new()` | None | Indicator | Completed event transitions to `AddReminder()` |
-| `view_detail(reminder_id)` | `ReminderApp.get_reminder_details(...)` | Reminder object | Completed event transitions to `ReminderDetail(reminder_id)` |
-| `delete_reminder(reminder_id)` | `ReminderApp.delete_reminder(...)` | Status string | Completed event transitions to `ReminderList()` or via `go_back()` |
+| `list_reminders()` | `ReminderApp.get_all_reminders()` | List of reminders | Remains in `ReminderList` |
+| `create_new()` | None | Indicator | → `AddReminder()` |
+| `open_reminder(reminder_id)` | None | Indicator | → `ReminderDetail(reminder_id)` |
 
 ---
 
@@ -25,8 +24,8 @@ into add, edit, or detail screens depending on which user tool completes.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `add_reminder(...)` | `ReminderApp.add_reminder(...)` | Reminder ID | Completed event transitions to `ReminderList()` |
-| `cancel()` | None | Indicator | No navigation change (returns to previous state) |
+| `save()` | `ReminderApp.add_reminder(...)` | Reminder ID | → `ReminderList()` |
+| `cancel()` | None | `"cancel"` | Pops navigation stack via `go_back()` |
 
 ---
 
@@ -34,10 +33,10 @@ into add, edit, or detail screens depending on which user tool completes.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `get_reminder_details(reminder_id)` | `ReminderApp.get_reminder_details(...)` | Reminder object | Remains in `ReminderDetail` |
-| `edit(reminder_id)` | None | Indicator | Completed event transitions to `EditReminder(reminder_id)` |
-| `delete_reminder(reminder_id)` | `ReminderApp.delete_reminder(...)` | Status string | Completed event transitions to `ReminderList()` or via navigation stack |
-| `cancel()` | None | Indicator | No navigation change (returns to previous state) |
+| `get_reminder()` | None | Reminder object | Remains in `ReminderDetail` |
+| `edit()` | None | Indicator | → `EditReminder(reminder_id)` |
+| `delete()` | `ReminderApp.delete_reminder(...)` | Status | → `ReminderList()` or `go_back()` |
+| `cancel()` | None | `"cancel"` | Pops navigation stack via `go_back()` |
 
 ---
 
@@ -45,22 +44,21 @@ into add, edit, or detail screens depending on which user tool completes.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `update_reminder(...)` | `ReminderApp.update_reminder(...)` | Reminder ID | Completed event transitions to `ReminderDetail(reminder_id)` |
-| `cancel()` | None | Indicator | No navigation change (returns to previous state) |
+| `save()` | `update_reminder(...)` | Reminder ID | → `ReminderDetail(reminder_id)` |
+| `cancel()` | None | `"cancel"` | Pops navigation stack via `go_back()` |
 
 ---
 
 ## Navigation Summary
 
 - `ReminderList → AddReminder` via `create_new`
-- `ReminderList → ReminderDetail` via `view_detail`
-- `AddReminder → ReminderList` via `add_reminder`
+- `ReminderList → ReminderDetail` via `open_reminder`
+- `AddReminder → ReminderList` via `save`
 - `ReminderDetail → EditReminder` via `edit`
-- `EditReminder → ReminderDetail` via `update_reminder`
-- `EditReminder → previous` via `cancel`
-- `ReminderDetail → previous` via `cancel`
-- `delete_reminder` returns to list or pops navigation stack
-- `get_all_reminders` keeps user in `ReminderList`
+- `EditReminder → ReminderDetail` via `save`
+- `cancel()` always pops navigation stack when available
+- `delete()` returns to list or pops navigation stack
+- `list_reminders()` keeps user in `ReminderList`
 
 ---
 
@@ -68,4 +66,4 @@ into add, edit, or detail screens depending on which user tool completes.
 
 - `load_root_state()` resets app to `ReminderList`
 - `set_current_state(...)` pushes a new state instance
-- `go_back()` returns to previous state when available
+- `go_back()` pops the navigation stack when available
