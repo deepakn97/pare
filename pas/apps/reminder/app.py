@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from are.simulation.apps.reminder import ReminderApp
+from are.simulation.tool_utils import OperationType, app_tool
 
 from pas.apps.core import StatefulApp
 from pas.apps.reminder.states import (
@@ -14,6 +15,7 @@ from pas.apps.reminder.states import (
     ReminderDetail,
     ReminderList,
 )
+from pas.apps.tool_decorators import pas_event_registered
 
 if TYPE_CHECKING:
     from are.simulation.types import CompletedEvent
@@ -40,6 +42,8 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
         """
         return ReminderList()
 
+    @app_tool()
+    @pas_event_registered(operation_type=OperationType.WRITE)
     def update_reminder(
         self,
         reminder_id: str,
@@ -77,12 +81,11 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
         reminder.repetition_unit = repetition_unit
         reminder.repetition_value = repetition_value
 
-        # Remove existing repetitions
-        for key in list(self.reminders.keys()):
-            if key.startswith(reminder_id + "_rep_"):
-                del self.reminders[key]
+        base_id = reminder_id.split("_rep_")[0]
+        to_delete = [k for k in self.reminders if k.startswith(f"{base_id}_rep_")]
+        for k in to_delete:
+            del self.reminders[k]
 
-        # Regenerate repetitions
         next_id = reminder_id
         count = 0
         while repetition_unit and next_id and count < self.max_reminder_repetitions:
