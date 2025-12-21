@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps.contacts import Contact
+from are.simulation.apps.messaging_v2 import ConversationV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -54,8 +55,10 @@ class ContactUpdateFromNewNumber(PASScenario):
                 email="michael.chen@oldcompany.com",  # Old email
             )
         )
-
-        # Messaging app starts empty (new messages will arrive as events)
+        self.messaging.add_users(["John Doe", "Michael Chen"])
+        self.user_id = self.messaging.current_user_id
+        self.unknown_conversation = ConversationV2(participant_ids=[self.user_id, "555-6787-897"])
+        self.messaging.add_conversation(self.unknown_conversation)
 
         # Register all apps
         self.apps = [self.messaging, self.contacts, self.agent_ui, self.system_app]
@@ -69,15 +72,15 @@ class ContactUpdateFromNewNumber(PASScenario):
         with EventRegisterer.capture_mode():
             # Event 1: First message from unknown number - identity claim and phone update request
             message1_event = messaging.create_and_add_message(
-                conversation_id="conv-unknown-555987654",
-                sender_id="555-987-6543",
+                conversation_id=self.unknown_conversation.conversation_id,
+                sender_id="555-6787-897",
                 content="Hey, this is Michael Chen. I got a new phone number - please update my contact to this number.",
             ).delayed(20)
 
             # Event 2: Second message from same unknown number - email update
             message2_event = messaging.create_and_add_message(
-                conversation_id="conv-unknown-555987654",
-                sender_id="555-987-6543",
+                conversation_id=self.unknown_conversation.conversation_id,
+                sender_id="555-6787-897",
                 content="Also using a new email now: michael.chen@newcompany.com",
             ).delayed(3)
 

@@ -14,6 +14,13 @@ from pas.scenarios.utils.scenario_expander import PASEnvEventsExpander
 class PASScenario(Scenario):
     """Base class for all PAS scenarios."""
 
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        for attr in ["start_time", "status", "is_benchmark_ready", "duration", "time_increment_in_seconds"]:
+            class_value = getattr(self.__class__, attr, None)
+            if class_value is not None:
+                setattr(self, attr, class_value)
+
     def initialize(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the scenario with all events and noise configurations."""
         if self._initialized:  # type: ignore[has-type]
