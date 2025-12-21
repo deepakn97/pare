@@ -25,11 +25,11 @@ class ApartmentHome(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def list_apartments(self) -> list[dict[str, object]]:
+    def list_apartments(self) -> dict[str, object]:
         """List all apartments.
 
         Returns:
-            list[dict[str, object]]: All available apartment records.
+            dict[str, object]: All available apartment records.
         """
         app = cast("StatefulApartmentApp", self.app)
         return app.list_all_apartments()
@@ -67,16 +67,6 @@ class ApartmentHome(AppState):
             str: Navigation indicator used by PAS.
         """
         return "open_saved"
-
-    @user_tool()
-    @pas_event_registered()
-    def open_create(self) -> str:
-        """Navigate to the apartment creation flow.
-
-        Returns:
-            str: Navigation indicator used by PAS.
-        """
-        return "open_create"
 
 
 # Detail Screen
@@ -187,11 +177,11 @@ class ApartmentSearch(AppState):
         pet_policy: str | None = None,
         lease_term: str | None = None,
         amenities: list[str] | None = None,
-    ) -> list[dict[str, object]]:
+    ) -> dict[str, object]:
         """Search apartments using optional filtering criteria.
 
         Returns:
-            list[dict[str, object]]: Filtered apartment results.
+            -> dict[str, object]: Filtered apartment results.
         """
         app = cast("StatefulApartmentApp", self.app)
         return app.search_apartments(
@@ -250,11 +240,11 @@ class ApartmentSaved(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def list_saved(self) -> list[dict[str, object]]:
+    def list_saved(self) -> dict[str, object]:
         """List all saved apartments.
 
         Returns:
-            list[dict[str, object]]: Saved apartments.
+            dict[str, object]: Saved apartments.
         """
         app = cast("StatefulApartmentApp", self.app)
         return app.list_saved_apartments()

@@ -1,8 +1,9 @@
 # Stateful Reminder App
 
-`pas.apps.reminder.app.StatefulReminderApp` layers PAS navigation on top of the
-Meta-ARE `ReminderApp`. It begins in the `ReminderList` state and transitions
-into add, edit, or detail screens depending on which user tool completes.
+`pas.apps.reminder.app.StatefulReminderApp` extends the Meta-ARE `ReminderApp`
+with PAS navigation support.
+It launches in `ReminderList` and transitions between list, detail,
+add, and edit flows based on completed reminder backend operations.
 
 ---
 
@@ -10,62 +11,71 @@ into add, edit, or detail screens depending on which user tool completes.
 
 ---
 
-## ReminderList
+### ReminderList
+
+State showing the full list of reminders.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `get_all_reminders()` | `ReminderApp.get_all_reminders()` | List of reminders | Remains in `ReminderList` |
-| `create_new()` | None | Indicator | Completed event transitions to `AddReminder()` |
-| `view_detail(reminder_id)` | `ReminderApp.get_reminder_details(...)` | Reminder object | Completed event transitions to `ReminderDetail(reminder_id)` |
-| `delete_reminder(reminder_id)` | `ReminderApp.delete_reminder(...)` | Status string | Completed event transitions to `ReminderList()` or via `go_back()` |
+| `list_reminders()` | `ReminderApp.get_all_reminders()` | `list[object]` reminders | Remains in `ReminderList` |
+| `open_reminder(reminder_id)` | — | Payload containing reminder ID | → `ReminderDetail(reminder_id)` |
+| `create_new()` | — | Navigation marker | → `AddReminder` |
 
 ---
 
-## AddReminder
+### ReminderDetail
+
+State displaying full details of a single reminder.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `add_reminder(...)` | `ReminderApp.add_reminder(...)` | Reminder ID | Completed event transitions to `ReminderList()` |
-| `cancel()` | None | Indicator | No navigation change (returns to previous state) |
+| `get_reminder()` | Reads from `ReminderApp.reminders` | Reminder object | Remains in `ReminderDetail` |
+| `edit()` | — | Payload with reminder ID | → `EditReminder(reminder_id)` |
+| `delete()` | `ReminderApp.delete_reminder(reminder_id)` | Deleted reminder ID | → previous state |
+| `go_back()` | — | Navigation directive `"back"` | → previous state |
 
 ---
 
-## ReminderDetail
+### AddReminder
+
+Wizard state for creating a new reminder using a draft container.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `get_reminder_details(reminder_id)` | `ReminderApp.get_reminder_details(...)` | Reminder object | Remains in `ReminderDetail` |
-| `edit(reminder_id)` | None | Indicator | Completed event transitions to `EditReminder(reminder_id)` |
-| `delete_reminder(reminder_id)` | `ReminderApp.delete_reminder(...)` | Status string | Completed event transitions to `ReminderList()` or via navigation stack |
-| `cancel()` | None | Indicator | No navigation change (returns to previous state) |
+| `set_title(title)` | — | Updated title | Remains in `AddReminder` |
+| `set_description(description)` | — | Updated description | Remains in `AddReminder` |
+| `set_due_datetime(due_datetime)` | — | Updated datetime | Remains in `AddReminder` |
+| `set_repetition(unit, value=None)` | — | Updated repetition info | Remains in `AddReminder` |
+| `save()` | `ReminderApp.add_reminder(...)` | Created reminder ID | → previous state |
+| `cancel()` | — | Navigation directive `"cancel"` | → previous state |
 
 ---
 
-## EditReminder
+### EditReminder
+
+Wizard state for editing an existing reminder.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `update_reminder(...)` | `ReminderApp.update_reminder(...)` | Reminder ID | Completed event transitions to `ReminderDetail(reminder_id)` |
-| `cancel()` | None | Indicator | No navigation change (returns to previous state) |
-
----
-
-## Navigation Summary
-
-- `ReminderList → AddReminder` via `create_new`
-- `ReminderList → ReminderDetail` via `view_detail`
-- `AddReminder → ReminderList` via `add_reminder`
-- `ReminderDetail → EditReminder` via `edit`
-- `EditReminder → ReminderDetail` via `update_reminder`
-- `EditReminder → previous` via `cancel`
-- `ReminderDetail → previous` via `cancel`
-- `delete_reminder` returns to list or pops navigation stack
-- `get_all_reminders` keeps user in `ReminderList`
+| `set_title(title)` | — | Updated title | Remains in `EditReminder` |
+| `set_description(description)` | — | Updated description | Remains in `EditReminder` |
+| `set_due_datetime(due_datetime)` | — | Updated datetime | Remains in `EditReminder` |
+| `set_repetition(unit, value=None)` | — | Updated repetition info | Remains in `EditReminder` |
+| `save()` | `ReminderApp.update_reminder(...)` | Reminder ID | → previous state |
+| `cancel()` | — | Navigation directive `"cancel"` | → previous state |
 
 ---
 
 ## Navigation Helpers
 
-- `load_root_state()` resets app to `ReminderList`
-- `set_current_state(...)` pushes a new state instance
-- `go_back()` returns to previous state when available
+- Navigation transitions are handled in
+  `StatefulReminderApp.handle_state_transition`
+  based on the completed backend tool name.
+- `open_reminder` always transitions into `ReminderDetail`
+  using the provided `reminder_id`.
+- `create_new` transitions into the `AddReminder` wizard.
+- `edit` transitions into the `EditReminder` wizard.
+- `save`, `delete`, `cancel`, and `"back"` signals always trigger `go_back()`
+  to return to the previous navigation state.
+- `go_back()` appears automatically when navigation history exists and pops
+  to the prior screen.

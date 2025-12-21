@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from are.simulation.apps.cab import CabApp
-
-if TYPE_CHECKING:
-    from are.simulation.types import CompletedEvent
 
 from pas.apps.cab.states import (
     CabHome,
@@ -17,6 +14,9 @@ from pas.apps.cab.states import (
 )
 from pas.apps.core import StatefulApp
 
+if TYPE_CHECKING:
+    from are.simulation.types import CompletedEvent
+
 
 class StatefulCabApp(StatefulApp, CabApp):
     """Cab client with navigation-aware user tool exposure."""
@@ -24,67 +24,67 @@ class StatefulCabApp(StatefulApp, CabApp):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialise the cab app and load the default home screen."""
         super().__init__(*args, **kwargs)
-        self.load_root_state()  # Start in CabHome()
+        self.load_root_state()
 
     def create_root_state(self) -> CabHome:
-        """Return a fresh home state.
-
-        Returns:
-            CabHome: The initial root state for the cab app navigation.
-        """
+        """Return the root navigation state for the cab app."""
         return CabHome()
 
-    def _handle_list_rides(self, args: dict[str, Any]) -> None:
-        start = args.get("start_location")
-        end = args.get("end_location")
-        ride_time = args.get("ride_time")
+    def handle_state_transition(self, event: CompletedEvent) -> None:
+        """Update navigation state after a cab operation completes."""
+        fname = event.function_name()
+        if fname is None:
+            return
+
+        event_args: dict[str, Any] = {}
+        action = getattr(event, "action", None)
+        if action is not None and hasattr(action, "args"):
+            event_args = cast("dict[str, Any]", getattr(action, "args", {}))
+
+        match fname:
+            case "list_rides":
+                self._handle_list_rides(event_args)
+            case "get_quotation" | "view_quotation":
+                self._handle_get_quotation(event)
+            case "order_ride" | "confirm_order":
+                self._handle_order_ride(event)
+            case "user_cancel_ride" | "end_ride":
+                self._handle_finish()
+
+    def _handle_list_rides(self, event_args: dict[str, Any]) -> None:
+        """Navigate to service options after listing rides."""
+        start = event_args.get("start_location")
+        end = event_args.get("end_location")
+        ride_time = event_args.get("ride_time")
 
         if start and end:
             self.set_current_state(CabServiceOptions(start, end, ride_time))
 
     def _handle_get_quotation(self, event: CompletedEvent) -> None:
+        """Navigate to quotation detail after getting a quotation."""
         ride_obj = getattr(event, "result", None)
         if ride_obj:
             self.set_current_state(CabQuotationDetail(ride_obj))
 
     def _handle_order_ride(self, event: CompletedEvent) -> None:
-        ride_obj = getattr(event, "result", None) or self.on_going_ride
+        """Navigate to ride detail after ordering a ride."""
+        ride_obj = getattr(event, "result", None)
 
-        if ride_obj and ride_obj.ride_id:
-            self.set_current_state(CabRideDetail(ride_obj.ride_id))
+        if ride_obj:
+            # Try to find the ride in history by matching ride_id
+            ride_index = None
+            if hasattr(ride_obj, "ride_id"):
+                for idx, ride in enumerate(self.ride_history):
+                    if hasattr(ride, "ride_id") and ride.ride_id == ride_obj.ride_id:
+                        ride_index = idx
+                        break
+
+            if ride_index is None and self.ride_history:
+                ride_index = len(self.ride_history) - 1
+
+            if ride_index is not None:
+                self.set_current_state(CabRideDetail(ride_index))
 
     def _handle_finish(self) -> None:
+        """Return to home screen after canceling or ending a ride."""
         self.load_root_state()
-
-    def _dispatch(self, fname: str, event: CompletedEvent, args: dict[str, Any]) -> None:
-        """Small dispatcher to remove match-case complexity."""
-        if fname == "list_rides":
-            self._handle_list_rides(args)
-        elif fname == "get_quotation":
-            self._handle_get_quotation(event)
-        elif fname == "order_ride":
-            self._handle_order_ride(event)
-        elif fname in {"user_cancel_ride", "cancel_ride", "end_ride"}:
-            self._handle_finish()
-        # confirm_order and others → no-op
-
-    def handle_state_transition(self, event: CompletedEvent) -> None:
-        """Update navigation state after a cab operation completes.
-
-        Args:
-            event: The completed event emitted by the cab backend. Contains the
-                executed function name, arguments, and result of the cab action.
-
-        Returns:
-            None
-        """
-        action = getattr(event, "action", None)
-        if action is None:
-            return
-
-        function_name = event.function_name()
-        if not function_name:
-            return
-
-        event_args = action.args or {}
-        self._dispatch(function_name, event, event_args)

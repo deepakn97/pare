@@ -49,7 +49,7 @@ class ReminderList(AppState):
 
     @user_tool()
     @pas_event_registered()
-    def view_detail(self, reminder_id: str) -> dict[str, str]:
+    def open_reminder(self, reminder_id: str) -> dict[str, str]:
         """Request to view details of a specific reminder.
 
         Args:
@@ -94,7 +94,7 @@ class ReminderDetail(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def view_detail(self) -> object | None:
+    def get_reminder(self) -> object | None:
         """Fetch reminder details from the backend.
 
         Returns:
