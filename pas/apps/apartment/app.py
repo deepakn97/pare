@@ -67,7 +67,7 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             self.set_current_state(ApartmentSaved())
             return
 
-        if fname == "update_apartment":
+        if fname == "update_price":
             apt_id = args.get("apartment_id")
             if apt_id:
                 self.set_current_state(ApartmentDetail(apartment_id=apt_id))
@@ -81,50 +81,35 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             self.load_root_state()
             return
 
-        if fname == "delete_apartment":
+        if fname == "delete":
             self.load_root_state()
             return
 
-    def _execute_operation(self, fname: str, event_args: dict[str, Any]) -> None:
-        """Execute the actual apartment operation.
-
-        Args:
-            fname: Function name.
-            event_args: Arguments for the operation.
-        """
-        apartment_id = event_args.get("apartment_id")
-        if not apartment_id:
-            return
-
-        if fname == "update_apartment":
-            new_price = event_args.get("new_price")
-            if new_price is not None:
-                ApartmentListingApp.update_apartment(self, apartment_id=apartment_id, new_price=new_price)
-        elif fname == "delete_apartment":
-            ApartmentListingApp.delete_apartment(self, apartment_id=apartment_id)
-        elif fname == "save_apartment":
-            ApartmentListingApp.save_apartment(self, apartment_id=apartment_id)
-        elif fname == "remove_saved_apartment":
-            ApartmentListingApp.remove_saved_apartment(self, apartment_id=apartment_id)
-
     def handle_state_transition(self, event: CompletedEvent) -> None:
-        """Handle state transition after a simulated ARE backend event.
+        """Handle navigation state transitions based on a completed event.
+
+        This method processes a completed event and updates the application's
+        navigation state accordingly. It extracts the function name and arguments
+        from the event, then delegates to the _navigate method to determine the
+        appropriate state transition.
+
+        Note:
+            This method only handles navigation/state changes. It does not
+            execute the actual backend operations (create, update, delete, etc.).
+            Backend operations must be executed separately before or after calling
+            this method.
 
         Args:
-            event: Completed event with function name and arguments.
+            event (CompletedEvent): The completed event containing action
+                information used to determine the navigation state transition.
         """
         fname = event.function_name()
         if fname is None:
             return
 
-        # Safely extract event args
         event_args: dict[str, Any] = {}
         action = getattr(event, "action", None)
         if action is not None and hasattr(action, "args"):
             event_args = cast("dict[str, Any]", getattr(action, "args", {}))
 
-        # Execute the actual operation first
-        self._execute_operation(fname, event_args)
-
-        # Then handle navigation
         self._navigate(fname, event_args)
