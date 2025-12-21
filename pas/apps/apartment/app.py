@@ -56,10 +56,6 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
         if isinstance(current_state, ApartmentSaved):
             self._handle_saved_transition(fname)
 
-    # ------------------------------------------------------------------
-    # State-specific transition handlers (Email-style)
-    # ------------------------------------------------------------------
-
     def _handle_home_transition(self, fname: str, args: dict[str, Any]) -> None:
         if fname == "view_apartment":
             apt_id = args.get("apartment_id")
@@ -85,8 +81,6 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
         if fname in {"delete", "go_back"}:
             self.load_root_state()
             return
-
-        # save / unsave: side-effect only, no navigation change
 
     def _handle_search_transition(self, fname: str, args: dict[str, Any]) -> None:
         if fname == "view_apartment":
