@@ -64,7 +64,7 @@ class PASEnvEventsExpander(EnvEventsExpander):
     def add_env_events_to_scenario(self, scenario: Scenario, apps_augmentation_data: list[dict[str, Any]]) -> None:
         """Add environmental noise to a PAS Scenario.
 
-        This override replaces Meta-ARE app type casts with PAS Stateful App types.
+        This override replaces Meta-ARE app type casts with PAS Stateful App types. Additionally, the noisy events do not depend on a start event from the scenario. They are scheduled to start at the beginning of the scenario.
 
         Args:
             scenario: The PAS Scenario to add environmental noise to.
@@ -94,8 +94,7 @@ class PASEnvEventsExpander(EnvEventsExpander):
         email_apps = ["StatefulEmailApp", "Email", "Emails"]
         shopping_apps = ["StatefulShoppingApp", "Shopping"]
 
-        d_events = {}
-        d_events["start_event"] = scenario.events[0]
+        d_events: dict[str, Any] = {}
 
         with EventRegisterer.capture_mode():
             for d in apps_augmentation_data:
@@ -141,9 +140,6 @@ class PASEnvEventsExpander(EnvEventsExpander):
                         np_rng=np_rng,
                         rng=rng,
                     )
-
-            # NOTE: We always want to remove the start event since it's already added to scenario.events
-            del d_events["start_event"]
 
             scenario.events += [e.with_id(f"{ENV_EVENT_EXPANSION_TAG}_{key}") for key, e in d_events.items()]
 
@@ -196,9 +192,7 @@ class PASEnvEventsExpander(EnvEventsExpander):
                         content=message["content"],
                     )
                 if i == 0:
-                    d_events[f"{app_name}_{conversation['conversation_id']}_{i}"].depends_on(
-                        d_events["start_event"], delay_seconds=tick
-                    )
+                    d_events[f"{app_name}_{conversation['conversation_id']}_{i}"].depends_on(None, delay_seconds=tick)
                 else:
                     d_events[f"{app_name}_{conversation['conversation_id']}_{i}"].depends_on(
                         d_events[f"{app_name}_{conversation['conversation_id']}_{i - 1}"],
@@ -238,7 +232,7 @@ class PASEnvEventsExpander(EnvEventsExpander):
                 subject=email["subject"],
                 content=email["content"],
                 folder_name="INBOX",
-            ).depends_on(d_events["start_event"], delay_seconds=tick)
+            ).depends_on(None, delay_seconds=tick)
 
     def _add_shopping_events(
         self,
@@ -272,7 +266,7 @@ class PASEnvEventsExpander(EnvEventsExpander):
         #         break
         #     d_events[f"shopping_product_{product['product_id']}"] = app.add_product(
         #         name=product["name"],
-        #     ).depends_on(d_events["start_event"], delay_seconds=tick)
+        #     ).depends_on(None, delay_seconds=tick)
 
         #     n_items = len(product["variants"])
         #     if n_items == 0:

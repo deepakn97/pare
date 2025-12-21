@@ -109,7 +109,33 @@ def create_sample_augmentation_data() -> list[dict]:
         },
     ]
 
+class TestNoiseEventTiming:
+    """Tests for noise event timing - events should be scheduled from t=0."""
 
+    @pytest.fixture
+    def augmentation_data(self) -> list[dict]:
+        """Provide sample augmentation data for tests."""
+        return create_sample_augmentation_data()
+
+    def test_noise_events_have_no_dependencies(self, augmentation_data: list[dict]) -> None:
+        """Noise events should not depend on other events."""
+        scenario = create_mock_scenario(duration=300)
+
+        config = EnvEventsConfig(
+            num_env_events_per_minute=2.0,
+            env_events_seed=42,
+            weight_per_app_class=default_weight_per_app_class(),
+        )
+        expander = PASEnvEventsExpander(env_events_config=config)
+
+        initial_event_count = len(scenario.events)
+        expander.add_env_events_to_scenario(scenario, augmentation_data)
+
+        # Get the noise events
+        noise_events = scenario.events[initial_event_count:]
+
+        events_without_deps = [e for e in noise_events if len(e.dependencies) == 0]
+        assert len(events_without_deps) > 0, "Should have events scheduled from t=0"
 
 class TestResolveAppNames:
     """Tests for _resolve_app_names method."""
