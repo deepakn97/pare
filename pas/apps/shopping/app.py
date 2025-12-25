@@ -23,10 +23,15 @@ if TYPE_CHECKING:
 class StatefulShoppingApp(StatefulApp, ShoppingApp):
     """Shopping app with PAS-aware navigation."""
 
-    def __init__(self, name: str = "shopping", **kwargs: object) -> None:
+    def __init__(self, name: str = "Shopping", **kwargs: object) -> None:
         """Initialise shopping app with root state."""
         StatefulApp.__init__(self, name)
-        ShoppingApp.__init__(self, **kwargs)
+        # IMPORTANT: Meta-ARE's `ShoppingApp` is a dataclass whose `__post_init__`
+        # calls `App.__init__(self.name)`. If we don't pass `name` here, that
+        # post-init will see `name=None` and overwrite `self.name` to the class
+        # name (e.g., "StatefulShoppingApp"), which breaks `Scenario.get_typed_app`
+        # lookups that match on both type *and* app.name.
+        ShoppingApp.__init__(self, name=name, **kwargs)
         self.load_root_state()
 
     def handle_state_transition(self, event: CompletedEvent) -> None:

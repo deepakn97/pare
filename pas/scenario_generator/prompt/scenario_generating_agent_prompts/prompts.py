@@ -149,6 +149,16 @@ APP_INITIALIZATION_SNIPPETS = {
         "flow": 'apartment_app = self.get_typed_app(StatefulApartmentApp, "Apartment")',
         "intent": "Apartment listing app for searching, viewing, and saving rental listings.",
     },
+    "StatefulNotesApp": {
+        "init": 'self.note = StatefulNotesApp(name="Notes")',
+        "flow": 'note_app = self.get_typed_app(StatefulNotesApp, "Notes")',
+        "intent": "Notes app for creating, updating, and searching notes.",
+    },
+    "StatefulReminderApp": {
+        "init": 'self.reminder = StatefulReminderApp(name="Reminders")',
+        "flow": 'reminder_app = self.get_typed_app(StatefulReminderApp, "Reminders")',
+        "intent": "Reminders app for creating, updating, and searching reminders.",
+    },
 }
 
 APP_IMPORT_INSTRUCTIONS = {
@@ -181,6 +191,12 @@ APP_IMPORT_INSTRUCTIONS = {
     },
     "StatefulApartmentApp": {
         "import instruction": "from pas.apps.apartment import StatefulApartmentApp",
+    },
+    "StatefulNotesApp": {
+        "import instruction": "from pas.apps.note import StatefulNotesApp",
+    },
+    "StatefulReminderApp": {
+        "import instruction": "from pas.apps.reminder import StatefulReminderApp",
     },
 }
 
@@ -247,12 +263,33 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
           (e.g., sender+subject, human-readable product name, explicit identifier present in an email/message, or a prior list/search action).
         * Prefer narratives where the agent can discover what it needs via natural keys (names/emails/titles) rather than opaque IDs.
 
+    Required trigger style (IMPORTANT):
+    - Every scenario MUST have a concrete exogenous trigger that can be represented as one or more NON-ORACLE environment events in Step 3.
+      Examples: an incoming email, an incoming message, a calendar-originated notification, a shopping/cab/apartment update notification, etc.
+    - Do NOT propose scenarios where the agent "just checks" apps on a timer with only oracle reads as the initial trigger.
+    - The trigger(s) you describe must be representable using methods that have notification templates in `pas/apps/notification_templates.py`.
+
+    Evidence / non-hallucination rule (CRITICAL):
+    - The scenario must not assume the agent knows ANY specific factual details (times/dates, delivery windows, locations, product/order details,
+      account/status metadata, participant identities/roles, etc.) unless those details will be surfaced via:
+      - non-oracle environment event content (notifications), and/or
+      - prior oracle tool outputs in Step 3 (list/search/get/read calls).
+    - Do NOT write a narrative where the agent proposes precise values (e.g., "delivery tomorrow 2-4 PM") unless the narrative also makes clear
+      how that value is observable (e.g., an order-status notification contains the window, or the agent will call `get_order_details(...)` and read it).
+
     Constraints:
-    - Treat every historical scenario description from `scenario_metadata.json` as a negative example.
+    - Treat every historical scenario description in the provided scenario metadata file as a negative example.
     - Your new scenario MUST be clearly and substantively different in trigger, domain, app combination, and cross-app workflow from all prior descriptions.
     - Avoid reusing the same situation with only minor wording or timestamp changes; design a genuinely new situation.
     - Only involve apps and tools that appear in the Selected Apps list (included below) and the Event-Registered App APIs block below.
     - Do NOT introduce new app types or tools that are not present in those context sections.
+    - App coverage requirement (CRITICAL):
+      - You MUST design a scenario that meaningfully uses EVERY app in the Selected Apps list, excluding:
+        - `PASAgentUserInterface`
+        - `HomeScreenSystemApp`
+      - Your Description must make it obvious why each selected app is needed by including at least one concrete, tool-based step per app.
+        Example: if `StatefulCabApp` is selected, include a step where the agent uses cab tools (quotation/booking/status update) for a clear reason.
+      - Do NOT write a scenario where an app is present only “in case” or “for future use”. If an app is selected, it must have a real role.
     - Scenario id requirements:
       - Lowercase letters, digits, and underscores only (e.g., `vip_calendar_conflict`).
       - No spaces, no punctuation besides underscore, and at most 40 characters.
@@ -279,6 +316,12 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
     The Explanation section is only for tooling and human readers; it will NOT be stored in
     `scenario_metadata.json` or in the scenario docstring. Only the Description block above
     is persisted as the official scenario description.
+
+    CRITICAL (prevent metadata pollution):
+    - The Description block MUST contain ONLY the final scenario narrative.
+    - Do NOT include self-talk, critique, revisions, alternatives, or multiple draft scenarios inside Description.
+    - Do NOT include additional "Scenario ID:", "Class Name:" or "Description:" headers inside Description.
+      If you need to reason or compare alternatives, put that content ONLY in the optional Explanation section.
     """
 )
 
@@ -295,6 +338,11 @@ _SCENARIO_UNIQUENESS_BODY = textwrap.dedent(
     - Novel trigger patterns and cross-app combinations, not just another generic "incoming email" case.
     - Different complexity/constraints (e.g., coordinating multiple people, resolving conflicts, multi-step reasoning).
     - Exercising different app capabilities and tools than prior scenarios.
+
+    IMPORTANT (app-combination scope):
+    - The scenario metadata file you are asked to read may be filtered to include only scenarios that use the same core app combination
+      as the current run (excluding PASAgentUserInterface and HomeScreenSystemApp which are always present).
+    - In that case, ONLY compare against the scenarios in that file; do not assume other app combinations are in-scope.
 
     What is NOT sufficient for uniqueness:
     - Merely swapping names or dates in an otherwise identical flow.
@@ -325,10 +373,19 @@ _APPS_AND_DATA_BODY = textwrap.dedent(
     - Do NOT invent runtime events; those belong to Step 3.
     - Triggering artifacts vs baseline state (IMPORTANT):
       - If an email/message/notification is meant to *trigger* the agent during the run (i.e., the agent should notice it arriving),
-        prefer creating it as a non-oracle environment event in Step 3 (e.g., `send_email_to_user_with_id(...).delayed(...)`)
+        prefer creating it as an EARLY non-oracle environment event in Step 3 (e.g., `send_email_to_user_with_id(...).delayed(...)`)
         rather than silently seeding it in Step 2.
+      - Step 3 must start with at least one concrete non-oracle environment event (see Step 3 instructions). Do not rely on oracle reads alone
+        as the initial trigger.
       - If something truly exists before `start_time` (e.g., older emails, prior purchases, existing calendar events), it may be seeded in Step 2,
         but Step 3 must include an early oracle "observation" action (list/read/search) so the agent has a plausible basis to know it.
+
+    Evidence completeness for later steps (CRITICAL):
+    - If Step 3 is expected to propose or act on a specific concrete fact (e.g., a delivery time window, an order status, a discount code, a price),
+      then Step 2 must ensure that fact is discoverable by the agent at runtime:
+      - Either seed it into app state AND include an early oracle observation in Step 3 that reveals it, OR
+      - Deliver it via a non-oracle environment event whose content includes the needed fact (and whose method is covered by notification templates).
+    - Do NOT rely on comments in the scenario file as "data". Comments are not observable to the agent.
     - Only modify the import section and `init_and_populate_apps()` body. Keep WARNING comments and other TODO blocks untouched.
       This means:
         - In the import section, you may replace the "TODO: import all Apps" area with concrete imports.
@@ -368,6 +425,10 @@ _APPS_AND_DATA_BODY = textwrap.dedent(
       - Do NOT call `add_message_from_contact_to_user` (does not exist).
       - Do NOT call `open_conversation` unless you confirm it is a real method/tool on the app class.
       Prefer seeding baseline history by constructing `ConversationV2` / `MessageV2` and calling `add_conversation(...)` when available.
+        - Avoid using private messaging helpers (leading underscore) in either Step 2 or Step 3, such as:
+        - `_get_or_create_default_conversation(...)`
+        - `_create_conversation(...)`
+        Private methods are not part of the stable tool API and often assume internal invariants that your scenario may not have seeded.
 
     If the runtime checker reports errors like:
     - "missing a required argument: '<arg>'"
@@ -384,9 +445,40 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     You are the Step 3 events-flow agent.
     Generate the ordered sequence for `build_events_flow()` using the approved narrative and data plan.
     Requirements:
-    - Start with non-oracle environment events to set context.
+    - REQUIRED (ordering): `build_events_flow()` MUST begin with one or more NON-ORACLE ENVIRONMENT events.
+      - Do not start with agent actions like `get_calendar_events_from_to`, `read_conversation`, or `send_message_to_user`.
+      - Do not start with "time passing" alone; model a concrete exogenous trigger as an environment event.
+      - Only AFTER at least one environment event has been registered should you add oracle/user events
+        (agent proposal → user response → agent follow-up).
+    - REQUIRED (template coverage): every non-oracle environment event MUST call a method that has a notification template entry
+      in `pas/apps/notification_templates.py` for both user and agent streams (the NOTIFICATION_TEMPLATES dict).
+    - REQUIRED (timing constraints):
+      - Keep scenarios fast: ALL `.delayed(...)` values and all `.depends_on(..., delay_seconds=...)` values MUST be <= 30 seconds.
+      - Do NOT model hours/minutes inside delays (e.g., do not use 3600, 10800, etc.). Use short delays to preserve ordering only.
     - Include oracle/user interactions (agent proposal → user response → agent follow-up).
     - Specify event source, method, arguments, delays, and purpose.
+    - REQUIRED (motivation): Every oracle/user event must have an explicit, evidence-based reason.
+      - For each oracle event you add, include a short 1-line comment immediately above it explaining *why* the agent is taking that action,
+        and what prior evidence motivates it (e.g., an earlier environment notification/email/message content, or outputs from earlier tool calls).
+      - Do NOT insert "just in case" oracle reads (calendar scans, order listings, broad searches) unless you can point to concrete prior evidence.
+    - REQUIRED (explicit environment cue for every proposal):
+      - Every agent proposal sent via `PASAgentUserInterface.send_message_to_user(...)` MUST be justified by at least one concrete NON-ORACLE environment cue
+        that occurred earlier in the run (e.g., an incoming email/message, a shopping/cab/apartment notification, etc.).
+      - Implementation rule: each proposal event must have a `.depends_on(...)` dependency chain that reaches at least one environment event variable.
+        Do NOT propose purely from seeded baseline state or the docstring narrative.
+      - The proposal content should explicitly cite the triggering cue (e.g., "I saw a delivery email..." / "I received a ride status update..." / "New message from ...").
+    - REQUIRED (no invented event-type helpers):
+      - Do NOT call `.env()` or `.user()` on events. In this codebase, environment events are created by directly calling allowed non-oracle methods
+        (e.g., `messaging_app.create_and_add_message(...)`, `email_app.send_email_to_user_with_id(...)`) inside `EventRegisterer.capture_mode()`,
+        optionally chaining `.delayed(...)` / `.depends_on(...)`.
+      - For agent/user actions, use `.oracle()` on the event (e.g., `aui.accept_proposal(...).oracle()`). Do NOT use `.user()`; it is not a supported API here.
+    - REQUIRED (no private methods in event flow):
+      - Do NOT call any private/underscore-prefixed app method (e.g., `_get_or_create_default_conversation`, `_create_conversation`) inside `build_events_flow()`.
+        Use only verified public tool APIs from PAS wrappers / Meta-ARE bases.
+    - REQUIRED (correct dependency wiring):
+      - `.depends_on(...)` signature is `depends_on(events=None, delay_seconds=0)`.
+      - To depend on multiple events, pass a LIST: `.depends_on([e1, e2], delay_seconds=...)` (or chain in multiple `.depends_on(...)` calls).
+      - Do NOT pass multiple positional event arguments like `.depends_on(e1, e2)`; that misinterprets `e2` as `delay_seconds` and can crash.
     - Non-oracle environment events represent exogenous signals from the world; they MUST NOT depend on agent or oracle actions.
       - Do NOT create `.depends_on(...)` chains where an environment event depends on an oracle/user event or other agent action.
       - You may chain environment events together using `.depends_on(...)` only when the dependency models ordering between environment events themselves
@@ -399,6 +491,8 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
         * prior environment event content (text shown to the user/agent), or
         * outputs of prior agent-visible tool calls earlier in `build_events_flow()` (list/search/get that reveals it), or
         * user-provided content (user message / `accept_proposal` content).
+      - This applies equally to concrete facts in proposals/messages: do NOT include specific times, dates, delivery windows, prices, or other numeric
+        details in `send_message_to_user(...)` unless those facts were already revealed by earlier env events or tool outputs.
       - Using Step 2 seeded artifacts in later oracle actions requires an explicit observation step:
         * If an oracle event uses a value that would normally be extracted from seeded state (e.g., an `order_id` from an order-confirmation email,
           a contact email address from Contacts, a calendar event identifier, a specific shopping item/product id, etc.), you MUST include a prior oracle
@@ -411,7 +505,8 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - ONLY modify the `build_events_flow()` section of the template while keeping WARNING comments and other sections
       unchanged, except for inserting the concrete implementation in the TODO area.
     Output should be the full updated python file with only the build_events_flow section changed.
-    - For non-oracle environment events, only use methods that have notification templates in `pas/apps/notification_templates.py` (see the NOTIFICATION_TEMPLATES dict).
+    - For non-oracle environment events, only use methods that have notification templates in `pas/apps/notification_templates.py` (see the NOTIFICATION_TEMPLATES dict),
+      and make sure at least one such env event appears BEFORE any oracle events.
     - For oracle/user actions, use app tools defined on the PAS apps and their Meta-ARE bases; do not invent new methods.
     - Mirror the "App Initialization Blueprint" so your local variables match how apps were seeded in Step 2.
 
@@ -489,13 +584,27 @@ _VALIDATION_BODY = textwrap.dedent(
     - Distinguish strict vs flexible checks:
       - STRICT: core reasoning and coordination must be present (e.g., the agent proposal referencing the right parties, key follow-up actions like messages/emails, calendar reminders actually created).
       - FLEXIBLE: wording details (exact subject/body strings), cosmetic fields, or small variations in time ranges and titles should not cause failure if the logical behavior is equivalent.
+      - IMPORTANT: Do NOT add new "nice-to-have" strict checks that are not required by the narrative.
+        Examples of typically optional behaviors: sending a final confirmation message after an update, redundant acknowledgements, or extra summaries.
+        Only make a check STRICT if the scenario description explicitly makes that behavior required for success.
       - Follow the "Validation Flexibility Guidelines" from the multi-step design doc: be strict on logic and data relationships, flexible on surface phrasing and minor formatting.
+    - Equivalence-class validation (IMPORTANT):
+      - For many scenarios, there may be MULTIPLE valid tool calls that achieve the same high-level goal.
+        Example goals:
+        - "agent informed Sarah" could be satisfied by `StatefulMessagingApp.send_message(...)` OR (if available) a group-conversation send, etc.
+        - "agent observed the inbox" could be satisfied by `list_emails(...)` OR `get_email_by_id(...)` depending on the scenario structure.
+      - When designing a STRICT check for a goal, prefer accepting ANY ONE of a small set of *verified* equivalent functions rather than hardcoding a single method name.
+        - Choose the allowed alternatives ONLY from the "Event-Registered App APIs" block included in this prompt.
+        - Do NOT invent method names. If a function is not listed in the tools/API blocks, you must not check for it.
+      - Keep the allowed alternatives tight and purposeful: 2-4 real options max for each goal, not a broad "accept anything" filter.
     - Mention the relevant EventType and tool/function each check expects in the log.
       - Before using EventType, use Read to open `are/simulation/types.py` and inspect which enum members exist; do NOT invent members like `ORACLE` if they are not defined.
       - Treat entries from `env.event_log.list_view()` as event objects (for example, `CompletedEvent` instances) with attributes such as `event_type` and `action`; do NOT subscript them like dictionaries or lists.
     - Keep checks structurally strict but content-flexible:
       - For message/email-like actions (such as reply emails, batched replies, and similar tools), do NOT assert on the exact text content in `action.args["content"]`
         or other free-form strings; those may legitimately vary across successful runs.
+      - In particular, for `PASAgentUserInterface.send_message_to_user(...)`, do NOT keyword-match on message content unless the scenario explicitly requires
+        a specific structured phrase (rare). Prefer simply asserting that the tool call happened (and, if necessary, that it happened at least once).
       - Instead, assert that:
         - The correct app class (for example, `StatefulEmailApp`, `StatefulMessagingApp`) appears in `action.class_name`.
         - The correct tool or method name appears in `action.function_name` (for example, `reply_to_email`, `send_message`, `send_batch_reply`).

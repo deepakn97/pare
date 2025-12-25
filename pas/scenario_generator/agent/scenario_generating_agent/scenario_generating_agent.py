@@ -43,6 +43,8 @@ class RunCheckResult:
 class ScenarioGeneratingAgentOrchestrator:
     """Coordinates the dedicated step agents to build a proactive scenario."""
 
+    _ALWAYS_INCLUDED_APPS = {"PASAgentUserInterface", "HomeScreenSystemApp"}  # noqa: RUF012
+
     def __init__(
         self,
         *,
@@ -97,6 +99,10 @@ class ScenarioGeneratingAgentOrchestrator:
         # across runs and not tied to a particular output directory.
         self.scenario_metadata_path = self.repo_root / "scenarios" / "scenario_metadata.json"
 
+        # Dynamic prompt context (selected apps/tools) for this run.
+        # IMPORTANT: must be set before any helper that reads `_prompt_context`.
+        self._prompt_context: dict[str, str] = prompt_context or {}
+
         self._last_check_result: RunCheckResult | None = None
         # Declarative filesystem policy for Claude Agent SDK usage. Enforcement
         # will be wired via hooks and tool options in a follow-up change.
@@ -108,6 +114,16 @@ class ScenarioGeneratingAgentOrchestrator:
         else:
             self.claude_filesystem_config = claude_filesystem_config
         self._historical_descriptions = self._read_scenario_metadata()
+
+        # For Step 0/1 prompting we often want to scope uniqueness comparisons to
+        # scenarios that use the same core app combination as this run (excluding
+        # the always-present PASAgentUserInterface + HomeScreenSystemApp).
+        self.scenario_metadata_path_for_prompt = self.scenario_metadata_path
+        self._historical_descriptions_for_prompt = self._historical_descriptions
+        filtered_path, filtered_entries = self._maybe_write_filtered_metadata_for_prompt()
+        if filtered_path is not None:
+            self.scenario_metadata_path_for_prompt = filtered_path
+            self._historical_descriptions_for_prompt = filtered_entries
 
         # Per-step Claude runtime configurations. Narrative and uniqueness
         # checks do not need code-editing tools, while Steps 2-4 use Read/Write
@@ -131,7 +147,6 @@ class ScenarioGeneratingAgentOrchestrator:
             filesystem=self.claude_filesystem_config,
         )
 
-        self._prompt_context: dict[str, str] = prompt_context or {}
         if prompt_context is not None:
             configure_dynamic_context(**prompt_context)
 
@@ -161,8 +176,8 @@ class ScenarioGeneratingAgentOrchestrator:
                 logger.info("Selected apps for this run: %s", prompt_context.get("selected_apps", "(unknown)"))
 
         self.uniqueness_agent = ScenarioUniquenessCheckAgent(
-            historical_descriptions=self._historical_descriptions,
-            scenario_metadata_path=str(self.scenario_metadata_path),
+            historical_descriptions=self._historical_descriptions_for_prompt,
+            scenario_metadata_path=str(self.scenario_metadata_path_for_prompt),
             debug_prompts=debug_prompts,
             claude_runtime_config=self._claude_config_uniqueness,
         )
@@ -244,24 +259,32 @@ class ScenarioGeneratingAgentOrchestrator:
                 check1 = None if self.debug_prompts else step1_check
 
                 step1 = self.step1_agent.run(
-                    scenario_metadata_path=str(self.scenario_metadata_path),
+                    scenario_metadata_path=str(self.scenario_metadata_path_for_prompt),
                     check_callback=check1,
                 )
                 logger.info("Step 1 completed with %s iterations.", step1.iterations)
                 if not self.debug_prompts:
                     scenario_id, class_name, description = self._parse_step1_output(step1.content)
-                    self._append_scenario_metadata(
-                        scenario_id=scenario_id,
-                        class_name=class_name,
-                        description=description,
-                    )
-                    self._update_scenario_header(
-                        scenario_id=scenario_id, class_name=class_name, description=description
-                    )
-                    self._append_step_trajectory("step1", step1)
-                    # Snapshot the scenario after Step 1 header updates so users
-                    # can inspect the early state if Step 2 fails.
-                    self._snapshot_scenario("step1")
+                    # Only persist metadata + update headers when Step 1 produced
+                    # a parseable identifier and a non-empty description.
+                    if scenario_id is None or class_name is None or not description.strip():
+                        logger.warning(
+                            "Step 1 output did not include a parseable Scenario ID/Class Name/Description. "
+                            "Skipping metadata/header update for this run."
+                        )
+                    else:
+                        self._append_scenario_metadata(
+                            scenario_id=scenario_id,
+                            class_name=class_name,
+                            description=description,
+                        )
+                        self._update_scenario_header(
+                            scenario_id=scenario_id, class_name=class_name, description=description
+                        )
+                        self._append_step_trajectory("step1", step1)
+                        # Snapshot the scenario after Step 1 header updates so users
+                        # can inspect the early state if Step 2 fails.
+                        self._snapshot_scenario("step1")
 
             # Step 2: Apps & Data Setup
             if resume_mode in {"step3", "step4"} and not self.debug_prompts:
@@ -423,6 +446,71 @@ class ScenarioGeneratingAgentOrchestrator:
             self._persist_failed_scenario(str(exc), runtime_error=runtime_error, validation_reached=validation_reached)
             raise
 
+    def _maybe_write_filtered_metadata_for_prompt(self) -> tuple[Path | None, list[dict[str, Any]]]:
+        """Optionally write a filtered metadata JSON for Step 0/1 prompts.
+
+        Motivation: when generating scenarios for a specific app set (e.g.,
+        --apps StatefulCalendarApp StatefulMessagingApp), it can be useful to
+        only enforce uniqueness against *scenarios with the same core app
+        combination* rather than against scenarios that involve other apps.
+        """
+        selected = self._parse_selected_apps_from_prompt_context()
+        if not selected:
+            return None, self._historical_descriptions
+
+        core_selected = selected - self._ALWAYS_INCLUDED_APPS
+        if not core_selected:
+            return None, self._historical_descriptions
+
+        filtered = self._filter_metadata_by_core_apps(self._historical_descriptions, core_selected)
+        # Always write the file when we have an explicit core app selection,
+        # even if it results in an empty list. This makes the prompting behavior
+        # deterministic and avoids surprising "other app" rejections.
+        filtered_path = self.trajectory_dir / "scenario_metadata.filtered.json"
+        try:
+            filtered_path.write_text(json.dumps(filtered, indent=2), encoding="utf-8")
+        except Exception:
+            logger.exception(
+                "Failed to write filtered scenario metadata to %s; falling back to full metadata", filtered_path
+            )
+            return None, self._historical_descriptions
+        return filtered_path, filtered
+
+    def _parse_selected_apps_from_prompt_context(self) -> set[str]:
+        """Parse selected app class names from the provided dynamic prompt context."""
+        raw = (self._prompt_context or {}).get("selected_apps", "") or ""
+        if not raw.strip():
+            return set()
+        # The prompt context may be word-wrapped, which can split long class
+        # names across newlines (e.g., "StatefulCale\ndarApp"). Normalize by
+        # removing all whitespace before parsing.
+        compact = re.sub(r"\s+", "", raw)
+        tokens: set[str] = set()
+        for part in compact.split(","):
+            item = part.strip()
+            if not item:
+                continue
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item):
+                tokens.add(item)
+        return tokens
+
+    @classmethod
+    def _filter_metadata_by_core_apps(
+        cls,
+        entries: list[dict[str, Any]],
+        core_selected: set[str],
+    ) -> list[dict[str, Any]]:
+        """Return metadata entries whose *core* app set exactly matches `core_selected`."""
+        filtered: list[dict[str, Any]] = []
+        for entry in entries:
+            apps = entry.get("apps") or []
+            if not isinstance(apps, list):
+                continue
+            core = {a for a in apps if isinstance(a, str)} - cls._ALWAYS_INCLUDED_APPS
+            if core == core_selected:
+                filtered.append(entry)
+        return filtered
+
     def _write_output(
         self,
         *,
@@ -549,7 +637,7 @@ class ScenarioGeneratingAgentOrchestrator:
         """Ensure the description can safely live inside a triple-quoted docstring."""
         return text.replace('"""', '\\"""')
 
-    def _parse_step1_output(self, text: str) -> tuple[str | None, str | None, str]:
+    def _parse_step1_output(self, text: str) -> tuple[str | None, str | None, str]:  # noqa: C901
         """Parse Step 1 agent output into (scenario_id, class_name, description)."""
         raw = text.strip()
         if not raw:
@@ -562,25 +650,83 @@ class ScenarioGeneratingAgentOrchestrator:
         in_description = False
         in_explanation = False
 
+        def _strip_md_label_prefix(s: str) -> str:
+            # Normalize common markdown variants like "**Scenario ID:** foo"
+            # to "Scenario ID: foo" so parsing is robust.
+            s = s.strip()
+            # Remove leading list markers (e.g., "-", "*", "1.")
+            s = re.sub(r"^\s*(?:[-*]|\d+\.)\s+", "", s)
+            # Remove surrounding **bold** markers around the label portion.
+            s = re.sub(r"^\*\*(.+?)\*\*\s*$", r"\1", s)
+            return s
+
+        def _match_labeled_value(label: str, s: str) -> str | None:
+            # Accept "Label: value" and "**Label:** value" and "Label:** value" variants.
+            # Returns the value if matched.
+            normalized = s.strip()
+            # Handle "**Label:** value" (colon inside the bold span)
+            m = re.match(
+                rf"^\*\*\s*{re.escape(label)}\s*:\s*\*\*\s*(.+)$",
+                normalized,
+                flags=re.IGNORECASE,
+            )
+            if m:
+                return m.group(1).strip() or None
+            # Handle "**Label**: value" (colon outside the bold span)
+            m = re.match(
+                rf"^\*\*\s*{re.escape(label)}\s*\*\*\s*:\s*(.+)$",
+                normalized,
+                flags=re.IGNORECASE,
+            )
+            if m:
+                return m.group(1).strip() or None
+            # Handle "Label: value" (with optional bold markers around label)
+            m = re.match(rf"^{re.escape(label)}\s*:\s*(.+)$", _strip_md_label_prefix(normalized), flags=re.IGNORECASE)
+            if m:
+                return m.group(1).strip() or None
+            return None
+
         for _idx, line in enumerate(lines):
             stripped = line.strip()
             lower = stripped.lower()
-            if not in_description and lower.startswith("scenario id:"):
-                scenario_id = stripped.split(":", 1)[1].strip() or None
-                continue
-            if not in_description and lower.startswith("class name:"):
-                class_name = stripped.split(":", 1)[1].strip() or None
-                continue
-            if not in_description and lower == "description:":
-                in_description = True
-                # Everything after this line is the narrative description, up until
-                # an optional Explanation section.
+            if not in_description:
+                scenario_id_val = _match_labeled_value("Scenario ID", stripped)
+                if scenario_id_val is not None:
+                    scenario_id = scenario_id_val
+                class_name_val = _match_labeled_value("Class Name", stripped)
+                if class_name_val is not None:
+                    class_name = class_name_val
+                # Description section header: allow "Description:" or "**Description:**"
+                if (
+                    re.match(r"^\s*\*\*\s*Description\s*:\s*\*\*\s*$", stripped, flags=re.IGNORECASE)
+                    or re.match(r"^\s*\*\*\s*Description\s*\*\*\s*:\s*$", stripped, flags=re.IGNORECASE)
+                    or (_strip_md_label_prefix(stripped).lower() == "description:")
+                ):
+                    in_description = True
+                    continue
+                # Description header with content on same line: "Description: foo"
+                desc_inline = _match_labeled_value("Description", stripped)
+                if desc_inline is not None:
+                    in_description = True
+                    description_lines.append(desc_inline)
+                    continue
                 continue
             if in_description and not in_explanation:
                 # Stop the description at the start of an optional Explanation section.
-                if lower.startswith("explanation:"):
+                if (
+                    re.match(r"^\s*\*\*\s*Explanation\s*:\s*\*\*\s*$", stripped, flags=re.IGNORECASE)
+                    or re.match(r"^\s*\*\*\s*Explanation\s*\*\*\s*:\s*$", stripped, flags=re.IGNORECASE)
+                    or re.match(r"^\s*(?:\*\*\s*)?explanation(?:\s*\*\*)?\s*:\s*$", stripped, flags=re.IGNORECASE)
+                    or lower.startswith("explanation:")
+                ):
                     in_explanation = True
                     continue
+                # Safety: some models accidentally paste additional drafts (including new Scenario ID/Class Name blocks)
+                # inside the Description section. Stop capturing at the start of a new header to avoid polluting metadata.
+                if re.match(r"^\s*\*{0,2}\s*Scenario ID\s*:\s*", stripped, flags=re.IGNORECASE) or re.match(
+                    r"^\s*\*{0,2}\s*Class Name\s*:\s*", stripped, flags=re.IGNORECASE
+                ):
+                    break
                 description_lines.append(line)
 
         if not in_description:
@@ -908,7 +1054,6 @@ class ScenarioGeneratingAgentOrchestrator:
                 scenario_name=scenario_id,
                 oracle_mode=True,
                 max_turns=None,
-                output_dir=None,
                 tool_failure_prob=0.0,
                 env_events_per_min=0.0,
                 env_events_seed=42,
