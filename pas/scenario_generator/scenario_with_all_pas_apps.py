@@ -17,6 +17,11 @@ from pas.apps import (
     StatefulEmailApp,
     StatefulMessagingApp,
 )
+from pas.apps.apartment import StatefulApartmentApp
+from pas.apps.cab import StatefulCabApp
+from pas.apps.note import StatefulNotesApp
+from pas.apps.reminder import StatefulReminderApp
+from pas.apps.shopping import StatefulShoppingApp
 from pas.scenarios import PASScenario
 
 if TYPE_CHECKING:
@@ -27,13 +32,15 @@ if TYPE_CHECKING:
 class ScenarioWithAllPASApps(PASScenario):
     """Scenario with ALL PAS applications initialized.
 
-    Initializes all applications defined under pas.apps, which provide stateful,
-    navigation-aware wrappers around Meta ARE applications.
+    Initializes all core applications defined under `pas.apps`, which provide
+    stateful, navigation-aware wrappers around Meta-ARE applications.
 
     Initialized apps include:
     - Core: PASAgentUserInterface, HomeScreenSystemApp
     - Communication: StatefulEmailApp, StatefulMessagingApp
     - Organization: StatefulCalendarApp, StatefulContactsApp
+    - Commerce & logistics: StatefulShoppingApp, StatefulCabApp
+    - Housing: StatefulApartmentApp
     """
 
     start_time = datetime(2025, 11, 18, 9, 0, 0, tzinfo=UTC).timestamp()
@@ -56,6 +63,13 @@ class ScenarioWithAllPASApps(PASScenario):
         self.calendar = StatefulCalendarApp(name="Calendar")
         self.contacts = StatefulContactsApp(name="Contacts")
 
+        # Commerce, transport, housing, and personal organization apps
+        self.shopping = StatefulShoppingApp(name="Shopping")
+        self.cab = StatefulCabApp(name="Cab")
+        self.apartment = StatefulApartmentApp(name="Apartment")
+        self.note = StatefulNotesApp(name="Notes")
+        self.reminder = StatefulReminderApp(name="Reminders")
+
         # =============================================================================
         # REGISTER ALL INITIALIZED APPLICATIONS
         # =============================================================================
@@ -69,6 +83,13 @@ class ScenarioWithAllPASApps(PASScenario):
             # Organization and productivity apps
             self.calendar,
             self.contacts,
+            # Commerce & logistics
+            self.shopping,
+            self.cab,
+            # Housing and personal organization
+            self.apartment,
+            self.note,
+            self.reminder,
         ]
 
     def build_events_flow(self) -> None:
@@ -87,7 +108,8 @@ class ScenarioWithAllPASApps(PASScenario):
         """Validate that all applications are properly initialized."""
         try:
             # Check that we have the expected number of apps
-            expected_app_count = 6
+            # Core (2) + communication (2) + org (2) + shopping + cab + apartment + note + reminder = 11
+            expected_app_count = 11
             actual_app_count = len(self.apps)
 
             if actual_app_count != expected_app_count:
@@ -104,6 +126,11 @@ class ScenarioWithAllPASApps(PASScenario):
                 "StatefulMessagingApp",
                 "StatefulCalendarApp",
                 "StatefulContactsApp",
+                "StatefulShoppingApp",
+                "StatefulCabApp",
+                "StatefulApartmentApp",
+                "StatefulNotesApp",
+                "StatefulReminderApp",
             }
 
             missing_apps = required_apps - app_types

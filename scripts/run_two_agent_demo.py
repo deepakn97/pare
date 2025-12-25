@@ -90,6 +90,7 @@ def run_demo(
     observe_max_iterations: int = 10,
     execute_max_iterations: int = 10,
     traces_dir: str = "traces/demo",
+    output_dir: str | None = None,
     oracle_mode: bool = False,
     tool_failure_prob: float = 0.0,
     env_events_per_min: float = 0.0,
@@ -121,6 +122,11 @@ def run_demo(
     logger.info(f"Tool failure probability: {tool_failure_prob}")
     logger.info(f"Environmental noise events per minute: {env_events_per_min}")
     logger.info(f"Environmental noise seed: {env_events_seed}")
+    # Back-compat: some callers historically used `output_dir` for trace exports.
+    # `run_demo` uses `traces_dir` as the canonical name.
+    if output_dir is not None:
+        traces_dir = output_dir
+
     logger.info(f"Traces directory: {traces_dir}")
 
     # Load the scenario using PAS registry
@@ -351,6 +357,8 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
     current_timestamp = get_pst_time()
+
+    log_dir: Path | None = None
 
     # Make log directory if it doesn't exist
     if args.log_to_file:
