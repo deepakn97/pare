@@ -274,6 +274,8 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
       account/status metadata, participant identities/roles, etc.) unless those details will be surfaced via:
       - non-oracle environment event content (notifications), and/or
       - prior oracle tool outputs in Step 3 (list/search/get/read calls).
+    - Location grounding (CRITICAL; common failure mode):
+      - Do NOT invent or hard-code pickup locations / addresses / place names for tool arguments (especially `start_location` / `end_location`).
     - Do NOT write a narrative where the agent proposes precise values (e.g., "delivery tomorrow 2-4 PM") unless the narrative also makes clear
       how that value is observable (e.g., an order-status notification contains the window, or the agent will call `get_order_details(...)` and read it).
 
@@ -491,6 +493,11 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
         * prior environment event content (text shown to the user/agent), or
         * outputs of prior agent-visible tool calls earlier in `build_events_flow()` (list/search/get that reveals it), or
         * user-provided content (user message / `accept_proposal` content).
+      - Location-specific reinforcement (CRITICAL):
+        * Do NOT hard-code `start_location`/`end_location` in cab/ride tools unless you have already introduced that exact location via an env event
+          or revealed it via an earlier oracle tool call.
+        * If a scenario needs a "home/work/current location", you MUST make it discoverable (e.g., put it in a notification body or retrieve it from
+          an app that stores it) before using it in `get_quotation(...)` / `order_ride(...)`.
       - This applies equally to concrete facts in proposals/messages: do NOT include specific times, dates, delivery windows, prices, or other numeric
         details in `send_message_to_user(...)` unless those facts were already revealed by earlier env events or tool outputs.
       - Using Step 2 seeded artifacts in later oracle actions requires an explicit observation step:
