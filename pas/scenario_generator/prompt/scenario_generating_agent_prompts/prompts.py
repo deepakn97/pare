@@ -274,6 +274,11 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
       account/status metadata, participant identities/roles, etc.) unless those details will be surfaced via:
       - non-oracle environment event content (notifications), and/or
       - prior oracle tool outputs in Step 3 (list/search/get/read calls).
+    - "Current item / identity" grounding (CRITICAL; common failure mode):
+      - Do NOT assume the agent knows what the "current" target is (e.g., current apartment/unit, current order, current pickup address, who a person is)
+        unless Step 3 explicitly introduces that information through:
+        - a concrete environment cue (email/message/notification content), and/or
+        - an explicit agent observation step (read/search/list/get) that reveals it before the agent uses it.
     - Location grounding (CRITICAL; common failure mode):
       - Do NOT invent or hard-code pickup locations / addresses / place names for tool arguments (especially `start_location` / `end_location`).
     - Do NOT write a narrative where the agent proposes precise values (e.g., "delivery tomorrow 2-4 PM") unless the narrative also makes clear
@@ -488,6 +493,10 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - Ground every agent/oracle argument in agent-visible evidence (applies to ALL apps):
       - The agent must not "make up" entities, targets, identifiers/handles, or free-form strings just to complete a flow.
       - Baseline data seeded in Step 2 exists in the world, but is NOT automatically "known" to the agent unless the agent could plausibly observe it.
+      - "Current item / identity" grounding (CRITICAL; common failure mode):
+        * If an oracle event acts on a specific "current" target (current apartment/unit, current order, current ride, a person's identity/relationship,
+          pickup/dropoff address), you MUST add a prior agent observation step that reveals why that target is the right one (read/search/list/get),
+          or ensure the target is explicitly specified in an earlier environment cue (email/message/notification text).
       - Any agent-chosen value in an oracle event (IDs/handles like `email_id`/`product_id`, addresses, phone numbers, search queries, order numbers, etc.)
         MUST be derivable from at least one of:
         * prior environment event content (text shown to the user/agent), or
