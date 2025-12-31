@@ -11,7 +11,9 @@ from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.core import AppState, StatefulApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
+from pas.apps.note import StatefulNotesApp
 from pas.apps.proactive_aui import PASAgentUserInterface
+from pas.apps.reminder import StatefulReminderApp
 from pas.apps.shopping import StatefulShoppingApp
 from pas.apps.system import HomeScreenSystemApp
 from pas.apps.tool_decorators import user_tool
@@ -28,6 +30,8 @@ __all__ = [
     "StatefulContactsApp",
     "StatefulEmailApp",
     "StatefulMessagingApp",
+    "StatefulNotesApp",
+    "StatefulReminderApp",
     "StatefulShoppingApp",
     "user_tool",
 ]
@@ -42,4 +46,6 @@ ALL_APPS = [
     StatefulCabApp,
     StatefulApartmentApp,
     StatefulMessagingApp,
+    StatefulNotesApp,
+    StatefulReminderApp,
 ]

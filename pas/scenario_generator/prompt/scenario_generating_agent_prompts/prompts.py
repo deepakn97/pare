@@ -269,6 +269,32 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
     - Do NOT propose scenarios where the agent "just checks" apps on a timer with only oracle reads as the initial trigger.
     - The trigger(s) you describe must be representable using methods that have notification templates in `pas/apps/notification_templates.py`.
 
+    Explicit motivation in triggers (CRITICAL; common failure mode):
+    - The scenario MUST be written so that the agent's proposal(s) and downstream actions are naturally motivated by what is explicitly stated in the
+      environment trigger(s) (emails/messages/notifications) and/or by facts the agent will explicitly observe via tools in Step 3.
+    - Do NOT rely on vague triggers that require the agent to guess what to propose ("something happened, help them") without concrete actionable
+      details. Prefer triggers that spell out the user's need, requested next step, constraints, or suggested coordination plan.
+    - If your narrative implies the agent will do ANY specific read/lookup action (e.g., "check reminders", "search emails", "review calendar",
+      "look up the contact", "scan orders"), the narrative MUST explain why that action is justified by the trigger content.
+      Examples:
+      - OK: a cab delay notification explicitly says "check prep reminders near pickup" → agent reads reminders.
+      - OK: an email explicitly says "please reply with X details" → agent searches emails / looks up the referenced order/ride.
+      - NOT OK: "agent checks reminders/emails/calendar just to be safe" with no trigger text that points there.
+    - Likewise, if your narrative implies the agent will propose a specific plan (e.g., "create a checklist note", "set reminders", "compare prices",
+      "book a ride", "email a third party"), the narrative MUST make it clear how the trigger content motivates that plan.
+      - If you cannot plausibly embed that motivation in the trigger content, redesign the trigger or add a follow-up observation step in Step 3
+        that retrieves the missing facts BEFORE the agent proposes.
+    - Reminder-related proposals must be explicitly cued (CRITICAL; common failure mode):
+      - If the agent will read reminders (e.g., `get_all_reminders`, `list_reminders`) or propose creating/updating a reminder, the trigger MUST explicitly
+        mention the need for follow-up tracking (e.g., "set a reminder", "check your reminders").
+      - Do NOT have the agent "discover" an unrelated reminder by scanning reminders without the trigger pointing to reminders or follow-up tracking.
+    - No "magic query strings" (CRITICAL; common failure mode):
+      - If the agent will call a search/list API with a specific query string (e.g., `search_notes(query="Apartment Must-Haves")`,
+        `search_emails(query="...")`), that query MUST be grounded in something the agent observed:
+        - Prefer: include the exact note title / keyword in the environment trigger text (email/message/notification), OR
+        - Derive it from a prior oracle observation step (e.g., list notes first, then search by a title you saw).
+      - Do NOT hard-code a note title / subject line / keyword that never appears in any env cue or tool output.
+
     Evidence / non-hallucination rule (CRITICAL):
     - The scenario must not assume the agent knows ANY specific factual details (times/dates, delivery windows, locations, product/order details,
       account/status metadata, participant identities/roles, etc.) unless those details will be surfaced via:
@@ -283,11 +309,40 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
       - Do NOT invent or hard-code pickup locations / addresses / place names for tool arguments (especially `start_location` / `end_location`).
     - Do NOT write a narrative where the agent proposes precise values (e.g., "delivery tomorrow 2-4 PM") unless the narrative also makes clear
       how that value is observable (e.g., an order-status notification contains the window, or the agent will call `get_order_details(...)` and read it).
+    - Environment cue richness (IMPORTANT; common failure mode):
+      - Prefer triggers whose environment event content includes the key actionable specifics the agent will need to propose and act correctly
+        (dates/times, amounts, locations, names, identifiers, suggested coordination plan, etc.).
+      - Do NOT rely on the agent to "guess what to do" from vague notifications; make the needed details observable via env event content and/or
+        a follow-up oracle read/search/get step in Step 3.
 
     Constraints:
     - Treat every historical scenario description in the provided scenario metadata file as a negative example.
     - Your new scenario MUST be clearly and substantively different in trigger, domain, app combination, and cross-app workflow from all prior descriptions.
     - Avoid reusing the same situation with only minor wording or timestamp changes; design a genuinely new situation.
+    - Tool diversity (IMPORTANT):
+      - When drafting a new scenario, try to exercise MORE of the selected apps' event-registered capabilities by choosing a workflow that uses
+        less frequently used / previously untouched tools for those apps (as long as they are real tools listed in the Event-Registered App APIs block).
+      - Do NOT invent new methods. Prefer novel but plausible combinations of existing tools over repeating the same small set of patterns.
+      - App-specific examples (IMPORTANT; do not treat as an exhaustive list):
+        - If `StatefulNotesApp` is selected, try to include at least one less-common Notes capability beyond "create + search", such as:
+          - updating an existing note (`update_note`)
+          - folder operations (`new_folder`, `rename_folder`, `delete_folder`)
+          - organization actions (`move_note`, `duplicate_note`)
+          - attachment workflows (`add_attachment_to_note`, `remove_attachment`, `list_attachments`)
+        Use these only when they make sense for the trigger and user goal; do not add gratuitous steps.
+    - Pattern minimization (IMPORTANT; keep scenarios concise):
+      - Avoid long repeated action loops in a single scenario (common bloat pattern):
+        - BAD: "delete 3 items" implemented as 3 repeated search+delete chains, or "move 6 notes" implemented as 6 repeated search+move chains.
+        - Prefer: ONE representative instance per distinct pattern/tool (e.g., one delete + one archive move) unless repetition is essential to the
+          scenario's core reasoning.
+      - When repetition would normally be required just to resolve handles (IDs), prefer making the trigger/env cue provide explicit identifiers or
+        concrete disambiguating details (IDs, exact titles, sender+subject, etc.) so the agent does not need extra "find each item" oracle loops.
+        This keeps the scenario focused on reasoning + coordination rather than boilerplate.
+    - Attachment handling (IMPORTANT; keep scenarios lightweight):
+      - When a workflow involves attachments (Notes attachments or email attachments), you do NOT need to create real files on disk for scenarios.
+      - Prefer treating attachments as **placeholder file paths** (strings) that represent documents (e.g., `"/files/Q1_Budget.xlsx"`), and pass those
+        paths through tool arguments (such as note/email attachment parameters) as needed.
+      - Validation should focus on correctness of the referenced filenames/paths (stable tokens), not the actual file contents.
     - Only involve apps and tools that appear in the Selected Apps list (included below) and the Event-Registered App APIs block below.
     - Do NOT introduce new app types or tools that are not present in those context sections.
     - App coverage requirement (CRITICAL):
@@ -463,17 +518,69 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
       - Keep scenarios fast: ALL `.delayed(...)` values and all `.depends_on(..., delay_seconds=...)` values MUST be <= 30 seconds.
       - Do NOT model hours/minutes inside delays (e.g., do not use 3600, 10800, etc.). Use short delays to preserve ordering only.
     - Include oracle/user interactions (agent proposal → user response → agent follow-up).
+    - REQUIRED (write actions must be user-gated; CRITICAL):
+      - Any WRITE / state-changing tool call (examples: add/edit/delete reminders, send/reply/forward emails, send messages to third parties,
+        create/update notes or add note attachments, book/cancel rides, save/delete/update apartments, cancel/checkout orders, edit calendar events)
+        MUST execute ONLY AFTER the user accepts
+        an explicit proposal.
+      - For high-volume external lookups (IMPORTANT; common failure mode):
+        - If the scenario requires many similar tool calls (e.g., multiple `get_quotation(...)` calls across destinations/service types),
+          treat that bulk data gathering as user-gated too: send a proposal first, then run the batch only after `accept_proposal`.
+      - Implementation rule:
+        1) Create a proposal via `PASAgentUserInterface.send_message_to_user(...)`.
+        2) Create a user acceptance via `PASAgentUserInterface.accept_proposal(...)`.
+        3) Every write action MUST `.depends_on(acceptance_event, ...)` (directly, or through a short chain that still depends on acceptance).
+      - Before acceptance, the agent may only perform READ/lookup actions (list/search/get/read) motivated by the environment cue,
+        and should present its plan as a proposal instead of acting.
     - Specify event source, method, arguments, delays, and purpose.
     - REQUIRED (motivation): Every oracle/user event must have an explicit, evidence-based reason.
       - For each oracle event you add, include a short 1-line comment immediately above it explaining *why* the agent is taking that action,
         and what prior evidence motivates it (e.g., an earlier environment notification/email/message content, or outputs from earlier tool calls).
       - Do NOT insert "just in case" oracle reads (calendar scans, order listings, broad searches) unless you can point to concrete prior evidence.
+      - IMPORTANT: The motivation should be grounded in explicit env event content whenever possible. If the env trigger is too vague to justify an
+        oracle action, first add an oracle observation step (list/search/get/read) that retrieves the missing facts, and cite that observation as the
+        motivation for subsequent actions.
+      - CRITICAL (no ungrounded oracle actions):
+        - An oracle event is INVALID unless its motivation comment cites one of:
+          1) an earlier NON-ORACLE environment event's content (email/message/notification text), or
+          2) the output of an earlier oracle observation (list/search/get/read) that was itself justified by an environment cue.
+        - Do NOT perform "context fishing": do not read reminders/emails/calendar/orders/ride history unless the trigger explicitly suggests those
+          sources, OR you have inserted a minimal observation step that is directly motivated by the trigger.
+        - If you cannot write a concrete motivation sentence that references an explicit cue, delete the oracle event or redesign the trigger.
+      - CRITICAL (motivation must be attributable):
+        - The motivation comment must name the specific upstream env event variable(s) (e.g., `ride_delay_event`, `incoming_email_event`) or the
+          specific upstream oracle event variable(s) whose outputs justify it.
+        - Prefer quoting a short snippet from the env text (e.g., `"check prep reminders"` / `"please reply with"` / `"delivery window 2-4 PM"`)
+          so the grounding is unambiguous.
     - REQUIRED (explicit environment cue for every proposal):
       - Every agent proposal sent via `PASAgentUserInterface.send_message_to_user(...)` MUST be justified by at least one concrete NON-ORACLE environment cue
         that occurred earlier in the run (e.g., an incoming email/message, a shopping/cab/apartment notification, etc.).
       - Implementation rule: each proposal event must have a `.depends_on(...)` dependency chain that reaches at least one environment event variable.
         Do NOT propose purely from seeded baseline state or the docstring narrative.
       - The proposal content should explicitly cite the triggering cue (e.g., "I saw a delivery email..." / "I received a ride status update..." / "New message from ...").
+      - Do NOT include specific proposed actions/parameters (times, dates, locations, amounts, recipients) unless they were explicitly present in the
+        env cue content or revealed by a prior oracle observation step earlier in the flow.
+      - CRITICAL (proposal grounding checklist; common failure mode):
+        - Immediately above EACH proposal event, write a 1-line motivation comment that:
+          - names the concrete upstream env event variable(s) (and any oracle observation variable(s) if applicable), and
+          - quotes a short snippet of the env text that justifies the proposal (e.g., `"please pull drafts from Notes"` / `"reply with pickup time + fare"`).
+        - The proposal message itself MUST reference the concrete cue facts it is responding to (deadline/time window, required deliverables, requested next steps).
+          Do NOT send generic offers ("Want me to help?") without citing what was observed.
+      - CRITICAL: A proposal is INVALID if the preceding env cue does not contain enough information to justify the proposal's plan.
+        - Fix by enriching the env event content (preferred), or by inserting an immediate oracle observation step that retrieves the missing facts
+          before proposing (and cite that observation in the proposal rationale).
+    - REQUIRED (make triggers informative; avoid guessing):
+      - When you create non-oracle environment trigger events, include enough concrete detail in the event content so the agent can form a specific,
+        grounded proposal (and later actions) without guessing.
+        Examples of good env detail:
+        - "Collect on the 1st of each month" for recurring splits
+        - explicit pickup/dropoff address for rides
+        - explicit deadline date/time and requested next step for tasks
+      - If the env event cannot reasonably contain the needed details, add an explicit oracle observation step immediately after the trigger
+        (list/search/get/read) to retrieve the missing facts before proposing.
+      - When you add an oracle observation step to fill missing context, keep it narrow and evidence-based:
+        - Prefer targeted reads/searches tied to the cue (e.g., search emails by sender/subject, list reminders for a specific time window, get the
+          current ride status) instead of broad scans of unrelated apps.
     - REQUIRED (no invented event-type helpers):
       - Do NOT call `.env()` or `.user()` on events. In this codebase, environment events are created by directly calling allowed non-oracle methods
         (e.g., `messaging_app.create_and_add_message(...)`, `email_app.send_email_to_user_with_id(...)`) inside `EventRegisterer.capture_mode()`,
@@ -561,6 +668,10 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
     - "'Event' object is not subscriptable":
       - You are treating an `Event` / `CompletedEvent` instance like a dict or list (e.g., `event[...]`) or passing it where a simple ID or string is expected.
       - Fix: never subscript `Event` objects. Use their attributes (`event_type`, `action`, etc.) when reading logs, and pass only simple values (IDs, strings, timestamps) into app methods as documented in their signatures.
+    - "Argument '<x>' must be of type <class 'str'>, got <class 'are.simulation.types.Event'>":
+      - You are calling an app method that returns an Event (e.g., `messaging_app.get_user_id(...)`) inside `EventRegisterer.capture_mode()`,
+        then passing that Event object where a plain string ID is required (e.g., `sender_id=...`, `conversation_id=...`).
+      - Fix: precompute IDs and other plain values OUTSIDE the `capture_mode()` block, then use those strings inside environment/oracle events.
     - "Argument 'start_datetime' must be of type str | None, got <class 'float'>":
       - You are passing a UNIX timestamp float into a tool API that expects a string (for example, `add_calendar_event(title=..., start_datetime=\"YYYY-MM-DD HH:MM:SS\", ...)`).
       - Fix: use Read on the PAS calendar wrapper at `pas/apps/calendar/` (for `StatefulCalendarApp`) and the Meta-ARE calendar base under `are/simulation/apps/` (for example, `calendar_v2.py` / `calendar.py`), confirm the exact parameter types, and pass properly formatted strings instead of raw floats. Keep using timestamp floats only where the dataclass explicitly documents them (such as the `CalendarEvent` dataclass in `are/simulation/apps/calendar.py`).
@@ -604,6 +715,9 @@ _VALIDATION_BODY = textwrap.dedent(
         Examples of typically optional behaviors: sending a final confirmation message after an update, redundant acknowledgements, or extra summaries.
         Only make a check STRICT if the scenario description explicitly makes that behavior required for success.
       - Follow the "Validation Flexibility Guidelines" from the multi-step design doc: be strict on logic and data relationships, flexible on surface phrasing and minor formatting.
+      - Do NOT validate proposal acceptance (IMPORTANT):
+        - Avoid adding STRICT checks that the user accepted a proposal (`accept_proposal`). Acceptance is an implementation detail and can vary.
+        - Instead, validate the downstream, user-visible outcomes (the actual tool actions performed, updates created, replies sent, etc.).
     - Equivalence-class validation (IMPORTANT):
       - For many scenarios, there may be MULTIPLE valid tool calls that achieve the same high-level goal.
         Example goals:
@@ -613,6 +727,9 @@ _VALIDATION_BODY = textwrap.dedent(
         - Choose the allowed alternatives ONLY from the "Event-Registered App APIs" block included in this prompt.
         - Do NOT invent method names. If a function is not listed in the tools/API blocks, you must not check for it.
       - Keep the allowed alternatives tight and purposeful: 2-4 real options max for each goal, not a broad "accept anything" filter.
+      - Common equivalence examples (calendar):
+        - "agent observed the calendar event details" can be satisfied by `get_calendar_event(...)`, `get_calendar_events_from_to(...)`, or
+          `read_today_calendar_events()` depending on the scenario design (avoid forcing a specific ID-based method if a natural-key read is valid).
     - Mention the relevant EventType and tool/function each check expects in the log.
       - Before using EventType, use Read to open `are/simulation/types.py` and inspect which enum members exist; do NOT invent members like `ORACLE` if they are not defined.
       - Treat entries from `env.event_log.list_view()` as event objects (for example, `CompletedEvent` instances) with attributes such as `event_type` and `action`; do NOT subscript them like dictionaries or lists.

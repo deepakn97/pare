@@ -215,6 +215,83 @@ class ScenarioGeneratingAgentOrchestrator:
             claude_runtime_config=self._claude_config_code_steps,
         )
 
+    @classmethod
+    def _dedupe_scenario_id(cls, scenario_id: str, existing_ids: set[str]) -> str:
+        """Return a scenario_id that does not collide with `existing_ids`.
+
+        Note: we intentionally do NOT enforce the Step 1 <= 40 char constraint here.
+        This is a post-processing safety shim to avoid overwriting an existing scenario.
+        """
+        if scenario_id not in existing_ids:
+            return scenario_id
+
+        base = scenario_id
+        # Choose smallest suffix that avoids collisions: foo_2, foo_3, ...
+        i = 2
+        while True:
+            suffix = f"_{i}"
+            candidate = f"{base}{suffix}"
+            if candidate not in existing_ids:
+                return candidate
+            i += 1
+
+    @staticmethod
+    def _dedupe_class_name(class_name: str, existing_class_names: set[str]) -> str:
+        """Return a class name that does not collide with `existing_class_names`.
+
+        Uses numeric suffixes to keep the name a valid PascalCase identifier, e.g. Foo2, Foo3.
+        """
+        if class_name not in existing_class_names:
+            return class_name
+        i = 2
+        while True:
+            candidate = f"{class_name}{i}"
+            if candidate not in existing_class_names:
+                return candidate
+            i += 1
+
+    def _ensure_unique_step1_identifiers(self, *, scenario_id: str, class_name: str) -> tuple[str, str, dict[str, Any]]:
+        """Ensure Step 1 identifiers won't silently overwrite existing artifacts."""
+        existing = self._read_scenario_metadata()
+        existing_ids: set[str] = {
+            str(entry.get("scenario_id")).strip()
+            for entry in existing
+            if isinstance(entry, dict) and entry.get("scenario_id")
+        }
+        existing_class_names: set[str] = {
+            str(entry.get("class_name")).strip()
+            for entry in existing
+            if isinstance(entry, dict) and entry.get("class_name")
+        }
+
+        # Also prevent filename collisions in the canonical generated scenarios dir.
+        try:
+            for path in self.seed_scenarios_dir.glob("*.py"):
+                existing_class_names.add(path.stem)
+        except Exception:
+            logger.exception("Failed to scan existing scenario filenames under %s", self.seed_scenarios_dir)
+
+        original = {"scenario_id": scenario_id, "class_name": class_name}
+        new_scenario_id = self._dedupe_scenario_id(scenario_id, existing_ids)
+        # If we had to dedupe the id, include it in the "existing_ids" set so class dedupe notes remain consistent.
+        existing_ids.add(new_scenario_id)
+
+        new_class_name = self._dedupe_class_name(class_name, existing_class_names)
+        notes: dict[str, Any] = {}
+        if new_scenario_id != scenario_id:
+            notes["scenario_id_deduped_from"] = scenario_id
+        if new_class_name != class_name:
+            notes["class_name_deduped_from"] = class_name
+        if notes:
+            notes["original_identifiers"] = original
+            notes["deduped_identifiers"] = {"scenario_id": new_scenario_id, "class_name": new_class_name}
+            logger.warning(
+                "Deduped Step 1 identifiers to avoid overwriting existing scenarios: %s -> %s",
+                original,
+                notes["deduped_identifiers"],
+            )
+        return new_scenario_id, new_class_name, notes
+
     def run(self) -> dict[str, Any]:  # noqa: C901
         """Execute the four-step pipeline and return artifact metadata."""
         logger.info("Starting multi-step scenario generation.")
@@ -273,6 +350,10 @@ class ScenarioGeneratingAgentOrchestrator:
                             "Skipping metadata/header update for this run."
                         )
                     else:
+                        # Avoid silent overwrites when the generator proposes identifiers that already exist.
+                        scenario_id, class_name, dedupe_notes = self._ensure_unique_step1_identifiers(
+                            scenario_id=scenario_id, class_name=class_name
+                        )
                         self._append_scenario_metadata(
                             scenario_id=scenario_id,
                             class_name=class_name,
@@ -282,6 +363,14 @@ class ScenarioGeneratingAgentOrchestrator:
                             scenario_id=scenario_id, class_name=class_name, description=description
                         )
                         self._append_step_trajectory("step1", step1)
+                        if dedupe_notes:
+                            # Best-effort: persist dedupe info next to the trajectory for debugging.
+                            try:
+                                (self.trajectory_dir / "step1_identifier_dedupe.json").write_text(
+                                    json.dumps(dedupe_notes, indent=2), encoding="utf-8"
+                                )
+                            except Exception:
+                                logger.exception("Failed to write Step 1 identifier dedupe notes")
                         # Snapshot the scenario after Step 1 header updates so users
                         # can inspect the early state if Step 2 fails.
                         self._snapshot_scenario("step1")
@@ -907,6 +996,21 @@ class ScenarioGeneratingAgentOrchestrator:
 
         class_name = match.group(1)
         target_path = self.seed_scenarios_dir / f"{class_name}.py"
+        if target_path.exists():
+            # Safety guard: avoid silently overwriting an existing scenario file.
+            # Prefer adding a numeric suffix to the filename (class name inside the file remains unchanged).
+            i = 2
+            while True:
+                candidate = self.seed_scenarios_dir / f"{class_name}{i}.py"
+                if not candidate.exists():
+                    logger.warning(
+                        "Target scenario file %s already exists; exporting to %s instead to avoid overwrite.",
+                        target_path,
+                        candidate,
+                    )
+                    target_path = candidate
+                    break
+                i += 1
 
         # Safety guard: never export into `generated_scenarios_w_claude_agent/`
         # unless the most recent run check reached validation and succeeded.
