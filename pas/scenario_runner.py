@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from are.simulation.agents.default_agent.base_agent import BaseAgent
@@ -14,6 +15,7 @@ from are.simulation.notification_system import VerbosityLevel
 from are.simulation.scenario_runner import ScenarioRunner
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import EnvironmentState, EnvironmentType
+from tqdm import tqdm
 
 from pas.agents import ProactiveAgent, UserAgent
 from pas.agents.proactive.prompts.execute_prompt import (
@@ -237,41 +239,36 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         # reset on first turn, then false for subsequent turns.
         user_reset = True
         proactive_reset = True
-        while (max_turns is None or turn_count < max_turns) and env.state != EnvironmentState.STOPPED:
-            logger.info("=" * 80)
-            logger.info(f"Turn {turn_count} - Environment Time: {env.time_manager.time()}")
-            logger.info("=" * 80)
 
+        # Create tqdm progress bar for turns
+        pbar = tqdm(
+            total=max_turns,
+            desc=f"Turn 0/{max_turns}",
+            bar_format="{desc} |{bar}| {unit}",
+            leave=True,
+        )
+
+        while (max_turns is None or turn_count < max_turns) and env.state != EnvironmentState.STOPPED:
             user_tools = env.get_user_tools()
             current_app = env.active_app
             current_state = current_app.current_state if current_app and isinstance(current_app, StatefulApp) else None
 
-            # Distribute notifications to both agents, so that they can see the same notifications.
-            # ! NOTE: This was a really bad idea. It gives stale notifications to the agents.
-            # all_notifications = env.notification_system.message_queue.get_by_timestamp(
-            #     timestamp=datetime.fromtimestamp(env.time_manager.time(), tz=UTC)
-            # )
+            # Update progress bar for user agent
+            pbar.set_description(f"Turn {turn_count + 1}/{max_turns}")
+            pbar.unit = "User Agent"
+            pbar.refresh()
 
-            # user_agent.react_agent.custom_state["notifications"] = all_notifications
-            # proactive_agent.observe_agent.custom_state["notifications"] = all_notifications
-            # proactive_agent.execute_agent.custom_state["notifications"] = all_notifications
-
-            # ! TODO: Check if setting the max_turns to 1 is correct.
-            # logger.debug(
-            #     f"Turn {turn_count} - Notifications: {json.dumps([{'Message': notification.message, 'Message Type': notification.message_type.value} for notification in all_notifications], indent=2)}"
-            # )
-            logger.info("*" * 80)
-            logger.info("User-Agent - Running...")
-            logger.info("*" * 80)
             user_result = user_agent.agent_loop(
                 user_tools, current_app, current_state, reset=user_reset or not user_agent.react_agent.is_initialized()
             )
             logger.info(f"User-Agent Turn {turn_count} Output: {user_result}")
             user_reset = False
 
-            logger.info("*" * 80)
-            logger.info("Proactive-Agent Turn - Running...")
-            logger.info("*" * 80)
+            # Update progress bar for proactive agent with current mode
+            proactive_mode = proactive_agent.mode.value
+            pbar.unit = f"Proactive Agent ({proactive_mode})"
+            pbar.refresh()
+
             proactive_result = proactive_agent.agent_loop(
                 reset=proactive_reset or not proactive_agent.observe_agent.is_initialized()
             )
@@ -279,6 +276,9 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             proactive_reset = False
 
             turn_count += 1
+            pbar.update(1)
+
+        pbar.close()
 
         logger.info("Validating Scenario...")
         validation_result = scenario.validate(env)
@@ -322,6 +322,8 @@ class TwoAgentScenarioRunner(ScenarioRunner):
 
         if scenario.start_time and scenario.start_time > 0:
             env_config.start_time = scenario.start_time
+        logger.info(f"Environment Start Time: {datetime.fromtimestamp(env_config.start_time, tz=UTC)}")
+        logger.info(f"Scenario Start Time: {datetime.fromtimestamp(scenario.start_time, tz=UTC)}")
 
         env = StateAwareEnvironmentWrapper(
             environment_type=EnvironmentType.CLI,

@@ -40,8 +40,8 @@ for file in $SCENARIO_FILES; do
     fi
 
     # Run the scenario in oracle mode and capture output (suppressed)
-    OUTPUT=$(uv run python pas/scripts/run_two_agent_demo.py \
-        --scenario "$SCENARIO_NAME" \
+    OUTPUT=$(uv run python scripts/run_scenarios.py \
+        --scenarios "$SCENARIO_NAME" \
         --user-model "gpt-4o-mini" \
         --proactive-model "gpt-4o" \
         --max-turns 10 \
