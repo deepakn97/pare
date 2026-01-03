@@ -22,6 +22,7 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialise the email app with the inbox as the starting state."""
         super().__init__(*args, **kwargs)
+        self.user_email = "john@pas.com"
         self.load_root_state()
 
     def handle_state_transition(self, event: CompletedEvent) -> None:

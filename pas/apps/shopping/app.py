@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from are.simulation.apps.shopping import ShoppingApp
 
@@ -23,10 +23,9 @@ if TYPE_CHECKING:
 class StatefulShoppingApp(StatefulApp, ShoppingApp):
     """Shopping app with PAS-aware navigation."""
 
-    def __init__(self, name: str = "shopping", **kwargs: object) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialise shopping app with root state."""
-        StatefulApp.__init__(self, name)
-        ShoppingApp.__init__(self, **kwargs)
+        super().__init__(*args, **kwargs)
         self.load_root_state()
 
     def handle_state_transition(self, event: CompletedEvent) -> None:

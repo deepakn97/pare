@@ -4,13 +4,29 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from are.simulation.apps.contacts import ContactsApp
+from are.simulation.apps.contacts import Contact, ContactsApp, Gender, Status
+from are.simulation.types import disable_events
 
 from pas.apps.contacts.states import ContactDetail, ContactEdit, ContactsList
 from pas.apps.core import StatefulApp
 
 if TYPE_CHECKING:
     from are.simulation.types import CompletedEvent
+
+USER_CONTACT = Contact(
+    first_name="John",
+    last_name="Doe",
+    email="john@pas.com",
+    phone="1234567890",
+    address="123 Main St, Anytown, USA",
+    city_living="Anytown",
+    country="USA",
+    is_user=True,
+    gender=Gender.MALE,
+    age=30,
+    nationality="American",
+    status=Status.STUDENT,
+)
 
 
 class StatefulContactsApp(StatefulApp, ContactsApp):
@@ -20,6 +36,8 @@ class StatefulContactsApp(StatefulApp, ContactsApp):
         """Initialise the contacts app and load the list view as the default state."""
         self._pending_transition: tuple[str, str] | None = None
         super().__init__(*args, **kwargs)
+        with disable_events():
+            self.add_contact(USER_CONTACT)
         self.load_root_state()
 
     def queue_contact_transition(self, intent: str, contact_id: str) -> None:

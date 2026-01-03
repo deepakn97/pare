@@ -28,6 +28,8 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
             **kwargs: Arbitrary keyword arguments passed to parent classes.
         """
         super().__init__(*args, **kwargs)
+        self.current_user_id = uuid_hex(self.rng)
+        self.current_user_name = "John Doe"
         # Set initial state to conversation list
         self.load_root_state()
 
