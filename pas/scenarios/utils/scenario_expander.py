@@ -188,7 +188,7 @@ class PASEnvEventsExpander(EnvEventsExpander):
                 else:
                     d_events[f"{app_name}_{conversation['conversation_id']}_{i}"] = app.create_and_add_message(
                         conversation_id=conversation["conversation_id"],
-                        sender_id=message["sender"],
+                        sender_id=message["sender_id"],
                         content=message["content"],
                     )
                 if i == 0:

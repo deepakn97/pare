@@ -27,6 +27,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.DS_Store
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -218,8 +219,11 @@ __marimo__/
 logs/
 traces/
 results/
+analyses/
 uv.lock
+docs/_plans/paper
 
 # Personal notes (not for version control)
 personal_notes/
 docs/github_issues/
+bedrock_models.json

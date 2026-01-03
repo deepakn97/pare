@@ -68,7 +68,8 @@ def configure_logging(level: int = logging.INFO, use_tqdm: bool = False, log_dir
     console_handler.setFormatter(standard_formatter)
 
     root_logger = logging.getLogger()
-    root_logger.setLevel(level)
+    # Allow all logging at root level. Handlers set their own levels.
+    root_logger.setLevel(logging.DEBUG)
 
     # Clear any existing handlers to avoid duplicates
     for handler in root_logger.handlers[:]:

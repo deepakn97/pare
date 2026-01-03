@@ -9,9 +9,9 @@ USER_AGENT_GENERAL_INSTRUCTIONS = textwrap.dedent(
   environment and calling available tools. If you recieve any notifications or messages, you should act accordingly.
 
   Your role is to:
+  - Explore your environment by using tools available to you.
   - Receive messages and notifications from the system and other agents
   - Determine appropriate actions based on the current context
-  - Execute tasks by calling available tools
   - Act naturally and efficiently as a real user would"""
 )
 
@@ -95,12 +95,14 @@ USER_AGENT_PROACTIVE_INTERACTION = textwrap.dedent(
       1. Evaluate if it aligns with what you were actually trying to do
       2. Check if it matches your recent action history and context
       3. Verify the proposal only uses apps listed in AVAILABLE APPS above
-      4. Decide if accepting it would be helpful or interrupt your actual goal
-    - You can ACCEPT a proposal if it accurately identifies your intent and can be completed with available apps
-    - You can REJECT a proposal if:
+      4. Decide if accepting it would be helpful or interrupt your actual goal. You have to be EXTREMELY STRICT about accepting proposals.
+    - You can ACCEPT a proposal if it accurately identifies your intent and can be completed with available apps. You have to be EXTREMELY STRICT about accepting proposals.
+    - You should REJECT a proposal if:
       * It misunderstands your goal or would be unhelpful
       * It is vague and unclear
-      * It requires apps or capabilities not listed in AVAILABLE APPS"""
+      * It requires apps or capabilities not listed in AVAILABLE APPS
+    - You should NOT ACCEPT every proposal that the agent gives you. You have to be absolutely sure that the task is related to the environment notifications and your actions. If you are not sure, simply reject the proposal.
+    """
 )
 
 PAS_USER_ENVIRONMENT_INSTRUCTIONS = textwrap.dedent(

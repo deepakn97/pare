@@ -24,6 +24,7 @@ dependencies = [
     "numpy>=2.2.6",
     "pytz>=2025.2",
     "boto3>=1.40.70",
+    "tenacity>=9.1.2",
 ]
 
 [project.urls]
@@ -46,6 +47,10 @@ dev = [
     "ipython>=9.6.0",
     "jupyter>=1.1.1",
     "types-pytz>=2025.2.0.20251108",
+    "types-tqdm>=4.67.0.20250809",
+    "matplotlib>=3.10.8",
+    "seaborn>=0.13.2",
+    "types-seaborn>=0.13.2.20251221",
 ]
 
 [build-system]
