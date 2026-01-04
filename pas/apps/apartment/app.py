@@ -8,8 +8,8 @@ from are.simulation.apps.apartment_listing import ApartmentListingApp
 
 from pas.apps.apartment.states import (
     ApartmentDetail,
+    ApartmentFavorites,
     ApartmentHome,
-    ApartmentSaved,
     ApartmentSearch,
 )
 from pas.apps.core import StatefulApp
@@ -53,8 +53,8 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             self._handle_search_transition(fname, args)
             return
 
-        if isinstance(current_state, ApartmentSaved):
-            self._handle_saved_transition(fname)
+        if isinstance(current_state, ApartmentFavorites):
+            self._handle_saved_transition(fname, args)
 
     def _handle_home_transition(self, fname: str, args: dict[str, Any]) -> None:
         if fname == "view_apartment":
@@ -67,18 +67,12 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             self.set_current_state(ApartmentSearch())
             return
 
-        if fname == "open_saved":
-            self.set_current_state(ApartmentSaved())
+        if fname == "open_favorites":
+            self.set_current_state(ApartmentFavorites())
             return
 
     def _handle_detail_transition(self, fname: str, args: dict[str, Any]) -> None:
-        if fname == "update_price":
-            apt_id = args.get("apartment_id")
-            if apt_id:
-                self.set_current_state(ApartmentDetail(apartment_id=apt_id))
-            return
-
-        if fname in {"delete", "go_back"}:
+        if fname == "go_back":
             self.load_root_state()
             return
 
@@ -92,7 +86,13 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             self.load_root_state()
             return
 
-    def _handle_saved_transition(self, fname: str) -> None:
+    def _handle_saved_transition(self, fname: str, args: dict[str, Any]) -> None:
+        if fname == "view_apartment":
+            apt_id = args.get("apartment_id")
+            if apt_id:
+                self.set_current_state(ApartmentDetail(apartment_id=apt_id))
+            return
+
         if fname == "go_back":
             self.load_root_state()
             return
