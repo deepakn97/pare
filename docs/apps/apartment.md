@@ -3,7 +3,45 @@
 `pas.apps.apartment.app.StatefulApartmentApp` extends the Meta-ARE
 `ApartmentListingApp` with PAS navigation support.
 It launches in `ApartmentHome` and transitions between home, search,
-saved, and detail views based on completed apartment backend operations.
+favorites, and detail views based on completed apartment backend operations.
+
+---
+
+## State Transition Diagram
+
+```
+                                    ○ list_apartments
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │        ApartmentHome          │
+                    │         (ROOT STATE)          │
+                    └───┬───────────┬───────────┬───┘
+                        │           │           │
+         view_apartment │           │           │ open_favorites
+                        │           │           │
+                        │           │           └─────────────────────────────┐
+                        │           │ open_search                             │
+                        │           │                                         │
+                        │           ▼                 ○ search                ▼
+                        │   ┌───────────────────┐     │         ┌─────────────────────┐
+                        │   │  ApartmentSearch  │◄────┘         │ ApartmentFavorites  │
+                        │   └─────────┬─────────┘               └──────────┬──────────┘
+                        │             │                                    │
+                        │             │ view_apartment                     │ view_apartment
+                        │             │                                    │
+                        ▼             ▼                                    ▼
+      ○ save    ┌─────────────────────────────────────────────────────────────────┐
+      │         │                       ApartmentDetail                           │
+      ├────────►│                    context: apartment_id                        │◄──┐
+      │         └─────────────────────────────────────────────────────────────────┘   │
+      └─────────────────────────────────────────────────────────────────────────────○─┘
+                                                                              unsave
+
+Legend:
+○ = Self-loop (action executes, state unchanged)
+→ = Transition to another state
+go_back (inherited from StatefulApp) returns to previous state via navigation stack
+```
 
 ---
 
@@ -13,29 +51,26 @@ saved, and detail views based on completed apartment backend operations.
 
 ### ApartmentHome
 
-Main screen for listing apartments and navigating to search or saved views.
+Main screen for listing apartments and navigating to search or favorites views.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `list_apartments()` | `ApartmentListingApp.list_all_apartments()` | `dict[str, object]` apartment records | Remains in `ApartmentHome` |
-| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(apartment_id)` | Apartment details dict | → `ApartmentDetail(apartment_id)` |
+| `list_apartments()` | `ApartmentListingApp.list_all_apartments()` | `dict[str, Any]` apartment records | Remains in `ApartmentHome` |
+| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(apartment_id)` | `Apartment` object | → `ApartmentDetail(apartment_id)` |
 | `open_search()` | — | Navigation indicator string | → `ApartmentSearch` |
-| `open_saved()` | — | Navigation indicator string | → `ApartmentSaved` |
+| `open_favorites()` | `ApartmentListingApp.list_saved_apartments()` | `dict[str, Apartment]` saved apartments | → `ApartmentFavorites` |
 
 ---
 
 ### ApartmentDetail
 
-Detail screen for a specific apartment, supporting save, update, and delete actions.
+Detail screen for a specific apartment, supporting save and unsave actions.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `get_details()` | `ApartmentListingApp.get_apartment_details(apartment_id)` | Apartment details dict | Remains in `ApartmentDetail` |
 | `save()` | `ApartmentListingApp.save_apartment(apartment_id)` | `None` | Remains in `ApartmentDetail` |
 | `unsave()` | `ApartmentListingApp.remove_saved_apartment(apartment_id)` | `None` | Remains in `ApartmentDetail` |
-| `update_price(new_price)` | `ApartmentListingApp.update_apartment(apartment_id, new_price)` | `None` | Remains in `ApartmentDetail(apartment_id)` |
-| `delete()` | `ApartmentListingApp.delete_apartment(apartment_id)` | `None` | → `ApartmentHome` |
-| `go_back()` | — | Navigation indicator string | → `ApartmentHome` |
+| `go_back()` | — | Navigation indicator string | → Previous state (via navigation stack) |
 
 ---
 
@@ -45,22 +80,33 @@ Screen for searching apartments with optional filtering criteria.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `search(...)` | `ApartmentListingApp.search_apartments(...)` | Filtered apartment results dict | Remains in `ApartmentSearch` |
-| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(apartment_id)` | Apartment details dict | → `ApartmentDetail(apartment_id)` |
-| `go_back()` | — | Navigation indicator string | → `ApartmentHome` |
+| `search(...)` | `ApartmentListingApp.search_apartments(...)` | `dict[str, Apartment]` filtered results | Remains in `ApartmentSearch` |
+| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(apartment_id)` | `Apartment` object | → `ApartmentDetail(apartment_id)` |
+| `go_back()` | — | Navigation indicator string | → Previous state (via navigation stack) |
+
+**Search parameters:** `name`, `location`, `zip_code`, `min_price`, `max_price`, `number_of_bedrooms`, `number_of_bathrooms`, `property_type`, `square_footage`, `furnished_status`, `floor_level`, `pet_policy`, `lease_term`, `amenities`
 
 ---
 
-### ApartmentSaved
+### ApartmentFavorites
 
-Screen displaying all saved apartments.
+Screen displaying saved apartments.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `list_saved()` | `ApartmentListingApp.list_saved_apartments()` | Saved apartments dict | Remains in `ApartmentSaved` |
-| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(apartment_id)` | Apartment details dict | → `ApartmentDetail(apartment_id)` |
-| `unsave(apartment_id)` | `ApartmentListingApp.remove_saved_apartment(apartment_id)` | `None` | Remains in `ApartmentSaved` |
-| `go_back()` | — | Navigation indicator string | → `ApartmentHome` |
+| `view_apartment(apartment_id)` | `ApartmentListingApp.get_apartment_details(apartment_id)` | `Apartment` object | → `ApartmentDetail(apartment_id)` |
+| `go_back()` | — | Navigation indicator string | → Previous state (via navigation stack) |
+
+---
+
+## Summary Table
+
+| State | Context | Transitions Out | Self-Loops |
+|-------|---------|-----------------|------------|
+| **ApartmentHome** | — | `view_apartment` → ApartmentDetail, `open_search` → ApartmentSearch, `open_favorites` → ApartmentFavorites | `list_apartments` |
+| **ApartmentDetail** | apartment_id | `go_back` → previous state | `save`, `unsave` |
+| **ApartmentSearch** | — | `view_apartment` → ApartmentDetail, `go_back` → previous state | `search` |
+| **ApartmentFavorites** | — | `view_apartment` → ApartmentDetail, `go_back` → previous state | — |
 
 ---
 
@@ -72,7 +118,5 @@ Screen displaying all saved apartments.
 - `view_apartment` always transitions into `ApartmentDetail`
   using the provided `apartment_id`.
 - `save` and `unsave` operations do not trigger navigation changes.
-- `update_price` refreshes the current detail view for the same apartment.
-- `delete` and `go_back` always return the app to `ApartmentHome`.
-- `go_back()` appears automatically when navigation history exists and pops
-  to the previous screen.
+- `go_back()` is inherited from `StatefulApp` and uses the navigation stack
+  to return to the previous state.

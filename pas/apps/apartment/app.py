@@ -45,10 +45,6 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             self._handle_home_transition(fname, args)
             return
 
-        if isinstance(current_state, ApartmentDetail):
-            self._handle_detail_transition(fname, args)
-            return
-
         if isinstance(current_state, ApartmentSearch):
             self._handle_search_transition(fname, args)
             return
@@ -71,19 +67,11 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             self.set_current_state(ApartmentFavorites())
             return
 
-    def _handle_detail_transition(self, fname: str, args: dict[str, Any]) -> None:
-        if fname == "go_back":
-            self.load_root_state()
-            return
-
     def _handle_search_transition(self, fname: str, args: dict[str, Any]) -> None:
         if fname == "view_apartment":
             apt_id = args.get("apartment_id")
             if apt_id:
                 self.set_current_state(ApartmentDetail(apartment_id=apt_id))
-            return
-        if fname == "go_back":
-            self.load_root_state()
             return
 
     def _handle_saved_transition(self, fname: str, args: dict[str, Any]) -> None:
@@ -91,8 +79,4 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             apt_id = args.get("apartment_id")
             if apt_id:
                 self.set_current_state(ApartmentDetail(apartment_id=apt_id))
-            return
-
-        if fname == "go_back":
-            self.load_root_state()
             return

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from are.simulation.types import OperationType, disable_events
 
@@ -9,6 +9,8 @@ from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
+    from are.simulation.apps.apartment_listing import Apartment
+
     from pas.apps.apartment.app import StatefulApartmentApp
 
 logger = logging.getLogger(__name__)
@@ -28,11 +30,11 @@ class ApartmentHome(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def list_apartments(self) -> dict[str, object]:
+    def list_apartments(self) -> dict[str, Any]:
         """List all apartments.
 
         Returns:
-            dict[str, object]: All available apartment records.
+            dict[str, Any]: All available apartment records.
         """
         app = cast("StatefulApartmentApp", self.app)
         with disable_events():
@@ -44,14 +46,14 @@ class ApartmentHome(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def view_apartment(self, apartment_id: str) -> dict[str, object]:
+    def view_apartment(self, apartment_id: str) -> Apartment:
         """Open the detail screen for a specific apartment.
 
         Args:
             apartment_id: Unique identifier for the apartment.
 
         Returns:
-            dict[str, object]: Apartment details.
+            Apartment: Apartment details.
         """
         app = cast("StatefulApartmentApp", self.app)
         with disable_events():
@@ -63,21 +65,21 @@ class ApartmentHome(AppState):
         """Navigate to the search page.
 
         Returns:
-            str: Navigation indicator used by PAS.
+            str: Confirmation that the search view is open.
         """
         return "Search Apartments view is open."
 
     @user_tool()
     @pas_event_registered()
-    def open_favorites(self) -> str:
+    def open_favorites(self) -> dict[str, Apartment]:
         """Navigate to the saved apartments page.
 
         Returns:
-            str: Navigation indicator used by PAS.
+            dict[str, Apartment]: Saved apartments.
         """
         app = cast("StatefulApartmentApp", self.app)
         with disable_events():
-            return app.load_saved_apartments()
+            return app.list_saved_apartments()
 
 
 # Detail Screen
@@ -117,16 +119,6 @@ class ApartmentDetail(AppState):
         with disable_events():
             return app.remove_saved_apartment(apartment_id=self.apartment_id)
 
-    @user_tool()
-    @pas_event_registered()
-    def go_back(self) -> str:
-        """Return to the home screen.
-
-        Returns:
-            str: Navigation indicator used by PAS.
-        """
-        return "Going back to Apartment Home."
-
 
 # Search Screen
 class ApartmentSearch(AppState):
@@ -158,11 +150,11 @@ class ApartmentSearch(AppState):
         pet_policy: str | None = None,
         lease_term: str | None = None,
         amenities: list[str] | None = None,
-    ) -> dict[str, object]:
+    ) -> dict[str, Apartment]:
         """Search apartments using optional filtering criteria.
 
         Returns:
-            -> dict[str, object]: Filtered apartment results.
+            dict[str, Apartment]: Filtered apartment results.
         """
         app = cast("StatefulApartmentApp", self.app)
         with disable_events():
@@ -185,28 +177,18 @@ class ApartmentSearch(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def view_apartment(self, apartment_id: str) -> dict[str, object]:
+    def view_apartment(self, apartment_id: str) -> Apartment:
         """Open detail page from search results.
 
         Args:
             apartment_id: Unique identifier for the apartment.
 
         Returns:
-            dict[str, object]: Apartment details.
+            Apartment: Apartment details.
         """
         app = cast("StatefulApartmentApp", self.app)
         with disable_events():
             return app.get_apartment_details(apartment_id=apartment_id)
-
-    @user_tool()
-    @pas_event_registered()
-    def go_back(self) -> str:
-        """Return to the home screen.
-
-        Returns:
-            str: Navigation indicator used by PAS.
-        """
-        return "go_back"
 
 
 # Saved Apartments
@@ -223,25 +205,15 @@ class ApartmentFavorites(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def view_apartment(self, apartment_id: str) -> dict[str, object]:
+    def view_apartment(self, apartment_id: str) -> Apartment:
         """View an apartment from the saved list.
 
         Args:
             apartment_id: Unique identifier for the apartment.
 
         Returns:
-            dict[str, object]: Apartment details.
+            Apartment: Apartment details.
         """
         app = cast("StatefulApartmentApp", self.app)
         with disable_events():
             return app.get_apartment_details(apartment_id=apartment_id)
-
-    @user_tool()
-    @pas_event_registered()
-    def go_back(self) -> str:
-        """Return to the home screen.
-
-        Returns:
-            str: Navigation indicator used by PAS.
-        """
-        return "go_back"
