@@ -44,12 +44,20 @@ class StatefulCabApp(StatefulApp, CabApp):
         match fname:
             case "list_rides":
                 self._handle_list_rides(event_args)
-            case "get_quotation" | "view_quotation":
+            case "get_quotation":
                 self._handle_get_quotation(event)
-            case "order_ride" | "confirm_order":
+            case "order_ride":
                 self._handle_order_ride(event)
-            case "user_cancel_ride" | "end_ride":
+            case "open_current_ride":
+                self._handle_open_current_ride(event)
+            case "cancel_ride":
                 self._handle_finish()
+
+    def _handle_open_current_ride(self, event: CompletedEvent) -> None:
+        """Navigate to the ride detail screen for the current ride."""
+        ride_obj = event.metadata.return_value if event.metadata else None
+        if ride_obj is not None:
+            self.set_current_state(CabRideDetail(ride_obj))
 
     def _handle_list_rides(self, event_args: dict[str, Any]) -> None:
         """Navigate to service options after listing rides."""
@@ -62,28 +70,15 @@ class StatefulCabApp(StatefulApp, CabApp):
 
     def _handle_get_quotation(self, event: CompletedEvent) -> None:
         """Navigate to quotation detail after getting a quotation."""
-        ride_obj = getattr(event, "result", None)
+        ride_obj = event.metadata.return_value if event.metadata else None
         if ride_obj:
             self.set_current_state(CabQuotationDetail(ride_obj))
 
     def _handle_order_ride(self, event: CompletedEvent) -> None:
         """Navigate to ride detail after ordering a ride."""
-        ride_obj = getattr(event, "result", None)
-
-        if ride_obj:
-            # Try to find the ride in history by matching ride_id
-            ride_index = None
-            if hasattr(ride_obj, "ride_id"):
-                for idx, ride in enumerate(self.ride_history):
-                    if hasattr(ride, "ride_id") and ride.ride_id == ride_obj.ride_id:
-                        ride_index = idx
-                        break
-
-            if ride_index is None and self.ride_history:
-                ride_index = len(self.ride_history) - 1
-
-            if ride_index is not None:
-                self.set_current_state(CabRideDetail(ride_index))
+        ride_obj = event.metadata.return_value if event.metadata else None
+        if ride_obj is not None:
+            self.set_current_state(CabRideDetail(ride_obj))
 
     def _handle_finish(self) -> None:
         """Return to home screen after canceling or ending a ride."""

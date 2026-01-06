@@ -12,14 +12,13 @@ quotation, and ride detail flows based on completed cab backend operations.
 
 ### CabHome
 
-Home screen for cab operations such as listing rides, requesting quotations,
-ordering rides, and viewing ride history.
+Home screen for cab operations such as listing available rides, viewing the
+current ride, and viewing ride history.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
 | `list_rides(start_location, end_location, ride_time=None)` | `CabApp.list_rides(start_location, end_location, ride_time)` | `list[Ride]` quotations | → `CabServiceOptions(start_location, end_location, ride_time)` |
-| `get_quotation(start_location, end_location, service_type, ride_time=None)` | `CabApp.get_quotation(...)` | Unbooked `Ride` quotation | → `CabQuotationDetail(ride)` |
-| `order_ride(start_location, end_location, service_type, ride_time=None)` | `CabApp.order_ride(...)` | Booked `Ride` | → `CabRideDetail(ride_index)` |
+| `open_current_ride()` | `CabApp.get_current_ride_status()` | Current `Ride` | → `CabRideDetail(ride)` |
 | `get_ride_history(offset=0, limit=10)` | `CabApp.get_ride_history(offset, limit)` | Pagination dict of rides | Remains in `CabHome` |
 
 ---
@@ -42,20 +41,17 @@ Screen displaying a quotation (ride before booking).
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
 | `show_quotation()` | — | Quotation `Ride` | Remains in `CabQuotationDetail` |
-| `confirm_order()` | `CabApp.order_ride(start, end, service_type, ride_time)` | Booked `Ride` | → `CabRideDetail(ride_index)` |
+| `order_ride()` | `CabApp.order_ride(start, end, service_type, ride_time)` | Booked `Ride` | → `CabRideDetail(ride)` |
 
 ---
 
 ### CabRideDetail
 
-Detail view for a specific ride, including status checks and ride lifecycle actions.
+Detail view for a specific ride, allowing the user to cancel the ride.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `get_ride()` | `CabApp.get_ride(ride_index)` | `Ride` details | Remains in `CabRideDetail` |
-| `get_current_ride_status()` | `CabApp.get_current_ride_status()` | Updated `Ride` | Remains in `CabRideDetail` |
-| `user_cancel_ride()` | `CabApp.user_cancel_ride()` | `None` | → `CabHome` |
-| `end_ride()` | `CabApp.end_ride()` | `None` | → `CabHome` |
+| `cancel_ride()` | `CabApp.user_cancel_ride()` | `None` | → `CabHome` (stack cleared) |
 
 ---
 
@@ -63,8 +59,7 @@ Detail view for a specific ride, including status checks and ride lifecycle acti
 
 - Navigation transitions are handled in `StatefulCabApp.handle_state_transition`
   based on the completed backend tool name.
-- Ride-to-detail navigation resolves the ride index by matching `ride_id`
-  against `CabApp.ride_history`.
-- After ride cancellation or completion, the app always returns to `CabHome`.
+- States store the `Ride` object directly for context (not ride index).
+- After ride cancellation, the app returns to `CabHome` and clears the navigation stack.
 - `go_back()` appears automatically when navigation history exists and pops
   to the previous state.

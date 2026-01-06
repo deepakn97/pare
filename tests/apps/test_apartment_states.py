@@ -23,7 +23,7 @@ from pas.apps.apartment.states import (
     ApartmentHome,
     ApartmentDetail,
     ApartmentSearch,
-    ApartmentSaved,
+    ApartmentFavorites,
 )
 
 def make_event(
@@ -210,7 +210,7 @@ def test_open_saved_and_unsave(apt_app: StatefulApartmentApp) -> None:
     )
 
     saved_state = apt_app.current_state
-    assert isinstance(saved_state, ApartmentSaved)
+    assert isinstance(saved_state, ApartmentFavorites)
 
     # Backend unsave through state
     saved_state.unsave(apartment_id=apt_id)
@@ -225,7 +225,7 @@ def test_open_saved_and_unsave(apt_app: StatefulApartmentApp) -> None:
     )
 
     assert apt_id not in apt_app.saved_apartments
-    assert isinstance(apt_app.current_state, ApartmentSaved)
+    assert isinstance(apt_app.current_state, ApartmentFavorites)
 
 
 def test_go_back_to_home(apt_app: StatefulApartmentApp) -> None:

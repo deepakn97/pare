@@ -43,7 +43,7 @@ class CabHome(AppState):
         Args:
             start_location: The starting location for the ride.
             end_location: The destination location for the ride.
-            ride_time: Optional scheduled time for the ride.
+            ride_time: The time for the ride in format 'YYYY-MM-DD HH:MM:SS'. If None, the current time is used.
 
         Returns:
             A list of available Ride objects with quotations for all service types.
@@ -56,63 +56,18 @@ class CabHome(AppState):
                 ride_time=ride_time,
             )
 
+    # should navigate to CabRideDetail
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def get_quotation(
-        self,
-        start_location: str,
-        end_location: str,
-        service_type: str,
-        ride_time: str | None = None,
-    ) -> Ride:
-        """Get a quotation (unbooked Ride).
-
-        Args:
-            start_location: The starting location for the ride.
-            end_location: The destination location for the ride.
-            service_type: The type of service requested.
-            ride_time: Optional scheduled time for the ride.
+    def open_current_ride(self) -> Ride:
+        """Get the details for the current ride.
 
         Returns:
-            A Ride object containing the quotation details.
+            Current ride object if there is an ongoing ride
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
-            return app.get_quotation(
-                start_location=start_location,
-                end_location=end_location,
-                service_type=service_type,
-                ride_time=ride_time,
-            )
-
-    @user_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
-    def order_ride(
-        self,
-        start_location: str,
-        end_location: str,
-        service_type: str,
-        ride_time: str | None = None,
-    ) -> Ride:
-        """Order a ride directly.
-
-        Args:
-            start_location: The starting location for the ride.
-            end_location: The destination location for the ride.
-            service_type: The type of service to order.
-            ride_time: Optional scheduled time for the ride.
-
-        Returns:
-            A Ride object representing the booked ride.
-        """
-        app = cast("StatefulCabApp", self.app)
-        with disable_events():
-            return app.order_ride(
-                start_location=start_location,
-                end_location=end_location,
-                service_type=service_type,
-                ride_time=ride_time,
-            )
+            return app.get_current_ride_status()
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
@@ -142,14 +97,14 @@ class CabRideDetail(AppState):
         ride_index: The index of the ride to display details for.
     """
 
-    def __init__(self, ride_index: int) -> None:
+    def __init__(self, ride: Ride) -> None:
         """Initialize ride detail view with a ride index.
 
         Args:
-            ride_index: The index of the ride to display.
+            ride: The ride object to display.
         """
         super().__init__()
-        self.ride_index = ride_index
+        self.ride = ride
 
     def on_enter(self) -> None:
         """Called when entering this state."""
@@ -160,32 +115,8 @@ class CabRideDetail(AppState):
         pass
 
     @user_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
-    def get_ride(self) -> Ride:
-        """Return details of the selected ride.
-
-        Returns:
-            A Ride object containing the details of the selected ride.
-        """
-        app = cast("StatefulCabApp", self.app)
-        with disable_events():
-            return app.get_ride(self.ride_index)
-
-    @user_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
-    def get_current_ride_status(self) -> Ride:
-        """Return current status of the ongoing ride.
-
-        Returns:
-            A Ride object with the current status of the ongoing ride.
-        """
-        app = cast("StatefulCabApp", self.app)
-        with disable_events():
-            return app.get_current_ride_status()
-
-    @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def user_cancel_ride(self) -> None:
+    def cancel_ride(self) -> None:
         """Cancel the current ride.
 
         Returns:
@@ -194,18 +125,6 @@ class CabRideDetail(AppState):
         app = cast("StatefulCabApp", self.app)
         with disable_events():
             return app.user_cancel_ride()
-
-    @user_tool()
-    @pas_event_registered(operation_type=OperationType.WRITE)
-    def end_ride(self) -> None:
-        """End the current ride.
-
-        Returns:
-            The result of the ride ending operation.
-        """
-        app = cast("StatefulCabApp", self.app)
-        with disable_events():
-            return app.end_ride()
 
 
 # Service Type Selection
@@ -260,7 +179,7 @@ class CabServiceOptions(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def view_quotation(self, service_type: str) -> Ride:
+    def get_quotation(self, service_type: str) -> Ride:
         """View quotation for a specific service type.
 
         Args:
@@ -319,7 +238,7 @@ class CabQuotationDetail(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def confirm_order(self) -> Ride:
+    def order_ride(self) -> Ride:
         """Confirm and book the ride from the quotation.
 
         Returns:
