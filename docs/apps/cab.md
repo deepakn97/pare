@@ -30,7 +30,7 @@ Screen displaying available service types for a given journey.
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
 | `list_service_types()` | Reads `CabApp.d_service_config` | `list[str]` service names | Remains in `CabServiceOptions` |
-| `view_quotation(service_type)` | `CabApp.get_quotation(start, end, service_type, ride_time)` | Unbooked `Ride` quotation | → `CabQuotationDetail(ride)` |
+| `get_quotation(service_type)` | `CabApp.get_quotation(start, end, service_type, ride_time)` | Unbooked `Ride` quotation | → `CabQuotationDetail(ride)` |
 
 ---
 
@@ -51,7 +51,7 @@ Detail view for a specific ride, allowing the user to cancel the ride.
 
 | Tool | Backend call(s) | Returns | Navigation effect |
 | --- | --- | --- | --- |
-| `cancel_ride()` | `CabApp.user_cancel_ride()` | `None` | → `CabHome` (stack cleared) |
+| `cancel_ride()` | `CabApp.user_cancel_ride()` | `str` (cancellation message) | → `CabHome` (stack cleared) |
 
 ---
 

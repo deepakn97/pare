@@ -309,6 +309,6 @@ class FolderList(AppState):
             folder (str): Folder name.
 
         Returns:
-            str: Confirmation message that folder is opened.
+            list[Note]: Notes in the opened folder.
         """
         return cast("StatefulNotesApp", self.app).open_folder(folder)

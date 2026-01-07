@@ -46,7 +46,7 @@ class CabHome(AppState):
             ride_time: The time for the ride in format 'YYYY-MM-DD HH:MM:SS'. If None, the current time is used.
 
         Returns:
-            A list of available Ride objects with quotations for all service types.
+            list[Ride]: Available ride objects with quotations for all service types.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -63,7 +63,7 @@ class CabHome(AppState):
         """Get the details for the current ride.
 
         Returns:
-            Current ride object if there is an ongoing ride
+            Ride: Current ride object if there is an ongoing ride.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -79,7 +79,7 @@ class CabHome(AppState):
             limit: The maximum number of records to return (default: 10).
 
         Returns:
-            A collection of historical Ride objects.
+            dict[str, Any]: Collection of historical ride records.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -92,9 +92,6 @@ class CabRideDetail(AppState):
 
     This state provides detailed information and operations for a specific ride,
     including viewing ride details, checking status, and canceling or ending the ride.
-
-    Attributes:
-        ride_index: The index of the ride to display details for.
     """
 
     def __init__(self, ride: Ride) -> None:
@@ -116,11 +113,11 @@ class CabRideDetail(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
-    def cancel_ride(self) -> None:
+    def cancel_ride(self) -> str:
         """Cancel the current ride.
 
         Returns:
-            The result of the cancellation operation.
+            str: Cancellation confirmation message.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -172,7 +169,7 @@ class CabServiceOptions(AppState):
         """List all available service types.
 
         Returns:
-            A sorted list of available service type names.
+            list[str]: Sorted list of available service type names.
         """
         app = cast("StatefulCabApp", self.app)
         return sorted(app.d_service_config.keys())
@@ -186,7 +183,7 @@ class CabServiceOptions(AppState):
             service_type: The type of service to get a quotation for.
 
         Returns:
-            A Ride object containing the quotation for the specified service type.
+            Ride: Quotation for the specified service type.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():
@@ -232,7 +229,7 @@ class CabQuotationDetail(AppState):
         """Show the quotation details.
 
         Returns:
-            The Ride object containing the quotation details.
+            Ride: The quotation details.
         """
         return self.ride
 
@@ -242,7 +239,7 @@ class CabQuotationDetail(AppState):
         """Confirm and book the ride from the quotation.
 
         Returns:
-            A Ride object representing the confirmed and booked ride.
+            Ride: The confirmed and booked ride.
         """
         app = cast("StatefulCabApp", self.app)
         with disable_events():

@@ -5,12 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from are.simulation.apps.reminder import ReminderApp
+from are.simulation.apps.reminder import Reminder, ReminderApp
 from are.simulation.tool_utils import OperationType, app_tool
 
 from pas.apps.core import StatefulApp
 from pas.apps.reminder.states import (
-    AddReminder,
     EditReminder,
     ReminderDetail,
     ReminderList,
@@ -42,6 +41,22 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
         """
         return ReminderList()
 
+    def get_reminder_with_id(self, reminder_id: str) -> Reminder:
+        """Retrieve a reminder by its ID.
+
+        Args:
+            reminder_id: The ID of the reminder to retrieve.
+
+        Returns:
+            The Reminder object corresponding to the given ID.
+
+        Raises:
+            KeyError: If the reminder ID does not exist.
+        """
+        if reminder_id not in self.reminders:
+            raise KeyError(f"Reminder {reminder_id} not found.")
+        return self.reminders[reminder_id]
+
     @app_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
     def update_reminder(
@@ -64,7 +79,7 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
             repetition_value: Repetition interval value, or None.
 
         Returns:
-            The reminder ID after update.
+            str: The reminder ID after update.
 
         Raises:
             ValueError: If the reminder ID does not exist.
@@ -111,25 +126,21 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
         args: dict[str, Any] = action.args if action and hasattr(action, "args") else {}
 
         metadata = event.metadata
-        if metadata and getattr(metadata, "return_value", None) in {"cancel", "back"}:
-            self.go_back()
-            return
 
         if isinstance(current_state, ReminderList):
             self._handle_list_transition(fname, args)
-            return
-
-        if isinstance(current_state, ReminderDetail):
-            self._handle_detail_transition(fname, current_state)
-            return
-
-        if isinstance(current_state, AddReminder):
-            self._handle_add_transition(fname)
-            return
-
-        if isinstance(current_state, EditReminder):
-            self._handle_edit_transition(fname)
-            return
+        elif isinstance(current_state, ReminderDetail):
+            reminder_id = current_state.reminder_id
+            self._handle_detail_transition(fname, reminder_id)
+        elif isinstance(current_state, EditReminder):
+            # EditReminder state can be reached from both creating a new reminder and editing an existing reminder.
+            # If we are editing an existing reminder, we use the current reminder ID to navigate back to the ReminderDetail state.
+            # Whereas, if we are creating a new reminder, there is no current reminder ID and we get the ID from the metadata after saving.
+            saved_reminder_id = getattr(metadata, "return_value", None) if metadata else None
+            original_reminder_id = current_state.reminder_id
+            self._handle_edit_transition(
+                fname, saved_reminder_id=saved_reminder_id, original_reminder_id=original_reminder_id
+            )
 
     def _handle_list_transition(self, fname: str, args: dict[str, Any]) -> None:
         """Handle transitions from the reminder list state.
@@ -142,43 +153,36 @@ class StatefulReminderApp(StatefulApp, ReminderApp):
             reminder_id = args.get("reminder_id")
             if reminder_id:
                 self.set_current_state(ReminderDetail(reminder_id))
-            return
+        elif fname == "create_new":
+            self.set_current_state(EditReminder())
 
-        if fname == "create_new":
-            self.set_current_state(AddReminder())
-            return
-
-    def _handle_detail_transition(self, fname: str, state: ReminderDetail) -> None:
+    def _handle_detail_transition(self, fname: str, reminder_id: str) -> None:
         """Handle transitions from the reminder detail state.
 
         Args:
             fname: Name of the invoked tool.
-            state: Current ReminderDetail state.
+            reminder_id: ID of the current reminder being viewed.
         """
         if fname == "edit":
-            self.set_current_state(EditReminder(state.reminder_id))
-            return
+            self.set_current_state(EditReminder(reminder_id=reminder_id))
+        elif fname == "delete":
+            self.load_root_state()
 
-        if fname in {"delete", "go_back"}:
-            self.go_back()
-            return
-
-    def _handle_add_transition(self, fname: str) -> None:
-        """Handle transitions from the add reminder state.
-
-        Args:
-            fname: Name of the invoked tool.
-        """
-        if fname in {"save", "go_back"}:
-            self.go_back()
-            return
-
-    def _handle_edit_transition(self, fname: str) -> None:
+    def _handle_edit_transition(
+        self, fname: str, saved_reminder_id: str | None, original_reminder_id: str | None
+    ) -> None:
         """Handle transitions from the edit reminder state.
 
         Args:
             fname: Name of the invoked tool.
+            saved_reminder_id: ID of the reminder after save, if any.
+            original_reminder_id: ID of the reminder being edited, if any.
         """
-        if fname in {"save", "go_back"}:
-            self.go_back()
-            return
+        if fname == "save":
+            if saved_reminder_id is not None:
+                self.set_current_state(ReminderDetail(reminder_id=saved_reminder_id))
+        elif fname == "cancel":
+            if original_reminder_id is not None:
+                self.set_current_state(ReminderDetail(reminder_id=original_reminder_id))
+            else:
+                self.load_root_state()
