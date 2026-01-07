@@ -164,7 +164,7 @@ class NoteDetail(AppState):
             attachment_path (str): Path to the attachment to add.
 
         Returns:
-            str: Backend confirmation "OK".
+            str: Returns note ID to which the attachment was added.
         """
         with disable_events():
             return cast("StatefulNotesApp", self.app).add_attachment_to_note(self.note_id, attachment_path)
@@ -178,7 +178,7 @@ class NoteDetail(AppState):
             attachment (str): Attachment identifier.
 
         Returns:
-            str: Backend confirmation "OK".
+            str: Returns note ID from which the attachment was removed.
         """
         with disable_events():
             return cast("StatefulNotesApp", self.app).remove_attachment(self.note_id, attachment)
@@ -189,7 +189,7 @@ class NoteDetail(AppState):
         """Delete the note.
 
         Returns:
-            str: Backend deletion confirmation "OK".
+            str: Returns note ID of the deleted note.
         """
         with disable_events():
             return cast("StatefulNotesApp", self.app).delete_note(self.note_id)
@@ -200,10 +200,9 @@ class NoteDetail(AppState):
         """Open edit mode for this note.
 
         Returns:
-            str: Confirmation message that edit mode is activated.
+            str: The note_id being edited.
         """
-        with disable_events():
-            return f"Edit mode activated for note {self.note_id}"
+        return self.note_id
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -264,12 +263,6 @@ class EditNote(AppState):
         pass
 
     @user_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
-    def go_back(self) -> None:
-        """Navigate back to the previous state."""
-        return None
-
-    @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
     def update(self, title: str, content: str) -> str:
         """Update note content and title.
@@ -298,12 +291,6 @@ class FolderList(AppState):
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.READ)
-    def go_back(self) -> None:
-        """Navigate back to the previous state."""
-        return None
-
-    @user_tool()
-    @pas_event_registered(operation_type=OperationType.READ)
     def list_folders(self) -> list[str]:
         """Return all folders.
 
@@ -322,6 +309,6 @@ class FolderList(AppState):
             folder (str): Folder name.
 
         Returns:
-            str: Confirmation message that folder is opened.
+            list[Note]: Notes in the opened folder.
         """
         return cast("StatefulNotesApp", self.app).open_folder(folder)

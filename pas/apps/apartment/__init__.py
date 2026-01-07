@@ -5,15 +5,15 @@ from __future__ import annotations
 from pas.apps.apartment.app import StatefulApartmentApp
 from pas.apps.apartment.states import (
     ApartmentDetail,
+    ApartmentFavorites,
     ApartmentHome,
-    ApartmentSaved,
     ApartmentSearch,
 )
 
 __all__ = [
     "ApartmentDetail",
+    "ApartmentFavorites",
     "ApartmentHome",
-    "ApartmentSaved",
     "ApartmentSearch",
     "StatefulApartmentApp",
 ]

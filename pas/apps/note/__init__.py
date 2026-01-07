@@ -9,5 +9,5 @@ __all__ = [
     "Note",
     "NoteDetail",
     "NoteList",
-    "StatefulNoteApp",
+    "StatefulNotesApp",
 ]

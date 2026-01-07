@@ -870,12 +870,6 @@ class StatefulNotesApp(StatefulApp):
         args = action.resolved_args or action.args
 
         metadata_value = event.metadata.return_value if event.metadata else None
-        # Handle go_back action for all states
-        if fname == "go_back":
-            if self.navigation_stack:
-                self.go_back()
-            return
-
         if isinstance(current_state, NoteList):
             self._handle_note_list_transition(fname, args, metadata_value)
         elif isinstance(current_state, NoteDetail):
@@ -911,7 +905,8 @@ class StatefulNotesApp(StatefulApp):
             return
 
         if fname == "delete" and self.navigation_stack:
-            self.go_back()
+            with disable_events():
+                self.go_back()
             return
 
         if fname == "duplicate":
@@ -928,12 +923,9 @@ class StatefulNotesApp(StatefulApp):
     def _handle_edit_note_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
         """Process transitions from the edit note view."""
         if fname == "update":
-            if self.navigation_stack:
-                self.go_back()
-            else:
-                note_id = self._resolve_note_id(args, metadata)
-                if note_id:
-                    self.set_current_state(NoteDetail(note_id))
+            note_id = self._resolve_note_id(args, metadata)
+            if note_id:
+                self.set_current_state(NoteDetail(note_id))
 
     def _handle_folder_list_transition(self, fname: str, args: dict[str, Any], metadata: object | None) -> None:
         """Process transitions from the folder list view."""

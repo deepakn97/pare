@@ -8,12 +8,11 @@ from are.simulation.apps.apartment_listing import ApartmentListingApp
 
 from pas.apps.apartment.states import (
     ApartmentDetail,
+    ApartmentFavorites,
     ApartmentHome,
-    ApartmentSaved,
     ApartmentSearch,
 )
 from pas.apps.core import StatefulApp
-from pas.apps.tool_decorators import user_tool
 
 if TYPE_CHECKING:
     from are.simulation.types import CompletedEvent
@@ -28,72 +27,33 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
         self.load_root_state()
 
     def create_root_state(self) -> ApartmentHome:
-        """Create and return the root state for this app.
-
-        Returns:
-            ApartmentHome: Initial navigation state.
-        """
+        """Return the root navigation state for the apartment app."""
         return ApartmentHome()
 
-    # Navigation tools
-    @user_tool()
-    def open_search(self) -> str:
-        """Navigate to the search screen.
+    def handle_state_transition(self, event: CompletedEvent) -> None:
+        """Update navigation state after an apartment operation completes."""
+        current_state = self.current_state
+        fname = event.function_name()
 
-        Returns:
-            str: Indicator string used by tests.
-        """
-        return "open_search"
-
-    @user_tool()
-    def open_saved(self) -> str:
-        """Navigate to the saved apartments screen.
-
-        Returns:
-            str: Indicator string used by tests.
-        """
-        return "open_saved"
-
-    @user_tool()
-    def go_back(self) -> str:
-        """Navigate back to the home screen.
-
-        Returns:
-            str: Indicator string used by tests.
-        """
-        return "go_back"
-
-    # Internal dispatch helpers
-    def _run_backend_if_needed(self, fname: str, args: dict[str, Any]) -> None:
-        """Execute backend operations that tests do not auto-run.
-
-        Args:
-            fname: Function name of the backend call.
-            args: Backend arguments passed via the CompletedEvent.
-        """
-        backend_funcs = {
-            "update_apartment",
-            "delete_apartment",
-            "save_apartment",
-            "remove_saved_apartment",
-        }
-
-        if fname not in backend_funcs:
+        if current_state is None or fname is None:  # defensive, Email-style
             return
 
-        action_func = getattr(self, fname, None)
-        if callable(action_func):
-            clean_args = {k: v for k, v in args.items() if k != "self"}
-            action_func(**clean_args)
+        action = event.action
+        args: dict[str, Any] = action.args if action and hasattr(action, "args") else {}
 
-    def _navigate(self, fname: str, args: dict[str, Any]) -> None:
-        """Update navigation state based on the completed action.
+        if isinstance(current_state, ApartmentHome):
+            self._handle_home_transition(fname, args)
+            return
 
-        Args:
-            fname: Function name for routing.
-            args: Arguments of the action.
-        """
-        if fname in {"get_apartment_details", "view_apartment"}:
+        if isinstance(current_state, ApartmentSearch):
+            self._handle_search_transition(fname, args)
+            return
+
+        if isinstance(current_state, ApartmentFavorites):
+            self._handle_saved_transition(fname, args)
+
+    def _handle_home_transition(self, fname: str, args: dict[str, Any]) -> None:
+        if fname == "view_apartment":
             apt_id = args.get("apartment_id")
             if apt_id:
                 self.set_current_state(ApartmentDetail(apartment_id=apt_id))
@@ -103,52 +63,20 @@ class StatefulApartmentApp(StatefulApp, ApartmentListingApp):
             self.set_current_state(ApartmentSearch())
             return
 
-        if fname == "open_saved":
-            self.set_current_state(ApartmentSaved())
+        if fname == "open_favorites":
+            self.set_current_state(ApartmentFavorites())
             return
 
-        if fname == "update_apartment":
+    def _handle_search_transition(self, fname: str, args: dict[str, Any]) -> None:
+        if fname == "view_apartment":
             apt_id = args.get("apartment_id")
             if apt_id:
                 self.set_current_state(ApartmentDetail(apartment_id=apt_id))
             return
 
-        if fname == "delete_apartment":
-            self.load_root_state()
+    def _handle_saved_transition(self, fname: str, args: dict[str, Any]) -> None:
+        if fname == "view_apartment":
+            apt_id = args.get("apartment_id")
+            if apt_id:
+                self.set_current_state(ApartmentDetail(apartment_id=apt_id))
             return
-
-        if fname in {"save_apartment", "remove_saved_apartment"}:
-            return
-
-        if fname == "go_back":
-            self.load_root_state()
-            return
-
-    # Dispatch
-    def _dispatch(self, fname: str, args: dict[str, Any]) -> None:
-        """Dispatch backend operations and navigation handling.
-
-        Args:
-            fname: Name of the executed function.
-            args: Arguments passed to the function.
-        """
-        self._run_backend_if_needed(fname, args)
-        self._navigate(fname, args)
-
-    # Main entry
-    def handle_state_transition(self, event: CompletedEvent) -> None:
-        """Handle state transition after a simulated ARE backend event.
-
-        Args:
-            event: Completed event with function name and arguments.
-        """
-        action = getattr(event, "action", None)
-        if action is None:
-            return
-
-        fname = event.function_name()
-        if not fname:
-            return
-
-        args = action.args or {}
-        self._dispatch(fname, args)
