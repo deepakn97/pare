@@ -12,7 +12,7 @@ Use these pages to explore the current user-facing tool surface for each PAS sta
 - [Stateful Apartment App](./apartment.md)
 - [Stateful Reminder App](./reminder.md)
 - [Stateful Shopping App](./shopping.md)
-- [Stateful Note App](./note.md)
+- [Stateful Note App](./notes.md)
 
 
 ## Navigation Framework Recap

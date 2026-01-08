@@ -10,9 +10,6 @@ copyright: Maintained by <a href="https://deepakn97.com">deepakn97</a>.
 nav:
   - Home: index.md
   - Getting Started:
-      - Integration Guide: interface-guide.md
-      - User Proxy Guide: user_proxy_guide.md
-      - Proactive Agent Guide: proactive_agent_guide.md
       - Scenario Authoring Guide: scenario_author_guide.md
       - Running Local LLM Models Guide: run_local_llm_model.md
       - Scenario Generation: scenario_generator.md
@@ -26,20 +23,18 @@ nav:
       - Email App: apps/email.md
       - Calendar App: apps/calendar.md
       - Cab Booking App: apps/cab.md
+      - Shopping App: apps/shopping.md
+      - Notes Taking App: apps/notes.md
   - API Reference:
       - Overview: modules.md
-      - System & Session: api/system.md
       - Environment: api/environment.md
       - Stateful Apps: api/apps.md
-      - User Proxy: api/user_proxy.md
-      - Proactive Agent: api/proactive_agent.md
       - Scenarios: api/scenarios.md
       - Scenario Generator: api/scenario_generator.md
-      - Adapters & Validation: api/adapters.md
-      - Logging: api/logging.md
 
 exclude_docs: |
   _plans/
+  github_issues
 
 plugins:
   - search
