@@ -40,7 +40,7 @@ Stateful wrappers around Meta-ARE mobile apps with navigation state machines.
 
 ## Proactive Agent UI
 
-::: pas.apps.proactive_agent_ui
+::: pas.apps.proactive_aui
 
 ## System Apps
 
