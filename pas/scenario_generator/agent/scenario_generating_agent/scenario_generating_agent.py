@@ -20,7 +20,7 @@ from pas.scenario_generator.prompt.scenario_generating_agent_prompts import (
 from pas.scenario_generator.prompt.scenario_generating_agent_prompts import (
     prompts as prompt_module,
 )
-from scripts.run_two_agent_demo import run_demo
+from scripts.run_scenarios import run_scenarios
 
 from .claude_backend import ClaudeAgentRuntimeConfig, ClaudeFilesystemConfig
 from .scenario_uniqueness_agent import ScenarioUniquenessCheckAgent
@@ -1154,8 +1154,8 @@ class ScenarioGeneratingAgentOrchestrator:
         # Use the two-agent demo runner in oracle mode (no LLM calls) to execute
         # the scenario deterministically and obtain a ScenarioValidationResult.
         try:
-            validation_result = run_demo(
-                scenario_name=scenario_id,
+            validation_result = run_scenarios(
+                scenario_names=[scenario_id],
                 oracle_mode=True,
                 max_turns=None,
                 tool_failure_prob=0.0,
@@ -1185,9 +1185,9 @@ class ScenarioGeneratingAgentOrchestrator:
             return result
 
         # `run_demo` returns the ScenarioValidationResult from the runner.
-        runtime_error = validation_result.exception is not None
+        runtime_error = validation_result.results[0].exception is not None if validation_result.results else False
         validation_reached = True
-        validation_success = bool(getattr(validation_result, "success", False))
+        validation_success = getattr(validation_result, "passed", 0) > 0
 
         passed = True
         if runtime_error or (require_validation_success and not validation_success):
