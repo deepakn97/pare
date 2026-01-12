@@ -37,6 +37,9 @@ NOTIFICATION_TEMPLATES = {
             "update_apartment": "Apartment {{apartment_id}} price updated to ${{new_price}}",
             "delete_apartment": "Apartment {{apartment_id}} removed",
         },
+        "StatefulNotesApp": {
+            "delete_folder": "Notes folder deleted: {{folder_name}}",
+        },
     },
     "agent": {
         "StatefulEmailApp": {
@@ -73,6 +76,9 @@ NOTIFICATION_TEMPLATES = {
             "add_new_apartment": "New apartment listing added\nName: {{name}}\nLocation: {{location}}\nZip: {{zip_code}}\nPrice: {{price}}\nBedrooms: {{number_of_bedrooms}}\nBathrooms: {{number_of_bathrooms}}\nSq ft: {{square_footage}}{% if property_type %}\nProperty type: {{property_type}}{% endif %}{% if furnished_status %}\nFurnished: {{furnished_status}}{% endif %}{% if floor_level %}\nFloor: {{floor_level}}{% endif %}{% if pet_policy %}\nPet policy: {{pet_policy}}{% endif %}{% if lease_term %}\nLease term: {{lease_term}}{% endif %}{% if amenities %}\nAmenities: {{amenities|join(', ')}}{% endif %}",
             "update_apartment": "Apartment update: {{apartment_id}}\nNew price: {{new_price}}",
             "delete_apartment": "Apartment removed: {{apartment_id}}",
+        },
+        "StatefulNotesApp": {
+            "delete_folder": "Notes update: folder deleted\nFolder: {{folder_name}}",
         },
     },
 }

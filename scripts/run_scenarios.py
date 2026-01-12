@@ -41,7 +41,7 @@ class ScenarioResult:
     scenario_name: str
     success: bool
     rationale: str | None = None
-    exception: str | None = None
+    exception: Exception | None = None
     duration_seconds: float = 0.0
     export_path: str | None = None
 
@@ -171,11 +171,11 @@ def run_scenarios(
             result.export_path = validation_result.export_path
 
             if validation_result.exception:
-                result.exception = str(validation_result.exception)
+                result.exception = validation_result.exception
 
         except Exception as e:
             result.success = False
-            result.exception = str(e)
+            result.exception = e
             logger.exception(f"Exception while running scenario {scenario_name}")
 
         result.duration_seconds = time.time() - start_time

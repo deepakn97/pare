@@ -25,6 +25,7 @@ dependencies = [
     "pytz>=2025.2",
     "boto3>=1.40.70",
     "tenacity>=9.1.2",
+    "claude-agent-sdk>=0.1.19",
 ]
 
 [project.urls]
