@@ -1,4 +1,4 @@
-"""Stateful DoorDash app with PAS navigation."""
+"""Stateful Food Delivery app with PAS navigation."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from are.simulation.types import CompletedEvent
 
 from pas.apps.core import StatefulApp
-from pas.apps.doordash.states import (
+from pas.apps.food_delivery.states import (
     CartView,
     CheckoutView,
     MenuItemDetail,
@@ -214,8 +214,8 @@ class Order:
 
 
 @dataclass
-class StatefulDoordashApp(StatefulApp):
-    """A DoorDash application that manages restaurant browsing, cart management, checkout, and order history with state-aware transitions.
+class StatefulFoodDeliveryApp(StatefulApp):
+    """A Food Delivery application that manages restaurant browsing, cart management, checkout, and order history with state-aware transitions.
 
     Key Features:
     - Restaurant Management: Browse, search, and view restaurant details
@@ -240,8 +240,8 @@ class StatefulDoordashApp(StatefulApp):
     payment_method: str = ""
 
     def __post_init__(self) -> None:
-        """Initialize the DoorDash app."""
-        super().__init__(self.name or "doordash")
+        """Initialize the Food Delivery app."""
+        super().__init__(self.name or "food_delivery")
         self.load_root_state()
 
     def create_root_state(self) -> RestaurantList:

@@ -1,4 +1,4 @@
-"""State definitions for the stateful DoorDash app."""
+"""State definitions for the stateful Food Delivery app."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
-    from pas.apps.doordash.app import StatefulDoordashApp
+    from pas.apps.food_delivery.app import StatefulFoodDeliveryApp
 
 
 class RestaurantList(AppState):
@@ -33,7 +33,7 @@ class RestaurantList(AppState):
             List of restaurant dictionaries with id, name, cuisine, rating, and delivery time.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).list_restaurants()
+            return cast("StatefulFoodDeliveryApp", self.app).list_restaurants()
 
     @user_tool()
     @pas_event_registered()
@@ -47,7 +47,7 @@ class RestaurantList(AppState):
             List of matching restaurant dictionaries.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).search_restaurants(query)
+            return cast("StatefulFoodDeliveryApp", self.app).search_restaurants(query)
 
     @user_tool()
     @pas_event_registered()
@@ -61,7 +61,7 @@ class RestaurantList(AppState):
             Restaurant details including menu items list.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).get_restaurant(restaurant_id)
+            return cast("StatefulFoodDeliveryApp", self.app).get_restaurant(restaurant_id)
 
     @user_tool()
     @pas_event_registered()
@@ -72,7 +72,7 @@ class RestaurantList(AppState):
             Current cart contents with items and total price.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).get_cart()
+            return cast("StatefulFoodDeliveryApp", self.app).get_cart()
 
     @user_tool()
     @pas_event_registered()
@@ -83,7 +83,7 @@ class RestaurantList(AppState):
             Dictionary containing orders list and pagination info.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).list_orders()
+            return cast("StatefulFoodDeliveryApp", self.app).list_orders()
 
 
 class RestaurantDetail(AppState):
@@ -125,7 +125,7 @@ class RestaurantDetail(AppState):
             Restaurant details including name, cuisine, rating, and delivery time.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).get_restaurant(restaurant_id)
+            return cast("StatefulFoodDeliveryApp", self.app).get_restaurant(restaurant_id)
 
     @user_tool()
     @pas_event_registered()
@@ -139,7 +139,7 @@ class RestaurantDetail(AppState):
             List of menu items with name, price, category, and availability.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).list_menu(restaurant_id)
+            return cast("StatefulFoodDeliveryApp", self.app).list_menu(restaurant_id)
 
     @user_tool()
     @pas_event_registered()
@@ -153,7 +153,7 @@ class RestaurantDetail(AppState):
             Complete menu item details including description and customization options.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).get_item(item_id)
+            return cast("StatefulFoodDeliveryApp", self.app).get_item(item_id)
 
     @user_tool()
     @pas_event_registered()
@@ -167,7 +167,7 @@ class RestaurantDetail(AppState):
             List of matching menu items with details.
         """
         with disable_events():
-            app = cast("StatefulDoordashApp", self.app)
+            app = cast("StatefulFoodDeliveryApp", self.app)
             return app.search_menu_item(query, restaurant_id=self.restaurant_id)
 
 
@@ -213,7 +213,7 @@ class MenuItemDetail(AppState):
             Item details including price, description, and available customizations.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).get_item(item_id)
+            return cast("StatefulFoodDeliveryApp", self.app).get_item(item_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -229,7 +229,7 @@ class MenuItemDetail(AppState):
             Success message confirming item was added to cart.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).add_to_cart(item_id, quantity, customizations)
+            return cast("StatefulFoodDeliveryApp", self.app).add_to_cart(item_id, quantity, customizations)
 
 
 class CartView(AppState):
@@ -256,7 +256,7 @@ class CartView(AppState):
             Dictionary containing items list and total price.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).get_cart()
+            return cast("StatefulFoodDeliveryApp", self.app).get_cart()
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -271,7 +271,7 @@ class CartView(AppState):
             Success message confirming quantity was updated.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).update_cart(item_id, quantity)
+            return cast("StatefulFoodDeliveryApp", self.app).update_cart(item_id, quantity)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -285,7 +285,7 @@ class CartView(AppState):
             Success message confirming item was removed.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).remove_from_cart(item_id)
+            return cast("StatefulFoodDeliveryApp", self.app).remove_from_cart(item_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -296,7 +296,7 @@ class CartView(AppState):
             Success message confirming cart was cleared.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).clear_cart()
+            return cast("StatefulFoodDeliveryApp", self.app).clear_cart()
 
     @user_tool()
     @pas_event_registered()
@@ -307,7 +307,7 @@ class CartView(AppState):
             Checkout information including cart summary and current delivery/payment settings.
         """
         with disable_events():
-            app = cast("StatefulDoordashApp", self.app)
+            app = cast("StatefulFoodDeliveryApp", self.app)
             return {
                 "cart": app.get_cart(),
                 "delivery_address": app.delivery_address,
@@ -342,7 +342,7 @@ class CheckoutView(AppState):
             Confirmation message with the address.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).set_delivery_address(address)
+            return cast("StatefulFoodDeliveryApp", self.app).set_delivery_address(address)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -356,7 +356,7 @@ class CheckoutView(AppState):
             Confirmation message with the payment method.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).set_payment_method(method)
+            return cast("StatefulFoodDeliveryApp", self.app).set_payment_method(method)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -370,7 +370,7 @@ class CheckoutView(AppState):
             This will empty the cart and create a new order with status "placed".
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).place_order()
+            return cast("StatefulFoodDeliveryApp", self.app).place_order()
 
 
 class OrderListView(AppState):
@@ -396,7 +396,7 @@ class OrderListView(AppState):
             Dictionary containing orders list and pagination info.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).list_orders()
+            return cast("StatefulFoodDeliveryApp", self.app).list_orders()
 
     @user_tool()
     @pas_event_registered()
@@ -410,7 +410,7 @@ class OrderListView(AppState):
             Complete order details including all items and delivery information.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).get_order(order_id)
+            return cast("StatefulFoodDeliveryApp", self.app).get_order(order_id)
 
 
 class OrderDetail(AppState):
@@ -453,7 +453,7 @@ class OrderDetail(AppState):
             payment method, and timestamps.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).get_order(order_id)
+            return cast("StatefulFoodDeliveryApp", self.app).get_order(order_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -471,7 +471,7 @@ class OrderDetail(AppState):
             Delivered or already cancelled orders cannot be cancelled.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).cancel_order(order_id)
+            return cast("StatefulFoodDeliveryApp", self.app).cancel_order(order_id)
 
     @user_tool()
     @pas_event_registered(operation_type=OperationType.WRITE)
@@ -489,4 +489,4 @@ class OrderDetail(AppState):
             Navigate to cart to review and checkout.
         """
         with disable_events():
-            return cast("StatefulDoordashApp", self.app).reorder(order_id)
+            return cast("StatefulFoodDeliveryApp", self.app).reorder(order_id)

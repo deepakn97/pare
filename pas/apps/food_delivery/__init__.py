@@ -1,9 +1,9 @@
-"""Stateful doordash application package."""
+"""Stateful food delivery application package."""
 
 from __future__ import annotations
 
-from pas.apps.doordash.app import StatefulDoordashApp
-from pas.apps.doordash.states import (
+from pas.apps.food_delivery.app import StatefulFoodDeliveryApp
+from pas.apps.food_delivery.states import (
     CartView,
     CheckoutView,
     MenuItemDetail,
@@ -21,5 +21,5 @@ __all__ = [
     "OrderListView",
     "RestaurantDetail",
     "RestaurantList",
-    "StatefulDoordashApp",
+    "StatefulFoodDeliveryApp",
 ]
