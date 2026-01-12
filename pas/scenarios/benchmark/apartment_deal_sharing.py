@@ -27,8 +27,8 @@ class ApartmentDealSharing(PASScenario):
     """Agent proactively shares price-reduced apartment listing with friend based on budget discussion. The user has saved multiple apartments to favorites and is casually apartment hunting. Earlier, the user participated in a group conversation where a friend (Sarah) mentioned needing to find a 2-bedroom apartment under $2000/month near downtown. A notification arrives that one of the user's saved apartments ("Riverside Lofts") has reduced its price from $2200 to $1850. The agent must: 1. Parse the price drop notification to identify the apartment by name and new price, 2. Search saved apartments to locate Riverside Lofts and retrieve its full details (bedrooms, location, amenities), 3. Search recent group conversations to find Sarah's budget and location requirements, 4. Match the reduced-price apartment to Sarah's stated needs, 5. Send a message to Sarah (or the group conversation) recommending the apartment with key details and the price reduction. This scenario exercises cross-app memory (messages → apartments), temporal reasoning about recent conversations, opportunistic information matching, and proactive social coordination without explicit user request.."""
 
     start_time = datetime(2025, 11, 18, 9, 0, 0, tzinfo=UTC).timestamp()
-    status = ScenarioStatus.Draft
-    is_benchmark_ready = False
+    status = ScenarioStatus.VALID
+    is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent

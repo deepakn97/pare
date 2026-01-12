@@ -32,8 +32,8 @@ class ApartmentFallthroughOrderCancel(PASScenario):
     """
 
     start_time = datetime(2025, 11, 18, 9, 0, 0, tzinfo=UTC).timestamp()
-    status = ScenarioStatus.Draft
-    is_benchmark_ready = False
+    status = ScenarioStatus.Valid
+    is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
