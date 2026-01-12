@@ -9,6 +9,7 @@ from pas.apps.cab import StatefulCabApp
 from pas.apps.calendar.app import StatefulCalendarApp
 from pas.apps.contacts.app import StatefulContactsApp
 from pas.apps.core import AppState, StatefulApp
+from pas.apps.doordash import StatefulDoordashApp
 from pas.apps.email.app import StatefulEmailApp
 from pas.apps.messaging.app import StatefulMessagingApp
 from pas.apps.note import StatefulNotesApp
@@ -28,6 +29,7 @@ __all__ = [
     "StatefulCabApp",
     "StatefulCalendarApp",
     "StatefulContactsApp",
+    "StatefulDoordashApp",
     "StatefulEmailApp",
     "StatefulMessagingApp",
     "StatefulNotesApp",
@@ -48,4 +50,5 @@ ALL_APPS = [
     StatefulMessagingApp,
     StatefulNotesApp,
     StatefulReminderApp,
+    StatefulDoordashApp,
 ]
