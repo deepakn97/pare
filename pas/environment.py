@@ -8,6 +8,7 @@ from are.simulation.types import EventType
 
 from pas.apps import PASAgentUserInterface
 from pas.apps.core import StatefulApp
+from pas.apps.reminder.app import StatefulReminderApp
 from pas.apps.system import HomeScreenSystemApp
 from pas.data_handler.models import PASEventMetadata
 
@@ -23,11 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class StateAwareEnvironmentWrapper(Environment):
-    """Environment wrapper that triggers state transitions in StatefulApps.
-
-    // RL NOTE: This is the environment in the RL sense - manages state transitions and
-    // provides observations (available actions) to agents based on current navigation state.
-    """
+    """Environment wrapper that triggers state transitions in StatefulApps."""
 
     def __init__(
         self,
@@ -108,14 +105,38 @@ class StateAwareEnvironmentWrapper(Environment):
         return tools
 
     def register_apps(self, apps: list[App]) -> None:
-        """Register apps and wire up navigation callbacks to HomeScreenSystemApp.
+        """Registers apps to the environment and wires up navigation callbacks to HomeScreenSystemApp.
 
         Args:
             apps: List of apps to register
         """
-        super().register_apps(apps)
+        for app in apps:
+            app.register_time_manager(self.time_manager)
+            app.register_to_env("environment", self.add_to_log)
+            if app.__class__ == PASAgentUserInterface:
+                app.pause_env = self.pause
+                app.resume_env = self.resume
+            if isinstance(app, StatefulReminderApp):
+                self.notification_system.setup_reminder_app(app)
+            if isinstance(app, HomeScreenSystemApp):
+                self.notification_system.setup_system_app(app)
+                app.wait_for_next_notification = self.wait_for_next_notification
 
-        # Wire up navigation callbacks to the HomeScreen system app
+            for protocol in app.get_implemented_protocols():
+                if protocol in self.protocol_to_app:
+                    old_app = self.protocol_to_app[protocol].__class__.__name__
+                    logger.warning(
+                        f"Protocol {protocol} already registered by {old_app} also provided by {app.__class__.__name__}."
+                    )
+                    continue
+                self.protocol_to_app[protocol] = app
+            self.apps[app.name] = app
+
+        # connect apps to protocol
+        for app in self.apps.values():
+            app.connect_to_protocols(self.protocol_to_app)
+
+        # Wire up navigation callbacks to the HomeScreen System App
         home_screen_app = self.get_app_with_class(HomeScreenSystemApp)
         if home_screen_app is None:
             raise ValueError("HomeScreenSystemApp must be registered in the environment.")
@@ -124,7 +145,6 @@ class StateAwareEnvironmentWrapper(Environment):
             switch_app_callback=self._switch_app, open_app_callback=self._open_app, go_home_callback=self._go_home
         )
 
-        # Set initial active app to home screen
         self.active_app = home_screen_app
         logger.debug("Wired up navigation callbacks to HomeScreenSystemApp")
 
