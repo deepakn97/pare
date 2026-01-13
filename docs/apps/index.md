@@ -13,6 +13,7 @@ Use these pages to explore the current user-facing tool surface for each PAS sta
 - [Stateful Reminder App](./reminder.md)
 - [Stateful Shopping App](./shopping.md)
 - [Stateful Note App](./notes.md)
+- [Stateful Payment App](./payment.md)
 
 
 ## Navigation Framework Recap
