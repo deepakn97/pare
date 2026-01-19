@@ -1,12 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
@@ -42,13 +38,12 @@ class DelayedRideEmailCoordination(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
         # Initialize email app
-        self.email = StatefulEmailApp(name="Emails", user_email="user@example.com")
+        self.email = StatefulEmailApp(name="Emails")
 
         # Initialize cab app
         self.cab = StatefulCabApp(name="Cab")
@@ -66,7 +61,6 @@ class DelayedRideEmailCoordination(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.cab]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
@@ -112,7 +106,7 @@ class DelayedRideEmailCoordination(PASScenario):
 
             # User confirms to notify Sarah
             confirm_notify_event = (
-                aui.accept_proposal(content="Yes, please let her know.")
+                aui.accept_proposal(content="Yes, please proceed.")
                 .oracle()
                 .depends_on(notify_user_event, delay_seconds=2)
             )
@@ -139,7 +133,6 @@ class DelayedRideEmailCoordination(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -181,6 +174,3 @@ class DelayedRideEmailCoordination(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

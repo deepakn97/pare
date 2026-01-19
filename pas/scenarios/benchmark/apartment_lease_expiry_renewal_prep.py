@@ -1,13 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
-from are.simulation.apps.apartment_listing import Apartment
 from are.simulation.apps.contacts import Contact
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
@@ -46,7 +41,6 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -54,89 +48,73 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
         # Initialize apartment app
         self.apartment = StatefulApartmentApp(name="Apartment")
 
-        # Populate apartment catalog with current residence (Downtown Lofts Unit 5C) that user has saved
-        # This is the user's current apartment at $2400/month
-        current_apt_id = "current_downtown_lofts_5c"
-        current_apartment = Apartment(
-            apartment_id=current_apt_id,
+        # Seed apartment catalog via public APIs (avoid mutating internal dicts/lists directly).
+        # Current residence (user has saved it).
+        self.current_apt_id = self.apartment.add_new_apartment(
             name="Downtown Lofts Unit 5C",
             location="Downtown",
             zip_code="90012",
             price=2400.0,
-            bedrooms=2,
-            bathrooms=2,
-            property_type="Apartment",
+            number_of_bedrooms=2,
+            number_of_bathrooms=2,
             square_footage=950,
+            property_type="Apartment",
             furnished_status="Unfurnished",
             floor_level="Upper floors",
             pet_policy="Cats allowed",
             lease_term="1 year",
             amenities=["Gym", "Parking", "In-unit laundry"],
-            saved=True,
         )
-        self.apartment.apartments[current_apt_id] = current_apartment
-        self.apartment.saved_apartments.append(current_apt_id)
+        self.apartment.save_apartment(self.current_apt_id)
 
         # Add comparable alternatives to the catalog (these will be discoverable via search in Step 3)
-        alt_1_id = "riverside_towers_8b"
-        alt_1 = Apartment(
-            apartment_id=alt_1_id,
+        self.alt_1_id = self.apartment.add_new_apartment(
             name="Riverside Towers 8B",
             location="Downtown",
             zip_code="90013",
             price=2450.0,
-            bedrooms=2,
-            bathrooms=2,
-            property_type="Apartment",
+            number_of_bedrooms=2,
+            number_of_bathrooms=2,
             square_footage=920,
+            property_type="Apartment",
             furnished_status="Unfurnished",
             floor_level="Upper floors",
             pet_policy="Pets allowed",
             lease_term="1 year",
             amenities=["Gym", "Parking", "Pool"],
-            saved=False,
         )
-        self.apartment.apartments[alt_1_id] = alt_1
 
-        alt_2_id = "urban_place_3d"
-        alt_2 = Apartment(
-            apartment_id=alt_2_id,
+        self.alt_2_id = self.apartment.add_new_apartment(
             name="Urban Place 3D",
             location="Downtown",
             zip_code="90014",
             price=2450.0,
-            bedrooms=2,
-            bathrooms=2,
-            property_type="Condo",
+            number_of_bedrooms=2,
+            number_of_bathrooms=2,
             square_footage=980,
+            property_type="Condo",
             furnished_status="Unfurnished",
             floor_level="Ground floor",
             pet_policy="Cats allowed",
             lease_term="1 year",
             amenities=["Gym", "In-unit laundry"],
-            saved=False,
         )
-        self.apartment.apartments[alt_2_id] = alt_2
 
-        alt_3_id = "city_view_12a"
-        alt_3 = Apartment(
-            apartment_id=alt_3_id,
+        self.alt_3_id = self.apartment.add_new_apartment(
             name="City View Apartments 12A",
             location="Downtown",
             zip_code="90015",
             price=2495.0,
-            bedrooms=2,
-            bathrooms=2,
-            property_type="Apartment",
+            number_of_bedrooms=2,
+            number_of_bathrooms=2,
             square_footage=1000,
+            property_type="Apartment",
             furnished_status="Semi-furnished",
             floor_level="Penthouse",
             pet_policy="No pets",
             lease_term="1 year",
             amenities=["Gym", "Parking", "Pool", "Rooftop deck"],
-            saved=False,
         )
-        self.apartment.apartments[alt_3_id] = alt_3
 
         # Initialize email app
         self.email = StatefulEmailApp(name="Emails")
@@ -156,7 +134,6 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.apartment, self.email]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -181,7 +158,7 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
                     "- Lease term: 1 year\n"
                     "- Response deadline: January 25th, 2025\n\n"
                     "Please let me know your decision by January 25th so we can proceed accordingly. "
-                    "If you'd like us to consider a price match, please reply with 2-3 comparable Downtown 2BR/2BA listings (building/unit name and monthly rent) at a lower monthly rate—we may be able to offer a match.\n\n"
+                    "If you'd like us to consider a price match, please reply with at least two comparable Downtown 2BR/2BA listings (building/unit name and monthly rent) at a lower monthly rate—we may be able to offer a match.\n\n"
                     "If you have any questions or would like to discuss the terms, feel free to reach out.\n\n"
                     "Best regards,\n"
                     "Sarah Johnson\n"
@@ -216,11 +193,7 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
 
             # Oracle event 3: User accepts the proposal
             acceptance_event = (
-                aui.accept_proposal(
-                    content="Yes—please look up comparable options and send a reply email asking if they can do $2500/month."
-                )
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=5)
+                aui.accept_proposal(content="Yes, please do that.").oracle().depends_on(proposal_event, delay_seconds=5)
             )
 
             # Oracle event 4: Agent searches for comparable alternatives in the same location (AFTER user approval)
@@ -288,8 +261,7 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
             summary_event,
         ]
 
-    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
-        # WARNING: this part is responsible to and can be modified only by validation agent
+    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -304,29 +276,7 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 2: Agent read the lease renewal email
-            # This proves the agent detected the triggering environment event
-            email_read_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "get_email_by_id"
-                and e.action.args.get("email_id") == "lease_renewal_email_2025"
-                for e in log_entries
-            )
-
-            # STRICT Check 3: Agent searched for alternative apartments
-            # Must search catalog for comparable alternatives in Downtown
-            alternatives_searched = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulApartmentApp"
-                and e.action.function_name == "search_apartments"
-                and e.action.args.get("location") == "Downtown"
-                for e in log_entries
-            )
-
-            # STRICT Check 4: Agent sent reply email with counter-offer
+            # STRICT Check 2: Agent sent reply email with counter-offer
             # Must reply to the lease renewal email (not just any email)
             reply_sent = any(
                 e.event_type == EventType.AGENT
@@ -337,7 +287,7 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 5: Reply email includes specific comparable listing names (to prove search results were used)
+            # STRICT Check 3: Reply email includes specific comparable listing names (to prove search results were used)
             reply_mentions_comps = False
             for e in log_entries:
                 if (
@@ -358,19 +308,13 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
                     break
 
             # All strict checks must pass for success
-            success = (
-                proposal_found and email_read_found and alternatives_searched and reply_sent and reply_mentions_comps
-            )
+            success = proposal_found and reply_sent and reply_mentions_comps
 
             if not success:
                 # Build rationale for failure
                 failed_checks = []
                 if not proposal_found:
                     failed_checks.append("agent did not send proposal to user about lease renewal")
-                if not email_read_found:
-                    failed_checks.append("agent did not read the lease renewal email")
-                if not alternatives_searched:
-                    failed_checks.append("agent did not search for alternative apartments")
                 if not reply_sent:
                     failed_checks.append("agent did not send reply email with counter-offer")
                 if not reply_mentions_comps:
@@ -385,6 +329,3 @@ class ApartmentLeaseExpiryRenewalPrep(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

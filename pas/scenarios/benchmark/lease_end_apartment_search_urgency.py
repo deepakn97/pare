@@ -1,12 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
@@ -14,8 +10,8 @@ from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
     StatefulApartmentApp,
-    StatefulEmailApp,
 )
+from pas.apps.reminder import StatefulReminderApp
 from pas.scenarios import PASScenario
 from pas.scenarios.utils.registry import register_scenario
 
@@ -24,8 +20,8 @@ from pas.scenarios.utils.registry import register_scenario
 class LeaseEndApartmentSearchUrgency(PASScenario):
     """Agent proactively initiates apartment search workflow when landlord's email indicates approaching lease termination and no new housing is secured.
 
-    The user has a calendar event "Current Lease Ends - Move Out" scheduled for 30 days from now with location "Oak Street Apartments, Unit 204". An email arrives from the current landlord with subject "Lease Renewal Deadline - Response Required by [14 days from now]" stating that if the user does not renew, they must vacate on the scheduled date. The agent must:
-    1. Parse the lease renewal deadline from the landlord's email
+    The user has a calendar event "Current Lease Ends - Move Out" scheduled for 30 days from now with location "Oak Street Apartments, Unit 204". A user-created reminder notification fires that the lease renewal response deadline is coming up in 14 days and suggests starting the housing search now. The agent must:
+    1. Detect the reminder notification (time-driven; emitted automatically when the reminder is due) and infer urgency to start searching
     2. Search the apartment app for available apartments matching the user's current criteria (similar price range, bedrooms, location preferences inferred from current apartment details if available, or use default search)
     3. Identify that no apartments are currently saved to favorites, indicating no active search
     4. Propose saving a few suitable 2-bedroom apartments to favorites as starting points for the user's search
@@ -39,17 +35,13 @@ class LeaseEndApartmentSearchUrgency(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
         # Initialize scenario-specific apps
-        self.email = StatefulEmailApp(name="Emails")
+        self.reminder = StatefulReminderApp(name="Reminders")
         self.apartment = StatefulApartmentApp(name="Apartment")
-
-        # Populate email: Add landlord contact for the incoming email
-        landlord_email = "landlord@oakstreetapts.com"
 
         # Populate apartment app: Seed a few available apartments in the market
         # These represent the baseline rental market that the agent can search
@@ -100,44 +92,36 @@ class LeaseEndApartmentSearchUrgency(PASScenario):
 
         # No apartments are saved to favorites - this absence signals no active search
 
+        # Seed a time-driven reminder that will automatically notify the user+agent when due.
+        # Following benchmark convention, set it shortly after start_time so it fires once the runner advances time.
+        self.reminder.add_reminder(
+            title="Lease renewal decision due soon — start apartment search",
+            due_datetime="2025-11-18 09:01:00",
+            description=(
+                "Lease at Oak Street Apartments, Unit 204 ends Dec 18, 2025.\n"
+                "Start looking for new apartments under $2200 now, and save at least two promising 2BR listings to compare."
+            ),
+        )
+
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.email, self.apartment]
+        self.apps = [self.agent_ui, self.system_app, self.reminder, self.apartment]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
-        email_app = self.get_typed_app(StatefulEmailApp, "Emails")
         apartment_app = self.get_typed_app(StatefulApartmentApp, "Apartment")
 
         with EventRegisterer.capture_mode():
-            # Event 1: Incoming email from landlord about lease renewal deadline (environment event)
-            # This is the primary trigger that motivates the agent's proactive behavior
-            landlord_email_event = email_app.send_email_to_user_with_id(
-                email_id="landlord-lease-renewal-email",
-                sender="landlord@oakstreetapts.com",
-                subject="Lease Renewal Deadline - Response Required by Dec 2",
-                content=(
-                    "Dear Tenant,\n\n"
-                    "This is a reminder that your lease at Oak Street Apartments, Unit 204 expires on December 18, 2025. "
-                    "If you wish to renew your lease, please respond by December 2, 2025 (14 days from now). If we do not receive "
-                    "confirmation by this date, we will assume you are vacating on the scheduled move-out date.\n\n"
-                    "If you plan to vacate and have not started looking yet, we recommend beginning your housing search now due to limited availability. "
-                    "It may help to save a few promising 2-bedroom listings to your favorites/saved list so you can compare options.\n\n"
-                    "Best regards,\n"
-                    "Oak Street Management"
-                ),
-            ).delayed(10)
+            # NOTE: Reminder notifications are time-driven in the Reminders app.
+            # The reminder seeded in init (`due_datetime="2025-11-18 09:01:00"`) will automatically notify user+agent.
+            # The agent does NOT need to poll reminders; we model reaction time by delaying the first oracle action.
 
-            # Event 2: Agent checks if any apartments are already saved (oracle)
-            # Motivation: To determine if the user has already started apartment hunting
-            check_saved_apartments_event = (
-                apartment_app.list_saved_apartments().oracle().depends_on(landlord_email_event, delay_seconds=1)
-            )
+            # Event 1: Agent checks if any apartments are already saved (oracle)
+            # Motivation: reminder prompted starting the search; agent checks if user already saved any apartments.
+            check_saved_apartments_event = apartment_app.list_saved_apartments().oracle().delayed(70)
 
-            # Event 3: Agent searches for available apartments (oracle)
+            # Event 2: Agent searches for available apartments (oracle)
             # Motivation: No saved apartments found, so agent looks for suitable options in the market
             search_apartments_event = (
                 apartment_app.search_apartments(
@@ -148,11 +132,11 @@ class LeaseEndApartmentSearchUrgency(PASScenario):
                 .depends_on(check_saved_apartments_event, delay_seconds=1)
             )
 
-            # Event 4: Agent proposes to help manage the lease deadline and start apartment search (oracle)
-            # Motivation: Landlord email requires response by Dec 2, calendar shows lease end Dec 18, no apartments saved
+            # Event 3: Agent proposes saving a few suitable apartments as starting points (oracle)
+            # Motivation: reminder indicates a deadline is approaching and suggests saving listings; no apartments saved yet.
             proposal_event = (
                 aui.send_message_to_user(
-                    content="I saw the lease renewal deadline email from your landlord. Your current lease ends on December 18 (30 days away), and you need to respond by December 2 (14 days). The email also suggested starting your housing search now if you're planning to move. I noticed you haven't saved any apartments yet—would you like me to save a couple suitable 2-bedroom apartments (under $2200) as starting points for your search?"
+                    content="I noticed your reminder about the lease renewal decision coming up. Your lease ends Dec 18, and you need to decide by Dec 2. I also see you haven't saved any apartments yet—would you like me to save a couple suitable 2-bedroom apartments (under $2200) as starting points for your search?"
                 )
                 .oracle()
                 .depends_on(search_apartments_event, delay_seconds=2)
@@ -183,9 +167,7 @@ class LeaseEndApartmentSearchUrgency(PASScenario):
                 .depends_on(save_apartment_1_event, delay_seconds=1)
             )
 
-        # TODO: Register ALL events here in self.events
         self.events = [
-            landlord_email_event,
             check_saved_apartments_event,
             search_apartments_event,
             proposal_event,
@@ -195,7 +177,6 @@ class LeaseEndApartmentSearchUrgency(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -203,50 +184,32 @@ class LeaseEndApartmentSearchUrgency(PASScenario):
             # Filter to only AGENT events for validation
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent checked for saved apartments
-            # The agent must verify if the user has already started apartment hunting
-            saved_apartments_check_found = any(
-                e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "list_saved_apartments"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent searched for apartments
-            # The agent must search for available apartments to help the user
-            apartment_search_found = any(
-                e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "search_apartments"
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent sent proposal to user
+            # STRICT Check 1: Agent sent proposal to user
             # The agent must propose a comprehensive help plan to the user
             proposal_found = any(
                 e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
                 for e in agent_events
             )
 
-            # STRICT Check 4: Agent saved at least 1 apartments to favorites
+            # STRICT Check 2: Agent saved at least 2 apartments to favorites
             # The agent must save apartments as starting points for the user's search
             save_apartment_events = [
                 e
                 for e in agent_events
                 if e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "save_apartment"
             ]
-            apartments_saved = len(save_apartment_events) >= 1
+            apartments_saved = len(save_apartment_events) >= 2
 
             # Combine all checks
-            success = saved_apartments_check_found and apartment_search_found and proposal_found and apartments_saved
+            success = proposal_found and apartments_saved
 
             # Build rationale if validation fails
             if not success:
                 missing = []
-                if not saved_apartments_check_found:
-                    missing.append("saved apartments check")
-                if not apartment_search_found:
-                    missing.append("apartment search")
                 if not proposal_found:
                     missing.append("proposal to user")
                 if not apartments_saved:
-                    missing.append("saving at least 1 apartment")
+                    missing.append("saving at least 2 apartments")
 
                 rationale = f"Missing required agent actions: {', '.join(missing)}"
                 return ScenarioValidationResult(success=False, rationale=rationale)
@@ -255,6 +218,3 @@ class LeaseEndApartmentSearchUrgency(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

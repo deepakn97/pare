@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,6 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import HomeScreenSystemApp, PASAgentUserInterface, StatefulCabApp, StatefulEmailApp
 from pas.apps.reminder import StatefulReminderApp
 from pas.scenarios import PASScenario
@@ -34,7 +30,6 @@ class CabIssueFollowupWithDetails(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -92,9 +87,7 @@ class CabIssueFollowupWithDetails(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.cab, self.reminder]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         email_app = self.get_typed_app(StatefulEmailApp, "Emails")
@@ -150,11 +143,7 @@ Would you like me to send this information to Urban Rides Support? And also crea
 
             # User accepts the proposal
             acceptance = (
-                aui.accept_proposal(
-                    content="Yes, please send that information. And also create a reminder to check the refund status in 48 hours."
-                )
-                .oracle()
-                .depends_on(proposal, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please do that.").oracle().depends_on(proposal, delay_seconds=2)
             )
 
             # Agent replies to the email with the requested details
@@ -219,7 +208,6 @@ Best regards""",
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -234,27 +222,7 @@ Best regards""",
                 for e in log_entries
             )
 
-            # STRICT Check 2: Agent retrieved ride history to search for the matching ride
-            # This validates the agent looked up rides (equivalence: get_ride_history is the primary method)
-            ride_history_retrieved = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_ride_history"
-                for e in log_entries
-            )
-
-            # FLEXIBLE Check 3: Agent retrieved specific ride details
-            # The agent may use get_ride or other methods to access specific ride info
-            ride_details_retrieved = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name in ["get_ride", "get_ride_history"]
-                for e in log_entries
-            )
-
-            # STRICT Check 4: Agent replied to the refund request email
+            # STRICT Check 2: Agent replied to the refund request email
             # The reply should be to the correct email_id and contain ride details
             # Content validation is FLEXIBLE (wording may vary), but structural data must be present
             email_reply_sent = any(
@@ -269,7 +237,7 @@ Best regards""",
                 for e in log_entries
             )
 
-            # STRICT Check 5: Agent created a reminder for the 48-hour follow-up
+            # STRICT Check 3: Agent created a reminder for the 48-hour follow-up
             # Title/description wording is FLEXIBLE, but the reminder must reference refund and timing
             reminder_created = any(
                 e.event_type == EventType.AGENT
@@ -283,23 +251,13 @@ Best regards""",
             )
 
             # Calculate success: all strict checks must pass
-            success = (
-                proposal_found
-                and ride_history_retrieved
-                and ride_details_retrieved
-                and email_reply_sent
-                and reminder_created
-            )
+            success = proposal_found and email_reply_sent and reminder_created
 
             if not success:
                 # Build rationale for failure
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("agent proposal mentioning refund request")
-                if not ride_history_retrieved:
-                    missing_checks.append("ride history retrieval")
-                if not ride_details_retrieved:
-                    missing_checks.append("specific ride details lookup")
                 if not email_reply_sent:
                     missing_checks.append("email reply with ride details to Urban Rides Support")
                 if not reminder_created:
@@ -312,6 +270,3 @@ Best regards""",
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

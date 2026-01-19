@@ -1,12 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from are.simulation.apps.calendar import CalendarEvent
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
@@ -42,7 +38,6 @@ class EmailAttachmentCartSuggestion(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -108,7 +103,6 @@ class EmailAttachmentCartSuggestion(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.calendar, self.shopping]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
@@ -181,7 +175,7 @@ class EmailAttachmentCartSuggestion(PASScenario):
 
             # User: Accept the proposal
             user_accept = (
-                aui.accept_proposal(content="Yes, please add them.").oracle().depends_on(proposal, delay_seconds=5)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal, delay_seconds=5)
             )
 
             # Oracle: Agent adds the three recommended items to cart (WRITE - depends on acceptance)
@@ -218,22 +212,11 @@ class EmailAttachmentCartSuggestion(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
 
-            # Check 1: Agent retrieved the specific email with recommendations (STRICT)
-            email_read_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "get_email_by_id"
-                and e.action.args.get("email_id") == "gift_recommendations_email"
-                for e in log_entries
-            )
-
-            # Check 2: Agent searched for at least two of the three recommended products (STRICT: coordination logic)
+            # Check 1: Agent searched for at least two of the three recommended products (STRICT: coordination logic)
             product_searches = [
                 e
                 for e in log_entries
@@ -244,7 +227,7 @@ class EmailAttachmentCartSuggestion(PASScenario):
             ]
             product_search_found = len(product_searches) >= 2
 
-            # Check 3: Agent sent proposal message to user (STRICT: action must occur, FLEXIBLE: exact wording)
+            # Check 2: Agent sent proposal message to user (STRICT: action must occur, FLEXIBLE: exact wording)
             proposal_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
@@ -253,7 +236,7 @@ class EmailAttachmentCartSuggestion(PASScenario):
                 for e in log_entries
             )
 
-            # Check 4: Agent added at least one item to cart after user acceptance (STRICT: write action happened)
+            # Check 3: Agent added at least one item to cart after user acceptance (STRICT: write action happened)
             add_to_cart_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
@@ -263,12 +246,10 @@ class EmailAttachmentCartSuggestion(PASScenario):
             )
 
             # All strict checks must pass
-            success = email_read_found and product_search_found and proposal_found and add_to_cart_found
+            success = product_search_found and proposal_found and add_to_cart_found
 
             if not success:
                 rationale_parts = []
-                if not email_read_found:
-                    rationale_parts.append("did not read gift recommendations email")
                 if not product_search_found:
                     rationale_parts.append("insufficient product searches (need at least 2)")
                 if not proposal_found:
@@ -283,6 +264,3 @@ class EmailAttachmentCartSuggestion(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

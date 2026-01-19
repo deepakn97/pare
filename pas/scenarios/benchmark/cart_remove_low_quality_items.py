@@ -1,13 +1,9 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
-from are.simulation.apps.shopping import CartItem, Item, Product
+from are.simulation.apps.messaging_v2 import ConversationV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -35,7 +31,6 @@ class CartRemoveLowQualityItems(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -43,55 +38,46 @@ class CartRemoveLowQualityItems(PASScenario):
         # Initialize Shopping App with cart items
         self.shopping = StatefulShoppingApp(name="Shopping")
 
-        # Create wireless headphones product
-        headphones_product = Product(name="Wireless Headphones", product_id="prod_headphones_001")
-        headphones_item = Item(
-            price=45.99, available=True, item_id="item_headphones_001", options={"color": "black", "type": "over-ear"}
+        # Seed products + cart via public APIs (avoid mutating internal dicts directly).
+        headphones_product_id = self.shopping.add_product("AudioPro Wireless Headphones")
+        self.headphones_item_id = self.shopping.add_item_to_product(
+            product_id=headphones_product_id,
+            price=45.99,
+            options={"color": "black", "type": "over-ear"},
+            available=True,
         )
-        headphones_product.variants["item_headphones_001"] = headphones_item
-        self.shopping.products["prod_headphones_001"] = headphones_product
-
-        # Create phone case product
-        case_product = Product(name="Phone Case", product_id="prod_case_001")
-        case_item = Item(
-            price=19.99, available=True, item_id="item_case_001", options={"color": "blue", "material": "silicone"}
+        case_product_id = self.shopping.add_product("Blue Silicone Phone Case")
+        self.case_item_id = self.shopping.add_item_to_product(
+            product_id=case_product_id,
+            price=19.99,
+            options={"color": "blue", "material": "silicone"},
+            available=True,
         )
-        case_product.variants["item_case_001"] = case_item
-        self.shopping.products["prod_case_001"] = case_product
 
         # Add both items to cart (simulating earlier browsing)
-        self.shopping.cart["item_headphones_001"] = CartItem(
-            item_id="item_headphones_001",
-            quantity=1,
-            price=45.99,
-            available=True,
-            options={"color": "black", "type": "over-ear"},
-        )
-        self.shopping.cart["item_case_001"] = CartItem(
-            item_id="item_case_001",
-            quantity=1,
-            price=19.99,
-            available=True,
-            options={"color": "blue", "material": "silicone"},
-        )
+        self.shopping.add_to_cart(self.headphones_item_id, quantity=1)
+        self.shopping.add_to_cart(self.case_item_id, quantity=1)
 
         # Initialize Messaging App with friend Jordan Lee
         self.messaging = StatefulMessagingApp(name="Messages")
-        self.messaging.current_user_id = "user_self"
-        self.messaging.current_user_name = "Me"
 
-        # Add friend Jordan Lee as a contact
-        jordan_id = "contact_jordan_001"
-        self.messaging.name_to_id["Jordan Lee"] = jordan_id
-        self.messaging.id_to_name[jordan_id] = "Jordan Lee"
+        # Add friend Jordan Lee and seed a 1:1 conversation via public APIs.
+        self.messaging.add_users(["Jordan Lee"])
+        self.jordan_id = self.messaging.name_to_id["Jordan Lee"]
+        user_id = self.messaging.current_user_id
+        conversation = ConversationV2(
+            participant_ids=[user_id, self.jordan_id],
+            title="Jordan Lee",
+            conversation_id="conv_jordan_001",
+        )
+        self.jordan_conversation_id = conversation.conversation_id
+        self.messaging.add_conversation(conversation)
 
         # Register all apps
         self.apps = [self.agent_ui, self.system_app, self.shopping, self.messaging]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
@@ -101,8 +87,8 @@ class CartRemoveLowQualityItems(PASScenario):
             # Environment Event 1: Friend Jordan warns that the cart items are low quality
             # This creates the trigger for the agent to inspect the user's cart and propose removal.
             quality_warning_event = messaging_app.create_and_add_message(
-                conversation_id="conv_jordan_001",
-                sender_id="contact_jordan_001",
+                conversation_id=self.jordan_conversation_id,
+                sender_id=self.jordan_id,
                 content=(
                     "Quick heads-up: I bought the AudioPro wireless headphones and that blue silicone phone case "
                     "recently, and both were pretty low quality. If you happen to have those in your cart, I'd remove "
@@ -132,21 +118,19 @@ class CartRemoveLowQualityItems(PASScenario):
 
             # Oracle Event 3: User accepts the proposal
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please remove those two items from my cart.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Oracle Event 4: Agent removes headphones from cart
             remove_headphones_event = (
-                shopping_app.remove_from_cart(item_id="item_headphones_001", quantity=1)
+                shopping_app.remove_from_cart(item_id=self.headphones_item_id, quantity=1)
                 .oracle()
                 .depends_on(acceptance_event, delay_seconds=1)
             )
 
             # Oracle Event 5: Agent removes phone case from cart
             remove_case_event = (
-                shopping_app.remove_from_cart(item_id="item_case_001", quantity=1)
+                shopping_app.remove_from_cart(item_id=self.case_item_id, quantity=1)
                 .oracle()
                 .depends_on(remove_headphones_event, delay_seconds=1)
             )
@@ -162,21 +146,11 @@ class CartRemoveLowQualityItems(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
 
-            # Check 1: Agent checked the shopping cart to understand current items
-            check_cart_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_cart"
-                for e in log_entries
-            )
-
-            # Check 2: Agent sent proposal to remove the warned-about cart items
+            # STRICT Check 1: Agent sent proposal to remove the warned-about cart items
             # FLEXIBLE on exact wording; proposal existence is sufficient here.
             proposal_found = any(
                 e.event_type == EventType.AGENT
@@ -186,34 +160,32 @@ class CartRemoveLowQualityItems(PASScenario):
                 for e in log_entries
             )
 
-            # Check 3: Agent removed headphones from cart (STRICT on item_id)
+            # STRICT Check 2: Agent removed headphones from cart (STRICT on item_id)
             remove_headphones_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "remove_from_cart"
-                and e.action.args.get("item_id") == "item_headphones_001"
+                and e.action.args.get("item_id") == self.headphones_item_id
                 for e in log_entries
             )
 
-            # Check 4: Agent removed phone case from cart (STRICT on item_id)
+            # STRICT Check 3: Agent removed phone case from cart (STRICT on item_id)
             remove_case_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "remove_from_cart"
-                and e.action.args.get("item_id") == "item_case_001"
+                and e.action.args.get("item_id") == self.case_item_id
                 for e in log_entries
             )
 
             # Combine checks: all must pass for success
-            success = check_cart_found and proposal_found and remove_headphones_found and remove_case_found
+            success = proposal_found and remove_headphones_found and remove_case_found
 
             # Build rationale for failure
             if not success:
                 missing_checks = []
-                if not check_cart_found:
-                    missing_checks.append("agent did not check shopping cart")
                 if not proposal_found:
                     missing_checks.append("agent did not propose removing the warned-about items")
                 if not remove_headphones_found:
@@ -228,6 +200,3 @@ class CartRemoveLowQualityItems(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

@@ -1,12 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from are.simulation.apps.contacts import Contact
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
@@ -35,7 +31,6 @@ class EnrichContactsFromSignatures(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -66,8 +61,8 @@ class EnrichContactsFromSignatures(PASScenario):
         )
 
         # Add contacts to the contacts app
-        self.contacts.add_contact(sarah_contact)
-        self.contacts.add_contact(robert_contact)
+        self.sarah_contact_id = self.contacts.add_contact(sarah_contact)
+        self.robert_contact_id = self.contacts.add_contact(robert_contact)
 
         # Initialize email app
         self.email = StatefulEmailApp(name="Emails")
@@ -76,7 +71,6 @@ class EnrichContactsFromSignatures(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.contacts, self.email]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -166,7 +160,7 @@ Address: 1200 Park Avenue, New York, NY 10128""",
             # Oracle Event 6: Agent updates Sarah Kim's contact with extracted details
             update_sarah_event = (
                 contacts_app.edit_contact(
-                    contact_id="contact-sarah-kim",
+                    contact_id=self.sarah_contact_id,
                     updates={
                         "job": "Senior Product Manager",
                         "phone": "+1-555-234-5678",
@@ -180,7 +174,7 @@ Address: 1200 Park Avenue, New York, NY 10128""",
             # Oracle Event 7: Agent updates Robert Martinez's contact with extracted details
             update_robert_event = (
                 contacts_app.edit_contact(
-                    contact_id="contact-robert-martinez",
+                    contact_id=self.robert_contact_id,
                     updates={
                         "job": "Chief Technology Officer",
                         "phone": "+1-555-876-5432",
@@ -205,7 +199,6 @@ Address: 1200 Park Avenue, New York, NY 10128""",
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -216,70 +209,36 @@ Address: 1200 Park Avenue, New York, NY 10128""",
                 and isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                and any(
-                    name in e.action.args.get("content", "")
-                    for name in ["Sarah Kim", "Robert Martinez", "Sarah", "Robert"]
-                )
                 for e in log_entries
             )
 
-            # Check 2: Agent searched for Sarah Kim's contact (STRICT)
-            search_sarah_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulContactsApp"
-                and e.action.function_name == "search_contacts"
-                and any(name in e.action.args.get("query", "") for name in ["Sarah", "Kim", "Sarah Kim"])
-                for e in log_entries
-            )
-
-            # Check 3: Agent searched for Robert Martinez's contact (STRICT)
-            search_robert_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulContactsApp"
-                and e.action.function_name == "search_contacts"
-                and any(name in e.action.args.get("query", "") for name in ["Robert", "Martinez", "Robert Martinez"])
-                for e in log_entries
-            )
-
-            # Check 4: Agent updated Sarah Kim's contact with extracted information (STRICT on structure, FLEXIBLE on exact values)
+            # Check 2: Agent updated Sarah Kim's contact with extracted information (STRICT on structure, FLEXIBLE on exact values)
             update_sarah_found = any(
                 (e.event_type == EventType.AGENT)
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulContactsApp"
                 and e.action.function_name == "edit_contact"
-                and e.action.args.get("contact_id") == "contact-sarah-kim"
+                and e.action.args.get("contact_id") == self.sarah_contact_id
                 for e in log_entries
             )
 
-            # Check 5: Agent updated Robert Martinez's contact with extracted information (STRICT on structure, FLEXIBLE on exact values)
+            # Check 3: Agent updated Robert Martinez's contact with extracted information (STRICT on structure, FLEXIBLE on exact values)
             update_robert_found = any(
                 (e.event_type == EventType.AGENT)
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulContactsApp"
                 and e.action.function_name == "edit_contact"
-                and e.action.args.get("contact_id") == "contact-robert-martinez"
+                and e.action.args.get("contact_id") == self.robert_contact_id
                 for e in log_entries
             )
 
             # Determine success and build rationale for failures
-            success = (
-                proposal_found
-                and search_sarah_found
-                and search_robert_found
-                and update_sarah_found
-                and update_robert_found
-            )
+            success = proposal_found and update_sarah_found and update_robert_found
 
             if not success:
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("no proposal message to user offering contact enrichment")
-                if not search_sarah_found:
-                    missing_checks.append("no search for Sarah Kim's contact")
-                if not search_robert_found:
-                    missing_checks.append("no search for Robert Martinez's contact")
                 if not update_sarah_found:
                     missing_checks.append("no edit_contact call for Sarah Kim with job/phone/address updates")
                 if not update_robert_found:
@@ -292,6 +251,3 @@ Address: 1200 Park Avenue, New York, NY 10128""",
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

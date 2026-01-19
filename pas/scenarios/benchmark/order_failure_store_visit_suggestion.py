@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,6 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
@@ -40,7 +36,6 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -76,7 +71,6 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.shopping, self.cab]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps from self.apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -102,7 +96,7 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
                     "We weren't able to complete your order (ID: test-order-001), so it was cancelled.\n\n"
                     "If you still want the item today, our staff can help you purchase it in person at:\n"
                     "TechMart Downtown, 789 Main Street\n\n"
-                    "We see your address on file as 456 Oak Avenue. "
+                    "We see your address on file as 456 Oak Avenue, which is close by. "
                     "If you'd like to resolve this quickly, visiting the store is the fastest option.\n\n"
                     "Best,\n"
                     "TechMart Support"
@@ -151,9 +145,7 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
             # Oracle Event 5: User accepts the proposal
             # Motivated by: user responds affirmatively to agent's ride booking proposal
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please book the ride.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Oracle Event 6: Agent books the cab ride to the store
@@ -181,7 +173,6 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -235,6 +226,3 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

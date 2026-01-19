@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,6 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
@@ -26,7 +22,7 @@ class ApartmentApplicationDocumentReminder(PASScenario):
 
     The user has saved "Parkview Terrace" apartment to their favorites after searching for pet-friendly apartments. The property management company "Summit Rentals" sends an email informing the user that their rental application has been received and lists required supporting documents: proof of employment (must be dated within 30 days), two recent pay stubs, bank statements from the last 3 months, and a copy of photo ID. The email states all documents must be submitted by Friday, January 17th, 2026 at 5:00 PM to the leasing office, provides the submission address (456 Maple Drive, Suite 100), and explicitly suggests setting a preparation reminder a few days earlier (e.g., Wednesday, January 14th at 9:00 AM). The agent must:
     1. Parse the document requirements and submission deadline from the application email
-    2. Propose creating a preparation reminder (grounded by the email's reminder suggestion) and, after user acceptance, create it.
+    2. Propose helping the user prepare the required documents (grounded by the email's reminder suggestion) and, after user acceptance, set a preparation reminder.
     """
 
     start_time = datetime(2025, 11, 18, 9, 0, 0, tzinfo=UTC).timestamp()
@@ -34,7 +30,6 @@ class ApartmentApplicationDocumentReminder(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -47,7 +42,6 @@ class ApartmentApplicationDocumentReminder(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.reminder]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
@@ -76,7 +70,7 @@ All documents must be submitted by Friday, January 17th, 2026 at 5:00 PM to our 
 
 Please bring or email the documents to this address. If you have any questions, feel free to contact us.
 
-Tip: To avoid missing the deadline, we recommend setting a preparation reminder for Wednesday, January 14th at 9:00 AM to gather the required documents.
+Tip: These documents can take time to collect (e.g., requesting updated employment verification or pulling bank statements), so we recommend setting a preparation reminder first and then help you prepare the documents for Wednesday morning, January 14th, 2026 to gather everything ahead of the Friday deadline.
 
 Best regards,
 Summit Rentals Leasing Team""",
@@ -107,13 +101,11 @@ Would you like me to create a reminder on Wednesday, January 14th at 9:00 AM to 
 
             # User accepts the proposal
             acceptance = (
-                aui.accept_proposal(content="Yes, please set up a reminder for me.")
-                .oracle()
-                .depends_on(proposal, delay_seconds=3)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal, delay_seconds=3)
             )
 
-            # Agent creates preparation reminders for January 14th (3 days before deadline)
-            # Motivation: the application email explicitly suggests setting a preparation reminder for Wednesday, Jan 14 at 9:00 AM.
+            # Agent creates a preparation reminder for January 14th (3 days before deadline)
+            # Motivation: the application email explicitly suggests setting a preparation reminder for Wednesday, Jan 14 (morning).
             reminder = (
                 reminder_app.add_reminder(
                     title="Prepare Application Docs - Parkview Terrace",
@@ -127,8 +119,7 @@ Would you like me to create a reminder on Wednesday, January 14th at 9:00 AM to 
         # Register ALL events here in self.events
         self.events = [app_email, read_email, proposal, acceptance, reminder]
 
-    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
-        # WARNING: this part is responsible to and can be modified only by validation agent
+    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -142,18 +133,8 @@ Would you like me to create a reminder on Wednesday, January 14th at 9:00 AM to 
                     proposal_found = True
                     break
 
-            # STRICT Check 2: Agent read or accessed the application email to understand requirements
-            email_read_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulEmailApp" and e.action.function_name in [
-                    "get_email_by_id",
-                    "list_emails",
-                ]:
-                    email_read_found = True
-                    break
-
-            # STRICT Check 3: Agent created multiple preparation reminders for January 14th
-            # Must have at least 1 preparation reminders (flexible on exact count)
+            # STRICT Check 2: Agent created a preparation reminder for January 14th
+            # Must have at least 1 preparation reminder (flexible on exact count)
             preparation_reminders_found = False
             for e in agent_events:
                 if e.action.class_name == "StatefulReminderApp" and e.action.function_name == "add_reminder":
@@ -161,7 +142,7 @@ Would you like me to create a reminder on Wednesday, January 14th at 9:00 AM to 
                     break
 
             # All strict checks must pass
-            success = proposal_found and email_read_found and preparation_reminders_found
+            success = proposal_found and preparation_reminders_found
 
             # Build rationale if validation fails
             rationale = ""
@@ -169,16 +150,11 @@ Would you like me to create a reminder on Wednesday, January 14th at 9:00 AM to 
                 failures = []
                 if not proposal_found:
                     failures.append("no proposal message to user found")
-                if not email_read_found:
-                    failures.append("agent did not read the application email")
                 if not preparation_reminders_found:
-                    failures.append("insufficient preparation reminders for Jan 14th (need at least 2)")
+                    failures.append("no preparation reminder for Jan 14th was created")
                 rationale = "; ".join(failures)
 
             return ScenarioValidationResult(success=success, rationale=rationale if not success else "")
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

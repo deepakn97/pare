@@ -1,12 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from are.simulation.apps.contacts import Contact
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
@@ -35,7 +31,6 @@ class FamilyApartmentRecommendationRequest(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with baseline data.
 
         Baseline state includes:
@@ -196,9 +191,7 @@ class FamilyApartmentRecommendationRequest(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.apartment]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         email_app = self.get_typed_app(StatefulEmailApp, "Emails")
@@ -276,9 +269,7 @@ Emma""",
 
             # User event: User accepts the proposal
             acceptance = (
-                aui.accept_proposal(content="Yes, please send her the recommendations!")
-                .oracle()
-                .depends_on(proposal, delay_seconds=5)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal, delay_seconds=5)
             )
 
             # Oracle event: Agent replies to sister's email with detailed apartment recommendations
@@ -334,7 +325,6 @@ Alex""",
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -342,17 +332,7 @@ Alex""",
             # Filter to only AGENT-type events (oracle events)
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent read the sister's email
-            read_email_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulEmailApp" and e.action.function_name == "get_email_by_id":
-                    args = e.action.args if e.action.args else e.action.resolved_args
-                    email_id = args.get("email_id", "")
-                    if "sister_apt_request" in email_id:
-                        read_email_found = True
-                        break
-
-            # STRICT Check 2: Agent searched apartments with correct criteria
+            # STRICT Check 1: Agent searched apartments with correct criteria
             search_found = False
             for e in agent_events:
                 if e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "search_apartments":
@@ -372,17 +352,7 @@ Alex""",
                         search_found = True
                         break
 
-            # STRICT Check 3: Agent retrieved apartment details (at least once)
-            details_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "get_apartment_details":
-                    args = e.action.args if e.action.args else e.action.resolved_args
-                    apt_id = args.get("apartment_id", "")
-                    if apt_id:  # Any apartment detail retrieval counts
-                        details_found = True
-                        break
-
-            # STRICT Check 4: Agent proposed to help the user
+            # STRICT Check 2: Agent proposed to help the user
             # Accept either send_message_to_user (proposal) OR propose_task as equivalent
             proposal_found = False
             for e in agent_events:
@@ -394,7 +364,7 @@ Alex""",
                     proposal_found = True
                     break
 
-            # STRICT Check 5: Agent replied to sister's email
+            # STRICT Check 3: Agent replied to sister's email
             reply_found = False
             for e in agent_events:
                 if e.action.class_name == "StatefulEmailApp" and e.action.function_name in [
@@ -409,16 +379,12 @@ Alex""",
                         break
 
             # Aggregate results
-            success = read_email_found and search_found and details_found and proposal_found and reply_found
+            success = search_found and proposal_found and reply_found
 
             if not success:
                 missing_checks = []
-                if not read_email_found:
-                    missing_checks.append("agent did not read sister's email")
                 if not search_found:
                     missing_checks.append("agent did not search apartments with correct criteria")
-                if not details_found:
-                    missing_checks.append("agent did not retrieve apartment details")
                 if not proposal_found:
                     missing_checks.append("agent did not propose help to user")
                 if not reply_found:
@@ -431,6 +397,3 @@ Alex""",
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

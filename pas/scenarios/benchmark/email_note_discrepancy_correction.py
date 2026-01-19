@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,6 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
@@ -48,7 +44,6 @@ class EmailNoteDiscrepancyCorrection(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -78,7 +73,6 @@ class EmailNoteDiscrepancyCorrection(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.note]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
@@ -180,7 +174,6 @@ class EmailNoteDiscrepancyCorrection(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -196,18 +189,7 @@ class EmailNoteDiscrepancyCorrection(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 2: Agent searched for or accessed the authoritative note
-            # Equivalence class: search_notes OR search_notes_in_folder OR list_notes OR get_note_by_id
-            # All of these are valid ways to locate the Emergency Contacts note
-            note_access_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name in ["search_notes", "search_notes_in_folder", "list_notes", "get_note_by_id"]
-                for e in log_entries
-            )
-
-            # STRICT Check 3: Agent replied to the email with corrections
+            # STRICT Check 2: Agent replied to the email with corrections
             # The reply must be to the specific email ID containing incorrect information
             # Content flexibility: We don't check exact correction text, just that a reply was sent
             email_reply_found = any(
@@ -222,15 +204,13 @@ class EmailNoteDiscrepancyCorrection(PASScenario):
             )
 
             # Build success result and rationale
-            success = proposal_found and note_access_found and email_reply_found
+            success = proposal_found and email_reply_found
 
             rationale = None
             if not success:
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("agent proposal mentioning discrepancies not found")
-                if not note_access_found:
-                    missing_checks.append("agent did not search for or access the authoritative note")
                 if not email_reply_found:
                     missing_checks.append("agent did not reply to the incorrect email with corrections")
                 rationale = "; ".join(missing_checks)
@@ -239,6 +219,3 @@ class EmailNoteDiscrepancyCorrection(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

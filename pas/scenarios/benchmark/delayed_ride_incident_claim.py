@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,6 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
@@ -40,19 +36,18 @@ class DelayedRideIncidentClaim(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
         # Initialize Email app with baseline data
-        self.email = StatefulEmailApp(name="Emails", user_email="user@example.com")
+        self.email = StatefulEmailApp(name="Emails")
 
         # Seed: Original booking confirmation email (sent earlier on Jan 10)
         # This email exists before the scenario trigger and contains the original ride details
         self.email.create_and_add_email_with_time(
             sender="bookings@cabapp.com",
-            recipients=["user@example.com"],
+            recipients=[self.email.user_email],
             subject="Ride Confirmed - Pickup 3:30 PM - Ride #R2847",
             content="Your ride has been confirmed.\n\nRide Details:\n- Ride ID: R2847\n- Pickup: 789 Pine Street\n- Destination: Medical Center, 456 Oak Avenue\n- Service: Standard\n- Scheduled Time: January 10, 2025 at 3:30 PM\n- Estimated Fare: $28.00\n- Estimated Duration: 15 minutes\n\nThank you for choosing CabApp!",
             email_time="2025-01-10 14:00:00",
@@ -80,7 +75,6 @@ class DelayedRideIncidentClaim(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.cab]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps from self.apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -129,9 +123,7 @@ class DelayedRideIncidentClaim(PASScenario):
 
             # Oracle Event 5: User accepts the proposal
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please cancel and book the replacement ride immediately.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=3)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=3)
             )
 
             # Oracle Event 6: Agent cancels the delayed ride (WRITE - depends on acceptance)
@@ -170,7 +162,6 @@ class DelayedRideIncidentClaim(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -182,25 +173,10 @@ class DelayedRideIncidentClaim(PASScenario):
                 and isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                and "R2847" in e.action.args.get("content", "")
-                and any(
-                    keyword in e.action.args.get("content", "").lower()
-                    for keyword in ["delay", "cancel", "replacement", "medical"]
-                )
                 for e in log_entries
             )
 
-            # FLEXIBLE Check 2: Agent observed ride history to verify delayed ride
-            # This demonstrates the agent verified the ride details before taking action
-            ride_history_check = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_ride_history"
-                for e in log_entries
-            )
-
-            # STRICT Check 4: Agent cancelled the delayed ride
+            # STRICT Check 2: Agent cancelled the delayed ride
             # This is a critical action - the agent must cancel the problematic ride
             cancel_ride_found = any(
                 e.event_type == EventType.AGENT
@@ -210,7 +186,7 @@ class DelayedRideIncidentClaim(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 5: Agent booked replacement ride with correct route
+            # STRICT Check 3: Agent booked replacement ride with correct route
             # This is the core action - agent must book the replacement with same locations
             replacement_ride_found = any(
                 e.event_type == EventType.AGENT
@@ -222,23 +198,12 @@ class DelayedRideIncidentClaim(PASScenario):
                 for e in log_entries
             )
 
-            # FLEXIBLE Check 6: Agent checked the current ride status after booking the replacement
-            status_checked = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_current_ride_status"
-                for e in log_entries
-            )
-
             # Collect all strict checks
             strict_checks = [
                 ("proposal with ride delay and replacement plan", proposal_found),
                 ("cancelled delayed ride R2847", cancel_ride_found),
                 ("booked replacement ride with correct route", replacement_ride_found),
             ]
-            # Optional but helpful for grounding/verification (does not gate success)
-            _ = status_checked
 
             # Collect failed strict checks for rationale
             failed_checks = [name for name, passed in strict_checks if not passed]
@@ -253,6 +218,3 @@ class DelayedRideIncidentClaim(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

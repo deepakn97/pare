@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,6 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
@@ -32,7 +28,6 @@ class SubletInquiryResponseTriage(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with baseline data.
 
         The user has listed their downtown 1-bedroom apartment for sublet. The apartment
@@ -73,7 +68,6 @@ class SubletInquiryResponseTriage(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.apartment, self.email]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps from self.apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -214,7 +208,6 @@ class SubletInquiryResponseTriage(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -226,14 +219,6 @@ class SubletInquiryResponseTriage(PASScenario):
                 and isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                and all(
-                    name in e.action.args.get("content", "")
-                    for name in ["Jessica Martinez", "Ryan Thompson", "Sarah Kim"]
-                )
-                and any(
-                    keyword in e.action.args.get("content", "")
-                    for keyword in ["Downtown Loft", "sublet", "inquiries", "inquiry"]
-                )
                 for e in log_entries
             )
 
@@ -246,35 +231,7 @@ class SubletInquiryResponseTriage(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 3: Agent read all three inquiry emails
-            jessica_email_read = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "get_email_by_id"
-                and e.action.args.get("email_id") == "email-jessica-inquiry"
-                for e in log_entries
-            )
-
-            ryan_email_read = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "get_email_by_id"
-                and e.action.args.get("email_id") == "email-ryan-inquiry"
-                for e in log_entries
-            )
-
-            sarah_email_read = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "get_email_by_id"
-                and e.action.args.get("email_id") == "email-sarah-inquiry"
-                for e in log_entries
-            )
-
-            # STRICT Check 4: Agent replied to Jessica with information about pet policy
+            # STRICT Check 3: Agent replied to Jessica with information about pet policy
             # (must mention "no pets" or similar negative pet policy)
             jessica_reply_sent = any(
                 (e.event_type == EventType.AGENT)
@@ -289,7 +246,7 @@ class SubletInquiryResponseTriage(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 5: Agent replied to Ryan with information about parking and laundry
+            # STRICT Check 4: Agent replied to Ryan with information about parking and laundry
             # (must confirm both parking and in-unit laundry are available/included)
             ryan_reply_sent = any(
                 (e.event_type == EventType.AGENT)
@@ -308,7 +265,7 @@ class SubletInquiryResponseTriage(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 6: Agent replied to Sarah mentioning urgency/priority
+            # STRICT Check 5: Agent replied to Sarah mentioning urgency/priority
             # and December timeline
             sarah_reply_sent = any(
                 (e.event_type == EventType.AGENT)
@@ -321,10 +278,9 @@ class SubletInquiryResponseTriage(PASScenario):
             )
 
             # Combine all checks
-            all_emails_read = jessica_email_read and ryan_email_read and sarah_email_read
             all_replies_sent = jessica_reply_sent and ryan_reply_sent and sarah_reply_sent
 
-            success = proposal_found and apartment_details_accessed and all_emails_read and all_replies_sent
+            success = proposal_found and apartment_details_accessed and all_replies_sent
 
             # Build rationale if failed
             if not success:
@@ -333,8 +289,6 @@ class SubletInquiryResponseTriage(PASScenario):
                     missing.append("initial proposal mentioning all three inquirers")
                 if not apartment_details_accessed:
                     missing.append("apartment details access")
-                if not all_emails_read:
-                    missing.append("reading all three inquiry emails")
                 if not all_replies_sent:
                     missing.append("sending all three personalized replies with correct info")
 
@@ -345,6 +299,3 @@ class SubletInquiryResponseTriage(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

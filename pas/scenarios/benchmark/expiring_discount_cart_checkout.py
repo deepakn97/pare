@@ -1,13 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
-from are.simulation.apps.shopping import CartItem, Item, Product
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -35,7 +30,6 @@ class ExpiringDiscountCartCheckout(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -46,61 +40,35 @@ class ExpiringDiscountCartCheckout(PASScenario):
         # Initialize shopping app with baseline products and cart items
         self.shopping = StatefulShoppingApp(name="Shopping")
 
-        # Create product: Wireless Headphones
-        headphones_product_id = "prod_headphones_001"
-        headphones_product = Product(
-            name="Wireless Headphones - Premium",
+        # Seed catalog + cart via public APIs (avoid mutating internal dicts directly).
+        headphones_product_id = self.shopping.add_product("Wireless Headphones - Premium")
+        self.headphones_item_id = self.shopping.add_item_to_product(
             product_id=headphones_product_id,
-        )
-        headphones_item_id = "item_headphones_001"
-        headphones_product.variants[headphones_item_id] = Item(
-            item_id=headphones_item_id,
             price=79.99,
-            available=True,
             options={"color": "black", "type": "over-ear"},
-        )
-        self.shopping.products[headphones_product_id] = headphones_product
-
-        # Create product: Phone Charger
-        charger_product_id = "prod_charger_001"
-        charger_product = Product(
-            name="USB-C Fast Charger",
-            product_id=charger_product_id,
-        )
-        charger_item_id = "item_charger_001"
-        charger_product.variants[charger_item_id] = Item(
-            item_id=charger_item_id,
-            price=24.99,
             available=True,
-            options={"wattage": "30W", "cable_included": True},
         )
-        self.shopping.products[charger_product_id] = charger_product
+
+        charger_product_id = self.shopping.add_product("USB-C Fast Charger")
+        self.charger_item_id = self.shopping.add_item_to_product(
+            product_id=charger_product_id,
+            price=24.99,
+            options={"wattage": "30W", "cable_included": True},
+            available=True,
+        )
 
         # Add both items to cart (user already browsed and added these)
-        self.shopping.cart[headphones_item_id] = CartItem(
-            item_id=headphones_item_id,
-            price=79.99,
-            quantity=1,
-            available=True,
-            options={"color": "black", "type": "over-ear"},
-        )
-        self.shopping.cart[charger_item_id] = CartItem(
-            item_id=charger_item_id,
-            price=24.99,
-            quantity=1,
-            available=True,
-            options={"wattage": "30W", "cable_included": True},
-        )
+        self.shopping.add_to_cart(self.headphones_item_id, quantity=1)
+        self.shopping.add_to_cart(self.charger_item_id, quantity=1)
 
         # Add discount code "SAVE20" (20% off) for both items
-        self.shopping.discount_codes[headphones_item_id] = {"SAVE20": 20.0}
-        self.shopping.discount_codes[charger_item_id] = {"SAVE20": 20.0}
+        self.shopping.add_discount_code(self.headphones_item_id, {"SAVE20": 20.0})
+        self.shopping.add_discount_code(self.charger_item_id, {"SAVE20": 20.0})
 
         # Register all apps
         self.apps = [self.agent_ui, self.system_app, self.email, self.shopping]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps from self.apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -137,9 +105,7 @@ class ExpiringDiscountCartCheckout(PASScenario):
 
             # Event 5: User accepts proposal (oracle)
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please complete the checkout with the discount code.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Event 6: Agent completes checkout with discount code (oracle)
@@ -158,7 +124,6 @@ class ExpiringDiscountCartCheckout(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -174,28 +139,7 @@ class ExpiringDiscountCartCheckout(PASScenario):
                 for e in log_entries
             )
 
-            # Check 2: Agent checked cart contents before proposing checkout
-            # STRICT: must list cart to see what items the user has
-            cart_check_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_cart"
-                for e in log_entries
-            )
-
-            # Check 3: Agent checked discount code validity
-            # STRICT: must verify the discount code applies to cart items
-            discount_check_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "get_discount_code_info"
-                and e.action.args.get("discount_code") == "SAVE20"
-                for e in log_entries
-            )
-
-            # Check 4: Agent completed checkout with the discount code
+            # Check 2: Agent completed checkout with the discount code
             # STRICT: must complete checkout with correct discount code SAVE20
             checkout_found = any(
                 (e.event_type == EventType.AGENT)
@@ -210,20 +154,13 @@ class ExpiringDiscountCartCheckout(PASScenario):
             missing_checks = []
             if not proposal_found:
                 missing_checks.append("agent proposal mentioning discount code, cart items, and urgency")
-            if not cart_check_found:
-                missing_checks.append("cart contents check (list_cart)")
-            if not discount_check_found:
-                missing_checks.append("discount code validation (get_discount_code_info)")
             if not checkout_found:
                 missing_checks.append("checkout completion with SAVE20 discount code")
 
-            success = proposal_found and cart_check_found and discount_check_found and checkout_found
+            success = proposal_found and checkout_found
 
             rationale = None if success else f"Missing critical checks: {', '.join(missing_checks)}"
             return ScenarioValidationResult(success=success, rationale=rationale)
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

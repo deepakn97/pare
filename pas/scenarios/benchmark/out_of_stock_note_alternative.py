@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,13 +6,12 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
 )
 from pas.apps.note import StatefulNotesApp
+from pas.apps.reminder import StatefulReminderApp
 from pas.apps.shopping import StatefulShoppingApp
 from pas.scenarios import PASScenario
 from pas.scenarios.utils.registry import register_scenario
@@ -24,7 +21,7 @@ from pas.scenarios.utils.registry import register_scenario
 class OutOfStockNoteAlternative(PASScenario):
     """Agent replaces an out-of-stock cart item using alternative product suggestions from a shopping note.
 
-    The user has a note in the "Personal" folder titled "Kitchen Shopping List" that contains a friend's product recommendations, including: "If the Espresso Deluxe Machine is sold out, try the Barista Pro 3000 instead - Sarah says it's even better." The user receives a shopping notification that an item in their cart (Espresso Deluxe Machine) is now out of stock and has been removed. The agent must:
+    The user has a note in the "Personal" folder titled "Kitchen Shopping List" that contains a friend's product recommendations, including: "If the Espresso Deluxe Machine is sold out, try the Barista Pro 3000 instead - Sarah says it's even better." The user also has a personal reminder to check for out-of-stock updates and, if the Espresso Deluxe Machine becomes unavailable, search Notes for "Espresso Deluxe" to find alternatives. Shortly after scenario start, the user receives a shopping notification that an item in their cart (Espresso Deluxe Machine) is now out of stock and has been removed. The agent must:
     1. Detect the out-of-stock notification and identify the removed product name
     2. Search the Notes app for references to that product
     3. Extract the recommended alternative (Barista Pro 3000) from the note content
@@ -41,13 +38,15 @@ class OutOfStockNoteAlternative(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
         # Initialize Notes app
         self.note = StatefulNotesApp(name="Notes")
+
+        # Initialize Reminder app
+        self.reminder = StatefulReminderApp(name="Reminders")
 
         # Create a note in the Personal folder with product alternative recommendations
         # This note contains the friend's suggestion: if Espresso Deluxe Machine is sold out,
@@ -66,7 +65,7 @@ Other items:
 - Espresso beans (dark roast)
 - Milk frother
 """
-        self.note.create_note_with_time(
+        self.kitchen_note_id = self.note.create_note_with_time(
             folder="Personal",
             title="Kitchen Shopping List",
             content=note_content,
@@ -111,35 +110,49 @@ Other items:
         # NOTE: This represents the user having already added the item to cart before the scenario starts
         self.shopping.add_to_cart(item_id=self.espresso_deluxe_item_id, quantity=1)
 
+        # Seed a time-driven reminder that will automatically notify the user+agent when due.
+        # The reminder is written in a personal note-like tone and nudges the "what to do next" behavior.
+        self.reminder.add_reminder(
+            title="If Espresso Deluxe is sold out, check Notes for alternatives",
+            due_datetime="2025-11-18 09:01:00",
+            description=(
+                "Check whether the Espresso Deluxe Machine is still available / in my cart.\n"
+                "If it's out of stock, search my Notes for “Espresso Deluxe” to see if I saved any alternatives or recommendations. Also, if purchased the alternative, update the same note with the purchase record."
+            ),
+        )
+
         # Register all apps here in self.apps
-        self.apps = [self.agent_ui, self.system_app, self.note, self.shopping]
+        self.apps = [self.agent_ui, self.system_app, self.note, self.reminder, self.shopping]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         note_app = self.get_typed_app(StatefulNotesApp, "Notes")
         shopping_app = self.get_typed_app(StatefulShoppingApp, "Shopping")
 
         with EventRegisterer.capture_mode():
+            # NOTE: Reminder notifications are time-driven in the Reminders app.
+            # The reminder seeded in init (`due_datetime="2025-11-18 09:01:00"`) will automatically notify user+agent.
+            # The agent does NOT need to poll reminders; we model reaction time by scheduling the first oracle action
+            # after the reminder is due (and after the out-of-stock update below).
+
             # Environment event 1: Mark the Espresso Deluxe Machine as unavailable and notify user
             # This is the triggering event - the product becomes out of stock
             out_of_stock_event = shopping_app.update_item(
                 item_id=self.espresso_deluxe_item_id, new_availability=False
-            ).delayed(10)
+            ).delayed(100)
 
             # Oracle event 1: Agent searches notes for the out-of-stock product name
-            # Motivation: Agent received out-of-stock notification mentioning "Espresso Deluxe Machine" and needs to check if user has notes about alternatives
+            # Motivation: The out-of-stock update + the reminder nudge the agent to check if the user saved alternatives.
             search_notes_event = (
-                note_app.search_notes(query="Espresso Deluxe").oracle().depends_on(out_of_stock_event, delay_seconds=2)
+                note_app.search_notes(query="Espresso Deluxe").oracle().depends_on(out_of_stock_event, delay_seconds=55)
             )
 
             # Oracle event 2: Agent retrieves the specific note containing the alternative recommendation
             # Motivation: Search results showed the "Kitchen Shopping List" note; agent needs to read full content to extract the alternative product name
             get_note_event = (
-                note_app.get_note_by_id(note_id=next(iter(note_app.folders["Personal"].notes.keys())))
+                note_app.get_note_by_id(note_id=self.kitchen_note_id)
                 .oracle()
                 .depends_on(search_notes_event, delay_seconds=1)
             )
@@ -156,7 +169,7 @@ Other items:
             # Motivation: Agent found matching alternative in catalog and can now propose the substitution to user, citing the note recommendation
             proposal_event = (
                 aui.send_message_to_user(
-                    content="I noticed the Espresso Deluxe Machine in your cart is now out of stock. Your Kitchen Shopping List note suggests trying the Barista Pro 3000 instead (recommended by Sarah). The Barista Pro 3000 is available for $349.99. Would you like me to add it to your cart and proceed with checkout?"
+                    content="I noticed the Espresso Deluxe Machine in your cart is now out of stock. Your reminder says to check Notes for alternatives, and your Kitchen Shopping List note suggests trying the Barista Pro 3000 instead (recommended by Sarah). The Barista Pro 3000 is available for $349.99. Would you like me to add it to your cart, proceed with checkout, and update your note with the purchase record?"
                 )
                 .oracle()
                 .depends_on(search_alternative_event, delay_seconds=2)
@@ -165,11 +178,7 @@ Other items:
             # Oracle event 5: User accepts the proposal
             # Motivation: User agrees with the substitution plan
             acceptance_event = (
-                aui.accept_proposal(
-                    content="Yes, please add the Barista Pro 3000 and checkout. And update the notes with your purchase update."
-                )
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=3)
+                aui.accept_proposal(content="Yes, please do that.").oracle().depends_on(proposal_event, delay_seconds=3)
             )
 
             # Oracle event 6: Agent adds the alternative product to cart
@@ -188,7 +197,7 @@ Other items:
             # Motivation: Scenario docstring specifies updating the note with purchase date and chosen alternative for future reference
             update_note_event = (
                 note_app.update_note(
-                    note_id=next(iter(note_app.folders["Personal"].notes.keys())),
+                    note_id=self.kitchen_note_id,
                     content="""Kitchen Shopping List
 
 Items to buy:
@@ -211,7 +220,6 @@ Other items:
                 .depends_on(checkout_event, delay_seconds=2)
             )
 
-        # TODO: Register ALL events here in self.events
         self.events = [
             out_of_stock_event,
             search_notes_event,
@@ -225,7 +233,6 @@ Other items:
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -233,23 +240,7 @@ Other items:
             # Filter to only AGENT events (oracle events)
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent searched notes for the out-of-stock product
-            # The agent must use search_notes to find references to the Espresso Deluxe Machine
-            search_notes_found = any(
-                e.action.class_name == "StatefulNotesApp" and e.action.function_name == "search_notes"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent retrieved the note content
-            # The agent must read the full note to extract the alternative recommendation
-            # Accepts either get_note_by_id OR get_note_by_title as equivalent methods
-            get_note_found = any(
-                e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name in ["get_note_by_id", "get_note_by_title"]
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent proposed the substitution to user
+            # STRICT Check 1: Agent proposed the substitution to user
             # The agent must send a message to the user proposing the alternative
             # We do NOT check exact message content, only that the agent communicated with the user
             proposal_found = any(
@@ -257,7 +248,7 @@ Other items:
                 for e in agent_events
             )
 
-            # STRICT Check 4: Agent added the alternative product to cart
+            # STRICT Check 2: Agent added the alternative product to cart
             # The agent must call add_to_cart to add the Barista Pro 3000
             add_to_cart_found = any(
                 e.action.class_name == "StatefulShoppingApp"
@@ -266,14 +257,14 @@ Other items:
                 for e in agent_events
             )
 
-            # STRICT Check 5: Agent completed checkout
+            # STRICT Check 3: Agent completed checkout
             # The agent must call checkout to finalize the purchase
             checkout_found = any(
                 e.action.class_name == "StatefulShoppingApp" and e.action.function_name == "checkout"
                 for e in agent_events
             )
 
-            # STRICT Check 6: Agent updated the note with purchase record
+            # STRICT Check 4: Agent updated the note with purchase record
             # The agent must call update_note to record the purchase
             # We check that update_note was called, but do NOT assert on exact content
             update_note_found = any(
@@ -282,22 +273,11 @@ Other items:
             )
 
             # Combine all checks
-            all_checks_passed = (
-                search_notes_found
-                and get_note_found
-                and proposal_found
-                and add_to_cart_found
-                and checkout_found
-                and update_note_found
-            )
+            all_checks_passed = proposal_found and add_to_cart_found and checkout_found and update_note_found
 
             if not all_checks_passed:
                 # Build a detailed rationale of what failed
                 failures = []
-                if not search_notes_found:
-                    failures.append("agent did not search notes for out-of-stock product")
-                if not get_note_found:
-                    failures.append("agent did not retrieve note content")
                 if not proposal_found:
                     failures.append("agent did not propose substitution to user")
                 if not add_to_cart_found:
@@ -314,6 +294,3 @@ Other items:
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

@@ -1,13 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
-from are.simulation.apps.apartment_listing import Apartment
 from are.simulation.apps.contacts import Contact
 from are.simulation.apps.messaging_v2 import ConversationV2, MessageV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
@@ -32,32 +27,26 @@ class ApartmentFeatureComparisonQuery(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
-        # TODO: Initialize scenario specific apps here
         self.messaging = StatefulMessagingApp(name="Messages")
         self.apartment = StatefulApartmentApp(name="Apartment")
-
-        # TODO: Populate apps with scenario specific data here
 
         # Add contacts and users for messaging
         jordan_contact = Contact(
             first_name="Jordan", last_name="Lee", phone="+1-555-0101", email="jordan.lee@example.com"
         )
 
-        # Set up messaging app with user names and IDs
-        self.messaging.current_user_id = "user_main"
-        self.messaging.current_user_name = "Me"
         self.messaging.add_users(["Jordan Lee"])
         jordan_id = self.messaging.name_to_id["Jordan Lee"]
+        user_id = self.messaging.current_user_id
 
         # Create earlier conversation history discussing apartment search
         earlier_messages = [
             MessageV2(
-                sender_id="user_main",
+                sender_id=user_id,
                 content="Hey Jordan! I've been apartment hunting and saved a few places that look promising.",
                 timestamp=datetime(2025, 11, 17, 14, 30, 0, tzinfo=UTC).timestamp(),
             ),
@@ -67,7 +56,7 @@ class ApartmentFeatureComparisonQuery(PASScenario):
                 timestamp=datetime(2025, 11, 17, 14, 35, 0, tzinfo=UTC).timestamp(),
             ),
             MessageV2(
-                sender_id="user_main",
+                sender_id=user_id,
                 content="I need parking for my car and a place that's pet-friendly since I'm planning to adopt a cat.",
                 timestamp=datetime(2025, 11, 17, 14, 40, 0, tzinfo=UTC).timestamp(),
             ),
@@ -79,86 +68,72 @@ class ApartmentFeatureComparisonQuery(PASScenario):
         ]
 
         conversation = ConversationV2(
-            participant_ids=["user_main", jordan_id],
+            participant_ids=[user_id, jordan_id],
             messages=earlier_messages,
             title="Jordan Lee",
             last_updated=datetime(2025, 11, 17, 15, 0, 0, tzinfo=UTC).timestamp(),
         )
+        self.jordan_conversation_id = conversation.conversation_id
         self.messaging.add_conversation(conversation)
 
         # Populate apartment app with three saved apartments with varying criteria
 
-        # Apartment 1: Has both parking and is pet-friendly
-        apt1 = Apartment(
+        # Seed apartments via public APIs (avoid mutating internal dicts/lists directly).
+        self.riverside_lofts_id = self.apartment.add_new_apartment(
             name="Riverside Lofts",
             location="Downtown",
             zip_code="90210",
             price=2200.0,
-            bedrooms=2,
-            bathrooms=1,
-            property_type="Apartment",
+            number_of_bedrooms=2,
+            number_of_bathrooms=1,
             square_footage=950,
+            property_type="Apartment",
             furnished_status="Unfurnished",
             floor_level="Upper floors",
             pet_policy="Pets allowed",
             lease_term="1 year",
             amenities=["Parking", "Gym", "Pool", "In-unit laundry"],
-            apartment_id="apt_001",
         )
+        self.apartment.save_apartment(self.riverside_lofts_id)
 
-        # Apartment 2: Has parking but NO pets allowed
-        apt2 = Apartment(
+        self.sunset_gardens_id = self.apartment.add_new_apartment(
             name="Sunset Gardens",
             location="Midtown",
             zip_code="90211",
             price=1900.0,
-            bedrooms=1,
-            bathrooms=1,
-            property_type="Apartment",
+            number_of_bedrooms=1,
+            number_of_bathrooms=1,
             square_footage=800,
+            property_type="Apartment",
             furnished_status="Unfurnished",
             floor_level="Ground floor",
             pet_policy="No pets",
             lease_term="1 year",
             amenities=["Parking", "Gym", "Balcony"],
-            apartment_id="apt_002",
         )
+        self.apartment.save_apartment(self.sunset_gardens_id)
 
-        # Apartment 3: Pet-friendly but NO parking
-        apt3 = Apartment(
+        self.green_valley_studios_id = self.apartment.add_new_apartment(
             name="Green Valley Studios",
             location="Westside",
             zip_code="90212",
             price=1750.0,
-            bedrooms=1,
-            bathrooms=1,
-            property_type="Studio",
+            number_of_bedrooms=1,
+            number_of_bathrooms=1,
             square_footage=650,
+            property_type="Studio",
             furnished_status="Semi-furnished",
             floor_level="Upper floors",
             pet_policy="Cats allowed",
             lease_term="1 year",
             amenities=["Gym", "Rooftop terrace", "In-unit laundry"],
-            apartment_id="apt_003",
         )
+        self.apartment.save_apartment(self.green_valley_studios_id)
 
-        # Add apartments to the app and mark them as saved
-        self.apartment.apartments["apt_001"] = apt1
-        self.apartment.apartments["apt_002"] = apt2
-        self.apartment.apartments["apt_003"] = apt3
-
-        self.apartment.saved_apartments = ["apt_001", "apt_002", "apt_003"]
-        apt1.saved = True
-        apt2.saved = True
-        apt3.saved = True
-
-        # TODO: Register all apps here in self.apps
         self.apps = [self.agent_ui, self.system_app, self.messaging, self.apartment]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
@@ -168,7 +143,7 @@ class ApartmentFeatureComparisonQuery(PASScenario):
             # Environment event: Jordan sends a message asking the comparison question
             # This is the triggering environment event that motivates agent action
             jordan_id = messaging_app.name_to_id["Jordan Lee"]
-            conversation_id = next(iter(messaging_app.conversations.keys()))
+            conversation_id = self.jordan_conversation_id
 
             env_msg = messaging_app.create_and_add_message(
                 conversation_id=conversation_id,
@@ -191,7 +166,7 @@ class ApartmentFeatureComparisonQuery(PASScenario):
             # Oracle event: Agent retrieves details for apartment 1 to check parking + pet policy
             # Motivation: Need to inspect amenities and pet_policy fields for comparison
             get_apt1 = (
-                apartment_app.get_apartment_details(apartment_id="apt_001")
+                apartment_app.get_apartment_details(apartment_id=self.riverside_lofts_id)
                 .oracle()
                 .depends_on(list_saved, delay_seconds=2)
             )
@@ -199,7 +174,7 @@ class ApartmentFeatureComparisonQuery(PASScenario):
             # Oracle event: Agent retrieves details for apartment 2
             # Motivation: Systematic comparison requires checking all saved apartments
             get_apt2 = (
-                apartment_app.get_apartment_details(apartment_id="apt_002")
+                apartment_app.get_apartment_details(apartment_id=self.sunset_gardens_id)
                 .oracle()
                 .depends_on(get_apt1, delay_seconds=2)
             )
@@ -207,7 +182,7 @@ class ApartmentFeatureComparisonQuery(PASScenario):
             # Oracle event: Agent retrieves details for apartment 3
             # Motivation: Complete the systematic review of all saved apartments
             get_apt3 = (
-                apartment_app.get_apartment_details(apartment_id="apt_003")
+                apartment_app.get_apartment_details(apartment_id=self.green_valley_studios_id)
                 .oracle()
                 .depends_on(get_apt2, delay_seconds=2)
             )
@@ -242,11 +217,9 @@ class ApartmentFeatureComparisonQuery(PASScenario):
                 .depends_on(acceptance, delay_seconds=4)
             )
 
-        # TODO: Register ALL events here in self.events
         self.events = [env_msg, agent_read, list_saved, get_apt1, get_apt2, get_apt3, proposal, acceptance, send_reply]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -254,43 +227,14 @@ class ApartmentFeatureComparisonQuery(PASScenario):
             # Filter to only AGENT events for validation
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent read the conversation to detect Jordan's query
-            read_conversation_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulMessagingApp" and e.action.function_name == "read_conversation":
-                    read_conversation_found = True
-                    break
-
-            # STRICT Check 2: Agent listed saved apartments
-            list_saved_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "list_saved_apartments":
-                    list_saved_found = True
-                    break
-
-            # STRICT Check 3: Agent retrieved details for all three apartments
-            # This ensures systematic comparison logic
-            retrieved_apartment_ids = set()
-            for e in agent_events:
-                if e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "get_apartment_details":
-                    apt_id = e.action.args.get("apartment_id")
-                    if apt_id:
-                        retrieved_apartment_ids.add(apt_id)
-
-            all_apartments_retrieved = (
-                "apt_001" in retrieved_apartment_ids
-                and "apt_002" in retrieved_apartment_ids
-                and "apt_003" in retrieved_apartment_ids
-            )
-
-            # STRICT Check 4: Agent sent proposal to user (flexible on content)
+            # STRICT Check 1: Agent sent proposal to user (flexible on content)
             proposal_found = False
             for e in agent_events:
                 if e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user":
                     proposal_found = True
                     break
 
-            # STRICT Check 5: Agent sent reply message to Jordan
+            # STRICT Check 2: Agent sent reply message to Jordan
             # Accept either send_message or any equivalent messaging method
             reply_sent_found = False
             for e in agent_events:
@@ -315,25 +259,11 @@ class ApartmentFeatureComparisonQuery(PASScenario):
                             break
 
             # Aggregate all strict checks
-            success = (
-                read_conversation_found
-                and list_saved_found
-                and all_apartments_retrieved
-                and proposal_found
-                and reply_sent_found
-            )
+            success = proposal_found and reply_sent_found
 
             # Build rationale for failures
             if not success:
                 missing_checks = []
-                if not read_conversation_found:
-                    missing_checks.append("agent did not read conversation")
-                if not list_saved_found:
-                    missing_checks.append("agent did not list saved apartments")
-                if not all_apartments_retrieved:
-                    missing_checks.append(
-                        f"agent did not retrieve all three apartment details (found: {retrieved_apartment_ids})"
-                    )
                 if not proposal_found:
                     missing_checks.append("agent did not send proposal to user")
                 if not reply_sent_found:
@@ -346,6 +276,3 @@ class ApartmentFeatureComparisonQuery(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

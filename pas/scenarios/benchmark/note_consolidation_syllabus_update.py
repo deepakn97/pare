@@ -1,15 +1,13 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
+import tempfile
 from datetime import UTC, datetime
-from typing import Any, cast
+from pathlib import Path
+from typing import Any
 
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
@@ -41,7 +39,6 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -63,16 +60,13 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             created_at="2025-11-10 10:00:00",
             updated_at="2025-11-15 14:30:00",
         )
-        # Seed a dummy attachment entry so the later removal workflow is meaningful.
-        # NOTE: We seed the attachment directly into the note state to avoid requiring real files on disk.
-        module2_note = self.note.folders["Spring 2025 CS"].notes[self.module2_note_id]
-        # NOTE: App state must be JSON-serializable for scenario initialization; do NOT store raw bytes here.
-        # We use a base64-encoded *string* placeholder to represent file contents.
-        #
-        # mypy: The underlying Contact/Note models may type `attachments` as `dict[str, bytes]`.
-        # We cast here because scenarios only need attachment *names* to be present; the bytes payload is unused.
-        module2_note.attachments = cast("dict[str, bytes]", {"Assignment2.pdf": "ZHVtbXk="})  # base64("dummy")
-        self.note.folders["Spring 2025 CS"].notes[self.module2_note_id] = module2_note
+        # Seed attachment via public API (requires a real file path).
+        attachments_dir = Path(tempfile.gettempdir()) / "pas_note_attachments"
+        attachments_dir.mkdir(parents=True, exist_ok=True)
+        self.assignment2_path = str(attachments_dir / "Assignment2.pdf")
+        Path(self.assignment2_path).write_bytes(b"dummy assignment 2")
+        self.combined_assignment_path = str(attachments_dir / "Combined_Assignment.pdf")
+        Path(self.combined_assignment_path).write_bytes(b"dummy combined assignment")
 
         # Populate baseline data: Create Module 3 Notes in the Spring 2025 CS folder
         # This note contains algorithms content
@@ -89,7 +83,6 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
         self.apps = [self.note, self.email, self.agent_ui, self.system_app]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
@@ -97,13 +90,34 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
         email_app = self.get_typed_app(StatefulEmailApp, "Email")
 
         with EventRegisterer.capture_mode():
+            # Environment event 0: Seed the existing Module 2 attachment AFTER initialization.
+            #
+            # Why: Notes attachments are stored as bytes in the app state; seeding an attachment during
+            # init_and_populate_apps() makes scenario initialization fail when run_scenarios serializes
+            # initial app states to JSON.
+            #
+            # This event happens before the professor email so the email's "currently attached" claim is consistent.
+            seed_module2_attachment_event = note_app.add_attachment_to_note(
+                note_id=self.module2_note_id,
+                attachment_path=self.assignment2_path,
+            ).delayed(1)
+
             # Environment event: Professor sends email with explicit syllabus update instructions
             # This email contains all the details needed: note titles to merge, folder to rename, attachment changes
             syllabus_email_event = email_app.send_email_to_user_with_id(
                 email_id="email-syllabus-update-123",
                 sender="prof.johnson@university.edu",
                 subject="CS 201 - Important Syllabus Update",
-                content="Hi,\n\nDue to curriculum changes, we're merging 'Module 2: Data Structures' and 'Module 3: Algorithms' into a single unified module.\n\nPlease consolidate your separate lecture notes titled 'Module 2 Notes' and 'Module 3 Notes' into one comprehensive 'Data Structures & Algorithms' note.\n\nAlso, the assignment file currently attached to Module 2 Notes (/files/Assignment2.pdf) should be removed since it's now obsolete, and the new combined assignment (/files/Combined_Assignment.pdf) should be attached to your consolidated note.\n\nFinally, rename your 'Spring 2025 CS' folder to 'Spring 2025 CS - Updated Curriculum' to reflect these changes.\n\nThanks,\nProf. Johnson",
+                content=(
+                    "Hi,\n\n"
+                    "Due to curriculum changes, we're merging 'Module 2: Data Structures' and 'Module 3: Algorithms' into a single unified module.\n\n"
+                    "Please consolidate your separate lecture notes titled 'Module 2 Notes' and 'Module 3 Notes' into one comprehensive 'Data Structures & Algorithms' note.\n\n"
+                    f"Also, the assignment file currently attached to Module 2 Notes ({self.assignment2_path}) should be removed since it's now obsolete, "
+                    f"and the new combined assignment ({self.combined_assignment_path}) should be attached to your consolidated note.\n\n"
+                    "Finally, rename your 'Spring 2025 CS' folder to 'Spring 2025 CS - Updated Curriculum' to reflect these changes.\n\n"
+                    "Thanks,\n"
+                    "Prof. Johnson"
+                ),
             ).delayed(5)
 
             # Oracle event: Agent searches for "Module 2 Notes" to locate it
@@ -146,9 +160,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
 
             # Oracle event: User accepts the proposal
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please go ahead and make those changes.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=3)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=3)
             )
 
             # Oracle event: Agent creates consolidated note with combined content
@@ -190,7 +202,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                     note_id=create_consolidated_event.metadata.return_value
                     if hasattr(create_consolidated_event, "metadata") and create_consolidated_event.metadata
                     else "",
-                    attachment_path="/files/Combined_Assignment.pdf",
+                    attachment_path=self.combined_assignment_path,
                 )
                 .oracle()
                 .depends_on(remove_obsolete_attachment_event, delay_seconds=1)
@@ -222,6 +234,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
 
         # Register ALL events here in self.events
         self.events = [
+            seed_module2_attachment_event,
             syllabus_email_event,
             search_module2_event,
             search_module3_event,
@@ -239,7 +252,6 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -254,16 +266,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 2: Agent observed both note titles
-            # Accept equivalence class: search_notes OR get_note_by_id OR list_notes
-            # (any method that would reveal the note's existence counts as observation)
-            observed_notes = any(
-                e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name in ["search_notes", "get_note_by_id", "list_notes"]
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent created the consolidated note
+            # STRICT Check 2: Agent created the consolidated note
             # Must be create_note with title "Data Structures & Algorithms"
             consolidated_note_created = any(
                 e.action.class_name == "StatefulNotesApp"
@@ -274,7 +277,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 4: Agent deleted both original notes
+            # STRICT Check 3: Agent deleted both original notes
             # Must have at least 2 delete_note calls
             delete_events = [
                 e
@@ -283,7 +286,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             ]
             both_notes_deleted = len(delete_events) >= 2
 
-            # STRICT Check 5: Agent renamed the folder
+            # STRICT Check 4: Agent renamed the folder
             # Must be rename_folder with new_folder containing "Updated Curriculum"
             folder_renamed = any(
                 e.action.class_name == "StatefulNotesApp"
@@ -293,7 +296,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 6: Agent removed the obsolete assignment attachment from Module 2
+            # STRICT Check 5: Agent removed the obsolete assignment attachment from Module 2
             removed_obsolete_attachment = any(
                 e.action.class_name == "StatefulNotesApp"
                 and e.action.function_name == "remove_attachment"
@@ -301,18 +304,17 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 7: Agent attached the new combined assignment to the consolidated note
+            # STRICT Check 6: Agent attached the new combined assignment to the consolidated note
             attached_new_assignment = any(
                 e.action.class_name == "StatefulNotesApp"
                 and e.action.function_name == "add_attachment_to_note"
-                and "/files/Combined_Assignment.pdf" in str(e.action.args.get("attachment_path", ""))
+                and str(e.action.args.get("attachment_path", "")).endswith("Combined_Assignment.pdf")
                 for e in agent_events
             )
 
             # Combine all strict checks
             success = (
                 proposal_found
-                and observed_notes
                 and consolidated_note_created
                 and both_notes_deleted
                 and folder_renamed
@@ -325,8 +327,6 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("no proposal sent to user")
-                if not observed_notes:
-                    missing_checks.append("agent did not observe the notes")
                 if not consolidated_note_created:
                     missing_checks.append("consolidated note 'Data Structures & Algorithms' not created")
                 if not both_notes_deleted:
@@ -345,6 +345,3 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

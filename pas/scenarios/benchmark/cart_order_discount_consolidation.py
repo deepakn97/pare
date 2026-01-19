@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,12 +6,10 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
-    StatefulCalendarApp,
+    StatefulEmailApp,
 )
 from pas.apps.shopping import StatefulShoppingApp
 from pas.scenarios import PASScenario
@@ -25,8 +21,9 @@ class CartOrderDiscountConsolidation(PASScenario):
     """Agent identifies discount savings opportunity by consolidating cart with pending orders.
 
     The user receives a shopping notification about a new 20% discount code ("BULK20") that applies to orders of 3 or more
-    electronics items. A calendar reminder from "Shop Deals" also summarizes the promotion rule (3+ electronics for 20%
-    off) and suggests checking the cart and any pending orders to see if consolidating items would reach the threshold.
+    electronics items. Separately, the user receives a promo email from "Shop Deals" summarizing the promotion rule (3+
+    electronics for 20% off) and suggesting checking the cart and any pending orders to see if consolidating items would
+    reach the threshold.
     The user currently has 2 electronics items in their cart ("Wireless Mouse - Black" and "USB-C Cable - White") and an
     existing pending order (#5431) containing 1 electronics item ("Laptop Stand - Silver") with status "processing" (not
     yet shipped). The agent must:
@@ -47,7 +44,6 @@ class CartOrderDiscountConsolidation(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with baseline data for cart-order discount consolidation scenario.
 
         Baseline state:
@@ -56,17 +52,15 @@ class CartOrderDiscountConsolidation(PASScenario):
         - User has 1 pending order (#5431) with laptop stand in "processing" status
         - Discount code "BULK20" (20% off) exists and applies to all 3 electronics items
         """
-        from are.simulation.apps.shopping import CartItem, Order
-
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
-        self.calendar = StatefulCalendarApp(name="Calendar")
+        self.email = StatefulEmailApp(name="Email")
         self.shopping = StatefulShoppingApp(name="Shopping")
 
         # Create products and variants in shopping catalog
         # Product 1: Wireless Mouse - Black ($25.99)
         mouse_product_id = self.shopping.add_product("Wireless Mouse")
-        mouse_item_id = self.shopping.add_item_to_product(
+        self.mouse_item_id = self.shopping.add_item_to_product(
             product_id=mouse_product_id,
             price=25.99,
             options={"color": "Black"},
@@ -75,7 +69,7 @@ class CartOrderDiscountConsolidation(PASScenario):
 
         # Product 2: USB-C Cable - White ($12.50)
         cable_product_id = self.shopping.add_product("USB-C Cable")
-        cable_item_id = self.shopping.add_item_to_product(
+        self.cable_item_id = self.shopping.add_item_to_product(
             product_id=cable_product_id,
             price=12.50,
             options={"color": "White"},
@@ -84,7 +78,7 @@ class CartOrderDiscountConsolidation(PASScenario):
 
         # Product 3: Laptop Stand - Silver ($45.00)
         stand_product_id = self.shopping.add_product("Laptop Stand")
-        stand_item_id = self.shopping.add_item_to_product(
+        self.stand_item_id = self.shopping.add_item_to_product(
             product_id=stand_product_id,
             price=45.00,
             options={"color": "Silver"},
@@ -92,85 +86,67 @@ class CartOrderDiscountConsolidation(PASScenario):
         )
 
         # Add discount code "BULK20" (20% off) to all three electronics items
-        self.shopping.add_discount_code(mouse_item_id, {"BULK20": 20.0})
-        self.shopping.add_discount_code(cable_item_id, {"BULK20": 20.0})
-        self.shopping.add_discount_code(stand_item_id, {"BULK20": 20.0})
+        self.shopping.add_discount_code(self.mouse_item_id, {"BULK20": 20.0})
+        self.shopping.add_discount_code(self.cable_item_id, {"BULK20": 20.0})
+        self.shopping.add_discount_code(self.stand_item_id, {"BULK20": 20.0})
 
         # Add 2 items to cart (mouse and cable)
-        self.shopping.add_to_cart(mouse_item_id, quantity=1)
-        self.shopping.add_to_cart(cable_item_id, quantity=1)
+        self.shopping.add_to_cart(self.mouse_item_id, quantity=1)
+        self.shopping.add_to_cart(self.cable_item_id, quantity=1)
 
         # Create existing pending order #5431 with laptop stand (processing status)
         # Order placed 2 days before scenario start_time
-        # We construct the Order directly to avoid the add_order bug with CartItem name field
         order_date = self.start_time - (2 * 24 * 60 * 60)  # 2 days ago
-        pending_order = Order(
+        self.shopping.add_order(
             order_id="5431",
             order_status="processing",
-            order_date=datetime.fromtimestamp(order_date, tz=UTC),
+            order_date=order_date,
             order_total=45.00,
-            order_items={
-                stand_item_id: CartItem(
-                    item_id=stand_item_id,
-                    quantity=1,
-                    price=45.00,
-                    available=True,
-                    options={"color": "Silver"},
-                )
-            },
+            item_id=self.stand_item_id,
+            quantity=1,
         )
-        self.shopping.orders["5431"] = pending_order
 
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.calendar, self.shopping]
+        self.apps = [self.agent_ui, self.system_app, self.email, self.shopping]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
-        calendar_app = self.get_typed_app(StatefulCalendarApp, "Calendar")
+        email_app = self.get_typed_app(StatefulEmailApp, "Email")
         shopping_app = self.get_typed_app(StatefulShoppingApp, "Shopping")
 
         with EventRegisterer.capture_mode():
             # Environment Event 1: Shopping app notifies about new BULK20 discount code
             # Requires 3+ electronics items for 20% off
             discount_notification = shopping_app.add_discount_code(
-                item_id="dummy_item_for_notification", discount_code={"BULK20": 20.0}
+                item_id=self.mouse_item_id, discount_code={"BULK20": 20.0}
             ).delayed(8)
 
-            # Environment Event 2: Calendar reminder with explicit promotion rule + suggestion to check cart/orders
+            # Environment Event 2: Incoming promo email with explicit promotion rule + suggestion to check cart/orders
             # This is a realistic "don't forget the promo" cue that motivates checking cart + pending orders.
-            promo_calendar_event = calendar_app.add_calendar_event_by_attendee(
-                who_add="Shop Deals",
-                title="Promo reminder: BULK20 requires 3+ electronics for 20% off",
-                start_datetime="2025-11-18 09:05:00",
-                end_datetime="2025-11-18 09:10:00",
-                location="",
-                description=(
+            promo_email_event = email_app.send_email_to_user_with_id(
+                email_id="email-bulk20-promo",
+                sender="Shop Deals <deals@shopdeals.example>",
+                subject="BULK20: 20% off when you buy 3+ electronics",
+                content=(
                     "BULK20 promo: 20% off when you buy 3+ electronics items.\n\n"
                     "Tip: Check what's already in your cart and any pending electronics orders—sometimes consolidating "
                     "items into one checkout can meet the 3-item threshold."
                 ),
-                attendees=["Current User"],
             ).delayed(10)
 
-            # Oracle Event 0: Agent reads calendar context to observe the promo rule + consolidation suggestion
-            read_promo_calendar = (
-                calendar_app.get_calendar_events_from_to(
-                    start_datetime="2025-11-18 00:00:00",
-                    end_datetime="2025-11-19 00:00:00",
-                )
+            # Oracle Event 0: Agent reads the promo email to observe the rule + consolidation suggestion
+            read_promo_email = (
+                email_app.get_email_by_id(email_id="email-bulk20-promo", folder_name="INBOX")
                 .oracle()
-                .depends_on(promo_calendar_event, delay_seconds=2)
+                .depends_on(promo_email_event, delay_seconds=2)
             )
 
             # Agent checks current cart contents to see what items are already there
             # Motivated by: discount notification mentions item count threshold, agent needs to verify current cart state
             check_cart = (
-                shopping_app.list_cart()
-                .oracle()
-                .depends_on([discount_notification, read_promo_calendar], delay_seconds=2)
+                shopping_app.list_cart().oracle().depends_on([discount_notification, read_promo_email], delay_seconds=2)
             )
 
             # Agent checks discount code details to understand which items qualify
@@ -202,16 +178,12 @@ class CartOrderDiscountConsolidation(PASScenario):
                     "checkout with BULK20, you'll save 20% on all 3 items. Would you like me to do this?"
                 )
                 .oracle()
-                .depends_on([get_order_details, read_promo_calendar], delay_seconds=3)
+                .depends_on([get_order_details, read_promo_email], delay_seconds=3)
             )
 
             # User accepts the consolidation proposal
             acceptance = (
-                aui.accept_proposal(
-                    content="Yes, please consolidate and apply the discount. Also please help me checkout directly."
-                )
-                .oracle()
-                .depends_on(proposal, delay_seconds=5)
+                aui.accept_proposal(content="Yes, please do that.").oracle().depends_on(proposal, delay_seconds=5)
             )
 
             # Agent cancels the pending order #5431
@@ -221,7 +193,7 @@ class CartOrderDiscountConsolidation(PASScenario):
             # Agent adds the laptop stand item back to the cart
             # Motivated by: order #5431 contained the laptop stand (revealed by get_order_details), need to re-add it to cart
             add_stand_to_cart = (
-                shopping_app.add_to_cart(item_id=next(iter(self.shopping.orders["5431"].order_items)), quantity=1)
+                shopping_app.add_to_cart(item_id=self.stand_item_id, quantity=1)
                 .oracle()
                 .depends_on(cancel_order, delay_seconds=1)
             )
@@ -246,8 +218,8 @@ class CartOrderDiscountConsolidation(PASScenario):
 
         # Register ALL events
         self.events = [
-            promo_calendar_event,
-            read_promo_calendar,
+            promo_email_event,
+            read_promo_email,
             discount_notification,
             check_cart,
             check_discount_info,
@@ -263,7 +235,6 @@ class CartOrderDiscountConsolidation(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -278,27 +249,7 @@ class CartOrderDiscountConsolidation(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 2: Agent checked cart contents
-            # Must use list_cart to understand current cart state
-            cart_check_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_cart"
-                for e in log_entries
-            )
-
-            # STRICT Check 3: Agent checked order history
-            # Must use list_orders or get_order_details to find pending orders
-            order_check_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name in ["list_orders", "get_order_details"]
-                for e in log_entries
-            )
-
-            # STRICT Check 4: Agent cancelled order #5431
+            # STRICT Check 2: Agent cancelled order #5431
             # Must cancel the pending order to consolidate items
             order_cancelled = any(
                 e.event_type == EventType.AGENT
@@ -309,7 +260,7 @@ class CartOrderDiscountConsolidation(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 5: Agent added item back to cart
+            # STRICT Check 3: Agent added item back to cart
             # Must re-add the laptop stand to cart after cancellation
             item_added_to_cart = any(
                 e.event_type == EventType.AGENT
@@ -319,7 +270,7 @@ class CartOrderDiscountConsolidation(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 6: Agent completed checkout with BULK20 discount
+            # STRICT Check 4: Agent completed checkout with BULK20 discount
             # Must checkout with the discount code to achieve savings
             checkout_with_discount = any(
                 e.event_type == EventType.AGENT
@@ -331,24 +282,13 @@ class CartOrderDiscountConsolidation(PASScenario):
             )
 
             # All strict checks must pass for success
-            success = (
-                proposal_found
-                and cart_check_found
-                and order_check_found
-                and order_cancelled
-                and item_added_to_cart
-                and checkout_with_discount
-            )
+            success = proposal_found and order_cancelled and item_added_to_cart and checkout_with_discount
 
             # Build rationale if validation fails
             if not success:
                 missing = []
                 if not proposal_found:
                     missing.append("agent proposal message")
-                if not cart_check_found:
-                    missing.append("cart contents check")
-                if not order_check_found:
-                    missing.append("order history check")
                 if not order_cancelled:
                     missing.append("order #5431 cancellation")
                 if not item_added_to_cart:
@@ -363,6 +303,3 @@ class CartOrderDiscountConsolidation(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

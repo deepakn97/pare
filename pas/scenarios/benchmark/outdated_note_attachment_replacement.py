@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,6 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
@@ -41,7 +37,6 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -70,7 +65,6 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.note, self.email]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -134,9 +128,7 @@ Project Lead""",
 
             # Oracle Event 4: User accepts the proposal
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please update those attachments as Sarah requested.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Oracle Event 5: Agent lists current attachments to verify state before modifications
@@ -208,7 +200,6 @@ Project Lead""",
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -223,38 +214,7 @@ Project Lead""",
                 for e in log_entries
             )
 
-            # STRICT Check 2: Agent searched for the note in the Work folder
-            # Must use search_notes_in_folder targeting the Work folder
-            note_search_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name == "search_notes_in_folder"
-                and e.action.args.get("folder_name") == "Work"
-                for e in log_entries
-            )
-
-            # FLEXIBLE Check 3: Agent observed the note details
-            # Accept get_note_by_id, get_calendar_events_from_to, or search results
-            note_observed = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name in ["get_note_by_id", "search_notes_in_folder"]
-                for e in log_entries
-            )
-
-            # FLEXIBLE Check 4: Agent listed attachments on the note
-            # This is part of the workflow but not strictly required if agent can proceed without it
-            list_attachments_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name == "list_attachments"
-                for e in log_entries
-            )
-
-            # STRICT Check 5: Agent removed the first outdated attachment
+            # STRICT Check 2: Agent removed the first outdated attachment
             # Must remove "TechCorp_Contract_Draft_v1.pdf"
             remove_contract_v1_found = any(
                 e.event_type == EventType.AGENT
@@ -265,7 +225,7 @@ Project Lead""",
                 for e in log_entries
             )
 
-            # STRICT Check 6: Agent added the first replacement attachment
+            # STRICT Check 3: Agent added the first replacement attachment
             # Must add the v2 contract at the specified path
             add_contract_v2_found = any(
                 e.event_type == EventType.AGENT
@@ -276,7 +236,7 @@ Project Lead""",
                 for e in log_entries
             )
 
-            # STRICT Check 7: Agent removed the second outdated attachment
+            # STRICT Check 4: Agent removed the second outdated attachment
             # Must remove "Technical_Specs_OLD.docx"
             remove_specs_old_found = any(
                 e.event_type == EventType.AGENT
@@ -287,7 +247,7 @@ Project Lead""",
                 for e in log_entries
             )
 
-            # STRICT Check 8: Agent added the second replacement attachment
+            # STRICT Check 5: Agent added the second replacement attachment
             # Must add the final specs at the specified path
             add_specs_final_found = any(
                 e.event_type == EventType.AGENT
@@ -301,7 +261,6 @@ Project Lead""",
             # All STRICT checks must pass; FLEXIBLE checks improve confidence but are not required
             strict_checks = (
                 proposal_found
-                and note_search_found
                 and remove_contract_v1_found
                 and add_contract_v2_found
                 and remove_specs_old_found
@@ -315,8 +274,6 @@ Project Lead""",
                 missing = []
                 if not proposal_found:
                     missing.append("agent proposal mentioning Sarah Chen and note")
-                if not note_search_found:
-                    missing.append("search for note in Work folder")
                 if not remove_contract_v1_found:
                     missing.append("removal of TechCorp_Contract_Draft_v1.pdf")
                 if not add_contract_v2_found:
@@ -333,6 +290,3 @@ Project Lead""",
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

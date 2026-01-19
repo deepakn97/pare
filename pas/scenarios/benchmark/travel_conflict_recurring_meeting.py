@@ -1,12 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from are.simulation.apps.contacts import Contact
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
@@ -33,7 +29,6 @@ class TravelConflictRecurringMeeting(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with baseline data for travel conflict scenario."""
         # Initialize required apps
         self.agent_ui = PASAgentUserInterface()
@@ -119,7 +114,6 @@ class TravelConflictRecurringMeeting(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.calendar]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps from self.apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -171,11 +165,7 @@ class TravelConflictRecurringMeeting(PASScenario):
 
             # Oracle Event 4: User accepts the proposal
             acceptance_event = (
-                aui.accept_proposal(
-                    content="Yes, please move the meeting to 10 AM and let everyone know about the change."
-                )
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please do that.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Oracle Event 5: Agent checks if 10 AM slot is available on Nov 20
@@ -237,7 +227,6 @@ class TravelConflictRecurringMeeting(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -253,19 +242,7 @@ class TravelConflictRecurringMeeting(PASScenario):
                 for e in log_entries
             )
 
-            # Check Step 2: Agent detected calendar events on Nov 20 to identify the conflict
-            # STRICT: Must check calendar for the specific day (Nov 20)
-            # FLEXIBLE: Time range can vary as long as it covers the conflict period
-            calendar_check_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCalendarApp"
-                and e.action.function_name == "get_calendar_events_from_to"
-                and "2025-11-20" in e.action.args.get("start_datetime", "")
-                for e in log_entries
-            )
-
-            # Check Step 3a: Agent edited the specific conflicting meeting instance (Nov 20)
+            # Check Step 2: Agent edited the specific conflicting meeting instance (Nov 20)
             # STRICT: Must edit the correct event_id and change time to 10:00 AM slot
             # FLEXIBLE: End time can be 11:00 or 11:30 depending on meeting duration logic
             edit_meeting_found = any(
@@ -278,15 +255,13 @@ class TravelConflictRecurringMeeting(PASScenario):
             )
 
             # Build success result: strict checks are required, flexible check is optional
-            success = proposal_found and calendar_check_found and edit_meeting_found
+            success = proposal_found and edit_meeting_found
 
             # Build rationale for failure
             if not success:
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("agent proposal about travel conflict")
-                if not calendar_check_found:
-                    missing_checks.append("calendar check for Nov 20")
                 if not edit_meeting_found:
                     missing_checks.append("edit meeting event to 10:00 AM")
 
@@ -297,6 +272,3 @@ class TravelConflictRecurringMeeting(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,6 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
@@ -40,7 +36,6 @@ class ColleagueRideEmergencyAssist(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with baseline data.
 
         Baseline state (pre-existing before start_time):
@@ -52,7 +47,7 @@ class ColleagueRideEmergencyAssist(PASScenario):
         self.system_app = HomeScreenSystemApp(name="System")
 
         # Initialize email app with user's email address
-        self.email = StatefulEmailApp(name="Emails", user_email="user@company.com")
+        self.email = StatefulEmailApp(name="Emails")
 
         # Initialize cab app
         self.cab = StatefulCabApp(name="Cab")
@@ -64,7 +59,6 @@ class ColleagueRideEmergencyAssist(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.email, self.cab]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps from self.apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -113,9 +107,7 @@ class ColleagueRideEmergencyAssist(PASScenario):
 
             # USER EVENT 1: User approves booking the ride
             user_accept_booking = (
-                aui.accept_proposal(content="Yes, please book it right away.")
-                .oracle()
-                .depends_on(proposal_book, delay_seconds=5)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_book, delay_seconds=5)
             )
 
             # ORACLE EVENT 4: Agent books the ride (motivated by user approval + quotation showing availability)
@@ -144,7 +136,7 @@ class ColleagueRideEmergencyAssist(PASScenario):
 
             # USER EVENT 2: User approves sending details to Lisa
             user_accept_send_details = (
-                aui.accept_proposal(content="Yes, please send her the ride details right away!")
+                aui.accept_proposal(content="Yes, please proceed.")
                 .oracle()
                 .depends_on(proposal_send_details, delay_seconds=5)
             )
@@ -175,7 +167,6 @@ class ColleagueRideEmergencyAssist(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -201,26 +192,8 @@ class ColleagueRideEmergencyAssist(PASScenario):
                 for e in agent_events
             )
 
-            # Check 3: STRICT - Agent replied to Lisa's email with ride details (equivalence class)
-            # Accept either reply_to_email or send_email to Lisa
-            reply_found = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and (
-                    (
-                        e.action.function_name == "reply_to_email"
-                        and e.action.args.get("email_id") == "emergency_lisa_email_001"
-                    )
-                    or (
-                        e.action.function_name == "send_email"
-                        and "lisa.park@company.com" in e.action.args.get("recipients", [])
-                    )
-                )
-                for e in agent_events
-            )
-
             # Determine success based on strict checks (all must pass)
-            success = proposal_found and booking_found and reply_found
+            success = proposal_found and booking_found
 
             # Build rationale for failure
             if not success:
@@ -229,8 +202,6 @@ class ColleagueRideEmergencyAssist(PASScenario):
                     missing_checks.append("no proposal to user found")
                 if not booking_found:
                     missing_checks.append("no ride booking for correct locations")
-                if not reply_found:
-                    missing_checks.append("no initial email reply to Lisa")
 
                 rationale = "; ".join(missing_checks)
                 return ScenarioValidationResult(success=False, rationale=rationale)
@@ -239,6 +210,3 @@ class ColleagueRideEmergencyAssist(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

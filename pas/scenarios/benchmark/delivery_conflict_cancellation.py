@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,14 +6,12 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
+    StatefulCalendarApp,
     StatefulEmailApp,
 )
-from pas.apps.reminder import StatefulReminderApp
 from pas.apps.shopping import StatefulShoppingApp
 from pas.scenarios import PASScenario
 from pas.scenarios.utils.registry import register_scenario
@@ -23,18 +19,18 @@ from pas.scenarios.utils.registry import register_scenario
 
 @register_scenario("delivery_conflict_cancellation")
 class DeliveryConflictCancellation(PASScenario):
-    """Agent detects a delivery time conflict between an incoming order shipment notification and an existing reminder about being unavailable, then cancels the order.
+    """Agent detects a delivery time conflict between an incoming order shipment notification and an existing calendar event about being unavailable, then cancels the order.
 
-    The user has a reminder titled "Out of town - Boston trip" due on Thursday covering the time period they'll be traveling. The shopping app sends a notification that an order for "Smart Home Camera" has shipped and will be delivered Thursday between 2-4 PM, requiring signature on delivery. The agent must:
+    The user has a calendar event titled "Out of town - Boston trip" spanning the next few days. The shopping app sends a notification that an order for "Smart Home Camera" has shipped and will be delivered Thursday between 2-4 PM, requiring signature on delivery. The agent must:
     1. Parse the incoming delivery notification extracting the delivery date and time window (Thursday 2-4 PM)
-    2. Check reminders (as suggested by the delivery email) and identify the conflicting "Out of town" reminder for the same day
+    2. Check the calendar (as suggested by the delivery email) and identify the conflicting "Out of town" event for the same day
     3. Recognize the user cannot receive the signature-required delivery while traveling
     4. Retrieve the order details to confirm it is cancellable
     5. Propose canceling the order before it reaches the delivery address
     6. After user acceptance, cancel the order via `cancel_order()`
-    7. Delete or update the reminder to note the cancellation was handled
+    7. Confirm with the user that the order was cancelled to avoid the missed signature-required delivery
 
-    This scenario exercises temporal conflict detection between delivery logistics and personal availability, order status reasoning, cross-app correlation (shopping notifications + reminder calendar), proactive order cancellation, and post-cancellation reminder cleanup.
+    This scenario exercises temporal conflict detection between delivery logistics and personal availability, order status reasoning, cross-app correlation (shopping notifications + calendar), and proactive order cancellation.
 
     ---.
     """
@@ -44,13 +40,12 @@ class DeliveryConflictCancellation(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
-        # Initialize reminder app
-        self.reminder = StatefulReminderApp(name="Reminders")
+        # Initialize calendar app
+        self.calendar = StatefulCalendarApp(name="Calendar")
 
         # Initialize shopping app
         self.shopping = StatefulShoppingApp(name="Shopping")
@@ -58,15 +53,16 @@ class DeliveryConflictCancellation(PASScenario):
         # Initialize email app (used to deliver delivery-window details as an observable artifact).
         self.email = StatefulEmailApp(name="Emails")
 
-        # Populate reminder app with baseline data
-        # Add a reminder for the user being out of town on Thursday
-        # Thursday is November 20, 2025 (start_time is Nov 18, 2025 at 9:00 AM)
-        self.reminder.add_reminder(
+        # Populate calendar app with baseline data
+        # Add an "out of town" event spanning the next few days (more realistic trip window).
+        # Start_time is Nov 18, 2025 at 9:00 AM; delivery is Thu Nov 20 (within the next 3 days).
+        self.out_of_town_event_id = self.calendar.add_calendar_event(
             title="Out of town - Boston trip",
-            due_datetime="2025-11-20 08:00:00",
+            start_datetime="2025-11-20 08:00:00",
+            end_datetime="2025-11-25 20:00:00",
+            location="Boston, MA",
             description="Away for business trip. Not home to receive deliveries.",
-            repetition_unit=None,
-            repetition_value=None,
+            tag="travel",
         )
 
         # Populate shopping app with baseline data
@@ -81,36 +77,25 @@ class DeliveryConflictCancellation(PASScenario):
 
         # Create a "shipped" order for this item that was placed earlier
         # Order was placed on Nov 17, one day before start_time
-        # Use load_orders_from_dict to avoid CartItem initialization bug in add_order
         order_datetime = datetime(2025, 11, 17, 14, 0, 0, tzinfo=UTC)
-        self.shopping.load_orders_from_dict({
-            "order_camera_001": {
-                "order_id": "order_camera_001",
-                "order_status": "shipped",
-                "order_date": order_datetime.isoformat(),
-                "order_total": 149.99,
-                "order_items": {
-                    item_id: {
-                        "item_id": item_id,
-                        "quantity": 1,
-                        "price": 149.99,
-                        "available": True,
-                        "options": {"color": "white", "resolution": "1080p"},
-                    }
-                },
-            }
-        })
+        self.shopping.add_order(
+            order_id="order_camera_001",
+            order_status="processed",
+            order_date=order_datetime.timestamp(),
+            order_total=149.99,
+            item_id=item_id,
+            quantity=1,
+        )
 
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.reminder, self.shopping, self.email]
+        self.apps = [self.agent_ui, self.system_app, self.calendar, self.shopping, self.email]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         shopping_app = self.get_typed_app(StatefulShoppingApp, "Shopping")
-        reminder_app = self.get_typed_app(StatefulReminderApp, "Reminders")
+        calendar_app = self.get_typed_app(StatefulCalendarApp, "Calendar")
         email_app = self.get_typed_app(StatefulEmailApp, "Emails")
 
         with EventRegisterer.capture_mode():
@@ -132,8 +117,8 @@ class DeliveryConflictCancellation(PASScenario):
                     "Delivery scheduled: Thursday (Nov 20) between 2:00 PM - 4:00 PM.\n"
                     "Signature required on delivery.\n"
                     "\n"
-                    "If you might be away during the delivery window, please check your reminders/calendar for conflicts. "
-                    "If you won't be available to sign, cancel the order before delivery.\n"
+                    "If you might be away during the delivery window, please check your calendar for conflicts. "
+                    "If you won't be available to sign anytime in the next 3 days after delivery, cancel the order before delivery.\n"
                 ),
             ).depends_on(shipment_notification_event, delay_seconds=2)
 
@@ -153,27 +138,31 @@ class DeliveryConflictCancellation(PASScenario):
                 .depends_on(read_delivery_email_event, delay_seconds=1)
             )
 
-            # Oracle Event 2: Agent checks reminders for conflicts with Thursday delivery
-            # Motivated by: delivery email explicitly instructs checking reminders/calendar for conflicts with the signature-required window.
-            check_reminders_event = (
-                reminder_app.get_all_reminders().oracle().depends_on(get_order_event, delay_seconds=1)
+            # Oracle Event 2: Agent checks calendar for conflicts with Thursday delivery
+            # Motivated by: delivery email explicitly instructs checking calendar for conflicts with the signature-required window.
+            check_calendar_event = (
+                calendar_app.get_calendar_events_from_to(
+                    # Check a broader window (~next 3 days) per the delivery email guidance.
+                    start_datetime="2025-11-20 00:00:00",
+                    end_datetime="2025-11-23 00:00:00",
+                )
+                .oracle()
+                .depends_on(get_order_event, delay_seconds=1)
             )
 
             # Oracle Event 3: Agent proposes canceling the order due to delivery conflict
-            # Motivated by: reminders revealed "Out of town - Boston trip" on Nov 20, conflicting with delivery
+            # Motivated by: calendar shows "Out of town - Boston trip" on Nov 20, conflicting with delivery
             proposal_event = (
                 aui.send_message_to_user(
-                    content="Your Smart Home Camera order (order_camera_001) has shipped. The delivery email says it's scheduled for Thursday (Nov 20) between 2-4 PM and requires a signature. You also have an 'Out of town - Boston trip' reminder that day, so you likely won't be home to sign. Would you like me to cancel the order before delivery?"
+                    content="Your Smart Home Camera order (order_camera_001) has shipped. The delivery email says it's scheduled for Thursday (Nov 20) between 2-4 PM and requires a signature. Your calendar shows you're out of town for a Boston trip then, so you likely won't be home to sign. Would you like me to cancel the order before delivery?"
                 )
                 .oracle()
-                .depends_on(check_reminders_event, delay_seconds=2)
+                .depends_on(check_calendar_event, delay_seconds=2)
             )
 
             # Oracle Event 4: User accepts the proposal to cancel the order
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please cancel the order. I won't be home to receive it.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Oracle Event 5: Agent cancels the order
@@ -200,7 +189,7 @@ class DeliveryConflictCancellation(PASScenario):
             delivery_email_event,
             read_delivery_email_event,
             get_order_event,
-            check_reminders_event,
+            check_calendar_event,
             proposal_event,
             acceptance_event,
             cancel_order_event,
@@ -208,33 +197,21 @@ class DeliveryConflictCancellation(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
 
-            # STRICT Check 1: Agent retrieved order details to understand delivery window
-            # After receiving shipment notification, agent must get order details
-            get_order_found = any(
+            # STRICT Check 1: Agent checked calendar to detect availability conflict
+            # Must query calendar to discover the "Out of town" conflict
+            check_calendar_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "get_order_details"
-                and e.action.args.get("order_id") == "order_camera_001"
+                and e.action.class_name == "StatefulCalendarApp"
+                and e.action.function_name == "get_calendar_events_from_to"
                 for e in log_entries
             )
 
-            # STRICT Check 2: Agent checked reminders to detect availability conflict
-            # Must query reminders to discover the "Out of town" conflict
-            check_reminders_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulReminderApp"
-                and e.action.function_name == "get_all_reminders"
-                for e in log_entries
-            )
-
-            # STRICT Check 3: Agent sent proposal to user about the delivery conflict
+            # STRICT Check 2: Agent sent proposal to user about the delivery conflict
             # Must propose canceling order and reference both delivery and unavailability
             # FLEXIBLE: exact wording can vary but must reference core conflict
             proposal_found = any(
@@ -245,7 +222,7 @@ class DeliveryConflictCancellation(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 4: Agent cancelled the order after user acceptance
+            # STRICT Check 3: Agent cancelled the order after user acceptance
             # Must execute cancel_order with correct order_id
             cancel_order_found = any(
                 e.event_type == EventType.AGENT
@@ -258,8 +235,7 @@ class DeliveryConflictCancellation(PASScenario):
 
             # Build success result and rationale
             strict_checks = [
-                ("get_order_details", get_order_found),
-                ("check_reminders", check_reminders_found),
+                ("check_calendar", check_calendar_found),
                 ("proposal_sent", proposal_found),
                 ("order_cancelled", cancel_order_found),
             ]
@@ -276,6 +252,3 @@ class DeliveryConflictCancellation(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

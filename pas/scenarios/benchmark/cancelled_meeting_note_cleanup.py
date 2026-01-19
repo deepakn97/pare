@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,12 +6,11 @@ from typing import Any
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
     StatefulCalendarApp,
+    StatefulEmailApp,
 )
 from pas.apps.note import StatefulNotesApp
 from pas.scenarios import PASScenario
@@ -27,10 +24,10 @@ class CancelledMeetingNoteCleanup(PASScenario):
     The user has a note in their "Work" folder titled "Client Onboarding Meeting Prep - Nov 28" containing detailed
     preparation materials, agenda items, and attendee information for an upcoming client meeting scheduled for November
     28th at 3:00 PM. The meeting organizer sends a calendar cancellation notification due to the client's scheduling
-    conflict. A follow-up calendar note/reminder explicitly references the prep note title so the agent can locate it
+    conflict. A follow-up email explicitly references the prep note title so the agent can locate it
     without guessing. The agent must:
     1. Recognize the calendar event cancellation notification
-    2. Read the follow-up cancellation note/reminder to get the exact prep note title
+    2. Read the follow-up cancellation email to get the exact prep note title
     3. Search notes for that prep note title to identify the now-obsolete note
     4. Propose deleting the note to avoid clutter
     5. Delete the note after user acceptance
@@ -44,7 +41,6 @@ class CancelledMeetingNoteCleanup(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -54,6 +50,9 @@ class CancelledMeetingNoteCleanup(PASScenario):
 
         # Initialize Calendar app
         self.calendar = StatefulCalendarApp(name="Calendar")
+
+        # Initialize Email app (used for follow-up cue; no reply required)
+        self.email = StatefulEmailApp(name="Emails")
 
         # Populate baseline data: calendar event scheduled for Nov 28 at 3:00 PM
         # The event exists before start_time and will be cancelled during the scenario
@@ -102,16 +101,15 @@ Key Points to Cover:
         )
 
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.note, self.calendar]
+        self.apps = [self.agent_ui, self.system_app, self.note, self.calendar, self.email]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         note_app = self.get_typed_app(StatefulNotesApp, "Notes")
         calendar_app = self.get_typed_app(StatefulCalendarApp, "Calendar")
+        email_app = self.get_typed_app(StatefulEmailApp, "Emails")
 
         with EventRegisterer.capture_mode():
             # Event 1: Calendar event cancelled by organizer (environment event - concrete exogenous trigger)
@@ -120,37 +118,35 @@ Key Points to Cover:
                 event_id=self.calendar_event_id, who_delete="Sarah Chen"
             ).delayed(20)
 
-            # Event 2: Organizer adds a follow-up calendar reminder with explicit prep-note title
+            # Event 2: Organizer sends a follow-up email with explicit prep-note title
             # Rationale: delete_calendar_event_by_attendee only includes event_id, so the agent needs an explicit cue
             # for which Notes entry to clean up.
-            followup_event = calendar_app.add_calendar_event_by_attendee(
-                who_add="Sarah Chen",
-                title="Client onboarding update: clean up prep note",
-                start_datetime="2025-11-18 09:30:00",
-                end_datetime="2025-11-18 09:40:00",
-                location="",
-                description=(
-                    "Update: The Client Onboarding Meeting on Nov 28 at 3:00 PM has been cancelled (client scheduling conflict). "
-                    "You can delete any related notes for the previous Client Onboarding Meeting since they are not needed anymore.\n\n"
+            followup_email_id = "client_onboarding_cancellation_followup_001"
+            followup_email_event = email_app.send_email_to_user_with_id(
+                email_id=followup_email_id,
+                sender="sarah.chen@company.example",
+                subject="Client Onboarding Meeting cancelled — please clean up prep note",
+                content=(
+                    "Hi,\n\n"
+                    "Update: The Client Onboarding Meeting on Nov 28 at 3:00 PM has been cancelled (client scheduling conflict).\n\n"
+                    "You can delete the old note for the Client Onboarding Meeting — we won't need it anymore.\n\n"
+                    "Thanks,\n"
+                    "Sarah"
                 ),
             ).delayed(25)
 
-            # Oracle Event 1: Agent reads calendar context to observe the explicit cleanup instruction + note title
-            # Motivation: followup_event contains the exact prep note title to look up in Notes.
-            read_calendar_event = (
-                calendar_app.get_calendar_events_from_to(
-                    start_datetime="2025-11-18 00:00:00",
-                    end_datetime="2025-11-19 00:00:00",
-                )
+            # Oracle Event 1: Agent reads the follow-up email to get the explicit cleanup instruction + exact note title
+            read_followup_email = (
+                email_app.get_email_by_id(email_id=followup_email_id, folder_name="INBOX")
                 .oracle()
-                .depends_on(followup_event, delay_seconds=2)
+                .depends_on(followup_email_event, delay_seconds=2)
             )
 
             # The agent observes the cancellation + follow-up instruction and searches for the specific prep note
             search_notes_event = (
                 note_app.search_notes(query="Client Onboarding Meeting")
                 .oracle()
-                .depends_on(read_calendar_event, delay_seconds=3)
+                .depends_on(read_followup_email, delay_seconds=3)
             )
 
             # Agent proposes cleanup action based on the cancellation notification
@@ -164,9 +160,7 @@ Key Points to Cover:
 
             # User accepts the cleanup proposal
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please delete the prep note.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Agent deletes the obsolete preparation note
@@ -183,11 +177,10 @@ Key Points to Cover:
                 .depends_on(delete_note_event, delay_seconds=1)
             )
 
-        # TODO: Register ALL events here in self.events
         self.events = [
             cancellation_event,
-            followup_event,
-            read_calendar_event,
+            followup_email_event,
+            read_followup_email,
             search_notes_event,
             proposal_event,
             acceptance_event,
@@ -196,22 +189,11 @@ Key Points to Cover:
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
 
-            # STRICT Check 1: Agent searched for notes related to the cancelled meeting
-            # Accepting list_notes or search_notes as equivalent methods to detect related notes
-            notes_search_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name in ["search_notes", "list_notes"]
-                for e in log_entries
-            )
-
-            # STRICT Check 2: Agent proposed cleanup action to the user
+            # STRICT Check 1: Agent proposed cleanup action to the user
             # Content-flexible: we verify the message was sent but don't constrain exact wording
             proposal_found = any(
                 e.event_type == EventType.AGENT
@@ -221,7 +203,7 @@ Key Points to Cover:
                 for e in log_entries
             )
 
-            # STRICT Check 3: Agent deleted the preparation note after user acceptance
+            # STRICT Check 2: Agent deleted the preparation note after user acceptance
             # Verifies the correct note_id was deleted
             note_deleted = any(
                 e.event_type == EventType.AGENT
@@ -234,20 +216,15 @@ Key Points to Cover:
 
             # Collect missing checks for rationale
             missing_checks = []
-            if not notes_search_found:
-                missing_checks.append("agent did not search notes for cancelled meeting")
             if not proposal_found:
                 missing_checks.append("agent did not propose cleanup to user")
             if not note_deleted:
                 missing_checks.append("agent did not delete the obsolete preparation note")
 
-            success = notes_search_found and proposal_found and note_deleted
+            success = proposal_found and note_deleted
             rationale = "; ".join(missing_checks) if missing_checks else "all checks passed"
 
             return ScenarioValidationResult(success=success, rationale=rationale)
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

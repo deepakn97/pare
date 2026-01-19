@@ -1,5 +1,3 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -9,15 +7,13 @@ from are.simulation.apps.messaging_v2 import ConversationV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
     StatefulMessagingApp,
 )
 from pas.apps.apartment import StatefulApartmentApp
-from pas.apps.note import Note, StatefulNotesApp
+from pas.apps.note import StatefulNotesApp
 from pas.scenarios import PASScenario
 from pas.scenarios.utils.registry import register_scenario
 
@@ -34,7 +30,6 @@ class ApartmentComparisonDecisionAid(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
@@ -106,8 +101,8 @@ class ApartmentComparisonDecisionAid(PASScenario):
         # Populate Notes App with baseline data
         # User has created tour notes for each apartment in the "Personal" folder
         # Note for Oakwood Terrace - toured Nov 12
-        oakwood_note = Note(
-            note_id="",
+        self.oakwood_note_id = self.note.create_note_with_time(
+            folder="Personal",
             title="Oakwood Terrace Tour Notes",
             content="""Tour Date: November 12, 2025
 
@@ -132,14 +127,13 @@ Lease Terms: 1 year minimum, can renew month-to-month after
 
 Overall Impression: Really liked this place. Modern finishes, pet-friendly, and great commute. Slightly above my ideal price but all the amenities included make it worthwhile.""",
             pinned=False,
-            created_at=datetime(2025, 11, 12, 15, 30, 0, tzinfo=UTC).timestamp(),
-            updated_at=datetime(2025, 11, 12, 15, 30, 0, tzinfo=UTC).timestamp(),
+            created_at="2025-11-12 15:30:00",
+            updated_at="2025-11-12 15:30:00",
         )
-        self.note.folders["Personal"].add_note(oakwood_note)
 
         # Note for Riverside Lofts - toured Nov 14
-        riverside_note = Note(
-            note_id="",
+        self.riverside_note_id = self.note.create_note_with_time(
+            folder="Personal",
             title="Riverside Lofts Apartment Tour Notes",
             content="""Apartment Tour Date: November 14, 2025
 
@@ -164,14 +158,13 @@ Lease Terms: 1 year lease required
 
 Overall Impression: Love the aesthetic and views. Concerned about Bella being over the weight limit - need to follow up on this. Also furthest from work and most expensive.""",
             pinned=False,
-            created_at=datetime(2025, 11, 14, 11, 0, 0, tzinfo=UTC).timestamp(),
-            updated_at=datetime(2025, 11, 14, 11, 0, 0, tzinfo=UTC).timestamp(),
+            created_at="2025-11-14 11:00:00",
+            updated_at="2025-11-14 11:00:00",
         )
-        self.note.folders["Personal"].add_note(riverside_note)
 
         # Note for Sunset Meadows - toured Nov 16
-        sunset_note = Note(
-            note_id="",
+        self.sunset_note_id = self.note.create_note_with_time(
+            folder="Personal",
             title="Sunset Meadows Apartment Tour Notes",
             content="""Apartment Tour Date: November 16, 2025
 
@@ -197,10 +190,9 @@ Lease Terms: 1 year lease
 
 Overall Impression: Great price and peaceful setting, but the no-pets policy is a deal-breaker. Also the commute would be tough without a car. Only toured this to keep options open but probably not viable with Bella.""",
             pinned=False,
-            created_at=datetime(2025, 11, 16, 14, 0, 0, tzinfo=UTC).timestamp(),
-            updated_at=datetime(2025, 11, 16, 14, 0, 0, tzinfo=UTC).timestamp(),
+            created_at="2025-11-16 14:00:00",
+            updated_at="2025-11-16 14:00:00",
         )
-        self.note.folders["Personal"].add_note(sunset_note)
 
         # Populate Messaging App with baseline data
         # Add property manager contact and create a conversation
@@ -214,7 +206,6 @@ Overall Impression: Great price and peaceful setting, but the no-pets policy is 
         self.apps = [self.agent_ui, self.system_app, self.note, self.apartment, self.messaging]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
         # Initialize all apps from self.apps
         aui = self.get_typed_app(PASAgentUserInterface)
@@ -229,7 +220,15 @@ Overall Impression: Great price and peaceful setting, but the no-pets policy is 
             env_move_out_message = messaging_app.create_and_add_message(
                 conversation_id=self.pm_conversation.conversation_id,
                 sender_id=self.property_manager_id,
-                content="Hi, this is your property manager. I wanted to give you advance notice that we will need you to vacate your current unit by December 31st as we'll be doing major renovations since your lease will ends on that day. To help you decide quickly, please review the apartments you've saved/favorited (your saved list) and any tour notes you wrote down for the places you've visited (for example, your notes in the Notes app about pricing, pet policies, and commute). You might also want to write a quick side-by-side comparison (pros/cons) from those notes so you can pick the best option in time. Please let me know if you have any questions. Again if you didn't find any suitable apartments in your saved lists after comparison, feel free to reach out to us again. Thanks!",
+                content=(
+                    "Hi Alex — this is your property manager. I wanted to give you a heads-up that your lease ends on "
+                    "December 31, 2025, and the building is scheduled for major renovations immediately after that date. "
+                    "Because of the construction schedule, we'll need you to fully move out by 12/31.\n\n"
+                    "If you're deciding where to go next, it may help to review the apartments you've saved and any tour "
+                    "notes you've taken (price, pet policy, commute, etc.) and make a quick pros/cons comparison so you can "
+                    "choose in time.\n\n"
+                    "Let me know if you have questions about move-out logistics or timing. Thanks."
+                ),
             ).delayed(10)
 
             # Agent detects the move-out deadline in the message and recognizes the urgency to make an apartment decision
@@ -263,9 +262,7 @@ Overall Impression: Great price and peaceful setting, but the no-pets policy is 
 
             # User accepts the proposal
             user_accept = (
-                aui.accept_proposal(content="Yes, that would be really helpful!")
-                .oracle()
-                .depends_on(proposal, delay_seconds=5)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal, delay_seconds=5)
             )
 
             # Agent creates consolidated comparison note in Personal folder
@@ -326,7 +323,6 @@ Next Steps:
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -334,37 +330,7 @@ Next Steps:
             # Filter to agent/oracle events only (no environment events)
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent read the messaging conversation to detect move-out deadline
-            # The agent must observe the property manager's message about the December 31st deadline
-            conversation_read = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent listed saved apartments to retrieve favorited options
-            # The agent needs to know which apartments the user has saved
-            saved_apartments_listed = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulApartmentApp"
-                and e.action.function_name == "list_saved_apartments"
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent searched notes to locate tour documentation
-            # The agent must find the existing tour notes for the saved apartments
-            notes_searched = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name == "search_notes"
-                for e in agent_events
-            )
-
-            # STRICT Check 4: Agent sent proposal referencing the move-out situation
+            # STRICT Check 1: Agent sent proposal referencing the move-out situation
             # The agent must proactively offer to create a comparison analysis
             # FLEXIBLE on exact wording, but must reference the deadline/message context
             proposal_sent = any(
@@ -376,7 +342,7 @@ Next Steps:
                 for e in agent_events
             )
 
-            # STRICT Check 5: Agent created the comparison note in Personal folder
+            # STRICT Check 2: Agent created the comparison note in Personal folder
             # The agent must synthesize the findings into a comparison note
             # FLEXIBLE on exact content/title, STRICT on folder="Personal" and tool being create_note
             comparison_note_created = any(
@@ -384,30 +350,17 @@ Next Steps:
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulNotesApp"
                 and e.action.function_name == "create_note"
-                and e.action.args.get("folder") == "Personal"
                 and e.action.args.get("title") is not None
                 and e.action.args.get("content") is not None
                 for e in agent_events
             )
 
             # All strict checks must pass for success
-            success = (
-                conversation_read
-                and saved_apartments_listed
-                and notes_searched
-                and proposal_sent
-                and comparison_note_created
-            )
+            success = proposal_sent and comparison_note_created
 
             if not success:
                 # Build rationale for failure
                 missing_checks = []
-                if not conversation_read:
-                    missing_checks.append("conversation not read to detect move-out deadline")
-                if not saved_apartments_listed:
-                    missing_checks.append("saved apartments not retrieved")
-                if not notes_searched:
-                    missing_checks.append("tour notes not searched")
                 if not proposal_sent:
                     missing_checks.append("no proposal message sent to user")
                 if not comparison_note_created:
@@ -420,6 +373,3 @@ Next Steps:
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

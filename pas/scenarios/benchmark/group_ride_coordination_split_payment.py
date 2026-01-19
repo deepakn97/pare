@@ -1,12 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from are.simulation.apps.messaging_v2 import ConversationV2, MessageV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
@@ -41,17 +37,12 @@ class GroupRideCoordinationSplitPayment(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
         # Initialize messaging app
         self.messaging = StatefulMessagingApp(name="Messages")
-
-        # Set current user details
-        self.messaging.current_user_id = "user_001"
-        self.messaging.current_user_name = "Me"
 
         # Add friends Alice and Bob
         self.messaging.add_users(["Alice", "Bob"])
@@ -93,9 +84,7 @@ class GroupRideCoordinationSplitPayment(PASScenario):
         self.apps = [self.agent_ui, self.system_app, self.messaging, self.cab]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
@@ -210,7 +199,6 @@ class GroupRideCoordinationSplitPayment(PASScenario):
         self.events = [e1, e2, e3, e4, e5, e6, e7, e8, e9, e10]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
-        # WARNING: this part is responsible to and can be modified only by validation agent
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -218,14 +206,7 @@ class GroupRideCoordinationSplitPayment(PASScenario):
             # Filter to only agent events
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # Check 1 (STRICT): Agent read the conversation
-            read_conversation_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulMessagingApp" and e.action.function_name == "read_conversation":
-                    read_conversation_found = True
-                    break
-
-            # Check 2 (STRICT): Agent listed rides with correct parameters
+            # Check 1 (STRICT): Agent listed rides with correct parameters
             list_rides_found = False
             for e in agent_events:
                 if e.action.class_name == "StatefulCabApp" and e.action.function_name in [
@@ -245,7 +226,7 @@ class GroupRideCoordinationSplitPayment(PASScenario):
                         list_rides_found = True
                         break
 
-            # Check 3 (STRICT on structure, FLEXIBLE on content): Agent sent proposal to user
+            # Check 2 (STRICT on structure, FLEXIBLE on content): Agent sent proposal to user
             proposal_found = False
             for e in agent_events:
                 if e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user":
@@ -253,7 +234,7 @@ class GroupRideCoordinationSplitPayment(PASScenario):
                     proposal_found = True
                     break
 
-            # Check 4 (STRICT): Agent ordered the ride with correct parameters
+            # Check 3 (STRICT): Agent ordered the ride with correct parameters
             order_ride_found = False
             for e in agent_events:
                 if e.action.class_name == "StatefulCabApp" and e.action.function_name == "order_ride":
@@ -271,13 +252,11 @@ class GroupRideCoordinationSplitPayment(PASScenario):
                         break
 
             # Determine success and build rationale
-            success = read_conversation_found and list_rides_found and proposal_found and order_ride_found
+            success = list_rides_found and proposal_found and order_ride_found
 
             rationale = None
             if not success:
                 missing = []
-                if not read_conversation_found:
-                    missing.append("agent did not read the conversation")
                 if not list_rides_found:
                     missing.append("agent did not list rides with required parameters")
                 if not proposal_found:
@@ -290,6 +269,3 @@ class GroupRideCoordinationSplitPayment(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""

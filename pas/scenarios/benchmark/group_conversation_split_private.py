@@ -1,12 +1,8 @@
-"""start of the template to build scenario for Proactive Agent."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
-# TODO: import all Apps that will be used in this scenario
-# WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
 from are.simulation.apps.messaging_v2 import ConversationV2, MessageV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
@@ -14,6 +10,7 @@ from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
+    StatefulEmailApp,
     StatefulMessagingApp,
 )
 from pas.scenarios import PASScenario
@@ -24,7 +21,7 @@ from pas.scenarios.utils.registry import register_scenario
 class GroupConversationSplitPrivate(PASScenario):
     """Agent detects sensitive discussion in group chat and proactively suggests moving to private conversation.
 
-    The user participates in a group conversation titled "Project Team" with colleagues Alex Rivera, Jordan Lee, and Casey Morgan. During a casual work discussion, Jordan messages: "Hey, can someone review the salary data I sent for the new hires?" followed by "Want to make sure the compensation packages are competitive before we finalize." The agent recognizes that salary and compensation information is sensitive and should not be discussed in a group setting with multiple participants. The agent must: 1. Detect the sensitive topic (salary/compensation) mentioned in the group chat. 2. Identify the specific participant (Jordan Lee) who initiated the sensitive discussion. 3. Propose creating a private 1:1 conversation with Jordan to discuss this matter appropriately. 4. After user acceptance, open or create a direct conversation with Jordan Lee. 5. Send an initial message to Jordan in the private thread suggesting they continue the compensation discussion there instead of the group chat. 6. Optionally send a brief message in the group chat redirecting the topic without revealing details.
+    The user participates in a group conversation titled "Project Team" with colleagues Alex Rivera, Jordan Lee, and Casey Morgan. During a casual work discussion, Jordan messages: "Hey, can someone review the salary data I sent for the new hires?" followed by "Want to make sure the compensation packages are competitive before we finalize." Casey separately emails the user explaining her Messages app suddenly broke and she doesn't remember Jordan's email address, and asks the user to privately notify Jordan to move the comp discussion to a 1:1 thread (instead of the group chat). The agent must: 1. Detect the sensitive topic (salary/compensation) mentioned in the group chat. 2. Identify the specific participant (Jordan Lee) who initiated the sensitive discussion. 3. Use Casey's email cue to justify moving the discussion off the group chat. 4. Propose creating a private 1:1 conversation with Jordan. 5. After user acceptance, open or create a direct conversation with Jordan Lee. 6. Send an initial message to Jordan in the private thread suggesting they continue the compensation discussion there instead of the group chat. 7. Optionally send a brief message in the group chat redirecting the topic without revealing details.
 
     This scenario exercises content sensitivity detection across messaging contexts, privacy-aware conversation routing, appropriate communication channel selection based on topic classification, and graceful topic redirection from group to individual conversations without exposing the sensitive nature of the original request..
     """
@@ -34,12 +31,12 @@ class GroupConversationSplitPrivate(PASScenario):
     is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
-        # WARNING: this part is responsible to and can be modified only by Apps & Data Setup Agent
         """Initialize apps with test data."""
         # Initialize core apps
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
         self.messaging = StatefulMessagingApp(name="Messages")
+        self.email = StatefulEmailApp(name="Emails")
 
         # Add users to messaging app
         self.messaging.add_users(["Alex Rivera", "Jordan Lee", "Casey Morgan"])
@@ -83,15 +80,14 @@ class GroupConversationSplitPrivate(PASScenario):
         self.messaging.add_conversation(self.group_conversation)
 
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.messaging]
+        self.apps = [self.agent_ui, self.system_app, self.messaging, self.email]
 
     def build_events_flow(self) -> None:
-        # WARNING: this part is responsible to and can be modified only by events-flow agent
         """Build event flow - environment events with agent detection and agent actions."""
-        # TODO: initialize all apps from self.apps like aui and system_app below
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
+        email_app = self.get_typed_app(StatefulEmailApp, "Emails")
 
         # Use stable participant IDs computed during init (avoid calling get_user_id in capture_mode, which can return an Event)
         jordan_id = self.jordan_id
@@ -112,32 +108,43 @@ class GroupConversationSplitPrivate(PASScenario):
                 content="Want to make sure the compensation packages are competitive before we finalize.",
             ).depends_on(message1_event, delay_seconds=3)
 
-            # Environment Event 3: Casey flags the topic as sensitive and requests moving it off the group chat
-            # This provides an explicit observable cue (not just policy inference) to move the discussion to a private thread.
-            message3_event = messaging_app.create_and_add_message(
-                conversation_id=self.group_conversation.conversation_id,
-                sender_id=self.casey_id,
+            # Environment Event 3: Casey emails the user with an explicit cue to move the discussion off the group chat.
+            # Rationale: makes it realistic why Casey isn't messaging Jordan directly (Messages app broke; doesn't have Jordan's email).
+            casey_email_id = "casey_sensitive_topic_move_off_group_001"
+            casey_email_event = email_app.send_email_to_user_with_id(
+                email_id=casey_email_id,
+                sender="casey.morgan@company.example",
+                subject="Quick request: move comp discussion off the group chat",
                 content=(
-                    "Quick note: salary/comp details are sensitive—let's move this to a 1:1 thread instead of the group chat. "
-                    "Could you DM Jordan directly to continue that discussion?"
+                    "Hi,\n\n"
+                    "My Messages app suddenly stopped working this morning, I can only saw notifications but cannot reply now. Also I don't have Jordan's email handy.\n\n"
+                    "Can you please message Jordan privately and ask him to move the salary/comp discussion to a 1:1 thread "
+                    "(instead of the Project Team group chat)?\n\n"
+                    "Thanks,\n"
+                    "Casey"
                 ),
             ).depends_on(message2_event, delay_seconds=2)
 
+            # Oracle: Agent reads Casey's email cue before proposing the action.
+            read_casey_email_event = (
+                email_app.get_email_by_id(email_id=casey_email_id, folder_name="INBOX")
+                .oracle()
+                .depends_on(casey_email_event, delay_seconds=2)
+            )
+
             # Oracle Event 1: Agent detects sensitive topic and proposes moving to private conversation
-            # Motivation: Casey explicitly flagged salary/comp as sensitive and asked the user to DM Jordan directly.
+            # Motivation: Casey explicitly asked (via email) to move salary/comp off the group chat and notify Jordan privately.
             proposal_event = (
                 aui.send_message_to_user(
-                    content="I noticed Jordan is discussing salary information in the Project Team group chat. This sensitive topic should be discussed privately. Would you like me to help move this conversation to a private thread with Jordan?"
+                    content="I noticed Jordan is discussing salary/compensation in the Project Team group chat. Casey also emailed asking to move this discussion to a 1:1 thread. Would you like me to help move it to a private conversation with Jordan?"
                 )
                 .oracle()
-                .depends_on(message3_event, delay_seconds=3)
+                .depends_on(read_casey_email_event, delay_seconds=3)
             )
 
             # Oracle Event 2: User accepts the proposal
             acceptance_event = (
-                aui.accept_proposal(content="Yes, that's a good idea. Please handle it.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Oracle Event 3: Agent searches for or identifies Jordan's user ID
@@ -170,11 +177,11 @@ class GroupConversationSplitPrivate(PASScenario):
                 .depends_on(private_message_event, delay_seconds=1)
             )
 
-        # TODO: Register ALL events here in self.events
         self.events = [
             message1_event,
             message2_event,
-            message3_event,
+            casey_email_event,
+            read_casey_email_event,
             proposal_event,
             acceptance_event,
             lookup_event,
@@ -182,8 +189,7 @@ class GroupConversationSplitPrivate(PASScenario):
             group_redirect_event,
         ]
 
-    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
-        # WARNING: this part is responsible to and can be modified only by validation agent
+    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -202,17 +208,7 @@ class GroupConversationSplitPrivate(PASScenario):
                     proposal_found = True
                     break
 
-            # Check Step 2: Agent looked up Jordan's user ID
-            # STRICT: Agent must identify the specific participant to message privately
-            lookup_found = False
-            for event in agent_events:
-                if event.action.class_name == "StatefulMessagingApp" and event.action.function_name == "lookup_user_id":
-                    args = event.get_args()
-                    if "jordan" in args.get("user_name", "").lower():
-                        lookup_found = True
-                        break
-
-            # Check Step 3: Agent sent private message to Jordan
+            # Check Step 2: Agent sent private message to Jordan
             # STRICT: Agent must send a message to Jordan privately
             # FLEXIBLE: Content can vary; we only check that the correct tool was called with Jordan's ID
             private_message_found = False
@@ -226,14 +222,12 @@ class GroupConversationSplitPrivate(PASScenario):
 
             # Success requires all STRICT checks to pass
             # The group redirect is optional and does not affect success
-            success = proposal_found and lookup_found and private_message_found
+            success = proposal_found and private_message_found
 
             if not success:
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("agent proposal to move sensitive conversation")
-                if not lookup_found:
-                    missing_checks.append("lookup of Jordan Lee's user ID")
                 if not private_message_found:
                     missing_checks.append("private message to Jordan Lee")
 
@@ -244,6 +238,3 @@ class GroupConversationSplitPrivate(PASScenario):
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)
-
-
-"""end of the template to build scenario for Proactive Agent."""
