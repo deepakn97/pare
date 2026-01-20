@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import tempfile
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
+from are.simulation.apps import SandboxLocalFileSystem
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
@@ -47,8 +46,21 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
         # Initialize Notes app
         self.note = StatefulNotesApp(name="Notes")
 
+        # Initialize sandbox filesystem so attachments have a real backing store.
+        self.files = SandboxLocalFileSystem(name="Files")
+        self.note.internal_fs = self.files
+        self.email.internal_fs = self.files
+
         # Create custom folder for course notes
         self.note.new_folder("Spring 2025 CS")
+
+        # Prepare attachment files in the sandbox filesystem.
+        self.assignment2_path = "/Assignment2.pdf"
+        self.combined_assignment_path = "/Combined_Assignment.pdf"
+        with self.files.open(self.assignment2_path, "wb") as f:
+            f.write(b"dummy assignment 2")
+        with self.files.open(self.combined_assignment_path, "wb") as f:
+            f.write(b"dummy combined assignment")
 
         # Populate baseline data: Create Module 2 Notes in the Spring 2025 CS folder
         # This note contains data structures content and has the obsolete Assignment2.pdf attachment
@@ -60,13 +72,6 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             created_at="2025-11-10 10:00:00",
             updated_at="2025-11-15 14:30:00",
         )
-        # Seed attachment via public API (requires a real file path).
-        attachments_dir = Path(tempfile.gettempdir()) / "pas_note_attachments"
-        attachments_dir.mkdir(parents=True, exist_ok=True)
-        self.assignment2_path = str(attachments_dir / "Assignment2.pdf")
-        Path(self.assignment2_path).write_bytes(b"dummy assignment 2")
-        self.combined_assignment_path = str(attachments_dir / "Combined_Assignment.pdf")
-        Path(self.combined_assignment_path).write_bytes(b"dummy combined assignment")
 
         # Populate baseline data: Create Module 3 Notes in the Spring 2025 CS folder
         # This note contains algorithms content
@@ -79,8 +84,19 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             updated_at="2025-11-16 16:00:00",
         )
 
+        # Create the target consolidated note up-front so we have a stable note_id for later attachment operations.
+        # The agent will update it with the merged contents during the scenario.
+        self.consolidated_note_id = self.note.create_note_with_time(
+            folder="Spring 2025 CS",
+            title="Data Structures & Algorithms",
+            content="(placeholder - will be updated with consolidated content)",
+            pinned=False,
+            created_at="2025-11-17 09:00:00",
+            updated_at="2025-11-17 09:00:00",
+        )
+
         # Register all apps
-        self.apps = [self.note, self.email, self.agent_ui, self.system_app]
+        self.apps = [self.note, self.email, self.files, self.agent_ui, self.system_app]
 
     def build_events_flow(self) -> None:
         """Build event flow - environment events with agent detection and agent actions."""
@@ -89,19 +105,11 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
         note_app = self.get_typed_app(StatefulNotesApp, "Notes")
         email_app = self.get_typed_app(StatefulEmailApp, "Email")
 
-        with EventRegisterer.capture_mode():
-            # Environment event 0: Seed the existing Module 2 attachment AFTER initialization.
-            #
-            # Why: Notes attachments are stored as bytes in the app state; seeding an attachment during
-            # init_and_populate_apps() makes scenario initialization fail when run_scenarios serializes
-            # initial app states to JSON.
-            #
-            # This event happens before the professor email so the email's "currently attached" claim is consistent.
-            seed_module2_attachment_event = note_app.add_attachment_to_note(
-                note_id=self.module2_note_id,
-                attachment_path=self.assignment2_path,
-            ).delayed(1)
+        # Seed the existing Module 2 attachment AFTER initialization (avoid bytes in initial state JSON),
+        # but BEFORE capture_mode so it's present for later list/remove operations.
+        note_app.add_attachment_to_note(note_id=self.module2_note_id, attachment_path=self.assignment2_path)
 
+        with EventRegisterer.capture_mode():
             # Environment event: Professor sends email with explicit syllabus update instructions
             # This email contains all the details needed: note titles to merge, folder to rename, attachment changes
             syllabus_email_event = email_app.send_email_to_user_with_id(
@@ -163,14 +171,13 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                 aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=3)
             )
 
-            # Oracle event: Agent creates consolidated note with combined content
-            # Motivation: user accepted the proposal to consolidate the notes per the professor's email instructions
-            create_consolidated_event = (
-                note_app.create_note(
-                    folder="Spring 2025 CS",
+            # Oracle event: Agent updates the consolidated note with combined content.
+            # NOTE: We pre-created the consolidated note in init to avoid needing a dynamic return value.
+            update_consolidated_event = (
+                note_app.update_note(
+                    note_id=self.consolidated_note_id,
                     title="Data Structures & Algorithms",
                     content="Data Structures & Algorithms - Consolidated Notes\n\n=== Data Structures ===\n\n- Arrays and Lists\n- Stacks and Queues\n- Linked Lists (singly, doubly)\n- Hash Tables and Hash Functions\n- Trees (Binary Trees, BST)\n- Heaps and Priority Queues\n\nKey concepts: Time complexity, space complexity, trade-offs between structures.\n\n=== Algorithms ===\n\n- Sorting Algorithms (QuickSort, MergeSort, HeapSort)\n- Searching Algorithms (Binary Search, DFS, BFS)\n- Graph Algorithms (Dijkstra, Kruskal, Prim)\n- Dynamic Programming Basics\n- Greedy Algorithms\n- Divide and Conquer\n\nKey concepts: Algorithm design paradigms, complexity analysis, optimization strategies.",
-                    pinned=False,
                 )
                 .oracle()
                 .depends_on(acceptance_event, delay_seconds=2)
@@ -199,9 +206,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             # Motivation: professor email explicitly says "/files/Combined_Assignment.pdf should be attached" to the consolidated note.
             attach_new_assignment_event = (
                 note_app.add_attachment_to_note(
-                    note_id=create_consolidated_event.metadata.return_value
-                    if hasattr(create_consolidated_event, "metadata") and create_consolidated_event.metadata
-                    else "",
+                    note_id=self.consolidated_note_id,
                     attachment_path=self.combined_assignment_path,
                 )
                 .oracle()
@@ -234,7 +239,6 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
 
         # Register ALL events here in self.events
         self.events = [
-            seed_module2_attachment_event,
             syllabus_email_event,
             search_module2_event,
             search_module3_event,
@@ -242,7 +246,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             read_module3_event,
             proposal_event,
             acceptance_event,
-            create_consolidated_event,
+            update_consolidated_event,
             list_module2_attachments_event,
             remove_obsolete_attachment_event,
             attach_new_assignment_event,
@@ -267,13 +271,11 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             )
 
             # STRICT Check 2: Agent created the consolidated note
-            # Must be create_note with title "Data Structures & Algorithms"
-            consolidated_note_created = any(
+            # Must update the pre-created consolidated note with the merged content.
+            consolidated_note_updated = any(
                 e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name == "create_note"
-                and "title" in e.action.args
-                and "data structures" in e.action.args["title"].lower()
-                and "algorithms" in e.action.args["title"].lower()
+                and e.action.function_name == "update_note"
+                and e.action.args.get("note_id") == self.consolidated_note_id
                 for e in agent_events
             )
 
@@ -315,7 +317,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             # Combine all strict checks
             success = (
                 proposal_found
-                and consolidated_note_created
+                and consolidated_note_updated
                 and both_notes_deleted
                 and folder_renamed
                 and removed_obsolete_attachment
@@ -327,8 +329,8 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("no proposal sent to user")
-                if not consolidated_note_created:
-                    missing_checks.append("consolidated note 'Data Structures & Algorithms' not created")
+                if not consolidated_note_updated:
+                    missing_checks.append("consolidated note 'Data Structures & Algorithms' not updated")
                 if not both_notes_deleted:
                     missing_checks.append("both original notes not deleted")
                 if not folder_renamed:

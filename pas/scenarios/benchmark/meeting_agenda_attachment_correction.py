@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from are.simulation.apps import SandboxLocalFileSystem
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -40,15 +41,35 @@ class MeetingAgendaAttachmentCorrection(PASScenario):
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
+        # Initialize sandbox filesystem so note attachments have a real backing store.
+        self.files = SandboxLocalFileSystem(name="Files")
+
         # Initialize scenario specific apps
         self.note = StatefulNotesApp(name="Notes")
         self.calendar = StatefulCalendarApp(name="Calendar")
         self.email = StatefulEmailApp(name="Emails")
 
+        # Notes attachments are read from internal_fs when set.
+        self.note.internal_fs = self.files
+
+        # Prepare attachment files in the sandbox filesystem.
+        self.budget_draft_path = "/Budget_Draft_v2.xlsx"
+        self.roadmap_draft_path = "/Roadmap_Draft.pptx"
+        self.budget_final_path = "/Budget_Final_v3.xlsx"
+        self.roadmap_approved_path = "/Roadmap_Approved.pptx"
+
+        with self.files.open(self.budget_draft_path, "wb") as f:
+            f.write(b"dummy budget draft v2")
+        with self.files.open(self.roadmap_draft_path, "wb") as f:
+            f.write(b"dummy roadmap draft")
+        with self.files.open(self.budget_final_path, "wb") as f:
+            f.write(b"dummy budget final v3")
+        with self.files.open(self.roadmap_approved_path, "wb") as f:
+            f.write(b"dummy roadmap approved")
+
         # Populate apps with scenario specific data
         # Create the Q1 Planning Meeting note in Work folder
-        # Note: Attachments will be added by Step 3 environment events since the file system
-        # needs to be populated first. The note content references the expected attachments.
+        # Note: Attachments are added via early environment events (after init serialization).
         self.note_id = self.note.create_note_with_time(
             folder="Work",
             title="Q1 Planning Meeting Agenda - Jan 15",
@@ -67,7 +88,7 @@ class MeetingAgendaAttachmentCorrection(PASScenario):
         )
 
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.note, self.calendar, self.email]
+        self.apps = [self.agent_ui, self.system_app, self.files, self.note, self.calendar, self.email]
 
     def build_events_flow(self) -> None:
         """Build event flow - environment events with agent detection and agent actions."""
@@ -76,6 +97,11 @@ class MeetingAgendaAttachmentCorrection(PASScenario):
         note_app = self.get_typed_app(StatefulNotesApp, "Notes")
         email_app = self.get_typed_app(StatefulEmailApp, "Emails")
 
+        # Seed the existing attachments AFTER initialization (avoid bytes in initial state JSON),
+        # but BEFORE capture_mode so they're present for later list/remove operations.
+        note_app.add_attachment_to_note(note_id=self.note_id, attachment_path=self.budget_draft_path)
+        note_app.add_attachment_to_note(note_id=self.note_id, attachment_path=self.roadmap_draft_path)
+
         with EventRegisterer.capture_mode():
             # Environment Event 1: Incoming email with attachment correction instructions
             # The email explicitly states which files to remove and which to add, plus identifies the note by title
@@ -83,7 +109,12 @@ class MeetingAgendaAttachmentCorrection(PASScenario):
                 email_id="email-attachment-correction-001",
                 sender="sarah.johnson@company.com",
                 subject="Q1 Planning Meeting - Please Update Agenda Attachments",
-                content="Hi! Please update the agenda note attachments before tomorrow's meeting. Replace Budget_Draft_v2.xlsx with Budget_Final_v3.xlsx (path: /files/Budget_Final_v3.xlsx), and replace Roadmap_Draft.pptx with Roadmap_Approved.pptx (path: /files/Roadmap_Approved.pptx). The note title is 'Q1 Planning Meeting Agenda - Jan 15' in your Work folder as we discussed previously. Thanks!",
+                content=(
+                    "Hi! Please update the agenda note attachments before tomorrow's meeting. "
+                    f"Replace Budget_Draft_v2.xlsx with Budget_Final_v3.xlsx (path: {self.budget_final_path}), "
+                    f"and replace Roadmap_Draft.pptx with Roadmap_Approved.pptx (path: {self.roadmap_approved_path}). "
+                    "The note title is 'Q1 Planning Meeting Agenda - Jan 15' in your Work folder as we discussed previously. Thanks!"
+                ),
             ).delayed(15)
 
             # Oracle Event 1: Agent searches for the note mentioned in the email
@@ -140,7 +171,7 @@ class MeetingAgendaAttachmentCorrection(PASScenario):
             # Oracle Event 8: Agent adds the first replacement attachment
             # Motivation: User accepted proposal; email provided replacement path "/files/Budget_Final_v3.xlsx"
             add_budget_event = (
-                note_app.add_attachment_to_note(note_id=self.note_id, attachment_path="/files/Budget_Final_v3.xlsx")
+                note_app.add_attachment_to_note(note_id=self.note_id, attachment_path=self.budget_final_path)
                 .oracle()
                 .depends_on(remove_roadmap_event, delay_seconds=1)
             )
@@ -148,7 +179,7 @@ class MeetingAgendaAttachmentCorrection(PASScenario):
             # Oracle Event 9: Agent adds the second replacement attachment
             # Motivation: User accepted proposal; email provided replacement path "/files/Roadmap_Approved.pptx"
             add_roadmap_event = (
-                note_app.add_attachment_to_note(note_id=self.note_id, attachment_path="/files/Roadmap_Approved.pptx")
+                note_app.add_attachment_to_note(note_id=self.note_id, attachment_path=self.roadmap_approved_path)
                 .oracle()
                 .depends_on(add_budget_event, delay_seconds=1)
             )

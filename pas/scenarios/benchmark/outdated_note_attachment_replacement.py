@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from are.simulation.apps import SandboxLocalFileSystem
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -41,17 +42,36 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
+        # Initialize sandbox filesystem so attachments have a real backing store.
+        self.files = SandboxLocalFileSystem(name="Files")
+
         # Initialize Notes app
         self.note = StatefulNotesApp(name="Notes")
 
         # Initialize Email app
         self.email = StatefulEmailApp(name="Emails")
 
+        # Notes attachments are read from internal_fs when set.
+        self.note.internal_fs = self.files
+
+        # Prepare attachment files in the sandbox filesystem.
+        self.contract_v1_path = "/TechCorp_Contract_Draft_v1.pdf"
+        self.contract_v2_path = "/TechCorp_Contract_Draft_v2.pdf"
+        self.specs_old_path = "/Technical_Specs_OLD.docx"
+        self.specs_final_path = "/Technical_Specs_FINAL.docx"
+
+        with self.files.open(self.contract_v1_path, "wb") as f:
+            f.write(b"dummy contract v1")
+        with self.files.open(self.contract_v2_path, "wb") as f:
+            f.write(b"dummy contract v2")
+        with self.files.open(self.specs_old_path, "wb") as f:
+            f.write(b"dummy specs old")
+        with self.files.open(self.specs_final_path, "wb") as f:
+            f.write(b"dummy specs final")
+
         # Populate Notes app with baseline data
         # Create the "Vendor Proposal - TechCorp" note in Work folder
-        # Note: Attachments cannot be seeded in Step 2 because they require actual filesystem files.
-        # The scenario will be adjusted so the triggering email asks the agent to manage the note
-        # in a different way (e.g., adding specific content references or updating text).
+        # Note: Attachments are seeded via early environment events (after init serialization).
         self.vendor_note_id = self.note.create_note_with_time(
             folder="Work",
             title="Vendor Proposal - TechCorp",
@@ -62,7 +82,7 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
         )
 
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.note, self.email]
+        self.apps = [self.agent_ui, self.system_app, self.files, self.note, self.email]
 
     def build_events_flow(self) -> None:
         """Build event flow - environment events with agent detection and agent actions."""
@@ -71,6 +91,11 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         note_app = self.get_typed_app(StatefulNotesApp, "Notes")
         email_app = self.get_typed_app(StatefulEmailApp, "Emails")
+
+        # Seed the existing attachments AFTER initialization (avoid bytes in initial state JSON),
+        # but BEFORE capture_mode so they're present for later list/remove operations.
+        note_app.add_attachment_to_note(note_id=self.vendor_note_id, attachment_path=self.contract_v1_path)
+        note_app.add_attachment_to_note(note_id=self.vendor_note_id, attachment_path=self.specs_old_path)
 
         with EventRegisterer.capture_mode():
             # Environment Event 1: Incoming email from project lead with explicit attachment correction request
@@ -84,8 +109,8 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
 
 I noticed the TechCorp vendor proposal note in your Work folder still has outdated attachments from our earlier discussion. Please update the note titled "Vendor Proposal - TechCorp" with the following corrections:
 
-1. Remove "TechCorp_Contract_Draft_v1.pdf" and replace with the updated contract at "/files/TechCorp_Contract_Draft_v2.pdf"
-2. Remove "Technical_Specs_OLD.docx" and replace with the final specifications at "/files/Technical_Specs_FINAL.docx"
+1. Remove "TechCorp_Contract_Draft_v1.pdf" and replace with the updated contract at "{self.contract_v2_path}"
+2. Remove "Technical_Specs_OLD.docx" and replace with the final specifications at "{self.specs_final_path}"
 
 These updated files are ready in the shared drive. Please make these changes today so we can finalize the proposal by tomorrow.
 
@@ -120,7 +145,13 @@ Project Lead""",
             # and the specific files mentioned in the email
             proposal_event = (
                 aui.send_message_to_user(
-                    content='I received an email from Sarah Chen requesting updates to the "Vendor Proposal - TechCorp" note attachments. She asks to replace two outdated files:\n\n1. Remove "TechCorp_Contract_Draft_v1.pdf" → Add "/files/TechCorp_Contract_Draft_v2.pdf"\n2. Remove "Technical_Specs_OLD.docx" → Add "/files/Technical_Specs_FINAL.docx"\n\nWould you like me to make these attachment corrections?'
+                    content=(
+                        'I received an email from Sarah Chen requesting updates to the "Vendor Proposal - TechCorp" note attachments. '
+                        "She asks to replace two outdated files:\n\n"
+                        f'1. Remove "TechCorp_Contract_Draft_v1.pdf" → Add "{self.contract_v2_path}"\n'
+                        f'2. Remove "Technical_Specs_OLD.docx" → Add "{self.specs_final_path}"\n\n'
+                        "Would you like me to make these attachment corrections?"
+                    )
                 )
                 .oracle()
                 .depends_on(get_note_event, delay_seconds=2)
@@ -157,7 +188,7 @@ Project Lead""",
             add_contract_v2_event = (
                 note_app.add_attachment_to_note(
                     note_id=self.vendor_note_id,
-                    attachment_path="/files/TechCorp_Contract_Draft_v2.pdf",
+                    attachment_path=self.contract_v2_path,
                 )
                 .oracle()
                 .depends_on(remove_contract_v1_event, delay_seconds=1)
@@ -179,7 +210,7 @@ Project Lead""",
             add_specs_final_event = (
                 note_app.add_attachment_to_note(
                     note_id=self.vendor_note_id,
-                    attachment_path="/files/Technical_Specs_FINAL.docx",
+                    attachment_path=self.specs_final_path,
                 )
                 .oracle()
                 .depends_on(remove_specs_old_event, delay_seconds=1)
