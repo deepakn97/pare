@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from are.simulation.apps.shopping import ShoppingApp
+from are.simulation.apps.shopping import CartItem, Order, ShoppingApp
+from are.simulation.tool_utils import data_tool
+from are.simulation.utils import type_check
 
 from pas.apps.core import StatefulApp
 from pas.apps.shopping.states import (
@@ -27,6 +29,104 @@ class StatefulShoppingApp(StatefulApp, ShoppingApp):
         """Initialise shopping app with root state."""
         super().__init__(*args, **kwargs)
         self.load_root_state()
+
+    @type_check
+    @data_tool()
+    def add_order(
+        self,
+        order_id: str,
+        order_status: str,
+        order_date: float,
+        order_total: float,
+        item_id: str,
+        quantity: int,
+    ) -> str:
+        """Add an order (used for scenario seeding).
+
+        The upstream `are` ShoppingApp currently returns extra keys (e.g. `name`,
+        `product_id`) from `_get_item()`, but its `CartItem` dataclass does not
+        accept them. We defensively filter to the fields `CartItem` supports.
+
+        Args:
+            order_id: The ID of the order.
+            order_status: The status of the order.
+            order_date: The date of the order as a timestamp.
+            order_total: The total amount of the order.
+            item_id: The ID of the item to add to the order.
+            quantity: The quantity of the item to add to the order.
+
+        Returns:
+            str: The ID of the created order.
+        """
+        item_dict = self._get_item(item_id)
+        if not item_dict:
+            raise ValueError("Item does not exist")
+
+        cart_item = CartItem(
+            item_id=item_dict["item_id"],
+            quantity=quantity,
+            price=item_dict["price"],
+            available=item_dict.get("available", True),
+            options=item_dict.get("options", {}),
+        )
+        self.orders[order_id] = Order(
+            order_status=order_status,
+            order_date=order_date,
+            order_total=order_total,
+            order_id=order_id,
+            order_items={item_id: cart_item},
+        )
+        return order_id
+
+    @type_check
+    @data_tool()
+    def add_order_multiple_items(
+        self,
+        order_id: str,
+        order_status: str,
+        order_date: float,
+        order_total: float,
+        items: dict[str, int],
+    ) -> str:
+        """Add an order with multiple items (used for scenario seeding).
+
+        The upstream `are` ShoppingApp currently returns extra keys (e.g. `name`,
+        `product_id`) from `_get_item()`, but its `CartItem` dataclass does not
+        accept them. We defensively filter to the fields `CartItem` supports.
+
+        Args:
+            order_id: The ID of the order.
+            order_status: The status of the order.
+            order_date: The date of the order as a timestamp.
+            order_total: The total amount of the order.
+            items: A dictionary mapping item IDs to quantities.
+
+        Returns:
+            str: The ID of the created order.
+        """
+        order_items: dict[str, CartItem] = {}
+        for item_id, quantity in items.items():
+            item_dict = self._get_item(item_id)
+            if not item_dict:
+                raise ValueError(f"Item {item_id} does not exist")
+
+            cart_item = CartItem(
+                item_id=item_dict["item_id"],
+                quantity=quantity,
+                price=item_dict["price"],
+                available=item_dict.get("available", True),
+                options=item_dict.get("options", {}),
+            )
+            order_items[item_id] = cart_item
+
+        self.orders[order_id] = Order(
+            order_status=order_status,
+            order_date=order_date,
+            order_total=order_total,
+            order_id=order_id,
+            order_items=order_items,
+        )
+        return order_id
 
     def handle_state_transition(self, event: CompletedEvent) -> None:
         """Update navigation state based on completed operations."""
