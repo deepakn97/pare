@@ -136,7 +136,7 @@ class RideStatusSharingWithFriend(PASScenario):
             # Agent opens the conversation with Sarah to confirm the commitment
             # Motivated by: conversation list revealed Sarah conversation; agent needs to read the actual commitment message
             read_conversation_event = (
-                messaging_app.open_conversation(
+                messaging_app.read_conversation(
                     conversation_id=sarah_conversation_id,
                     offset=0,
                     limit=10,

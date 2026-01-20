@@ -85,7 +85,7 @@ class MeetingNotesFromMessages(PASScenario):
         self.messaging.add_contacts([("Sarah Martinez", sarah_contact.phone), ("David Park", david_contact.phone)])
 
         # Create an existing conversation with Sarah (older message history)
-        sarah_conversation = ConversationV2(
+        self.sarah_conversation = ConversationV2(
             participant_ids=[user_contact.phone, sarah_contact.phone], title="Sarah Martinez"
         )
         # Add a prior message from a few days ago
@@ -95,9 +95,9 @@ class MeetingNotesFromMessages(PASScenario):
             content="Hey Alex, looking forward to our project planning meeting on Monday!",
             timestamp=prior_timestamp,
         )
-        sarah_conversation.messages.append(prior_message)
-        sarah_conversation.update_last_updated(prior_timestamp)
-        self.messaging.add_conversation(sarah_conversation)
+        self.sarah_conversation.messages.append(prior_message)
+        self.sarah_conversation.update_last_updated(prior_timestamp)
+        self.messaging.add_conversation(self.sarah_conversation)
 
         # Initialize Notes app with existing folder structure
         self.note = StatefulNotesApp(name="Notes")
@@ -121,7 +121,11 @@ class MeetingNotesFromMessages(PASScenario):
         sarah_phone = "+1-555-0101"
         user_phone = "+1-555-0100"
         conversation_ids = messaging_app.get_existing_conversation_ids([sarah_phone])
-        sarah_conversation_id = conversation_ids[0]
+        if len(conversation_ids) > 0:
+            sarah_conversation_id = conversation_ids[0]
+        else:
+            # Fallback: use the conversation_id from the seeded conversation
+            sarah_conversation_id = self.sarah_conversation.conversation_id
 
         with EventRegisterer.capture_mode():
             # Environment events: Sarah sends fragmented meeting notes across multiple messages
