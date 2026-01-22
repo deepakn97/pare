@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps import SandboxLocalFileSystem
+from are.simulation.apps.email_client import Email, EmailFolderName
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -19,18 +20,19 @@ from pas.scenarios.utils.registry import register_scenario
 
 @register_scenario("outdated_note_attachment_replacement")
 class OutdatedNoteAttachmentReplacement(PASScenario):
-    """Agent replaces outdated attachments on an existing note based on explicit correction request from incoming email.
+    """Agent updates a work note to use the latest vendor documents received via email attachments, and replies to confirm.
 
-    The user maintains a Work folder note titled "Vendor Proposal - TechCorp" containing project documentation with several attached files including contract drafts and technical specifications. An email arrives from the project lead explicitly stating that two attachments on this note are outdated: "TechCorp_Contract_Draft_v1.pdf" should be removed and replaced with "TechCorp_Contract_Draft_v2.pdf" (located at "/files/TechCorp_Contract_Draft_v2.pdf"), and "Technical_Specs_OLD.docx" should be removed and replaced with "Technical_Specs_FINAL.docx" (located at "/files/Technical_Specs_FINAL.docx"). The email provides the exact note title ("Vendor Proposal - TechCorp"), folder name ("Work"), and all file names/paths to ensure the agent can act without ambiguity. The agent must:
-    1. Parse the correction request from the incoming email identifying the note, attachments to remove, and replacement files
+    The user maintains a Work folder note titled "Vendor Proposal - TechCorp" containing project documentation with two
+    draft attachments (TechCorp_Contract_Draft_v1.pdf and Technical_Specs_OLD.docx). The project lead later emails the
+    *final* versions as attachments. The agent must:
+    1. Read the email and download the attached final files into a dedicated project folder (e.g., /TechCorp_Final/)
     2. Search the Work folder to locate the "Vendor Proposal - TechCorp" note
-    3. List current attachments on the note to verify outdated files are present
-    4. Remove the outdated attachment "TechCorp_Contract_Draft_v1.pdf"
-    5. Add the replacement attachment at "/files/TechCorp_Contract_Draft_v2.pdf"
-    6. Remove the outdated attachment "Technical_Specs_OLD.docx"
-    7. Add the replacement attachment at "/files/Technical_Specs_FINAL.docx"
+    3. List current attachments on the note to verify draft files are present
+    4. Remove the draft attachments from the note
+    5. Attach the downloaded final files to the note
+    6. Reply to the project lead confirming the note has been updated
 
-    This scenario exercises email-driven note maintenance (email → notes attachment correction), less-common attachment management tools (`list_attachments`, `remove_attachment`, `add_attachment_to_note`), multi-step file replacement workflow, and confirmation communication via email reply..
+    This scenario exercises email-driven note maintenance (email → notes attachment correction), downloading attachments from email, less-common attachment management tools (`list_attachments`, `remove_attachment`, `add_attachment_to_note`), and a multi-step replacement workflow.
     """
 
     start_time = datetime(2025, 11, 18, 9, 0, 0, tzinfo=UTC).timestamp()
@@ -53,12 +55,19 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
 
         # Notes attachments are read from internal_fs when set.
         self.note.internal_fs = self.files
+        # Email attachments are read from internal_fs when set.
+        self.email.internal_fs = self.files
 
         # Prepare attachment files in the sandbox filesystem.
         self.contract_v1_path = "/TechCorp_Contract_Draft_v1.pdf"
         self.contract_v2_path = "/TechCorp_Contract_Draft_v2.pdf"
         self.specs_old_path = "/Technical_Specs_OLD.docx"
         self.specs_final_path = "/Technical_Specs_FINAL.docx"
+        self.contract_v2_filename = self.contract_v2_path.split("/")[-1]
+        self.specs_final_filename = self.specs_final_path.split("/")[-1]
+        self.techcorp_final_dir = "/TechCorp_Final"
+        # Create a dedicated directory where the agent will download final files (to differ from other attachment scenarios).
+        self.files.mkdir(self.techcorp_final_dir)
 
         with self.files.open(self.contract_v1_path, "wb") as f:
             f.write(b"dummy contract v1")
@@ -81,6 +90,26 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
             updated_at="2025-11-15 10:00:00",
         )
 
+        # Seed email history: earlier draft docs were shared via email.
+        # IMPORTANT: Don't add attachments here (bytes); we'll attach them in build_events_flow post-init.
+        self.draft_email_id = "email-techcorp-drafts"
+        prior_email = Email(
+            email_id=self.draft_email_id,
+            sender="sarah.chen@techcorp.com",
+            recipients=[self.email.user_email],
+            subject="TechCorp proposal — draft contract + specs",
+            content=(
+                "Hi,\n\n"
+                "Sharing the current draft contract + technical specs for the TechCorp proposal.\n"
+                "I'll send final versions once legal/eng sign off.\n\n"
+                "Thanks,\n"
+                "Sarah Chen"
+            ),
+            timestamp=datetime(2025, 11, 15, 17, 0, 0, tzinfo=UTC).timestamp(),
+            is_read=True,
+        )
+        self.email.folders[EmailFolderName.INBOX].add_email(prior_email)
+
         # Register all apps
         self.apps = [self.agent_ui, self.system_app, self.files, self.note, self.email]
 
@@ -97,37 +126,60 @@ class OutdatedNoteAttachmentReplacement(PASScenario):
         note_app.add_attachment_to_note(note_id=self.vendor_note_id, attachment_path=self.contract_v1_path)
         note_app.add_attachment_to_note(note_id=self.vendor_note_id, attachment_path=self.specs_old_path)
 
+        # Attach files to the historical draft email AFTER initialization (avoid bytes in initial state JSON).
+        draft_email = email_app.folders[EmailFolderName.INBOX].get_email_by_id(self.draft_email_id)
+        email_app.add_attachment(email=draft_email, attachment_path=self.contract_v1_path)
+        email_app.add_attachment(email=draft_email, attachment_path=self.specs_old_path)
+
         with EventRegisterer.capture_mode():
-            # Environment Event 1: Incoming email from project lead with explicit attachment correction request
-            # This email explicitly specifies: note location (Work/"Vendor Proposal - TechCorp"),
-            # outdated files to remove, and replacement file paths to add
+            # Environment Event 1: Project lead sends final versions as attachments (realistic trigger).
             correction_email_event = email_app.send_email_to_user_with_id(
                 email_id="email-attachment-correction-request",
                 sender="sarah.chen@techcorp.com",
-                subject="Action Required: Update Vendor Proposal Note Attachments",
+                subject="TechCorp proposal — final contract + specs (attached)",
                 content="""Hi,
 
-I noticed the TechCorp vendor proposal note in your Work folder still has outdated attachments from our earlier discussion. Please update the note titled "Vendor Proposal - TechCorp" with the following corrections:
+Attached are the final versions for the TechCorp proposal:
 
-1. Remove "TechCorp_Contract_Draft_v1.pdf" and replace with the updated contract at "{self.contract_v2_path}"
-2. Remove "Technical_Specs_OLD.docx" and replace with the final specifications at "{self.specs_final_path}"
+- TechCorp_Contract_Draft_v2.pdf
+- Technical_Specs_FINAL.docx
 
-These updated files are ready in the shared drive. Please make these changes today so we can finalize the proposal by tomorrow.
+Please download these attachments into the TechCorp_Final folder so we keep the final versions in one place:
+- /TechCorp_Final/
+
+Please use these instead of the earlier draft versions when finalizing the proposal materials today.
 
 Thanks,
 Sarah Chen
 Project Lead""",
+                attachment_paths=[self.contract_v2_path, self.specs_final_path],
             ).delayed(5)
 
+            # Oracle Event 0: Agent reads the email and downloads attachments before attaching into Notes.
+            read_email_event = (
+                email_app.get_email_by_id(email_id="email-attachment-correction-request", folder_name="INBOX")
+                .oracle()
+                .depends_on(correction_email_event, delay_seconds=1)
+            )
+            download_attachments_event = (
+                email_app.download_attachments(
+                    email_id="email-attachment-correction-request",
+                    folder_name="INBOX",
+                    path_to_save=self.techcorp_final_dir,
+                )
+                .oracle()
+                .depends_on(read_email_event, delay_seconds=1)
+            )
+
             # Oracle Event 1: Agent searches Work folder to locate the target note
-            # Motivation: correction_email_event explicitly mentions 'note titled "Vendor Proposal - TechCorp"' in 'Work folder'
+            # Motivation: user maintains TechCorp proposal materials in a Work note; agent updates it to match final docs.
             search_note_event = (
                 note_app.search_notes_in_folder(
                     query="Vendor Proposal - TechCorp",
                     folder_name="Work",
                 )
                 .oracle()
-                .depends_on(correction_email_event, delay_seconds=2)
+                .depends_on(download_attachments_event, delay_seconds=1)
             )
 
             # Oracle Event 2: Agent retrieves the note details to confirm identity
@@ -141,16 +193,15 @@ Project Lead""",
             )
 
             # Oracle Event 3: Agent sends proposal to user citing the email trigger
-            # Motivation: correction_email_event requests attachment updates; proposal explicitly cites Sarah's request
-            # and the specific files mentioned in the email
+            # Motivation: Sarah sent final versions attached; agent asks to swap draft attachments in user's note.
             proposal_event = (
                 aui.send_message_to_user(
                     content=(
-                        'I received an email from Sarah Chen requesting updates to the "Vendor Proposal - TechCorp" note attachments. '
-                        "She asks to replace two outdated files:\n\n"
-                        f'1. Remove "TechCorp_Contract_Draft_v1.pdf" → Add "{self.contract_v2_path}"\n'
-                        f'2. Remove "Technical_Specs_OLD.docx" → Add "{self.specs_final_path}"\n\n'
-                        "Would you like me to make these attachment corrections?"
+                        "I received an email from Sarah Chen with the final TechCorp proposal files attached "
+                        '(TechCorp_Contract_Draft_v2.pdf and Technical_Specs_FINAL.docx). Your "Vendor Proposal - TechCorp" note '
+                        "still has the older draft attachments (TechCorp_Contract_Draft_v1.pdf and Technical_Specs_OLD.docx). "
+                        f"She also asked to download/store the final files under {self.techcorp_final_dir}/. "
+                        "Would you like me to download the attachments into that folder and replace the attachments in your note with the final versions?"
                     )
                 )
                 .oracle()
@@ -184,11 +235,11 @@ Project Lead""",
             )
 
             # Oracle Event 7: Agent adds first replacement attachment
-            # Motivation: acceptance_event approved addition; Sarah's email specified adding "/files/TechCorp_Contract_Draft_v2.pdf"
+            # Motivation: acceptance_event approved addition; attach the downloaded final contract from the project folder.
             add_contract_v2_event = (
                 note_app.add_attachment_to_note(
                     note_id=self.vendor_note_id,
-                    attachment_path=self.contract_v2_path,
+                    attachment_path=f"{self.techcorp_final_dir}/{self.contract_v2_filename}",
                 )
                 .oracle()
                 .depends_on(remove_contract_v1_event, delay_seconds=1)
@@ -206,19 +257,35 @@ Project Lead""",
             )
 
             # Oracle Event 9: Agent adds second replacement attachment
-            # Motivation: acceptance_event approved addition; Sarah's email specified adding "/files/Technical_Specs_FINAL.docx"
+            # Motivation: acceptance_event approved addition; attach the downloaded final specs from the project folder.
             add_specs_final_event = (
                 note_app.add_attachment_to_note(
                     note_id=self.vendor_note_id,
-                    attachment_path=self.specs_final_path,
+                    attachment_path=f"{self.techcorp_final_dir}/{self.specs_final_filename}",
                 )
                 .oracle()
                 .depends_on(remove_specs_old_event, delay_seconds=1)
             )
 
+            # Oracle Event 10: Agent replies to Sarah confirming update completion (distinguishes this scenario).
+            reply_confirmation_event = (
+                email_app.reply_to_email(
+                    email_id="email-attachment-correction-request",
+                    folder_name="INBOX",
+                    content=(
+                        "Thanks — I downloaded the final contract + specs and updated my 'Vendor Proposal - TechCorp' note "
+                        "to use the final attachments (removed the draft versions)."
+                    ),
+                )
+                .oracle()
+                .depends_on(add_specs_final_event, delay_seconds=1)
+            )
+
         # Register ALL events
         self.events = [
             correction_email_event,
+            read_email_event,
+            download_attachments_event,
             search_note_event,
             get_note_event,
             proposal_event,
@@ -228,6 +295,7 @@ Project Lead""",
             add_contract_v2_event,
             remove_specs_old_event,
             add_specs_final_event,
+            reply_confirmation_event,
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
@@ -289,6 +357,19 @@ Project Lead""",
                 for e in log_entries
             )
 
+            # STRICT Check 6: Agent downloaded the final attachments into the dedicated project folder
+            # Must call download_attachments with path_to_save == "/TechCorp_Final"
+            downloaded_to_project_folder = any(
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulEmailApp"
+                and e.action.function_name == "download_attachments"
+                and e.action.args.get("email_id") == "email-attachment-correction-request"
+                and e.action.args.get("folder_name") == "INBOX"
+                and e.action.args.get("path_to_save") == self.techcorp_final_dir
+                for e in log_entries
+            )
+
             # All STRICT checks must pass; FLEXIBLE checks improve confidence but are not required
             strict_checks = (
                 proposal_found
@@ -296,6 +377,7 @@ Project Lead""",
                 and add_contract_v2_found
                 and remove_specs_old_found
                 and add_specs_final_found
+                and downloaded_to_project_folder
             )
 
             success = strict_checks
@@ -313,6 +395,8 @@ Project Lead""",
                     missing.append("removal of Technical_Specs_OLD.docx")
                 if not add_specs_final_found:
                     missing.append("addition of Technical_Specs_FINAL.docx")
+                if not downloaded_to_project_folder:
+                    missing.append(f"download_attachments to {self.techcorp_final_dir}")
 
                 rationale = f"Missing required actions: {', '.join(missing)}"
                 return ScenarioValidationResult(success=False, rationale=rationale)

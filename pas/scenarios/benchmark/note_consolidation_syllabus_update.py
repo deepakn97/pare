@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from are.simulation.apps import SandboxLocalFileSystem
@@ -10,25 +11,28 @@ from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 from pas.apps import (
     HomeScreenSystemApp,
     PASAgentUserInterface,
-    StatefulEmailApp,
 )
 from pas.apps.note import StatefulNotesApp
+from pas.apps.reminder import StatefulReminderApp
 from pas.scenarios import PASScenario
 from pas.scenarios.utils.registry import register_scenario
 
 
 @register_scenario("note_consolidation_syllabus_update")
 class NoteConsolidationSyllabusUpdate(PASScenario):
-    """Agent consolidates and updates scattered course notes after receiving a syllabus change notification that explicitly lists which topics to merge and which attachments to redistribute.
+    """Agent consolidates and updates scattered course notes after a user-set reminder to prepare for an upcoming curriculum change.
 
-    The user receives an email from their professor stating: "Due to curriculum changes, we're merging 'Module 2: Data Structures' and 'Module 3: Algorithms' into a single unified module. Please consolidate your separate lecture notes titled 'Module 2 Notes' and 'Module 3 Notes' into one comprehensive 'Data Structures & Algorithms' note. Also, the assignment file currently attached to Module 2 Notes (/files/Assignment2.pdf) should be removed since it's now obsolete, and the new combined assignment (/files/Combined_Assignment.pdf) should be attached to your consolidated note. Finally, rename your 'Spring 2025 CS' folder to 'Spring 2025 CS - Updated Curriculum' to reflect these changes." The user has notes titled "Module 2 Notes" and "Module 3 Notes" in their "Spring 2025 CS" folder, with Module 2 containing the old assignment attachment. The agent must:
+    The user knows there is an updated curriculum rollout later today (e.g., an afternoon study session / new module kickoff),
+    and they set a reminder at 09:01 to proactively consolidate their notes beforehand. The user has notes titled
+    "Module 2 Notes" and "Module 3 Notes" in their "Spring 2025 CS" folder, with Module 2 containing the old assignment
+    attachment (Assignment2.pdf). The agent must:
     1. Search for "Module 2 Notes" and "Module 3 Notes" across folders to locate them
     2. Read the content from both notes to prepare for consolidation
     3. Create a new consolidated note titled "Data Structures & Algorithms" combining both contents
-    4. Remove the obsolete attachment (/files/Assignment2.pdf) from the original Module 2 note or ensure it's not carried forward
-    5. Add the new combined assignment attachment (/files/Combined_Assignment.pdf) to the consolidated note
+    4. Remove the obsolete attachment (Assignment2.pdf) from the original Module 2 note
+    5. Add the new combined assignment attachment (Combined_Assignment.pdf) to the consolidated note
     6. Delete the original separate "Module 2 Notes" and "Module 3 Notes" since they're now redundant
-    7. Rename the "Spring 2025 CS" folder to "Spring 2025 CS - Updated Curriculum" as instructed
+    7. Rename the "Spring 2025 CS" folder to "Spring 2025 CS - Updated Curriculum"
 
     This scenario exercises note consolidation from multiple sources, attachment removal and addition within the same workflow, deletion of obsolete notes after content migration, and folder renaming—capabilities focused on curriculum-driven reorganization rather than cleanup or derivative note creation..
     """
@@ -41,15 +45,14 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
         """Initialize apps with test data."""
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
-        self.email = StatefulEmailApp(name="Email")
 
         # Initialize Notes app
         self.note = StatefulNotesApp(name="Notes")
+        self.reminder = StatefulReminderApp(name="Reminders")
 
         # Initialize sandbox filesystem so attachments have a real backing store.
         self.files = SandboxLocalFileSystem(name="Files")
         self.note.internal_fs = self.files
-        self.email.internal_fs = self.files
 
         # Create custom folder for course notes
         self.note.new_folder("Spring 2025 CS")
@@ -57,6 +60,9 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
         # Prepare attachment files in the sandbox filesystem.
         self.assignment2_path = "/Assignment2.pdf"
         self.combined_assignment_path = "/Combined_Assignment.pdf"
+        # Notes store attachments keyed by filename, not by full path.
+        self.assignment2_filename = Path(self.assignment2_path).name
+        self.combined_assignment_filename = Path(self.combined_assignment_path).name
         with self.files.open(self.assignment2_path, "wb") as f:
             f.write(b"dummy assignment 2")
         with self.files.open(self.combined_assignment_path, "wb") as f:
@@ -95,47 +101,42 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             updated_at="2025-11-17 09:00:00",
         )
 
+        # User-set reminder that will automatically notify user+agent shortly after start_time.
+        # The afternoon timing is described in the reminder content (no need for an external email).
+        self.reminder.add_reminder(
+            title="Prep for updated curriculum this afternoon",
+            due_datetime="2025-11-18 09:01:00",
+            description=(
+                "Curriculum update / new module kickoff later today (this afternoon).\n\n"
+                "Before then need to make some changes to the notes:\n"
+                "- Consolidate the 'Module 2 Notes' + 'Module 3 Notes' into 'Data Structures & Algorithms'\n"
+                f"- Remove obsolete attachment from Module 2: {self.assignment2_filename}\n"
+                f"- Attach the new combined assignment to the consolidated note: {self.combined_assignment_filename}\n"
+                "- Rename folder 'Spring 2025 CS' -> 'Spring 2025 CS - Updated Curriculum'\n"
+                "- Delete the old separate notes once consolidated\n"
+            ),
+        )
+
         # Register all apps
-        self.apps = [self.note, self.email, self.files, self.agent_ui, self.system_app]
+        self.apps = [self.note, self.reminder, self.files, self.agent_ui, self.system_app]
 
     def build_events_flow(self) -> None:
         """Build event flow - environment events with agent detection and agent actions."""
         aui = self.get_typed_app(PASAgentUserInterface)
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         note_app = self.get_typed_app(StatefulNotesApp, "Notes")
-        email_app = self.get_typed_app(StatefulEmailApp, "Email")
 
         # Seed the existing Module 2 attachment AFTER initialization (avoid bytes in initial state JSON),
         # but BEFORE capture_mode so it's present for later list/remove operations.
         note_app.add_attachment_to_note(note_id=self.module2_note_id, attachment_path=self.assignment2_path)
 
         with EventRegisterer.capture_mode():
-            # Environment event: Professor sends email with explicit syllabus update instructions
-            # This email contains all the details needed: note titles to merge, folder to rename, attachment changes
-            syllabus_email_event = email_app.send_email_to_user_with_id(
-                email_id="email-syllabus-update-123",
-                sender="prof.johnson@university.edu",
-                subject="CS 201 - Important Syllabus Update",
-                content=(
-                    "Hi,\n\n"
-                    "Due to curriculum changes, we're merging 'Module 2: Data Structures' and 'Module 3: Algorithms' into a single unified module.\n\n"
-                    "Please consolidate your separate lecture notes titled 'Module 2 Notes' and 'Module 3 Notes' into one comprehensive 'Data Structures & Algorithms' note.\n\n"
-                    f"Also, the assignment file currently attached to Module 2 Notes ({self.assignment2_path}) should be removed since it's now obsolete, "
-                    f"and the new combined assignment ({self.combined_assignment_path}) should be attached to your consolidated note.\n\n"
-                    "Finally, rename your 'Spring 2025 CS' folder to 'Spring 2025 CS - Updated Curriculum' to reflect these changes.\n\n"
-                    "Thanks,\n"
-                    "Prof. Johnson"
-                ),
-            ).delayed(5)
-
             # Oracle event: Agent searches for "Module 2 Notes" to locate it
-            # Motivation: email explicitly requests consolidating "Module 2 Notes" and "Module 3 Notes"
-            search_module2_event = (
-                note_app.search_notes(query="Module 2 Notes").oracle().depends_on(syllabus_email_event, delay_seconds=2)
-            )
+            # Motivation: user-set reminder to consolidate notes before the afternoon curriculum update.
+            search_module2_event = note_app.search_notes(query="Module 2 Notes").oracle().delayed(70)
 
             # Oracle event: Agent searches for "Module 3 Notes" to locate it
-            # Motivation: email explicitly requests consolidating "Module 3 Notes" along with Module 2
+            # Motivation: reminder also calls out consolidating Module 3 Notes.
             search_module3_event = (
                 note_app.search_notes(query="Module 3 Notes").oracle().depends_on(search_module2_event, delay_seconds=1)
             )
@@ -157,10 +158,16 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             )
 
             # Oracle event: Agent sends proposal to user
-            # Motivation: email from prof.johnson@university.edu requests "consolidate your separate lecture notes titled 'Module 2 Notes' and 'Module 3 Notes'"
+            # Motivation: user reminder indicates the desired reorg actions; agent confirms before making changes.
             proposal_event = (
                 aui.send_message_to_user(
-                    content='I received an email from Prof. Johnson requesting syllabus changes. The email asks to consolidate your "Module 2 Notes" and "Module 3 Notes" into a single "Data Structures & Algorithms" note, remove the obsolete Assignment2.pdf attachment, attach the new Combined_Assignment.pdf, and rename the "Spring 2025 CS" folder to "Spring 2025 CS - Updated Curriculum". Would you like me to make these changes?'
+                    content=(
+                        "I noticed your reminder to prep for the updated curriculum this afternoon. "
+                        'It looks like you want to consolidate your "Module 2 Notes" and "Module 3 Notes" into a single '
+                        '"Data Structures & Algorithms" note, remove the obsolete Assignment2.pdf attachment, attach the new '
+                        "Combined_Assignment.pdf, delete the old separate notes, and rename the folder to "
+                        '"Spring 2025 CS - Updated Curriculum". Would you like me to do that now?'
+                    )
                 )
                 .oracle()
                 .depends_on(read_module3_event, delay_seconds=2)
@@ -192,11 +199,11 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             )
 
             # Oracle event: Agent removes obsolete Assignment2.pdf from Module 2 note (user-gated WRITE)
-            # Motivation: professor email explicitly says "/files/Assignment2.pdf should be removed" from Module 2 Notes.
+            # Motivation: reminder indicates the Module 2 attachment is obsolete and should be removed.
             remove_obsolete_attachment_event = (
                 note_app.remove_attachment(
                     note_id=self.module2_note_id,
-                    attachment="Assignment2.pdf",
+                    attachment=self.assignment2_filename,
                 )
                 .oracle()
                 .depends_on(list_module2_attachments_event, delay_seconds=1)
@@ -239,7 +246,6 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
 
         # Register ALL events here in self.events
         self.events = [
-            syllabus_email_event,
             search_module2_event,
             search_module3_event,
             read_module2_event,
@@ -302,7 +308,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             removed_obsolete_attachment = any(
                 e.action.class_name == "StatefulNotesApp"
                 and e.action.function_name == "remove_attachment"
-                and e.action.args.get("attachment") == "Assignment2.pdf"
+                and e.action.args.get("attachment") == self.assignment2_filename
                 for e in agent_events
             )
 
@@ -310,7 +316,7 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
             attached_new_assignment = any(
                 e.action.class_name == "StatefulNotesApp"
                 and e.action.function_name == "add_attachment_to_note"
-                and str(e.action.args.get("attachment_path", "")).endswith("Combined_Assignment.pdf")
+                and str(e.action.args.get("attachment_path", "")).endswith(self.combined_assignment_filename)
                 for e in agent_events
             )
 
@@ -336,9 +342,9 @@ class NoteConsolidationSyllabusUpdate(PASScenario):
                 if not folder_renamed:
                     missing_checks.append("folder not renamed to 'updated curriculum'")
                 if not removed_obsolete_attachment:
-                    missing_checks.append("obsolete Assignment2.pdf attachment not removed")
+                    missing_checks.append(f"obsolete {self.assignment2_filename} attachment not removed")
                 if not attached_new_assignment:
-                    missing_checks.append("new Combined_Assignment.pdf not attached")
+                    missing_checks.append(f"new {self.combined_assignment_filename} not attached")
 
                 rationale = "; ".join(missing_checks)
                 return ScenarioValidationResult(success=False, rationale=rationale)

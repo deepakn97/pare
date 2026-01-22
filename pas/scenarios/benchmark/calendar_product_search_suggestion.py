@@ -54,7 +54,7 @@ class CalendarProductSearchSuggestion(PASScenario):
         # Populate calendar with camping trip event
         # Event scheduled 5 days from start_time (Nov 23, 2025)
         camping_start = datetime(2025, 11, 23, 10, 0, 0, tzinfo=UTC).timestamp()
-        camping_end = datetime(2025, 11, 23, 18, 0, 0, tzinfo=UTC).timestamp()
+        camping_end = datetime(2025, 11, 24, 10, 0, 0, tzinfo=UTC).timestamp()
 
         camping_event = CalendarEvent(
             title="Camping Trip at Yosemite",
@@ -135,7 +135,7 @@ class CalendarProductSearchSuggestion(PASScenario):
             title="Yosemite trip prep — buy tent + sleeping bags",
             due_datetime="2025-11-18 09:01:00",
             description=(
-                "Yosemite camping trip is coming up.\n\n"
+                "Yosemite camping trip is coming up on Nov 23.\n\n"
                 "We still need several big items: a tent and 3 sleeping bags. Buy these today.\n"
                 'Search in Shopping: "tent" and "sleeping bag" and add options to cart so we can review before checkout.'
             ),

@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps.contacts import Contact, ContactsApp
+from are.simulation.apps.sandbox_file_system import SandboxLocalFileSystem
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
@@ -44,9 +45,13 @@ class EmailForwardApartmentInquiry(PASScenario):
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
+        # Initialize sandbox filesystem so email attachments have a real backing store.
+        self.files = SandboxLocalFileSystem(name="Files")
+
         # Initialize email app
         self.email = StatefulEmailApp(name="Emails")
         self.email.user_email = "user@example.com"
+        self.email.internal_fs = self.files
 
         # Initialize apartment app with saved apartment
         self.apartment = StatefulApartmentApp(name="Apartment")
@@ -65,9 +70,9 @@ class EmailForwardApartmentInquiry(PASScenario):
             property_type="Apartment",
             furnished_status="Unfurnished",
             floor_level="Upper floors",
-            pet_policy="Contact leasing office for pet policy details",
+            pet_policy="Pet policy varies by unit; confirm cat policy and fees with leasing office.",
             lease_term="1 year",
-            amenities=["Parking", "Gym", "Pool", "leasing office:  (leasing@riversidetowers.com)"],
+            amenities=["Parking", "Gym", "Pool", "Leasing office email: leasing@riversidetowers.com"],
         )
 
         # Save the apartment to favorites
@@ -83,8 +88,36 @@ class EmailForwardApartmentInquiry(PASScenario):
         )
         self.contacts.add_contact(partner_contact)
 
+        # Prepare a small attachment that Alex includes: a pet profile.
+        # This makes forwarding more realistic than copy/paste (preserves the exact pet details).
+        self.partner_attachment_path = "/Alex_pet_profile.txt"
+        with self.files.open(self.partner_attachment_path, "wb") as f:
+            f.write(
+                b"Pet profile (Alex Johnson)\\n"
+                b"Apartment of interest: Riverside Towers Unit 402B\\n"
+                b"\\n"
+                b"Pets:\\n"
+                b"1) Cat: 'Miso' (domestic shorthair)\\n"
+                b"   - Age: 3 years\\n"
+                b"   - Weight: 10 lb\\n"
+                b"   - Indoor-only, litter trained\\n"
+                b"   - Spayed/neutered: yes\\n"
+                b"   - Vaccinated: yes\\n"
+                b"\\n"
+                b"2) Cat: 'Nori' (domestic longhair)\\n"
+                b"   - Age: 2 years\\n"
+                b"   - Weight: 9 lb\\n"
+                b"   - Indoor-only, litter trained\\n"
+                b"   - Spayed/neutered: yes\\n"
+                b"   - Vaccinated: yes\\n"
+                b"\\n"
+                b"Questions:\\n"
+                b"- Are two cats allowed for Unit 402B?\\n"
+                b"- If allowed, what are the fees (deposit + monthly pet rent) and any required documentation?\\n"
+            )
+
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.email, self.apartment, self.contacts]
+        self.apps = [self.agent_ui, self.system_app, self.files, self.email, self.apartment, self.contacts]
 
     def build_events_flow(self) -> None:
         """Build event flow - environment events with agent detection and agent actions."""
@@ -95,18 +128,39 @@ class EmailForwardApartmentInquiry(PASScenario):
 
         # Store email ID for later reference
         partner_email_id = "email-partner-inquiry-001"
+        leasing_guidance_email_id = "email-leasing-forwarding-guidance-001"
 
         with EventRegisterer.capture_mode():
+            # Environment Event 0: Leasing office guidance (sets realistic motivation for forwarding).
+            # Rationale: The user is the primary point of contact; leasing asks to forward co-applicant questions verbatim.
+            leasing_guidance_event = email_app.send_email_to_user_with_id(
+                email_id=leasing_guidance_email_id,
+                sender="Riverside Towers Leasing <leasing@riversidetowers.com>",
+                subject="Riverside Towers Unit 402B — quick question policy",
+                content=(
+                    "Hi!\n\n"
+                    "Thanks for saving Riverside Towers Unit 402B. For the fastest response, please email questions to "
+                    "leasing@riversidetowers.com.\n\n"
+                    "If you're applying with a partner/co-applicant, feel free to forward their questions so we can answer "
+                    "their exact wording (especially for pet policy).\n\n"
+                    "— Riverside Towers Leasing"
+                ),
+            ).delayed(4)
+
             # Environment Event 1: Partner sends email asking about pet policy for Riverside apartment
             partner_email_event = email_app.send_email_to_user_with_id(
                 email_id=partner_email_id,
                 sender="alex.johnson@example.com",
                 subject="Question about the apartment",
                 content=(
-                    "Hey! Can you find out if that Riverside apartment allows two cats? The listing wasn't clear about the pet policy and I want to make sure before we proceed.\n\n"
-                    "Can you please forward this email to the leasing office for the Riverside Towers Unit 402B listing you saved, so they see my exact question and can reply?"
+                    "Hey — quick question about the Riverside Towers Unit 402B listing you saved.\n\n"
+                    "Can you ask the leasing office if our pets would be allowed in Unit 402B (and any fees)?\n\n"
+                    "\n\n"
+                    "I attached a short pet profile (names/ages/weights) so the leasing office can answer based on the exact details.\n"
+                    "Could you please forward this email to the leasing office? I don't have their contact email/thread."
                 ),
-            ).delayed(10)
+                attachment_paths=[self.partner_attachment_path],
+            ).depends_on(leasing_guidance_event, delay_seconds=6)
 
             # Oracle Event 1: Agent reads the partner's email to understand the inquiry
             # Motivation: The email notification triggered the agent to check inbox
@@ -143,7 +197,12 @@ class EmailForwardApartmentInquiry(PASScenario):
             # details surfaced the leasing office contact info via tools.
             proposal_event = (
                 aui.send_message_to_user(
-                    content="I see Alex is asking about the pet policy for Riverside Towers Unit 402B. I checked the saved listing details and found the leasing office contact in the amenities:  (leasing@riversidetowers.com). Would you like me to forward Alex's question to the leasing office?"
+                    content=(
+                        "Alex is asking whether Riverside Towers Unit 402B allows two cats (and any pet fees) and included an attachment with the exact questions. "
+                        "I checked your saved listing details and found the leasing office email in the amenities: leasing@riversidetowers.com. "
+                        "Would you like me to forward Alex's email (including the attachment) to the leasing office so they can respond with the official policy? "
+                        "You can then forward their reply back to Alex."
+                    )
                 )
                 .oracle()
                 .depends_on([read_email_event, get_details_event], delay_seconds=2)
@@ -167,6 +226,7 @@ class EmailForwardApartmentInquiry(PASScenario):
 
         # Register ALL events
         self.events = [
+            leasing_guidance_event,
             partner_email_event,
             read_email_event,
             search_saved_event,

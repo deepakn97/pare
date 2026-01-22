@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from are.simulation.apps import SandboxLocalFileSystem
+from are.simulation.apps.email_client import Email, EmailFolderName
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -50,6 +52,10 @@ class EmailDrivenNoteCleanup(PASScenario):
         # Initialize Email App
         self.email = StatefulEmailApp(name="Emails")
 
+        # Initialize sandbox filesystem so historical emails can include attachments.
+        self.files = SandboxLocalFileSystem(name="Files")
+        self.email.internal_fs = self.files
+
         # Populate baseline data
 
         # Create custom ProjectAlpha folder and populate with notes
@@ -82,8 +88,99 @@ class EmailDrivenNoteCleanup(PASScenario):
             updated_at="2025-10-05 11:00:00",
         )
 
+        # Seed prior email history from Sarah to make the later cleanup directive more realistic.
+        #
+        # Rationale: In real workflows, a coordinator would reference prior deliverables / updated docs
+        # (often attached), and the cleanup request would be part of an existing thread.
+        requirements_v2_path = "/ProjectAlpha_Requirements_v2.pdf"
+        deliverables_path = "/ProjectAlpha_Final_Deliverables_Checklist.pdf"
+        with self.files.open(requirements_v2_path, "wb") as f:
+            f.write(b"dummy ProjectAlpha requirements v2")
+        with self.files.open(deliverables_path, "wb") as f:
+            f.write(b"dummy ProjectAlpha deliverables checklist")
+
+        prior_email_1 = Email(
+            email_id="email_projectalpha_requirements_v2",
+            sender="sarah.martinez@example.com",
+            recipients=[self.email.user_email],
+            subject="ProjectAlpha: updated requirements (v2) + next steps",
+            content=(
+                "Hi,\n\n"
+                "Sharing the updated ProjectAlpha requirements (v2). This supersedes the early draft requirements.\n\n"
+                "For your records:\n"
+                '- You have a note titled "ProjectAlpha - Outdated Requirements" that captured the initial draft.\n'
+                "  You can delete it once we're fully wrapped up.\n\n"
+                "Thanks!\n"
+                "Sarah Martinez\n"
+                "Project Coordinator"
+            ),
+            timestamp=datetime(2025, 10, 26, 10, 0, 0, tzinfo=UTC).timestamp(),
+            is_read=True,
+        )
+        # Seed a user reply in SENT to make this feel like a real thread.
+        # (No attachments here; attachments would store bytes and break initial state JSON.)
+        self.user_reply_1_id = "sent_projectalpha_requirements_ack"
+        user_reply_1 = Email(
+            email_id=self.user_reply_1_id,
+            sender=self.email.user_email,
+            recipients=["sarah.martinez@example.com"],
+            subject="Re: ProjectAlpha: updated requirements (v2) + next steps",
+            content=(
+                "Thanks Sarah — received.\n\n"
+                "I'll keep my notes aligned to v2 going forward.\n"
+                "I still have an older 'ProjectAlpha - Outdated Requirements' note from the early draft; "
+                "I'll delete it once we're fully wrapped.\n\n"
+                "— John"
+            ),
+            timestamp=datetime(2025, 10, 26, 10, 12, 0, tzinfo=UTC).timestamp(),
+            is_read=True,
+            parent_id=prior_email_1.email_id,
+        )
+        # IMPORTANT: Don't add attachments here; email attachments store base64 as bytes and break
+        # PASScenario.initialize() JSON serialization of initial app state. We'll attach them in
+        # build_events_flow() after initialization.
+        self.requirements_v2_path = requirements_v2_path
+        self.email.folders[EmailFolderName.INBOX].add_email(prior_email_1)
+        self.email.folders[EmailFolderName.SENT].add_email(user_reply_1)
+
+        prior_email_2 = Email(
+            email_id="email_projectalpha_deliverables_handoff",
+            sender="sarah.martinez@example.com",
+            recipients=[self.email.user_email],
+            subject="ProjectAlpha handoff: final deliverables checklist",
+            content=(
+                "Hi,\n\n"
+                "Attaching the final deliverables checklist for ProjectAlpha.\n\n"
+                'If you\'re tracking notes, please keep your "ProjectAlpha - Final Deliverables" note as the single source\n'
+                "of truth for what shipped (we'll archive it after handoff).\n\n"
+                "Best,\n"
+                "Sarah"
+            ),
+            timestamp=datetime(2025, 11, 1, 16, 30, 0, tzinfo=UTC).timestamp(),
+            is_read=True,
+        )
+        self.user_reply_2_id = "sent_projectalpha_handoff_ack"
+        user_reply_2 = Email(
+            email_id=self.user_reply_2_id,
+            sender=self.email.user_email,
+            recipients=["sarah.martinez@example.com"],
+            subject="Re: ProjectAlpha handoff: final deliverables checklist",
+            content=(
+                "Got it — thanks.\n\n"
+                "I'll keep my 'ProjectAlpha - Final Deliverables' note as the source of truth, and we can archive it "
+                "after handoff.\n\n"
+                "— John"
+            ),
+            timestamp=datetime(2025, 11, 1, 16, 40, 0, tzinfo=UTC).timestamp(),
+            is_read=True,
+            parent_id=prior_email_2.email_id,
+        )
+        self.deliverables_path = deliverables_path
+        self.email.folders[EmailFolderName.INBOX].add_email(prior_email_2)
+        self.email.folders[EmailFolderName.SENT].add_email(user_reply_2)
+
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.note, self.email]
+        self.apps = [self.agent_ui, self.system_app, self.files, self.note, self.email]
 
     def build_events_flow(self) -> None:
         """Build event flow - environment events with agent detection and agent actions."""
@@ -91,6 +188,15 @@ class EmailDrivenNoteCleanup(PASScenario):
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         note_app = self.get_typed_app(StatefulNotesApp, "Notes")
         email_app = self.get_typed_app(StatefulEmailApp, "Emails")
+
+        # Add attachments to the historical emails AFTER initialization (avoid bytes in initial state JSON),
+        # but BEFORE capture_mode so the emails provide realistic context.
+        req_email = email_app.folders[EmailFolderName.INBOX].get_email_by_id("email_projectalpha_requirements_v2")
+        email_app.add_attachment(req_email, self.requirements_v2_path)
+        deliv_email = email_app.folders[EmailFolderName.INBOX].get_email_by_id(
+            "email_projectalpha_deliverables_handoff"
+        )
+        email_app.add_attachment(deliv_email, self.deliverables_path)
 
         with EventRegisterer.capture_mode():
             # Environment Event 1: Cleanup directive email arrives from project coordinator
@@ -120,12 +226,45 @@ Sarah Martinez
 Project Coordinator""",
             )
 
-            # Oracle Event 1: Agent reads the email to extract note IDs + requested actions
-            # Motivation: cleanup_email_event provides explicit note IDs to delete/archive and requests creating "2025_Archives".
+            # Oracle Event 1: Agent reviews recent email thread context (INBOX + SENT).
+            # Motivation: The cleanup request is part of an ongoing thread; the agent scans prior emails to understand context
+            # before proposing destructive note operations.
+            list_inbox_event = (
+                email_app.list_emails(folder_name="INBOX", offset=0, limit=10)
+                .oracle()
+                .depends_on(cleanup_email_event, delay_seconds=1)
+            )
+            list_sent_event = (
+                email_app.list_emails(folder_name="SENT", offset=0, limit=10)
+                .oracle()
+                .depends_on(list_inbox_event, delay_seconds=1)
+            )
+            read_prior_inbox_1_event = (
+                email_app.get_email_by_id(email_id="email_projectalpha_requirements_v2", folder_name="INBOX")
+                .oracle()
+                .depends_on(list_sent_event, delay_seconds=1)
+            )
+            read_prior_inbox_2_event = (
+                email_app.get_email_by_id(email_id="email_projectalpha_deliverables_handoff", folder_name="INBOX")
+                .oracle()
+                .depends_on(read_prior_inbox_1_event, delay_seconds=1)
+            )
+            read_prior_sent_1_event = (
+                email_app.get_email_by_id(email_id=self.user_reply_1_id, folder_name="SENT")
+                .oracle()
+                .depends_on(read_prior_inbox_2_event, delay_seconds=1)
+            )
+            read_prior_sent_2_event = (
+                email_app.get_email_by_id(email_id=self.user_reply_2_id, folder_name="SENT")
+                .oracle()
+                .depends_on(read_prior_sent_1_event, delay_seconds=1)
+            )
+
+            # Oracle Event 2: Agent reads the cleanup directive email to extract note IDs + requested actions.
             read_email_event = (
                 email_app.get_email_by_id(email_id=cleanup_email_id, folder_name="INBOX")
                 .oracle()
-                .depends_on(cleanup_email_event, delay_seconds=2)
+                .depends_on(read_prior_sent_2_event, delay_seconds=1)
             )
 
             # Oracle Event 2: Agent sends proposal to user based on the cleanup email directive
@@ -178,6 +317,12 @@ Project Coordinator""",
         # Register ALL events here in self.events
         self.events = [
             cleanup_email_event,
+            list_inbox_event,
+            list_sent_event,
+            read_prior_inbox_1_event,
+            read_prior_inbox_2_event,
+            read_prior_sent_1_event,
+            read_prior_sent_2_event,
             read_email_event,
             proposal_event,
             acceptance_event,

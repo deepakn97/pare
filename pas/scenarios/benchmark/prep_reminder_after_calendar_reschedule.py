@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.apps.calendar import CalendarEvent
+from are.simulation.apps.email_client import Email, EmailFolderName
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -59,10 +60,47 @@ class PrepReminderAfterCalendarReschedule(PASScenario):
         # Populate baseline data: Reminder "Finalize board presentation deck" due Nov 24, 2025 at 6:00 PM
         # This is the preparation reminder that will need to be adjusted when the event is rescheduled.
         self.prep_reminder_id = self.reminder.add_reminder(
-            title="Finalize board presentation deck",
+            title="Finalize board presentation deck for tomorrow's meeting",
             due_datetime="2025-11-24 18:00:00",
-            description="Complete and review the presentation slides before the board meeting",
+            description="Complete and review the presentation slides before the board meeting tomorrow",
         )
+
+        # Seed prior email context about the ORIGINAL date + prep expectations.
+        # This makes the later reschedule email more realistic, and it explains why the user set a reminder one day before.
+        self.original_prep_email_id = "board_pres_prep_original_001"
+        self.user_ack_email_id = "sent_board_pres_prep_ack_001"
+
+        prior_board_email = Email(
+            email_id=self.original_prep_email_id,
+            sender="board.members@company.example",
+            recipients=[self.email.user_email],
+            subject="Board Presentation (Nov 25, 10:00 AM) — prep expectations",
+            content=(
+                "Hi,\n\n"
+                "Reminder that the Board Presentation is scheduled for Nov 25 at 10:00 AM.\n"
+                "Please have your deck finalized and reviewed ahead of time.\n\n"
+                "Thanks,\n"
+                "Board Members"
+            ),
+            timestamp=datetime(2025, 11, 10, 16, 0, 0, tzinfo=UTC).timestamp(),
+            is_read=True,
+        )
+        user_reply = Email(
+            email_id=self.user_ack_email_id,
+            sender=self.email.user_email,
+            recipients=["board.members@company.example"],
+            subject="Re: Board Presentation (Nov 25, 10:00 AM) — prep expectations",
+            content=(
+                "Thanks — confirmed.\n\n"
+                "I'll set a prep reminder for the evening before (Nov 24 @ 6:00 PM) to finalize the deck.\n\n"
+                "— John"
+            ),
+            timestamp=datetime(2025, 11, 10, 16, 12, 0, tzinfo=UTC).timestamp(),
+            is_read=True,
+            parent_id=self.original_prep_email_id,
+        )
+        self.email.folders[EmailFolderName.INBOX].add_email(prior_board_email)
+        self.email.folders[EmailFolderName.SENT].add_email(user_reply)
 
         # Register all apps
         self.apps = [self.agent_ui, self.system_app, self.calendar, self.reminder, self.email]
@@ -102,19 +140,40 @@ class PrepReminderAfterCalendarReschedule(PASScenario):
                 content=(
                     "Hi,\n\n"
                     "The Board Presentation has been rescheduled from Nov 25 (10:00 AM) to Nov 27 at 2:00 PM.\n\n"
-                    "Please update any prep reminders/tasks you set for the original date so they still happen before the new meeting time.\n"
-                    "For example: if you had a prep reminder the evening before, shift it to the same evening time slot before Nov 27.\n\n"
+                    "Please update any prep reminders you set for the original date so they still happen one day before the new meeting time.\n"
                     "Thanks,\n"
                     "Board Members"
                 ),
             ).delayed(40)
+
+            # Oracle Event 0: Agent reviews prior email thread context (INBOX + SENT) about the original date + reminder plan.
+            list_inbox_event = (
+                email_app.list_emails(folder_name="INBOX", offset=0, limit=10)
+                .oracle()
+                .depends_on(reschedule_email_event, delay_seconds=1)
+            )
+            list_sent_event = (
+                email_app.list_emails(folder_name="SENT", offset=0, limit=10)
+                .oracle()
+                .depends_on(list_inbox_event, delay_seconds=1)
+            )
+            read_prior_board_email_event = (
+                email_app.get_email_by_id(email_id=self.original_prep_email_id, folder_name="INBOX")
+                .oracle()
+                .depends_on(list_sent_event, delay_seconds=1)
+            )
+            read_user_ack_email_event = (
+                email_app.get_email_by_id(email_id=self.user_ack_email_id, folder_name="SENT")
+                .oracle()
+                .depends_on(read_prior_board_email_event, delay_seconds=1)
+            )
 
             # Agent detects the calendar reschedule notifications and searches for the rescheduled event
             # Motivation: The user received a reschedule email and the calendar was updated; the agent searches to confirm new timing.
             search_rescheduled_event = (
                 calendar_app.search_events(query="Board Presentation")
                 .oracle()
-                .depends_on([add_new_event, reschedule_email_event], delay_seconds=3)
+                .depends_on([add_new_event, read_user_ack_email_event], delay_seconds=2)
             )
 
             # Agent lists all reminders to find preparation-related reminders
@@ -148,7 +207,7 @@ class PrepReminderAfterCalendarReschedule(PASScenario):
             update_reminder_event = (
                 reminder_app.update_reminder(
                     reminder_id=self.prep_reminder_id,
-                    title="Finalize board presentation deck",
+                    title="Finalize board presentation deck for tomorrow's meeting",
                     description="Complete and review the presentation slides before the board meeting",
                     due_datetime="2025-11-26 18:00:00",  # Nov 26, 6:00 PM (evening before new date)
                     repetition_unit=None,
@@ -162,6 +221,10 @@ class PrepReminderAfterCalendarReschedule(PASScenario):
             delete_old_event,
             reschedule_email_event,
             add_new_event,
+            list_inbox_event,
+            list_sent_event,
+            read_prior_board_email_event,
+            read_user_ack_email_event,
             search_rescheduled_event,
             list_reminders_event,
             proposal_event,

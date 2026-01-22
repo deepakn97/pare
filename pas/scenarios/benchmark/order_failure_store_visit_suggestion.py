@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from are.simulation.apps.email_client import Email, EmailFolderName
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
@@ -19,7 +20,7 @@ from pas.scenarios.utils.registry import register_scenario
 
 @register_scenario("order_failure_store_visit_suggestion")
 class OrderFailureStoreVisitSuggestion(PASScenario):
-    """Agent detects shopping order failure notification and proactively suggests booking a cab ride to the store for in-person resolution.
+    """Agent detects shopping order failure and proactively suggests a cab ride for urgent in-store pickup.
 
     The user has placed an online shopping order for in-store pickup or delivery. They receive a notification that the order has failed due to payment issues, item unavailability, or address problems. The agent must:
     1. Parse the order failure notification containing the order details and failure reason using view_order() or list_orders()
@@ -67,6 +68,36 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
             distance_km=8.5,
         )
 
+        # Seed a prior email thread that creates urgency: user needs wireless headphones TODAY for an afternoon test.
+        # This grounds why booking a cab for quick in-store pickup makes sense.
+        teacher_email = Email(
+            email_id="email-teacher-headphones-required",
+            sender="prof.lee@university.edu",
+            recipients=[self.email.user_email],
+            subject="Reminder: Listening section requires headphones (today)",
+            content=(
+                "Hi,\n\n"
+                "Reminder: today's assessment has a listening section. Please bring wired/wireless headphones.\n"
+                "If you don't have a working pair, please get one before the test this afternoon.\n\n"
+                "Best,\n"
+                "Prof. Lee"
+            ),
+            timestamp=self.start_time - 3600,  # 1 hour before scenario start
+            is_read=True,
+        )
+        user_reply = Email(
+            email_id="sent-teacher-headphones-ack",
+            sender=self.email.user_email,
+            recipients=["prof.lee@university.edu"],
+            subject="Re: Reminder: Listening section requires headphones (today)",
+            content="Thanks — I'll pick up wireless headphones today so I'm ready for the test this afternoon.\n\n— John",
+            timestamp=self.start_time - 3300,
+            is_read=True,
+            parent_id=teacher_email.email_id,
+        )
+        self.email.folders[EmailFolderName.INBOX].add_email(teacher_email)
+        self.email.folders[EmailFolderName.SENT].add_email(user_reply)
+
         # Register all apps
         self.apps = [self.agent_ui, self.system_app, self.email, self.shopping, self.cab]
 
@@ -86,26 +117,56 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
                 order_id="test-order-001", status="cancelled"
             ).delayed(5)
 
+            # Environment Event 1.5: Teacher replies to the user's email, reinforcing the urgency (time-driven trigger).
+            # We use send_email_to_user_with_id so it shows up as an incoming email event in the log/notifications.
+            teacher_reply_event = email_app.send_email_to_user_with_id(
+                sender="prof.lee@university.edu",
+                email_id="sent-teacher-headphones-ack",
+                content="Thanks for confirming. See you this afternoon — please bring headphones for the listening section.",
+            ).delayed(3)
+
             # Environment Event 2: Retailer follow-up recommends an in-person store visit (grounds the cab idea + store address)
             techmart_followup_email_event = email_app.send_email_to_user_with_id(
                 email_id="email-techmart-cancelled-001",
                 sender="support@techmart.example",
-                subject="Your TechMart order was cancelled — in-store help available",
+                subject="Your TechMart order was cancelled — in-store pickup available today",
                 content=(
                     "Hi,\n\n"
-                    "We weren't able to complete your order (ID: test-order-001), so it was cancelled.\n\n"
-                    "If you still want the item today, our staff can help you purchase it in person at:\n"
+                    "We weren't able to ship your order (ID: test-order-001), so it was cancelled.\n\n"
+                    "If you still want the item today, you can purchase it in person or set up in-store pickup at:\n"
                     "TechMart Downtown, 789 Main Street\n\n"
-                    "We see your address on file as 456 Oak Avenue, which is close by. "
-                    "If you'd like to resolve this quickly, visiting the store is the fastest option.\n\n"
+                    "If you need it urgently, visiting the store is the fastest option.\n\n"
                     "Best,\n"
                     "TechMart Support"
                 ),
-            ).delayed(15)
+            ).delayed(70)
+
+            # Oracle Event 0: Agent notices the new teacher reply in INBOX (strong trigger).
+            list_inbox_after_teacher_reply_event = (
+                email_app.list_emails(folder_name="INBOX", offset=0, limit=5)
+                .oracle()
+                .depends_on(teacher_reply_event, delay_seconds=1)
+            )
+            read_teacher_reply_event = (
+                email_app.get_email_by_index(idx=0, folder_name="INBOX")
+                .oracle()
+                .depends_on(list_inbox_after_teacher_reply_event, delay_seconds=1)
+            )
+
+            # Oracle Event 0.5: Agent also reads the original teacher reminder email for full details.
+            read_teacher_email_event = (
+                email_app.get_email_by_id(email_id="email-teacher-headphones-required", folder_name="INBOX")
+                .oracle()
+                .depends_on(read_teacher_reply_event, delay_seconds=1)
+            )
 
             # Oracle Event 1: Agent lists orders to understand the failure details
             # Motivated by: order failure notification from environment event
-            list_orders_event = shopping_app.list_orders().oracle().depends_on(order_failure_event, delay_seconds=2)
+            list_orders_event = (
+                shopping_app.list_orders()
+                .oracle()
+                .depends_on([order_failure_event, read_teacher_email_event], delay_seconds=1)
+            )
 
             # Oracle Event 2: Agent gets order details to extract store location
             # Motivated by: need to understand which store/merchant the failed order is associated with
@@ -134,8 +195,9 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
                 aui.send_message_to_user(
                     content=(
                         "I noticed your order (test-order-001) was cancelled. TechMart support emailed that the fastest "
-                        "way to resolve it is an in-person visit to TechMart Downtown (789 Main Street). "
-                        "Would you like me to book a cab from 456 Oak Avenue to the store?"
+                        "way to get the item today is an in-person visit to TechMart Downtown (789 Main Street). "
+                        "I also saw your email about needing headphones for the test this afternoon, so time is tight. "
+                        "Would you like me to book a cab from 456 Oak Avenue to the store for a quick pickup?"
                     )
                 )
                 .oracle()
@@ -163,7 +225,11 @@ class OrderFailureStoreVisitSuggestion(PASScenario):
         # Register ALL events
         self.events = [
             order_failure_event,
+            teacher_reply_event,
             techmart_followup_email_event,
+            list_inbox_after_teacher_reply_event,
+            read_teacher_reply_event,
+            read_teacher_email_event,
             list_orders_event,
             get_order_event,
             get_quotation_event,

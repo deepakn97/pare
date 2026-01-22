@@ -129,7 +129,8 @@ Key Points to Cover:
                 content=(
                     "Hi,\n\n"
                     "Update: The Client Onboarding Meeting on Nov 28 at 3:00 PM has been cancelled (client scheduling conflict).\n\n"
-                    "You can delete the old note for the Client Onboarding Meeting — we won't need it anymore.\n\n"
+                    "Please delete any prep materials/notes you drafted for this meeting. They include confidential client information\n"
+                    "(PII + contract terms), and we need to minimize retention now that the meeting is cancelled.\n\n"
                     "Thanks,\n"
                     "Sarah"
                 ),
@@ -152,7 +153,11 @@ Key Points to Cover:
             # Agent proposes cleanup action based on the cancellation notification
             proposal_event = (
                 aui.send_message_to_user(
-                    content="I saw that Sarah Chen cancelled the Client Onboarding Meeting (Nov 28) and left a follow-up note to clean up the prep note for the previous Client Onboarding Meeting. Would you like me to delete that prep note since the meeting is no longer happening?"
+                    content=(
+                        "I saw that Sarah Chen cancelled the Client Onboarding Meeting (Nov 28) and emailed asking you to delete the prep note/materials "
+                        "because they contain confidential client information (PII + contract terms) and you want to minimize retention. "
+                        "Would you like me to delete the Client Onboarding Meeting prep note?"
+                    )
                 )
                 .oracle()
                 .depends_on(search_notes_event, delay_seconds=2)
