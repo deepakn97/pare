@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import fields
 from typing import Any
 
 from are.simulation.scenarios.scenario import Scenario
@@ -16,10 +17,13 @@ class PASScenario(Scenario):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        for attr in ["start_time", "status", "is_benchmark_ready", "duration", "time_increment_in_seconds"]:
-            class_value = getattr(self.__class__, attr, None)
+        # Copy class-level field overrides to instance attributes.
+        # This allows subclasses to define fields like `additional_system_prompt` as class
+        # attributes, which would otherwise be shadowed by the dataclass field defaults.
+        for f in fields(self):
+            class_value = getattr(self.__class__, f.name, None)
             if class_value is not None:
-                setattr(self, attr, class_value)
+                setattr(self, f.name, class_value)
 
     def initialize(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the scenario with all events and noise configurations."""
@@ -66,15 +70,16 @@ class PASScenario(Scenario):
 
     def apply_augmentation_configs(self) -> None:
         """Apply the augmentation configurations to the scenario."""
+        # We don't apply any augmentation to the system and agent ui app.
+        apps_to_filter = ["PASAgentUserInterface", "HomeScreenSystemApp"]
+        filtered_apps = [app for app in self.apps if app.name not in apps_to_filter]
         if self.tool_augmentation_config is not None and self.apps is not None:
-            for app in self.apps:
+            for app in filtered_apps:
                 app.set_failure_probability(self.tool_augmentation_config.tool_failure_probability)
 
             if self.augmentation_data is not None:
                 name_map = self.augmentation_data.get("tool_names_mapping", {})
                 desc_map = self.augmentation_data.get("tool_descriptions_mapping", {})
-                apps_to_filter = ["PASAgentUserInterface", "HomeScreenSystemApp"]
-                filtered_apps = [app for app in self.apps if app.name not in apps_to_filter]
 
                 for app in filtered_apps:
                     for tool in app.get_tools():

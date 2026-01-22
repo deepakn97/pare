@@ -30,6 +30,9 @@ class StatefulMessagingApp(StatefulApp, MessagingAppV2):
         super().__init__(*args, **kwargs)
         self.current_user_id = uuid_hex(self.rng)
         self.current_user_name = "John Doe"
+        # Register current user in id/name mappings
+        self.id_to_name[self.current_user_id] = self.current_user_name
+        self.name_to_id[self.current_user_name] = self.current_user_id
         # Set initial state to conversation list
         self.load_root_state()
 
