@@ -13,6 +13,7 @@ from pas.apps import (
     StatefulCalendarApp,
     StatefulEmailApp,
 )
+from pas.apps.reminder import StatefulReminderApp
 from pas.scenarios import PASScenario
 from pas.scenarios.utils.registry import register_scenario
 
@@ -35,6 +36,7 @@ class TravelConflictRecurringMeeting(PASScenario):
         self.system_app = HomeScreenSystemApp(name="System")
         self.email = StatefulEmailApp(name="Emails")
         self.calendar = StatefulCalendarApp(name="Calendar")
+        self.reminder = StatefulReminderApp(name="Reminders")
 
         # Populate baseline calendar with recurring weekly meeting instances
         # Weekly team sync meeting: Every Thursday 1:30 PM - 2:30 PM
@@ -81,6 +83,17 @@ class TravelConflictRecurringMeeting(PASScenario):
             tag="recurring",
         )
 
+        # Seed a user-created reminder that will automatically notify the user+agent when due (time-driven).
+        # This replaces the unrealistic "airline tells you to check your calendar" line in the flight email.
+        self.reminder.add_reminder(
+            title="Travel prep: check Nov 20 calendar conflicts (airport)",
+            due_datetime="2025-11-18 09:01:00",
+            description=(
+                "Reminder: Please check your calendar for any meetings on Nov 20 that conflict with leaving for the "
+                "airport, and reschedule as needed."
+            ),
+        )
+
         # Populate contacts with meeting attendees
         # Team member contacts for the weekly meeting
         # Sarah Johnson - team lead
@@ -111,7 +124,7 @@ class TravelConflictRecurringMeeting(PASScenario):
         )
 
         # Register all apps
-        self.apps = [self.agent_ui, self.system_app, self.email, self.calendar]
+        self.apps = [self.agent_ui, self.system_app, self.email, self.calendar, self.reminder]
 
     def build_events_flow(self) -> None:
         """Build event flow - environment events with agent detection and agent actions."""
@@ -120,6 +133,7 @@ class TravelConflictRecurringMeeting(PASScenario):
         system_app = self.get_typed_app(HomeScreenSystemApp, "System")
         email_app = self.get_typed_app(StatefulEmailApp, "Emails")
         calendar_app = self.get_typed_app(StatefulCalendarApp, "Calendar")
+        reminder_app = self.get_typed_app(StatefulReminderApp, "Reminders")
 
         with EventRegisterer.capture_mode():
             # Environment Event 1: Flight confirmation email arrives
@@ -135,25 +149,32 @@ class TravelConflictRecurringMeeting(PASScenario):
                     "Departure: 2:00 PM from San Francisco Airport (SFO)\n"
                     "Arrival: 10:30 PM at Boston Logan (BOS)\n\n"
                     "Please arrive at the airport at least 90 minutes before departure (12:30 PM).\n"
-                    "Reminder: Please check your calendar for any meetings on Nov 20 that conflict with leaving for the "
-                    "airport, and reschedule as needed.\n\n"
                     "Booking Reference: XYZ789"
                 ),
             ).delayed(30)
 
-            # Oracle Event 2: Agent checks calendar for conflicts on Nov 20
-            # Evidence: Flight email explicitly says "check your calendar for any meetings on Nov 20 that conflict"
-            # with leaving for the airport, so the agent inspects that day's schedule.
+            # NOTE: Reminder notifications are time-driven in the Reminders app.
+            # The reminder seeded in init (`due_datetime="2025-11-18 09:01:00"`) will automatically notify user+agent.
+            # We model reaction time by delaying the first oracle action until after the reminder would have fired.
+
+            # Oracle Event 2: Agent reads the flight confirmation details (after the reminder notification)
+            read_flight_email_event = (
+                email_app.get_email_by_id(email_id="flight-confirmation-email", folder_name="INBOX")
+                .oracle()
+                .delayed(70)
+            )
+
+            # Oracle Event 3: Agent checks calendar for conflicts on Nov 20 (motivated by the reminder + flight timing)
             check_calendar_event = (
                 calendar_app.get_calendar_events_from_to(
                     start_datetime="2025-11-20 00:00:00",
                     end_datetime="2025-11-20 23:59:59",
                 )
                 .oracle()
-                .depends_on(flight_email_event, delay_seconds=3)
+                .depends_on(read_flight_email_event, delay_seconds=2)
             )
 
-            # Oracle Event 3: Agent proposes rescheduling the conflicting meeting instance
+            # Oracle Event 4: Agent proposes rescheduling the conflicting meeting instance
             # Agent identifies conflict: meeting 1:30-2:30 PM overlaps with required airport departure time
             proposal_event = (
                 aui.send_message_to_user(
@@ -163,12 +184,12 @@ class TravelConflictRecurringMeeting(PASScenario):
                 .depends_on(check_calendar_event, delay_seconds=2)
             )
 
-            # Oracle Event 4: User accepts the proposal
+            # Oracle Event 5: User accepts the proposal
             acceptance_event = (
                 aui.accept_proposal(content="Yes, please do that.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
-            # Oracle Event 5: Agent checks if 10 AM slot is available on Nov 20
+            # Oracle Event 6: Agent checks if 10 AM slot is available on Nov 20
             check_alternate_slot_event = (
                 calendar_app.get_calendar_events_from_to(
                     start_datetime="2025-11-20 10:00:00",
@@ -178,7 +199,7 @@ class TravelConflictRecurringMeeting(PASScenario):
                 .depends_on(acceptance_event, delay_seconds=1)
             )
 
-            # Oracle Event 6: Agent edits the specific Nov 20 meeting instance (not the series)
+            # Oracle Event 7: Agent edits the specific Nov 20 meeting instance (not the series)
             edit_meeting_event = (
                 calendar_app.edit_calendar_event(
                     event_id=self.conflicting_meeting_id,
@@ -189,7 +210,7 @@ class TravelConflictRecurringMeeting(PASScenario):
                 .depends_on(check_alternate_slot_event, delay_seconds=1)
             )
 
-            # Oracle Event 7: Agent sends email to all attendees about the reschedule
+            # Oracle Event 8: Agent sends email to all attendees about the reschedule
             notify_attendees_event = (
                 email_app.send_email(
                     recipients=[
@@ -204,7 +225,7 @@ class TravelConflictRecurringMeeting(PASScenario):
                 .depends_on(edit_meeting_event, delay_seconds=2)
             )
 
-            # Oracle Event 8: Agent verifies the future instance (Nov 27) remains unchanged
+            # Oracle Event 9: Agent verifies the future instance (Nov 27) remains unchanged
             verify_future_instance_event = (
                 calendar_app.get_calendar_events_from_to(
                     start_datetime="2025-11-27 13:30:00",
@@ -217,6 +238,7 @@ class TravelConflictRecurringMeeting(PASScenario):
         # Register ALL events
         self.events = [
             flight_email_event,
+            read_flight_email_event,
             check_calendar_event,
             proposal_event,
             acceptance_event,
