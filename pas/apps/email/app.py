@@ -214,8 +214,9 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
         sender: str,
         subject: str = "",
         content: str = "",
+        attachment_paths: list[str] | None = None,
     ) -> str:
-        """Create an incoming email with a specified ID and add it to user's INBOX.
+        """Create an incoming email with a specified ID (optionally with attachments) and add it to user's INBOX.
 
         This is a PAS-specific environment tool that allows scenarios to reference
         the email_id in subsequent events (e.g., for replying to the email).
@@ -225,10 +226,17 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
             sender: The sender of the email.
             subject: The subject of the email.
             content: The content of the email.
+            attachment_paths: Optional list of attachment paths to add to the email.
+                NOTE: Attachments are read from `self.internal_fs` (SandboxLocalFileSystem / VirtualFileSystem)
+                and stored as base64 bytes on the email. This is safe to use in scenario event flows (post-init),
+                but DO NOT add such emails during PASScenario init state serialization.
 
         Returns:
             The email_id that was provided.
         """
+        if attachment_paths is None:
+            attachment_paths = []
+
         email = Email(
             email_id=email_id,
             sender=sender,
@@ -238,6 +246,9 @@ class StatefulEmailApp(StatefulApp, EmailClientV2):
             timestamp=self.time_manager.time(),
             is_read=False,
         )
+        for path in attachment_paths:
+            self.add_attachment(email=email, attachment_path=path)
+
         self.folders[EmailFolderName.INBOX].add_email(email)
         return email_id
 
