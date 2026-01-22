@@ -139,7 +139,13 @@ class ApartmentViewingScheduleConflict(PASScenario):
                 email_id="email-riverside-viewing",
                 sender="manager@riverside-lofts.com",
                 subject="Viewing Appointment Confirmation - Riverside Lofts Unit 3B",
-                content="Thank you for your interest in Riverside Lofts Unit 3B! Your viewing appointment is confirmed for Thursday, November 20th at 10:00 AM. Please meet us at the lobby at 123 River Street. Looking forward to showing you the apartment!",
+                content=(
+                    "Thank you for your interest in Riverside Lofts Unit 3B! Your viewing appointment is confirmed for "
+                    "Thursday, November 20th at 10:00 AM. Please meet us at the lobby at 123 River Street.\n\n"
+                    "If you have any scheduling conflicts, please reply to this email as soon as possible so we can offer "
+                    "an alternative time.\n\n"
+                    "Looking forward to showing you the apartment!"
+                ),
             ).delayed(5)
 
             # Environment Event 2: Property manager for Downtown Studio sends viewing confirmation for Friday 2:30 PM
@@ -147,7 +153,12 @@ class ApartmentViewingScheduleConflict(PASScenario):
                 email_id="email-downtown-viewing",
                 sender="leasing@downtown-realty.com",
                 subject="Apartment Viewing Scheduled - Downtown Studio 205",
-                content="Hi! This confirms your viewing appointment for Downtown Studio 205 on Friday, November 21st at 2:30 PM. The address is 456 Main Avenue, City Center. We'll give you a complete tour of the unit and amenities. See you then!",
+                content=(
+                    "Hi! This confirms your viewing appointment for Downtown Studio 205 on Friday, November 21st at 2:30 PM. "
+                    "The address is 456 Main Avenue, City Center.\n\n"
+                    "If you need to reschedule due to a conflict, please reply to this email and we'll coordinate a new time.\n\n"
+                    "We'll give you a complete tour of the unit and amenities. See you then!"
+                ),
             ).delayed(10)
 
             # Oracle Event 1: Agent reads first viewing confirmation email (motivated by email1_event notification)
@@ -290,7 +301,11 @@ class ApartmentViewingScheduleConflict(PASScenario):
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulCalendarApp"
                 and e.action.function_name in ["get_calendar_events_from_to", "list_calendar_events", "search_events"]
-                and "2025-11-20" in str(e.action.args.get("start_datetime", ""))
+                and "2025-11-20"
+                in str(
+                    e.action.args.get("start_datetime", "")
+                    or "2025-11-20" in str(e.action.args.get("end_datetime", ""))
+                )
                 for e in agent_entries
             )
 
@@ -300,7 +315,10 @@ class ApartmentViewingScheduleConflict(PASScenario):
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulCalendarApp"
                 and e.action.function_name in ["get_calendar_events_from_to", "list_calendar_events", "search_events"]
-                and ("2025-11-21" in str(e.action.args.get("start_datetime", "")))
+                and (
+                    "2025-11-21" in str(e.action.args.get("start_datetime", ""))
+                    or "2025-11-21" in str(e.action.args.get("end_datetime", ""))
+                )
                 for e in agent_entries
             )
 

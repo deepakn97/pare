@@ -20,7 +20,18 @@ from pas.scenarios.utils.registry import register_scenario
 
 @register_scenario("apartment_comparison_decision_aid")
 class ApartmentComparisonDecisionAid(PASScenario):
-    """Agent synthesizes apartment comparison data to support user's final rental decision. The user has saved three apartments to their favorites (Oakwood Terrace, Riverside Lofts, and Sunset Meadows) and created individual tour notes in the "Personal" folder documenting each visit with details about pricing, amenities, neighborhood feel, and pet policy. After touring all three, the user receives a message notification from their property manager stating they must vacate their current unit by the end of next month, creating urgency for a decision. The property manager's message explicitly suggests reviewing the user's tour notes to decide quickly. The agent must: 1. Detect the move-out deadline notification, 2. Search the user's saved apartments to retrieve all favorited options, 3. Search notes to locate tour documentation, 4. Extract and compare key decision factors (price, pet-friendliness for their dog, commute-relevant location data, lease terms) across all three apartments, 5. Create a consolidated comparison note in the "Personal" folder presenting side-by-side analysis with a recommendation based on the user's documented priorities.
+    """Agent synthesizes apartment comparison data to support user's final rental decision.
+
+    The user has saved three apartments to their favorites (Oakwood Terrace, Riverside Lofts, and Sunset Meadows) and
+    created individual tour notes in the "Personal" folder documenting each visit with details about pricing, amenities,
+    neighborhood feel, and pet policy. After touring all three, the user receives a message from their property manager
+    with a hard move-out deadline (lease ends 12/31 due to renovations). Shortly after, the user's roommate/partner
+    messages suggesting they review saved apartments + tour notes and decide this week. The agent must:
+    1. Detect the move-out deadline notification
+    2. Search the user's saved apartments to retrieve all favorited options
+    3. Search notes to locate tour documentation
+    4. Extract and compare key decision factors (price, pet-friendliness for their dog, commute-relevant location data, lease terms)
+    5. Create a consolidated comparison note in the "Personal" folder with a recommendation based on the user's priorities.
 
     This scenario exercises deadline-triggered decision support, multi-item data aggregation (saved apartments → tour notes), structured information extraction and synthesis, comparative analysis across user-authored content, and proactive recommendation generation to resolve time-sensitive housing decisions..
     """
@@ -195,11 +206,14 @@ Overall Impression: Great price and peaceful setting, but the no-pets policy is 
         )
 
         # Populate Messaging App with baseline data
-        # Add property manager contact and create a conversation
-        self.messaging.add_users(["Property Manager"])
+        # Add property manager + roommate contacts and create a shared conversation (both can see PM message).
+        self.messaging.add_users(["Property Manager", "Roommate"])
         self.user_id = self.messaging.current_user_id
         self.property_manager_id = self.messaging.name_to_id["Property Manager"]
-        self.pm_conversation = ConversationV2(participant_ids=[self.user_id, self.property_manager_id])
+        self.roommate_id = self.messaging.name_to_id["Roommate"]
+        self.pm_conversation = ConversationV2(
+            participant_ids=[self.user_id, self.property_manager_id, self.roommate_id]
+        )
         self.messaging.add_conversation(self.pm_conversation)
 
         # Register all apps
@@ -224,29 +238,38 @@ Overall Impression: Great price and peaceful setting, but the no-pets policy is 
                     "Hi Alex — this is your property manager. I wanted to give you a heads-up that your lease ends on "
                     "December 31, 2025, and the building is scheduled for major renovations immediately after that date. "
                     "Because of the construction schedule, we'll need you to fully move out by 12/31.\n\n"
-                    "If you're deciding where to go next, it may help to review the apartments you've saved and any tour "
-                    "notes you've taken (price, pet policy, commute, etc.) and make a quick pros/cons comparison so you can "
-                    "choose in time.\n\n"
-                    "Let me know if you have questions about move-out logistics or timing. Thanks."
+                    "I'll send move-out instructions (walkthrough scheduling, key return, and cleaning checklist) closer to the date. "
+                    "If you have questions about timing or move-out logistics, let me know. Thanks."
                 ),
             ).delayed(10)
+
+            # Environment event: Roommate/partner nudges decision-making (more realistic than PM giving workflow advice).
+            roommate_nudge_message = messaging_app.create_and_add_message(
+                conversation_id=self.pm_conversation.conversation_id,
+                sender_id=self.roommate_id,
+                content=(
+                    "Oof — with the 12/31 move-out deadline, can we review the apartments you saved + your tour notes tonight "
+                    "and pick one this week? If it helps, can you create a new side-by-side comparison note (price, pet policy for Bella, commute) "
+                    "so we can decide faster?"
+                ),
+            ).depends_on(env_move_out_message, delay_seconds=5)
 
             # Agent detects the move-out deadline in the message and recognizes the urgency to make an apartment decision
             # Agent reads the conversation to understand the move-out timeline
             oracle_read_conversation = (
                 messaging_app.read_conversation(conversation_id=self.pm_conversation.conversation_id)
                 .oracle()
-                .depends_on(env_move_out_message, delay_seconds=3)
+                .depends_on(roommate_nudge_message, delay_seconds=2)
             )
 
             # Agent searches saved apartments to retrieve all favorited options
-            # Motivation: the property manager message explicitly references reviewing the user's saved/favorited apartments list.
+            # Motivation: roommate asked to review saved apartments and decide this week.
             oracle_list_saved = (
                 apartment_app.list_saved_apartments().oracle().depends_on(oracle_read_conversation, delay_seconds=2)
             )
 
             # Agent searches notes to locate tour documentation for saved apartments
-            # Motivation: the property manager message explicitly suggests reviewing the user's tour notes (Notes app) to decide quickly.
+            # Motivation: roommate explicitly referenced the tour notes as the basis for decision-making.
             oracle_search_notes = (
                 note_app.search_notes(query="Apartment").oracle().depends_on(oracle_list_saved, delay_seconds=2)
             )
@@ -254,10 +277,15 @@ Overall Impression: Great price and peaceful setting, but the no-pets policy is 
             # Agent sends proposal to create comparison analysis based on the move-out deadline message
             proposal = (
                 aui.send_message_to_user(
-                    content="I saw your property manager's message about needing to vacate by December 31st. They suggested reviewing your tour notes and making a side-by-side comparison to decide quickly. I also see you have 3 apartments saved with tour notes. Would you like me to create a comparison analysis to help you decide (pricing, pet policies for Bella, commute factors)?"
+                    content=(
+                        "I saw the message from your property manager that you need to be fully moved out by Dec 31 due to renovations. "
+                        "Your roommate also asked to review your saved apartments + tour notes and decide this week. "
+                        "I see you have 3 apartments saved with tour notes. Would you like me to create a side-by-side comparison "
+                        "(pricing, pet policies for Bella, commute factors) and a recommendation?"
+                    )
                 )
                 .oracle()
-                .depends_on([env_move_out_message, oracle_search_notes], delay_seconds=3)
+                .depends_on([roommate_nudge_message, oracle_search_notes], delay_seconds=2)
             )
 
             # User accepts the proposal
@@ -314,6 +342,7 @@ Next Steps:
         # Register ALL events here in self.events
         self.events = [
             env_move_out_message,
+            roommate_nudge_message,
             oracle_read_conversation,
             oracle_list_saved,
             oracle_search_notes,

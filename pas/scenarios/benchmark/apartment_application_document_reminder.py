@@ -70,7 +70,7 @@ All documents must be submitted by Friday, January 17th, 2026 at 5:00 PM to our 
 
 Please bring or email the documents to this address. If you have any questions, feel free to contact us.
 
-Tip: These documents can take time to collect (e.g., requesting updated employment verification or pulling bank statements), so we recommend setting a preparation reminder first and then help you prepare the documents for Wednesday morning, January 14th, 2026 to gather everything ahead of the Friday deadline.
+Tip: To avoid delays, please plan to have documents ready by Wednesday, Jan 14th, 2026 at 9:00 AM. Submitting early helps us process your application faster.
 
 Best regards,
 Summit Rentals Leasing Team""",

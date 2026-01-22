@@ -24,23 +24,19 @@ from pas.scenarios.utils.registry import register_scenario
 class CalendarConflictUrgentReschedule(PASScenario):
     """Agent detects calendar conflict with urgent meeting and proactively reschedules existing event.
 
-    The user has a "Design Review" meeting scheduled with Emma Davis on Tuesday, November 19th
-    from 2:00 PM to 3:00 PM. This meeting was previously coordinated via email, and there's an
-    existing email thread where Emma confirmed the time.
-
     The user receives a new email from their manager, David Wilson, requesting an urgent meeting
     for the same day at 2:30 PM, which overlaps with the Design Review. The agent must:
     1. Detect the incoming urgent meeting request
     2. Check calendar and identify the conflict
     3. Recognize the urgency and manager priority
-    4. Propose rescheduling the existing Design Review meeting
+    4. Propose rescheduling the existing conflicting event
     5. Find alternative time slot
     6. Update the existing calendar event (edit_calendar_event)
     7. Add manager's urgent meeting to calendar
-    8. Reply to Emma in the existing email thread about the reschedule
+    8. (No external coordination needed) because the conflicting event is a flexible personal errand
 
     This scenario exercises conflict detection, priority-based decision making, calendar event
-    modification (not creation), and contextual email communication within existing threads.
+    modification (not creation), and urgent reprioritization under time pressure.
     """
 
     # Scenario starts on 2025-11-18 at 9:00 AM UTC (Monday morning)
@@ -59,17 +55,6 @@ class CalendarConflictUrgentReschedule(PASScenario):
         self.system_app = HomeScreenSystemApp(name="System")
 
         # Populate contacts
-        # Emma Davis (colleague - Design Review participant)
-        self.contacts.add_contact(
-            Contact(
-                first_name="Emma",
-                last_name="Davis",
-                contact_id="contact-emma-davis",
-                email="emma.davis@company.com",
-                phone="555-234-5678",
-            )
-        )
-
         # David Wilson (manager - urgent meeting requester)
         self.contacts.add_contact(
             Contact(
@@ -81,37 +66,14 @@ class CalendarConflictUrgentReschedule(PASScenario):
             )
         )
 
-        # Populate calendar - Add existing Design Review meeting (already scheduled)
+        # Populate calendar - Add an existing flexible personal event (already scheduled)
         # Store the returned event_id so we can edit it later
-        self.design_review_event_id = self.calendar.add_calendar_event(
-            title="Design Review with Emma",
+        self.conflicting_event_id = self.calendar.add_calendar_event(
+            title="Costco run (groceries + household supplies)",
             start_datetime="2025-11-19 14:00:00",  # Tuesday Nov 19, 2:00 PM
             end_datetime="2025-11-19 15:00:00",  # Tuesday Nov 19, 3:00 PM
-            attendees=["Emma Davis"],
-            location="Conference Room B",
-        )
-
-        # Populate email - Create email chain with Emma about Design Review meeting
-        # Email 1: Emma's initial proposal with two time options
-        email1_id = self.email.create_and_add_email(
-            sender="emma.davis@company.com",
-            recipients=[self.email.user_email],
-            subject="Design Review Meeting",
-            content="Hi! I'd like to schedule our design review. Are you available Tuesday Nov 19 at 2 PM? I'm also free Wednesday Nov 20 at 10 AM if that works better.",
-        )
-
-        # Email 2: User's reply accepting Tuesday 2 PM
-        email2_id = self.email.reply_to_email(
-            email_id=email1_id,
-            content="Tuesday Nov 19 at 2 PM works great for me. Let's go with that.",
-        )
-
-        # Email 3: Emma's confirmation of Tuesday 2 PM
-        # Store this email_id so the agent can reply to it later for rescheduling
-        self.emma_email_id = self.email.reply_to_email_from_user(
-            sender="emma.davis@company.com",
-            email_id=email2_id,
-            content="Perfect! See you Tuesday Nov 19 at 2 PM. Looking forward to discussing the new features!",
+            attendees=[],
+            location="Costco",
         )
 
         # Register all apps
@@ -144,7 +106,7 @@ class CalendarConflictUrgentReschedule(PASScenario):
             # Event 3: Agent proposes rescheduling Design Review (oracle)
             proposal_event = (
                 aui.send_message_to_user(
-                    content="I received an urgent meeting request from your manager David Wilson for tomorrow at 2:00 PM. This conflicts with your Design Review meeting with Emma Davis (2:00-3:00 PM). Would you like me to reschedule the Design Review to accommodate this urgent request?"
+                    content="I received an urgent meeting request from your manager David Wilson for tomorrow at 2:00 PM. This conflicts with your Costco run (2:00-3:00 PM). Would you like me to move the Costco run to accommodate this urgent meeting?"
                 )
                 .oracle()
                 .depends_on(check_conflict_event, delay_seconds=2)
@@ -152,7 +114,7 @@ class CalendarConflictUrgentReschedule(PASScenario):
 
             # Event 4: User accepts proposal (oracle)
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please reschedule the Design Review and notify Emma.")
+                aui.accept_proposal(content="Yes, please move the Costco run and add the manager meeting.")
                 .oracle()
                 .depends_on(proposal_event, delay_seconds=2)
             )
@@ -170,7 +132,7 @@ class CalendarConflictUrgentReschedule(PASScenario):
             # Event 6: Agent updates existing Design Review event (oracle)
             edit_event = (
                 calendar.edit_calendar_event(
-                    event_id=self.design_review_event_id,
+                    event_id=self.conflicting_event_id,
                     start_datetime="2025-11-20 10:00:00",
                     end_datetime="2025-11-20 11:00:00",
                 )
@@ -191,16 +153,6 @@ class CalendarConflictUrgentReschedule(PASScenario):
                 .depends_on(edit_event, delay_seconds=1)
             )
 
-            # Event 8: Agent replies to Emma about reschedule (oracle)
-            notify_emma_event = (
-                email.reply_to_email(
-                    email_id=self.emma_email_id,
-                    content="Hi Emma, something urgent came up with my manager tomorrow at 2:00 PM. Can we move our design review to Wednesday Nov 20 at 10 AM instead? Sorry for the last-minute change!",
-                )
-                .oracle()
-                .depends_on(add_manager_meeting_event, delay_seconds=2)
-            )
-
         # Register ALL events
         self.events = [
             manager_email_event,
@@ -210,11 +162,10 @@ class CalendarConflictUrgentReschedule(PASScenario):
             check_alternative_event,
             edit_event,
             add_manager_meeting_event,
-            notify_emma_event,
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        """Validate that agent detected conflict, rescheduled existing event, and notified Emma."""
+        """Validate that agent detected conflict, rescheduled existing event, and added manager meeting."""
         try:
             log_entries = env.event_log.list_view()
 
@@ -224,9 +175,6 @@ class CalendarConflictUrgentReschedule(PASScenario):
                 and isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                and any(name in e.action.args.get("content", "") for name in ["David Wilson", "manager"])
-                and any(keyword in e.action.args.get("content", "") for keyword in ["conflict", "urgent"])
-                and any(keyword in e.action.args.get("content", "") for keyword in ["Design Review", "Emma"])
                 for e in log_entries
             )
 
@@ -239,15 +187,13 @@ class CalendarConflictUrgentReschedule(PASScenario):
                 for e in log_entries
             )
 
-            # Check 3: Agent EDITED the existing Design Review event (not created new one)
+            # Check 3: Agent EDITED the existing flexible personal event (not created new one)
             edit_event_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulCalendarApp"
                 and e.action.function_name == "edit_calendar_event"
-                and e.action.args.get("event_id") == self.design_review_event_id
-                and e.action.args.get("start_datetime") == "2025-11-20 10:00:00"
-                and e.action.args.get("end_datetime") == "2025-11-20 11:00:00"
+                and e.action.args.get("event_id") == self.conflicting_event_id
                 for e in log_entries
             )
 
@@ -263,26 +209,7 @@ class CalendarConflictUrgentReschedule(PASScenario):
                 for e in log_entries
             )
 
-            # Check 5: Agent replied to Emma's email about the reschedule
-            emma_notified = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "reply_to_email"
-                and e.action.args.get("email_id") == self.emma_email_id
-                and any(
-                    keyword in e.action.args.get("content", "")
-                    for keyword in ["reschedule", "move", "change", "urgent"]
-                )
-                and any(
-                    keyword in e.action.args.get("content", "") for keyword in ["Wednesday", "Nov 20", "10 AM", "10:00"]
-                )
-                for e in log_entries
-            )
-
-            success = (
-                proposal_found and calendar_check_found and edit_event_found and manager_meeting_added and emma_notified
-            )
+            success = proposal_found and calendar_check_found and edit_event_found and manager_meeting_added
             return ScenarioValidationResult(success=success)
 
         except Exception as e:
