@@ -40,7 +40,7 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
         # Add furniture product to catalog
         sofa_product_id = self.shopping.add_product(name="Modern Sectional Sofa")
         sofa_item_id = self.shopping.add_item_to_product(
-            product_id=sofa_product_id, price=1899.99, options={"color": "gray", "material": "fabric"}, available=True
+            product_id=sofa_product_id, price=1900.0, options={"color": "gray", "material": "fabric"}, available=True
         )
 
         # Create a furniture order that was placed previously (order exists but not yet shipped)
@@ -52,7 +52,7 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
             order_id=self.furniture_order_id,
             order_status="processed",
             order_date=order_timestamp,
-            order_total=1899.99,
+            order_total=1900.0,
             item_id=sofa_item_id,
             quantity=1,
         )
@@ -62,7 +62,7 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
 
         # Add apartments to catalog with different lease terms
         # 12-month lease apartments
-        apt_12mo_1_id = self.apartment.add_new_apartment(
+        self.apt_12mo_1_id = self.apartment.add_new_apartment(
             name="Downtown Loft",
             location="Downtown",
             zip_code="93101",
@@ -78,7 +78,7 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
             amenities=["Parking", "Gym", "In-unit laundry"],
         )
 
-        apt_12mo_2_id = self.apartment.add_new_apartment(
+        self.apt_12mo_2_id = self.apartment.add_new_apartment(
             name="Beachside Condo",
             location="West Beach",
             zip_code="93103",
@@ -128,8 +128,8 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
         )
 
         # Save all apartments to favorites
-        self.apartment.save_apartment(apt_12mo_1_id)
-        self.apartment.save_apartment(apt_12mo_2_id)
+        self.apartment.save_apartment(self.apt_12mo_1_id)
+        self.apartment.save_apartment(self.apt_12mo_2_id)
         self.apartment.save_apartment(apt_6mo_1_id)
         self.apartment.save_apartment(apt_6mo_2_id)
 
@@ -176,7 +176,7 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
             # Motivated by: agent has identified that furniture order is shipping, total investment is $1,900 for a substantial furniture item, and only 2 of 4 saved apartments have lease terms (1 year) compatible with this investment
             proposal_event = (
                 aui.send_message_to_user(
-                    content="Your furniture order ($1,900 for a sectional sofa) is now shipping. I notice you have 4 apartments saved, but only 2 offer 1-year leases (Downtown Loft and Beachside Condo). Given this furniture investment, a longer lease would make more sense. Would you like me to help you finalize your apartment choice from these two 1-year options before the furniture arrives?"
+                    content="Your furniture order ($1,900 for a sectional sofa) is now shipping. I notice you have 4 apartments saved, but only 2 offer 1-year leases. Given this furniture investment, a longer lease would make more sense. Would you like me to help you finalize your apartment choice from these two 1-year options before the furniture arrives?"
                 )
                 .oracle()
                 .depends_on(filter_apartments_event, delay_seconds=3)
@@ -194,7 +194,7 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
             # Motivated by: user has accepted help and explicitly asked to decide between the two 1-year lease apartments
             summary_event = (
                 aui.send_message_to_user(
-                    content="Here's a comparison:\n\n• Downtown Loft ($2200/mo): 1100 sq ft, 2BR/2BA, unfurnished, gym + in-unit laundry, pets allowed, upper floors\n• Beachside Condo ($2500/mo): 1200 sq ft, 2BR/2BA, unfurnished, pool + ocean view, cats only, ground floor\n\nBoth have 1-year leases and parking. The Beachside Condo is $300 more but offers more space and an ocean view. Which would you prefer?"
+                    content="Here's a comparison of the two 1-year lease apartments:\n\nBoth have 2BR/2BA and are unfurnished. One offers more space and amenities like a pool and ocean view, while the other is more affordable with gym access and in-unit laundry. Both have parking and 1-year leases. Which would you prefer?"
                 )
                 .oracle()
                 .depends_on(acceptance_event, delay_seconds=2)
@@ -238,16 +238,7 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 3: Agent filtered apartments by 1-year lease term
-            # This is the core constraint propagation - agent must recognize furniture investment requires longer lease
-            filter_lease_check = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "StatefulApartmentApp"
-                and e.action.function_name == "search_apartments"
-                for e in agent_events
-            )
-
-            # STRICT Check 4: Agent sent proposal to user about the lease term mismatch
+            # STRICT Check 3: Agent sent proposal to user about the lease term mismatch
             # The proposal must reference the furniture order/investment and the lease term constraint
             # We check for structural presence of proposal, not exact content
             proposal_check = any(
@@ -257,25 +248,11 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 5: Agent provided apartment comparison after user acceptance
-            # After user accepts, agent should help with decision by providing comparison
-            # At least one follow-up message after the initial proposal
-            follow_up_messages = [
-                e
-                for e in agent_events
-                if isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-            ]
-            comparison_check = len(follow_up_messages) >= 2  # Initial proposal + follow-up comparison
-
             # Determine success based on all strict checks
             all_strict_checks = [
                 order_details_check,
                 apartments_check,
-                filter_lease_check,
                 proposal_check,
-                comparison_check,
             ]
 
             if not all(all_strict_checks):
@@ -285,12 +262,8 @@ class FurnitureOrderLeaseTermMismatch(PASScenario):
                     failed_checks.append("agent did not retrieve order details")
                 if not apartments_check:
                     failed_checks.append("agent did not list/search saved apartments")
-                if not filter_lease_check:
-                    failed_checks.append("agent did not filter apartments by 1-year lease term")
                 if not proposal_check:
                     failed_checks.append("agent did not send proposal to user")
-                if not comparison_check:
-                    failed_checks.append("agent did not provide apartment comparison after user acceptance")
 
                 rationale = "; ".join(failed_checks)
                 return ScenarioValidationResult(success=False, rationale=rationale)

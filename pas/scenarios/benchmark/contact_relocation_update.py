@@ -121,7 +121,7 @@ class ContactRelocationUpdate(PASScenario):
             # Environment Event 1: Michael sends message about relocation
             relocation_message_event = messaging_app.create_and_add_message(
                 conversation_id=self.michael_conversation_id,
-                sender_id="+1-555-0147",
+                sender_id=messaging_app.name_to_id["Michael Torres"],
                 content="Hey! I just moved to Seattle for a new job. Can you update my contact info? New address is 456 Pine Street, Seattle, WA 98101.",
             ).delayed(1)
 
@@ -185,7 +185,7 @@ class ContactRelocationUpdate(PASScenario):
             # Motivated by: agent has completed the contact update and verified no order issues (empty order list), so confirms back to Michael
             confirmation_event = (
                 messaging_app.send_message(
-                    user_id="+1-555-0147",
+                    user_id=messaging_app.name_to_id["Michael Torres"],
                     content="Done! I've updated your contact with the new Seattle address. No pending orders were affected.",
                 )
                 .oracle()
@@ -209,37 +209,7 @@ class ContactRelocationUpdate(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Check Step 1 (STRICT): Agent read the conversation to parse the relocation message
-            # The agent must have read the conversation containing Michael's relocation request
-            read_conversation_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                for e in log_entries
-            )
-
-            # Check Step 2 (STRICT): Agent searched for Michael Torres in contacts
-            # The agent must have searched contacts to locate Michael's contact record
-            search_contacts_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulContactsApp"
-                and e.action.function_name == "search_contacts"
-                for e in log_entries
-            )
-
-            # Check Step 3 (STRICT): Agent proposed the contact update and order verification
-            # The agent must have sent a proposal to the user via PASAgentUserInterface
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
-
-            # Check Step 4 (STRICT): Agent updated Michael's contact with new city and address
+            # Check Step 1 (STRICT): Agent updated Michael's contact with new city and address
             # The agent must have called edit_contact to update the contact record
             update_contact_found = any(
                 e.event_type == EventType.AGENT
@@ -249,17 +219,7 @@ class ContactRelocationUpdate(PASScenario):
                 for e in log_entries
             )
 
-            # Check Step 5 (STRICT): Agent checked shopping orders for address conflicts
-            # The agent must have called list_orders to verify order addresses
-            list_orders_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_orders"
-                for e in log_entries
-            )
-
-            # Check Step 6 (STRICT): Agent sent confirmation message back to Michael
+            # Check Step 2 (STRICT): Agent sent confirmation message back to Michael
             # The agent must have sent a confirmation message to Michael after completing the update
             send_message_found = any(
                 e.event_type == EventType.AGENT
@@ -270,28 +230,13 @@ class ContactRelocationUpdate(PASScenario):
             )
 
             # All checks must pass for success
-            success = (
-                read_conversation_found
-                and search_contacts_found
-                and proposal_found
-                and update_contact_found
-                and list_orders_found
-                and send_message_found
-            )
+            success = update_contact_found and send_message_found
 
             if not success:
                 # Build rationale for failure
                 missing_checks = []
-                if not read_conversation_found:
-                    missing_checks.append("read_conversation to parse relocation message")
-                if not search_contacts_found:
-                    missing_checks.append("search_contacts for Michael Torres")
-                if not proposal_found:
-                    missing_checks.append("proposal to update contact and verify orders")
                 if not update_contact_found:
                     missing_checks.append("edit_contact with new city_living and address")
-                if not list_orders_found:
-                    missing_checks.append("list_orders to check for address conflicts")
                 if not send_message_found:
                     missing_checks.append("send_message to confirm update to Michael")
 

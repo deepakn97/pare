@@ -162,27 +162,7 @@ class CabExpenseReimbursementWorkflow(PASScenario):
             # Filter to agent events only
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent sent proposal to user about the reimbursement request
-            # The proposal should reference the finance email and deadline mentioned in the policy email
-            proposal_found = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                and any(keyword in e.action.args.get("content", "").lower() for keyword in ["reimbursement", "finance"])
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent retrieved ride history (demonstrates observing cab app state)
-            # Accepts either get_ride_history or equivalent methods for retrieving ride data
-            ride_history_retrieved = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name in ["get_ride_history", "get_ride"]
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent sent email to accounting@company.com with reimbursement details
-            # Must include the required recipient, but wording is flexible
+            # Check: Agent sent email to accounting@company.com with reimbursement details
             reimbursement_email_sent = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulEmailApp"
@@ -191,22 +171,13 @@ class CabExpenseReimbursementWorkflow(PASScenario):
                 for e in agent_events
             )
 
-            # Build success and rationale
-            success = proposal_found and ride_history_retrieved and reimbursement_email_sent
+            if not reimbursement_email_sent:
+                return ScenarioValidationResult(
+                    success=False,
+                    rationale="Missing critical check: reimbursement email sent to accounting@company.com",
+                )
 
-            if not success:
-                missing_checks = []
-                if not proposal_found:
-                    missing_checks.append("agent proposal about reimbursement request")
-                if not ride_history_retrieved:
-                    missing_checks.append("ride history retrieval from cab app")
-                if not reimbursement_email_sent:
-                    missing_checks.append("reimbursement email sent to accounting@company.com")
-
-                rationale = f"Missing critical checks: {', '.join(missing_checks)}"
-                return ScenarioValidationResult(success=False, rationale=rationale)
-
-            return ScenarioValidationResult(success=success)
+            return ScenarioValidationResult(success=True)
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)

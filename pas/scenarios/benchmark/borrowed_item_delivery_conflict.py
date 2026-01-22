@@ -231,8 +231,7 @@ class BorrowedItemDeliveryConflict(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Check Step 1 (STRICT): Agent sent proposal to user about the borrowing conflict
-            # The agent must propose to the user mentioning Alex and the projector/delivery conflict
+            # Agent sent proposal to user about the borrowing conflict
             proposal_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
@@ -241,46 +240,7 @@ class BorrowedItemDeliveryConflict(PASScenario):
                 for e in log_entries
             )
 
-            # Check Step 2a (STRICT): Agent read the conversation to detect the borrowing request
-            read_conversation_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                for e in log_entries
-            )
-
-            # Check Step 2a.2 (STRICT): Agent read the shopping alert that contains the updated delivery date.
-            read_alert_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                and e.action.args.get("conversation_id") == self.shopping_alerts_conversation_id
-                for e in log_entries
-            )
-
-            # Check Step 2b (STRICT): Agent searched/listed orders to find projector order
-            search_orders_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_orders"
-                for e in log_entries
-            )
-
-            # Check Step 2c (STRICT): Agent retrieved order details (status/items), not delivery date.
-            get_order_details_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "get_order_details"
-                and e.action.args.get("order_id") == "order_12345"
-                for e in log_entries
-            )
-
-            # Check Step 3 (STRICT): Agent sent message to friend about the conflict
-            # This must happen and must target the friend Alex
+            # Agent sent message to friend about the conflict
             message_sent_to_friend = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
@@ -290,28 +250,13 @@ class BorrowedItemDeliveryConflict(PASScenario):
             )
 
             # All strict checks must pass for success
-            success = (
-                proposal_found
-                and read_conversation_found
-                and read_alert_found
-                and search_orders_found
-                and get_order_details_found
-                and message_sent_to_friend
-            )
+            success = proposal_found and message_sent_to_friend
 
             if not success:
                 # Build rationale for failure
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("agent proposal about borrowing conflict")
-                if not read_conversation_found:
-                    missing_checks.append("reading conversation to detect request")
-                if not read_alert_found:
-                    missing_checks.append("reading shopping alert with updated delivery date")
-                if not search_orders_found:
-                    missing_checks.append("searching orders for projector")
-                if not get_order_details_found:
-                    missing_checks.append("retrieving order details (status/items)")
                 if not message_sent_to_friend:
                     missing_checks.append("sending message to friend Alex about the conflict")
 

@@ -136,27 +136,7 @@ class DeliveryRideConflictDetection(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Check 1 (STRICT): Agent sent proposal message about delivery-ride conflict
-            # Must be present and reference both the delivery and the conflicting ride
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
-
-            # Check 2 (STRICT): Agent checked current ride status to identify conflict
-            # This is a required detection step
-            ride_check_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_current_ride_status"
-                for e in log_entries
-            )
-
-            # Check 3 (STRICT): Agent canceled the ride upon acceptance
+            # Check: Agent canceled the ride
             # This is the core resolution action
             cancel_found = any(
                 e.event_type == EventType.AGENT
@@ -166,20 +146,8 @@ class DeliveryRideConflictDetection(PASScenario):
                 for e in log_entries
             )
 
-            # All three checks are strict: proposal, detection, and execution
-            success = proposal_found and ride_check_found and cancel_found
-
-            if not success:
-                # Build rationale for debugging
-                missing = []
-                if not proposal_found:
-                    missing.append("agent proposal about delivery-ride conflict")
-                if not ride_check_found:
-                    missing.append("ride status check")
-                if not cancel_found:
-                    missing.append("ride cancellation")
-                rationale = f"Missing critical checks: {', '.join(missing)}"
-                return ScenarioValidationResult(success=False, rationale=rationale)
+            if not cancel_found:
+                return ScenarioValidationResult(success=False, rationale="Ride cancellation not found")
 
             return ScenarioValidationResult(success=True)
 

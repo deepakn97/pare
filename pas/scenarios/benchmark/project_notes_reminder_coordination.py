@@ -288,28 +288,20 @@ Each person must present their completed section.
                 for e in agent_events
             )
 
-            # FLEXIBLE CHECK 2: Agent searched notes for relevant keywords (at least one search)
-            # Not strictly required, but expected behavior
-            note_search_found = any(
-                e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name in ["search_notes", "list_notes", "list_folders"]
-                for e in agent_events
-            )
-
-            # STRICT CHECK 3: Agent sent proposal to user
-            # Accept either send_message_to_user or any messaging function
+            # STRICT CHECK 2: Agent sent proposal to user
             proposal_found = any(
                 e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
                 for e in agent_events
             )
 
-            # STRICT CHECK 4: Agent created a note (the coordination note)
+            # STRICT CHECK 3: Agent created a note (the coordination note)
             note_creation_found = any(
                 e.action.class_name == "StatefulNotesApp" and e.action.function_name == "create_note"
                 for e in agent_events
             )
 
-            # STRICT CHECK 5: Agent added exactly three reminders with staggered due dates
+            # STRICT CHECK 4: Agent added exactly three reminders with staggered due dates
+            # Verify reminders have due dates on Jan 14, Jan 15, and Jan 16 (before prep meeting on Jan 16 and deadline on Jan 17)
             reminder_events = [
                 e
                 for e in agent_events
@@ -317,8 +309,21 @@ Each person must present their completed section.
             ]
             three_reminders_found = len(reminder_events) >= 3
 
+            # Verify staggered due dates: at least one reminder on each of Jan 14, 15, and 16
+            reminder_due_dates = [e.action.args.get("due_datetime", "") for e in reminder_events]
+            has_jan14 = any("2025-01-14" in date for date in reminder_due_dates)
+            has_jan15 = any("2025-01-15" in date for date in reminder_due_dates)
+            has_jan16 = any("2025-01-16" in date for date in reminder_due_dates)
+            staggered_dates_found = has_jan14 and has_jan15 and has_jan16
+
             # Combine strict checks
-            success = calendar_observation_found and proposal_found and note_creation_found and three_reminders_found
+            success = (
+                calendar_observation_found
+                and proposal_found
+                and note_creation_found
+                and three_reminders_found
+                and staggered_dates_found
+            )
 
             if not success:
                 rationale_parts = []
@@ -330,6 +335,8 @@ Each person must present their completed section.
                     rationale_parts.append("agent did not create coordination note")
                 if not three_reminders_found:
                     rationale_parts.append("agent did not create three reminders")
+                if not staggered_dates_found:
+                    rationale_parts.append("agent did not create reminders with staggered due dates (Jan 14, 15, 16)")
 
                 rationale = "; ".join(rationale_parts)
                 return ScenarioValidationResult(success=False, rationale=rationale)

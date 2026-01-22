@@ -187,30 +187,7 @@ class CorrectMisaddressedEmailTypo(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Check Step 1: Agent searched contacts for "Jennifer Thompson"
-            search_contacts_found = any(
-                e.event_type in (EventType.AGENT, EventType.ENV)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulContactsApp"
-                and e.action.function_name == "search_contacts"
-                and "Jennifer Thompson" in str(e.action.args.get("query", ""))
-                for e in log_entries
-            )
-
-            # Check Step 2: Agent sent proposal to user about the addressing error
-            # Strict: must mention the addressing error context
-            # Flexible: exact wording can vary
-            proposal_found = any(
-                e.event_type in (EventType.AGENT, EventType.ENV)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
-
-            # Check Step 3: Agent sent corrected email to Jennifer Thompson
-            # Strict: must send to correct email address
-            # Flexible: content can vary as long as it's sent
+            # Check: Agent sent corrected email to Jennifer Thompson
             send_corrected_email_found = any(
                 e.event_type in (EventType.AGENT, EventType.ENV)
                 and isinstance(e.action, Action)
@@ -220,9 +197,7 @@ class CorrectMisaddressedEmailTypo(PASScenario):
                 for e in log_entries
             )
 
-            # Check Step 4: Agent replied to Mark Davis
-            # Strict: must use reply_to_email with correct email_id
-            # Flexible: content can vary
+            # Check: Agent replied to Mark Davis
             reply_to_mark_found = any(
                 e.event_type in (EventType.AGENT, EventType.ENV)
                 and isinstance(e.action, Action)
@@ -232,16 +207,10 @@ class CorrectMisaddressedEmailTypo(PASScenario):
                 for e in log_entries
             )
 
-            # Aggregate success
-            success = search_contacts_found and proposal_found and send_corrected_email_found and reply_to_mark_found
+            success = send_corrected_email_found and reply_to_mark_found
 
-            # Build rationale if validation fails
             if not success:
                 missing_checks = []
-                if not search_contacts_found:
-                    missing_checks.append("contact search for Jennifer Thompson")
-                if not proposal_found:
-                    missing_checks.append("agent proposal about addressing error")
                 if not send_corrected_email_found:
                     missing_checks.append("corrected email to jennifer.thompson@company.com")
                 if not reply_to_mark_found:

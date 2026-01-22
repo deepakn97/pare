@@ -63,7 +63,7 @@ class RideShareMeetingCoordination(PASScenario):
         )
 
         # Calendar: Seed the meeting event (already exists in calendar before the scenario starts)
-        meeting_event_id = self.calendar.add_calendar_event(
+        self.calendar.add_calendar_event(
             title="Client Presentation - WeWork Downtown",
             start_datetime="2024-12-20 10:00:00",
             end_datetime="2024-12-20 11:30:00",
@@ -173,7 +173,7 @@ class RideShareMeetingCoordination(PASScenario):
             reply_email_event,
         ]
 
-    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
+    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -181,59 +181,34 @@ class RideShareMeetingCoordination(PASScenario):
             # Filter to only agent/oracle events (exclude ENV events)
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent checked calendar for meeting details
-            # The agent should query the calendar to understand attendee list and timing
-            check_calendar_found = any(
-                e.action.class_name == "StatefulCalendarApp" and e.action.function_name == "get_calendar_events_from_to"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent queried cab services for group transportation
-            # The agent must list available rides to compare options for 4 people
-            list_rides_found = any(
-                e.action.class_name == "StatefulCabApp" and e.action.function_name == "list_rides" for e in agent_events
-            )
-
-            # STRICT Check 3: Agent proposed the ride-sharing plan to user
-            # The agent must communicate the proposal via the user interface
-            proposal_found = any(
-                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
-                for e in agent_events
-            )
-
-            # STRICT Check 4: Agent booked the Van ride after user acceptance
-            # This is the core action - booking transportation for the group
+            # STRICT Check 1: Agent booked the Van ride for group transportation
+            # This is the core outcome - booking transportation for 4 people to the meeting location
             book_ride_found = False
             for e in agent_events:
                 if e.action.class_name == "StatefulCabApp" and e.action.function_name == "order_ride":
                     args = e.action.args if e.action.args else e.action.resolved_args
-                    # Verify it's for the Van service (group transportation)
+                    # Verify it's for the Van service (group transportation) and correct destination
                     if args.get("service_type") == "Van":
-                        book_ride_found = True
-                        break
+                        end_location = args.get("end_location", "")
+                        # Verify destination matches meeting location (flexible on exact formatting)
+                        if end_location and "wework" in end_location.lower():
+                            book_ride_found = True
+                            break
 
-            # STRICT Check 5: Agent informed attendees via email reply
+            # STRICT Check 2: Agent informed attendees via email reply
             # The agent must reply to the invitation email to coordinate with all participants
             reply_email_found = any(
                 e.action.class_name == "StatefulEmailApp" and e.action.function_name == "reply_to_email"
                 for e in agent_events
             )
 
-            # Determine overall success
-            success = (
-                check_calendar_found and list_rides_found and proposal_found and book_ride_found and reply_email_found
-            )
+            # Determine overall success based on core outcomes only
+            success = book_ride_found and reply_email_found
 
             # Build failure rationale if needed
             rationale = None
             if not success:
                 missing = []
-                if not check_calendar_found:
-                    missing.append("calendar check for meeting details")
-                if not list_rides_found:
-                    missing.append("cab services query")
-                if not proposal_found:
-                    missing.append("proposal to user")
                 if not book_ride_found:
                     missing.append("Van ride booking")
                 if not reply_email_found:

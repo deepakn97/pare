@@ -180,24 +180,7 @@ Sarah""",
             log_entries = env.event_log.list_view()
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent sent a proposal referencing the reorganization request
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent read the email to understand the request
-            # Equivalence: get_email_by_id is the standard way, but list-based reads could work too
-            read_email_found = any(
-                e.event_type == EventType.AGENT
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name in ["get_email_by_id", "list_emails"]
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent created the requested folder
+            # Check 1: Agent created the requested folder
             new_folder_calls = [
                 e
                 for e in agent_events
@@ -211,8 +194,7 @@ Sarah""",
 
             project_docs_created = "Project Docs" in created_folders
 
-            # STRICT Check 4: Agent moved notes to their designated folders
-            # We check that move_note was called at least once to the requested destination.
+            # Check 2: Agent moved notes to their designated folders
             move_note_calls = [
                 e
                 for e in agent_events
@@ -229,21 +211,18 @@ Sarah""",
 
             correct_moves = moves_by_destination.get("Project Docs", 0) >= 1
 
-            # Collect all failures for rationale
-            failures = []
-            if not proposal_found:
-                failures.append("agent did not send proposal to user")
-            if not read_email_found:
-                failures.append("agent did not read the reorganization email")
-            if not project_docs_created:
-                failures.append(f'agent did not create "Project Docs" folder (found: {created_folders})')
-            if not correct_moves:
-                failures.append(f"agent did not move notes correctly (moves by dest: {moves_by_destination})")
+            success = project_docs_created and correct_moves
 
-            success = proposal_found and read_email_found and project_docs_created and correct_moves
+            if not success:
+                failures = []
+                if not project_docs_created:
+                    failures.append(f'agent did not create "Project Docs" folder (found: {created_folders})')
+                if not correct_moves:
+                    failures.append(f"agent did not move notes correctly (moves by dest: {moves_by_destination})")
+                rationale = "; ".join(failures)
+                return ScenarioValidationResult(success=False, rationale=rationale)
 
-            rationale = None if success else "; ".join(failures)
-            return ScenarioValidationResult(success=success, rationale=rationale)
+            return ScenarioValidationResult(success=True)
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)

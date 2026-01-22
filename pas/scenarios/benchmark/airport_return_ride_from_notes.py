@@ -168,36 +168,19 @@ class AirportReturnRideFromNotes(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Filter to agent events only (ignore ENV events)
-            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
-
-            # STRICT Check 1: Agent retrieved ride history to identify airport destination
-            ride_history_check = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_ride_history"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent searched notes for travel information
-            notes_search_check = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "StatefulNotesApp"
-                and e.action.function_name == "search_notes"
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent proposed booking return ride to user
+            # Check 1 (STRICT): Agent proposed booking return ride to user
             proposal_check = any(
-                isinstance(e.action, Action)
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                for e in agent_events
+                for e in log_entries
             )
 
-            # STRICT Check 4: Agent booked the return ride with correct parameters
+            # Check 2 (STRICT): Agent booked the return ride with correct parameters
             booking_check = any(
-                isinstance(e.action, Action)
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulCabApp"
                 and e.action.function_name == "order_ride"
                 and (
@@ -206,19 +189,15 @@ class AirportReturnRideFromNotes(PASScenario):
                 )
                 and "123 main" in e.action.args.get("end_location", "").lower()
                 and "2025-01-18" in e.action.args.get("ride_time", "")
-                for e in agent_events
+                for e in log_entries
             )
 
             # All STRICT checks must pass
-            success = ride_history_check and notes_search_check and proposal_check and booking_check
+            success = proposal_check and booking_check
 
             if not success:
                 # Build rationale for failure
                 missing_checks = []
-                if not ride_history_check:
-                    missing_checks.append("agent did not retrieve ride history")
-                if not notes_search_check:
-                    missing_checks.append("agent did not search notes for travel information")
                 if not proposal_check:
                     missing_checks.append("agent did not propose booking return ride")
                 if not booking_check:

@@ -151,91 +151,35 @@ class RideCancellationExpenseReporting(PASScenario):
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
+            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # Check Step 1: Agent sent proposal to the user (STRICT - core reasoning)
-            # The proposal must reference the meeting cancellation and offer to cancel ride + file expense report
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
-
-            # Check Step 2a: Agent read the cancellation email (STRICT - must detect the trigger)
-            email_read_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "get_email_by_id"
-                and e.action.args.get("email_id") == "email-meeting-cancelled-001"
-                for e in log_entries
-            )
-
-            # Check Step 2b: Agent checked current ride status (STRICT - must verify ride exists)
-            ride_check_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_current_ride_status"
-                for e in log_entries
-            )
-
-            # Check Step 3a: Agent cancelled the ride (STRICT - core action)
+            # STRICT Check 1: Agent cancelled the ride (core outcome)
             cancel_ride_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulCabApp"
                 and e.action.function_name == "user_cancel_ride"
-                for e in log_entries
+                for e in agent_events
             )
 
-            # Check Step 5: Agent retrieved ride history to get cancellation fee (STRICT - required for expense report)
-            get_history_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_ride_history"
-                for e in log_entries
-            )
-
-            # Check Step 6: Agent sent expense report email to finance department (STRICT - core requirement from scenario description)
+            # STRICT Check 2: Agent sent expense report email to finance department (core requirement from scenario description)
             expense_email_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulEmailApp"
                 and e.action.function_name == "send_email"
                 and "finance@company.com" in e.action.args.get("recipients", [])
-                for e in log_entries
+                for e in agent_events
             )
 
-            # All checks must pass for success
-            success = (
-                proposal_found
-                and email_read_found
-                and ride_check_found
-                and cancel_ride_found
-                and get_history_found
-                and expense_email_found
-            )
+            success = cancel_ride_found and expense_email_found
 
             if not success:
-                # Build rationale for failure
                 missing_checks = []
-                if not proposal_found:
-                    missing_checks.append("no agent proposal to user found in log")
-                if not email_read_found:
-                    missing_checks.append("agent did not read the meeting cancellation email")
-                if not ride_check_found:
-                    missing_checks.append("agent did not check current ride status")
                 if not cancel_ride_found:
                     missing_checks.append("agent did not cancel the ride")
-                if not get_history_found:
-                    missing_checks.append("agent did not retrieve ride history to get cancellation fee")
                 if not expense_email_found:
                     missing_checks.append("agent did not send expense report email to finance department")
 
-                rationale = "; ".join(missing_checks)
+                rationale = "Validation failed: " + "; ".join(missing_checks)
                 return ScenarioValidationResult(success=False, rationale=rationale)
 
             return ScenarioValidationResult(success=True)

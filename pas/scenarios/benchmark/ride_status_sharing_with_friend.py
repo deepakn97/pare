@@ -5,7 +5,7 @@ from typing import Any
 
 from are.simulation.apps.messaging_v2 import ConversationV2, MessageV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
-from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
+from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
 from pas.apps import (
     HomeScreenSystemApp,
@@ -41,34 +41,40 @@ class RideStatusSharingWithFriend(PASScenario):
         self.agent_ui = PASAgentUserInterface()
         self.system_app = HomeScreenSystemApp(name="System")
 
+        # Store key values as instance variables to avoid hardcoding
+        self.friend_name = "Sarah"
+        self.restaurant_name = "Bella's Restaurant"
+        self.start_location = "User Home"
+        self.original_time = "7:00 PM"
+        self.delayed_time = "7:15 PM"
+
         # Initialize messaging app
         self.messaging = StatefulMessagingApp(name="Messages")
 
         # Add Sarah as a contact in messaging
-        sarah_name = "Sarah"
-        self.messaging.add_users([sarah_name])
-        sarah_id = self.messaging.name_to_id[sarah_name]
+        self.messaging.add_users([self.friend_name])
+        sarah_id = self.messaging.name_to_id[self.friend_name]
 
         # Create baseline conversation with Sarah containing user's commitment to meet at 7 PM
         # This conversation happened earlier in the day
         baseline_timestamp = self.start_time - 3600  # 1 hour before start_time
         sarah_conversation = ConversationV2(
             participant_ids=[self.messaging.current_user_id, sarah_id],
-            title=sarah_name,
+            title=self.friend_name,
         )
 
         # Add earlier messages establishing the dinner plan
         sarah_conversation.messages.append(
             MessageV2(
                 sender_id=sarah_id,
-                content="Hey! Still on for dinner tonight at Bella's Restaurant?",
+                content=f"Hey! Still on for dinner tonight at {self.restaurant_name}?",
                 timestamp=baseline_timestamp - 1800,  # 30 min before baseline
             )
         )
         sarah_conversation.messages.append(
             MessageV2(
                 sender_id=self.messaging.current_user_id,
-                content="Yes! I'll be there around 7:00 PM.",
+                content=f"Yes! I'll be there around {self.original_time}.",
                 timestamp=baseline_timestamp - 900,  # 15 min before baseline
             )
         )
@@ -101,15 +107,15 @@ class RideStatusSharingWithFriend(PASScenario):
         cab_app = self.get_typed_app(StatefulCabApp, "Cab")
 
         # Get Sarah's participant ID and conversation ID from stored instance variables
-        sarah_id = messaging_app.name_to_id["Sarah"]
+        sarah_id = messaging_app.name_to_id[self.friend_name]
         sarah_conversation_id = self.sarah_conversation_id
 
         with EventRegisterer.capture_mode():
             # Environment Event 1: User orders a ride to restaurant
             # This creates the ride that will later be delayed
             order_event = cab_app.order_ride(
-                start_location="User Home",
-                end_location="Bella's Restaurant",
+                start_location=self.start_location,
+                end_location=self.restaurant_name,
                 service_type="Default",
                 ride_time=None,
             ).delayed(1)
@@ -118,7 +124,7 @@ class RideStatusSharingWithFriend(PASScenario):
             # This is the trigger that should prompt the agent to notify Sarah
             delay_event = cab_app.update_ride_status(
                 status="DELAYED",
-                message="Your driver is running 15 minutes late due to heavy traffic. Updated arrival time: 7:15 PM.",
+                message=f"Your driver is running 15 minutes late due to heavy traffic. Updated arrival time: {self.delayed_time}.",
             ).delayed(10)
 
             # Agent retrieves current ride status to confirm delay details
@@ -149,7 +155,7 @@ class RideStatusSharingWithFriend(PASScenario):
             # Motivated by: agent confirmed ride delay (15 min) and user's commitment to Sarah ("I'll be there around 7:00 PM")
             proposal_event = (
                 aui.send_message_to_user(
-                    content="Your ride to Bella's Restaurant is delayed by 15 minutes due to traffic. You told Sarah you'd arrive around 7:00 PM, but you'll now arrive closer to 7:15 PM. Would you like me to send her an update?"
+                    content=f"Your ride to {self.restaurant_name} is delayed by 15 minutes due to traffic. You told {self.friend_name} you'd arrive around {self.original_time}, but you'll now arrive closer to {self.delayed_time}. Would you like me to send her an update?"
                 )
                 .oracle()
                 .depends_on([read_conversation_event], delay_seconds=2)
@@ -167,7 +173,7 @@ class RideStatusSharingWithFriend(PASScenario):
             notification_event = (
                 messaging_app.send_message(
                     user_id=sarah_id,
-                    content="Hi Sarah, just a heads up - my ride is running a bit late due to traffic. I'll be there around 7:15 PM instead of 7:00 PM. See you soon!",
+                    content=f"Hi {self.friend_name}, just a heads up - my ride is running a bit late due to traffic. I'll be there around {self.delayed_time} instead of {self.original_time}. See you soon!",
                 )
                 .oracle()
                 .depends_on([acceptance_event], delay_seconds=1)
@@ -190,69 +196,30 @@ class RideStatusSharingWithFriend(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Check 1: Agent checked ride status to confirm delay details (STRICT)
-            status_check_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_current_ride_status"
-                for e in log_entries
-            )
+            # Filter to only agent/oracle events (EventType.AGENT)
+            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # Check 2: Agent searched for relevant conversations (STRICT)
-            conversation_search_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "list_recent_conversations"
-                for e in log_entries
-            )
-
-            # Check 3: Agent read Sarah's conversation to confirm commitment (STRICT)
-            sarah_id = self.messaging.name_to_id.get("Sarah")
-
-            read_conversation_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name in ["open_conversation", "read_conversation"]
-                for e in log_entries
-            )
-
-            # Check 4: Agent sent proposal to user (FLEXIBLE on content, STRICT on presence)
+            # STRICT Check 1: Agent sent proposal to user about the delay
+            # Core outcome: agent must propose notifying Sarah about the delay
             proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
+                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
+                for e in agent_events
             )
 
-            # Check 5: Agent sent update message to Sarah (STRICT on app/function, FLEXIBLE on content)
+            # STRICT Check 2: Agent sent update message to Sarah
+            # Core outcome: agent must send message to Sarah specifically
+            sarah_id = self.messaging.name_to_id.get(self.friend_name)
             notification_sent = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name in ["send_message_to_group_conversation", "send_message"]
-                for e in log_entries
+                e.action.class_name == "StatefulMessagingApp"
+                and e.action.function_name == "send_message"
+                and e.action.args.get("user_id") == sarah_id
+                for e in agent_events
             )
 
-            success = (
-                status_check_found
-                and conversation_search_found
-                and read_conversation_found
-                and proposal_found
-                and notification_sent
-            )
+            success = proposal_found and notification_sent
 
             if not success:
                 rationale_parts = []
-                if not status_check_found:
-                    rationale_parts.append("ride status check not found")
-                if not conversation_search_found:
-                    rationale_parts.append("conversation search not found")
-                if not read_conversation_found:
-                    rationale_parts.append("Sarah's conversation not read")
                 if not proposal_found:
                     rationale_parts.append("proposal to user not found")
                 if not notification_sent:

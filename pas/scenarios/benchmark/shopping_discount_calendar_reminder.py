@@ -211,68 +211,58 @@ class ShoppingDiscountCalendarReminder(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
+            # Filter to only AGENT events for validation
+            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
+
             # Check 1 (STRICT): Agent sent proposal mentioning the discount code expiration and the hike event
             proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                for e in log_entries
+                for e in agent_events
             )
 
             # Check 2 (STRICT): Agent read the discount email to understand the expiration
             read_email_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulEmailApp"
                 and e.action.function_name == "get_email_by_id"
-                for e in log_entries
+                and e.action.args.get("email_id") == "discount_reminder_email_001"
+                for e in agent_events
             )
 
             # Check 3 (STRICT): Agent checked the shopping cart to see what items are pending
             cart_checked = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "list_cart"
-                for e in log_entries
+                for e in agent_events
             )
 
             # Check 4 (STRICT): Agent searched calendar for upcoming events
             calendar_searched = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulCalendarApp"
                 and e.action.function_name == "get_calendar_events_from_to"
-                for e in log_entries
+                for e in agent_events
             )
 
             # Check 5 (STRICT): Agent performed checkout with the OUTDOOR30 discount code
             checkout_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "checkout"
                 and e.action.args.get("discount_code") == "OUTDOOR30"
-                for e in log_entries
+                for e in agent_events
             )
 
-            # Check 6 (FLEXIBLE): Agent sent a message to user after checkout (content can vary)
-            final_message_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
-
-            # All strict checks must pass; flexible check is optional but expected
+            # All strict checks must pass
             success = proposal_found and read_email_found and cart_checked and calendar_searched and checkout_found
 
             if not success:
                 rationale = []
                 if not proposal_found:
-                    rationale.append("no agent proposal mentioning discount and hike event")
+                    rationale.append("agent did not send proposal mentioning discount and hike event")
                 if not read_email_found:
                     rationale.append("agent did not read the discount email")
                 if not cart_checked:

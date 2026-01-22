@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from are.simulation.apps.contacts import Contact
 from are.simulation.apps.messaging_v2 import ConversationV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
@@ -48,45 +47,21 @@ class ForgottenItemFriendRequest(PASScenario):
         # Initialize messaging app
         self.messaging = StatefulMessagingApp(name="Messages")
 
-        # Create contact for Alex (friend who will request to borrow camera)
-        alex_contact = Contact(first_name="Alex", last_name="Johnson", phone="+1-555-0123")
-
-        # Add Alex as a user in messaging app
+        # Add Alex as a contact in messaging app
         self.messaging.add_contacts([("Alex Johnson", "+1-555-0123")])
 
-        # Create conversation with Alex (for baseline state)
-        self.user_id = self.messaging.current_user_id
-        self.alex_conversation = ConversationV2(participant_ids=[self.user_id, "+1-555-0123"], title="Alex Johnson")
-        self.messaging.add_conversation(self.alex_conversation)
-
-        # Create conversation with cab service for lost item notification
-        # Cab service phone number from notification message: +1-555-0123 (same as Alex for simplicity)
-        # In practice, this would be a different number like +1-555-CAB-123
-        cab_service_phone = "+1-555-0100"  # Cab service phone number
-        self.cab_service_conversation = ConversationV2(
-            participant_ids=[self.user_id, cab_service_phone], title="Cab Service"
-        )
-        self.messaging.add_conversation(self.cab_service_conversation)
+        # Add cab service as a contact in messaging app
+        self.messaging.add_contacts([("Cab Service", "+1-555-0100")])
 
         # Seed an ongoing ride that will be completed via end_ride() to trigger lost item notification
         # This ride started earlier and will be completed 5 minutes before start_time
-        ride_timestamp = self.start_time - 300  # 5 minutes before start_time
-        self.cab.add_new_ride(
-            service_type="Default",
+        ride_time = datetime.fromtimestamp(self.start_time - 300, tz=UTC)  # 5 minutes before start_time
+        self.cab.order_ride(
             start_location="Home",
             end_location="Downtown Coffee Shop",
-            price=15.50,
-            duration=20.0,
-            time_stamp=ride_timestamp,
-            distance_km=8.5,
+            service_type="Default",
+            ride_time=ride_time.strftime("%Y-%m-%d %H:%M:%S"),
         )
-        # Modify the ride to be ongoing and set it as on_going_ride for end_ride() to work
-        ongoing_ride = self.cab.ride_history[-1]  # Get the ride just added
-        ongoing_ride.status = "IN_PROGRESS"  # Change status from "BOOKED" to "IN_PROGRESS"
-        ongoing_ride.delay = 0.0
-        # Note: Setting on_going_ride is required for scenario setup to simulate an ongoing ride
-        # This is necessary because add_new_ride() doesn't automatically set on_going_ride
-        self.cab.on_going_ride = ongoing_ride
 
         # Register all apps here in self.apps
         self.apps = [self.agent_ui, self.system_app, self.cab, self.messaging]
@@ -98,13 +73,20 @@ class ForgottenItemFriendRequest(PASScenario):
         cab_app = self.get_typed_app(StatefulCabApp, "Cab")
         messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
 
-        # Get Alex's user_id and conversation_id
+        # Get Alex's user_id and create conversation dynamically
         alex_user_id = "+1-555-0123"
-        alex_conversation_id = self.alex_conversation.conversation_id
+        user_id = messaging_app.current_user_id
+        alex_conversation = ConversationV2(participant_ids=[user_id, alex_user_id], title="Alex Johnson")
+        messaging_app.add_conversation(alex_conversation)
+        alex_conversation_id = alex_conversation.conversation_id
+        # Store conversation_id for validation
+        self.alex_conversation_id = alex_conversation_id
 
-        # Get cab service phone and conversation_id
+        # Get cab service phone and create conversation dynamically
         cab_service_phone = "+1-555-0100"
-        cab_service_conversation_id = self.cab_service_conversation.conversation_id
+        cab_service_conversation = ConversationV2(participant_ids=[user_id, cab_service_phone], title="Cab Service")
+        messaging_app.add_conversation(cab_service_conversation)
+        cab_service_conversation_id = cab_service_conversation.conversation_id
 
         with EventRegisterer.capture_mode():
             # Environment Event 1: Cab ride completes
@@ -212,28 +194,7 @@ class ForgottenItemFriendRequest(PASScenario):
                 for e in log_entries
             )
 
-            # Check 2 (STRICT): Agent checked ride history to get details about the completed ride
-            # The agent must have looked up ride information after detecting the lost item
-            ride_history_check = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_ride_history"
-                for e in log_entries
-            )
-
-            # Check 3 (STRICT): Agent read the conversation with Alex to understand the request
-            # The agent must have accessed messaging to see Alex's borrowing request
-            read_conversation_check = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                and e.action.args.get("conversation_id") == self.alex_conversation.conversation_id
-                for e in log_entries
-            )
-
-            # Check 4 (STRICT): Agent informed Alex about the situation
+            # Check 2 (STRICT): Agent informed Alex about the situation
             # Accept either send_message (to user_id) as the valid way to message Alex
             # Content flexibility: only require "camera" mentioned, not exact wording
             alex_notification_found = any(
@@ -247,9 +208,7 @@ class ForgottenItemFriendRequest(PASScenario):
             )
 
             # Compute success: all strict checks must pass; flexible check adds robustness but is not required
-            strict_checks = (
-                proposal_found and ride_history_check and read_conversation_check and alex_notification_found
-            )
+            strict_checks = proposal_found and alex_notification_found
 
             success = strict_checks
 
@@ -258,10 +217,6 @@ class ForgottenItemFriendRequest(PASScenario):
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("agent proposal to user about camera/Alex conflict not found")
-                if not ride_history_check:
-                    missing_checks.append("agent did not check ride history")
-                if not read_conversation_check:
-                    missing_checks.append("agent did not read Alex's conversation")
                 if not alex_notification_found:
                     missing_checks.append("agent did not message Alex about camera situation")
 

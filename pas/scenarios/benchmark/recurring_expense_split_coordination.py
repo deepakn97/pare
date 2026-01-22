@@ -57,7 +57,7 @@ class RecurringExpenseSplitCoordination(PASScenario):
 
         # Conversation with Jordan - prior context about streaming service
         jordan_conv = ConversationV2(
-            participant_ids=["user_001", jordan_id],
+            participant_ids=[self.messaging.current_user_id, jordan_id],
             messages=[
                 MessageV2(
                     sender_id=jordan_id,
@@ -65,7 +65,7 @@ class RecurringExpenseSplitCoordination(PASScenario):
                     timestamp=datetime(2025, 11, 15, 14, 30, 0, tzinfo=UTC).timestamp(),
                 ),
                 MessageV2(
-                    sender_id="user_001",
+                    sender_id=self.messaging.current_user_id,
                     content="Yeah, I've been thinking about subscribing but it's a bit pricey.",
                     timestamp=datetime(2025, 11, 15, 15, 0, 0, tzinfo=UTC).timestamp(),
                 ),
@@ -77,7 +77,7 @@ class RecurringExpenseSplitCoordination(PASScenario):
 
         # Conversation with Casey - general chat history
         casey_conv = ConversationV2(
-            participant_ids=["user_001", casey_id],
+            participant_ids=[self.messaging.current_user_id, casey_id],
             messages=[
                 MessageV2(
                     sender_id=casey_id,
@@ -85,7 +85,7 @@ class RecurringExpenseSplitCoordination(PASScenario):
                     timestamp=datetime(2025, 11, 16, 10, 0, 0, tzinfo=UTC).timestamp(),
                 ),
                 MessageV2(
-                    sender_id="user_001",
+                    sender_id=self.messaging.current_user_id,
                     content="Pretty good! Caught up on some shows.",
                     timestamp=datetime(2025, 11, 16, 10, 30, 0, tzinfo=UTC).timestamp(),
                 ),
@@ -97,7 +97,7 @@ class RecurringExpenseSplitCoordination(PASScenario):
 
         # Conversation with Alex - general chat history
         alex_conv = ConversationV2(
-            participant_ids=["user_001", alex_id],
+            participant_ids=[self.messaging.current_user_id, alex_id],
             messages=[
                 MessageV2(
                     sender_id=alex_id,
@@ -105,7 +105,7 @@ class RecurringExpenseSplitCoordination(PASScenario):
                     timestamp=datetime(2025, 11, 17, 12, 0, 0, tzinfo=UTC).timestamp(),
                 ),
                 MessageV2(
-                    sender_id="user_001",
+                    sender_id=self.messaging.current_user_id,
                     content="Yep, Thursday works for me!",
                     timestamp=datetime(2025, 11, 17, 12, 15, 0, tzinfo=UTC).timestamp(),
                 ),
@@ -265,40 +265,43 @@ class RecurringExpenseSplitCoordination(PASScenario):
         """Validate final outcomes: recurring reminder created and group conversation set up."""
         try:
             log_entries = env.event_log.list_view()
+
+            # Filter to only AGENT event types (oracle events)
+            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
+
             messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
             jordan_id = messaging_app.name_to_id["Jordan"]
             casey_id = messaging_app.name_to_id["Casey"]
             alex_id = messaging_app.name_to_id["Alex"]
 
-            # Check final outcome 1: Recurring monthly reminder created
+            # Check 1 (STRICT): Recurring monthly reminder created
+            # Core requirement: monthly repetition for expense collection
             reminder_created = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulReminderApp"
                 and e.action.function_name == "add_reminder"
                 and e.action.args.get("repetition_unit") == "month"
                 and e.action.args.get("repetition_value") == 1
-                for e in log_entries
+                for e in agent_events
             )
 
-            # Check final outcome 2: Group conversation created with all participants
+            # Check 2 (STRICT): Group conversation created with all participants
+            # Core requirement: group chat with Jordan, Casey, and Alex
             group_created = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulMessagingApp"
                 and e.action.function_name == "create_group_conversation"
                 and set(e.action.args.get("user_ids", [])) == {jordan_id, casey_id, alex_id}
-                for e in log_entries
+                for e in agent_events
             )
 
-            # Check final outcome 3: Message sent to group conversation
-            # Check that a group message was sent (conversation_id may be resolved at runtime or may be empty placeholder)
+            # Check 3 (STRICT): Message sent to group conversation
+            # Core requirement: initial coordination message to the group
             group_message_sent = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulMessagingApp"
                 and e.action.function_name == "send_message_to_group_conversation"
-                for e in log_entries
+                for e in agent_events
             )
 
             success = reminder_created and group_created and group_message_sent

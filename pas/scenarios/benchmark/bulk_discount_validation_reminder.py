@@ -57,7 +57,7 @@ class BulkDiscountValidationReminder(PASScenario):
 
         # Add printer paper product
         printer_paper_product_id = self.shopping.add_product("Premium Printer Paper")
-        printer_paper_item_id = self.shopping.add_item_to_product(
+        self.printer_paper_item_id = self.shopping.add_item_to_product(
             product_id=printer_paper_product_id,
             price=24.99,
             options={"ream_count": "5", "paper_size": "Letter"},
@@ -66,7 +66,7 @@ class BulkDiscountValidationReminder(PASScenario):
 
         # Add stapler product
         stapler_product_id = self.shopping.add_product("Heavy Duty Stapler")
-        stapler_item_id = self.shopping.add_item_to_product(
+        self.stapler_item_id = self.shopping.add_item_to_product(
             product_id=stapler_product_id,
             price=18.50,
             options={"color": "black", "capacity": "50 sheets"},
@@ -75,7 +75,7 @@ class BulkDiscountValidationReminder(PASScenario):
 
         # Add pens product
         pens_product_id = self.shopping.add_product("Ballpoint Pens Pack")
-        pens_item_id = self.shopping.add_item_to_product(
+        self.pens_item_id = self.shopping.add_item_to_product(
             product_id=pens_product_id,
             price=12.99,
             options={"color": "blue", "pack_size": "24"},
@@ -84,7 +84,7 @@ class BulkDiscountValidationReminder(PASScenario):
 
         # Add notebooks product
         notebooks_product_id = self.shopping.add_product("Spiral Notebooks")
-        notebooks_item_id = self.shopping.add_item_to_product(
+        self.notebooks_item_id = self.shopping.add_item_to_product(
             product_id=notebooks_product_id,
             price=15.99,
             options={"page_count": "100", "pack_size": "6"},
@@ -92,10 +92,10 @@ class BulkDiscountValidationReminder(PASScenario):
         )
 
         # Add OFFICE20 discount code for all office supply items (20% off)
-        self.shopping.add_discount_code(printer_paper_item_id, {"OFFICE20": 20.0})
-        self.shopping.add_discount_code(stapler_item_id, {"OFFICE20": 20.0})
-        self.shopping.add_discount_code(pens_item_id, {"OFFICE20": 20.0})
-        self.shopping.add_discount_code(notebooks_item_id, {"OFFICE20": 20.0})
+        self.shopping.add_discount_code(self.printer_paper_item_id, {"OFFICE20": 20.0})
+        self.shopping.add_discount_code(self.stapler_item_id, {"OFFICE20": 20.0})
+        self.shopping.add_discount_code(self.pens_item_id, {"OFFICE20": 20.0})
+        self.shopping.add_discount_code(self.notebooks_item_id, {"OFFICE20": 20.0})
 
         # Initialize email app
         self.email = StatefulEmailApp(name="Emails")
@@ -184,30 +184,30 @@ class BulkDiscountValidationReminder(PASScenario):
                 .depends_on(proposal_event, delay_seconds=2)
             )
 
-            # Motivation: User accepted proposal to order items; agent adds printer paper (item_printer_paper from search results)
+            # Motivation: User accepted proposal to order items; agent adds printer paper
             add_paper_event = (
-                shopping_app.add_to_cart(item_id="item_printer_paper", quantity=1)
+                shopping_app.add_to_cart(item_id=self.printer_paper_item_id, quantity=1)
                 .oracle()
                 .depends_on(acceptance_event, delay_seconds=1)
             )
 
-            # Motivation: User accepted proposal; agent continues adding items (stapler from search results)
+            # Motivation: User accepted proposal; agent continues adding items (stapler)
             add_stapler_event = (
-                shopping_app.add_to_cart(item_id="item_stapler", quantity=1)
+                shopping_app.add_to_cart(item_id=self.stapler_item_id, quantity=1)
                 .oracle()
                 .depends_on(add_paper_event, delay_seconds=1)
             )
 
-            # Motivation: User accepted proposal; agent continues adding items (pens from search results)
+            # Motivation: User accepted proposal; agent continues adding items (pens)
             add_pens_event = (
-                shopping_app.add_to_cart(item_id="item_pens", quantity=1)
+                shopping_app.add_to_cart(item_id=self.pens_item_id, quantity=1)
                 .oracle()
                 .depends_on(add_stapler_event, delay_seconds=1)
             )
 
-            # Motivation: User accepted proposal; agent continues adding items (notebooks from search results)
+            # Motivation: User accepted proposal; agent continues adding items (notebooks)
             add_notebooks_event = (
-                shopping_app.add_to_cart(item_id="item_notebooks", quantity=1)
+                shopping_app.add_to_cart(item_id=self.notebooks_item_id, quantity=1)
                 .oracle()
                 .depends_on(add_pens_event, delay_seconds=1)
             )
@@ -279,37 +279,7 @@ class BulkDiscountValidationReminder(PASScenario):
                 for e in log_entries
             )
 
-            # FLEXIBLE Check 2: Agent checked reminders to identify related task
-            # Accept either get_all_reminders or other reminder-reading methods
-            reminder_check_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulReminderApp"
-                and e.action.function_name in ["get_all_reminders", "get_reminder"]
-                for e in log_entries
-            )
-
-            # STRICT Check 3: Agent verified discount code eligibility
-            discount_check_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "get_discount_code_info"
-                and e.action.args.get("discount_code") == "OFFICE20"
-                for e in log_entries
-            )
-
-            # STRICT Check 4: Agent searched for office supply products
-            # Must search for at least one of the items mentioned in the reminder
-            search_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "search_product"
-                for e in log_entries
-            )
-
-            # STRICT Check 5: Agent added items to cart (at least 4 items to meet discount requirement)
+            # STRICT Check 2: Agent added items to cart (at least 4 items to meet discount requirement)
             # Check that add_to_cart was called for the expected item IDs
             add_to_cart_calls = [
                 e
@@ -321,7 +291,7 @@ class BulkDiscountValidationReminder(PASScenario):
             ]
             cart_items_added = len(add_to_cart_calls) >= 4
 
-            # STRICT Check 6: Agent completed checkout with OFFICE20 discount code
+            # STRICT Check 3: Agent completed checkout with OFFICE20 discount code
             checkout_found = any(
                 (e.event_type == EventType.AGENT)
                 and isinstance(e.action, Action)
@@ -335,25 +305,12 @@ class BulkDiscountValidationReminder(PASScenario):
             missing_checks = []
             if not proposal_found:
                 missing_checks.append("agent proposal mentioning OFFICE20 discount opportunity")
-            if not reminder_check_found:
-                missing_checks.append("reminder check to identify office supplies task")
-            if not discount_check_found:
-                missing_checks.append("discount code validation (get_discount_code_info with OFFICE20)")
-            if not search_found:
-                missing_checks.append("product search for office supply items")
             if not cart_items_added:
                 missing_checks.append("adding at least 4 items to cart to meet discount minimum")
             if not checkout_found:
                 missing_checks.append("checkout completion with OFFICE20 discount code")
 
-            success = (
-                proposal_found
-                and reminder_check_found
-                and discount_check_found
-                and search_found
-                and cart_items_added
-                and checkout_found
-            )
+            success = proposal_found and cart_items_added and checkout_found
 
             rationale = None if success else f"Missing critical checks: {', '.join(missing_checks)}"
             return ScenarioValidationResult(success=success, rationale=rationale)

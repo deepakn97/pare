@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
-from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
+from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
 from pas.apps import (
     HomeScreenSystemApp,
@@ -204,52 +204,46 @@ class LeaseEndApartmentSearch(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # STRICT Check 1: Agent sent a proposal to ask permission to search after observing the reminder
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
+            # Filter to only AGENT events for validation
+            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 2: Agent retrieved lease end event details from calendar
+            # STRICT Check 1: Agent retrieved lease end event details from calendar
             # The agent must check calendar to understand the lease end date
             lease_event_retrieved = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCalendarApp"
-                and e.action.function_name == "get_calendar_event"
-                for e in log_entries
+                e.action.class_name == "StatefulCalendarApp" and e.action.function_name == "get_calendar_event"
+                for e in agent_events
+            )
+
+            # STRICT Check 2: Agent sent a proposal to ask permission to search
+            proposal_found = any(
+                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
+                for e in agent_events
             )
 
             # STRICT Check 3: Agent listed apartments after user acceptance
             apartment_list_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulApartmentApp"
-                and e.action.function_name == "list_all_apartments"
-                for e in log_entries
+                e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "list_all_apartments"
+                for e in agent_events
             )
 
             # STRICT Check 4: Agent summarized results to the user after searching
-            summary_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
+            # Ensure there are at least 2 messages (proposal + summary)
+            user_messages = [
+                e
+                for e in agent_events
+                if e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
+            ]
+            summary_found = len(user_messages) >= 2
 
             # All critical checks must pass for success
             success = proposal_found and lease_event_retrieved and apartment_list_found and summary_found
 
             if not success:
                 rationale_parts = []
-                if not proposal_found:
-                    rationale_parts.append("no agent proposal to user found")
                 if not lease_event_retrieved:
                     rationale_parts.append("agent did not retrieve lease end calendar event")
+                if not proposal_found:
+                    rationale_parts.append("no agent proposal to user found")
                 if not apartment_list_found:
                     rationale_parts.append("agent did not list apartments")
                 if not summary_found:

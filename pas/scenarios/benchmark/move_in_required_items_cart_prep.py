@@ -223,7 +223,7 @@ Riverside Towers Leasing Office""",
             final_message_event,
         ]
 
-    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
+    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
@@ -232,41 +232,29 @@ Riverside Towers Leasing Office""",
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
             # STRICT Check 1: Agent read the lease confirmation email
-            read_email_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulEmailApp" and e.action.function_name == "get_email_by_id":
-                    args = e.action.args
-                    if args.get("email_id") == "lease_confirmation_001":
-                        read_email_found = True
-                        break
+            read_email_found = any(
+                e.action.class_name == "StatefulEmailApp"
+                and e.action.function_name == "get_email_by_id"
+                and e.action.args.get("email_id") == "lease_confirmation_001"
+                for e in agent_events
+            )
 
             # STRICT Check 2: Agent added all three required items to cart
-            # We need to verify that add_to_cart was called three times with the correct item IDs
-            add_to_cart_events = []
-            for e in agent_events:
-                if e.action.class_name == "StatefulShoppingApp" and e.action.function_name == "add_to_cart":
-                    add_to_cart_events.append(e)
-
-            # Use stored item IDs from initialization
             expected_item_ids = {self.door_mat_item_id, self.batteries_item_id, self.blinds_item_id}
-
-            # Verify all three items were added
-            added_item_ids = set()
-            for e in add_to_cart_events:
-                item_id = e.action.args.get("item_id")
-                if item_id:
-                    added_item_ids.add(item_id)
-
+            added_item_ids = {
+                e.action.args.get("item_id")
+                for e in agent_events
+                if e.action.class_name == "StatefulShoppingApp"
+                and e.action.function_name == "add_to_cart"
+                and e.action.args.get("item_id")
+            }
             all_items_added = len(added_item_ids) == 3 and added_item_ids == expected_item_ids
 
             # STRICT Check 3: Agent sent a proposal to user
-            proposal_sent = False
-            for e in agent_events:
-                if e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user":
-                    # Check that the message appears before acceptance (proposal, not confirmation)
-                    # We're flexible on content but strict on occurrence
-                    proposal_sent = True
-                    break
+            proposal_sent = any(
+                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
+                for e in agent_events
+            )
 
             # Determine success based on STRICT checks only
             success = read_email_found and all_items_added and proposal_sent
@@ -278,7 +266,7 @@ Riverside Towers Leasing Office""",
                     missing_checks.append("agent did not read lease confirmation email")
                 if not all_items_added:
                     missing_checks.append(
-                        f"agent did not add all three required items to cart (found {len(added_item_ids)}/3)"
+                        f"agent did not add all three required items to cart (found {len(added_item_ids)}/3, expected {expected_item_ids})"
                     )
                 if not proposal_sent:
                     missing_checks.append("agent did not send proposal to user")

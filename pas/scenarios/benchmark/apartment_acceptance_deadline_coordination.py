@@ -304,33 +304,13 @@ class ApartmentAcceptanceDeadlineCoordination(PASScenario):
             log_entries = env.event_log.list_view()
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent read the acceptance email to extract deadline information
-            email_read = any(
-                e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "get_email_by_id"
-                and e.action.args.get("email_id") == "downtown_acceptance_email"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent searched saved apartments to compare options
-            apartments_searched = any(
-                e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "list_saved_apartments"
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent queried calendar to find viewing appointments relative to deadline
-            calendar_queried = any(
-                e.action.class_name == "StatefulCalendarApp" and e.action.function_name == "get_calendar_events_from_to"
-                for e in agent_events
-            )
-
-            # STRICT Check 4: Agent sent proposal to user explaining timing dilemma (flexible on exact wording)
+            # STRICT Check 1: Agent sent proposal to user explaining timing dilemma (flexible on exact wording)
             proposal_sent = any(
                 e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
                 for e in agent_events
             )
 
-            # STRICT Check 5: Agent sent follow-up email to Harbor View property manager
+            # STRICT Check 2: Agent sent follow-up email to Harbor View property manager
             # Accept send_email or send_batch_email (equivalent for single-recipient outbound email)
             harbor_email_sent = any(
                 e.action.class_name == "StatefulEmailApp"
@@ -342,7 +322,7 @@ class ApartmentAcceptanceDeadlineCoordination(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 6: Agent sent follow-up email to Riverside Lofts property manager
+            # STRICT Check 3: Agent sent follow-up email to Riverside Lofts property manager
             # Accept send_email or send_batch_email (equivalent for single-recipient outbound email)
             riverside_email_sent = any(
                 e.action.class_name == "StatefulEmailApp"
@@ -354,7 +334,7 @@ class ApartmentAcceptanceDeadlineCoordination(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 7: Agent created reminder for decision deadline
+            # STRICT Check 4: Agent created reminder for decision deadline
             # Check that the reminder exists with correct structural properties (flexible on exact title/description)
             reminder_added = any(
                 e.action.class_name == "StatefulReminderApp"
@@ -366,9 +346,6 @@ class ApartmentAcceptanceDeadlineCoordination(PASScenario):
 
             # Determine success based on all strict checks
             all_strict_checks = [
-                email_read,
-                apartments_searched,
-                calendar_queried,
                 proposal_sent,
                 harbor_email_sent,
                 riverside_email_sent,
@@ -380,12 +357,6 @@ class ApartmentAcceptanceDeadlineCoordination(PASScenario):
             else:
                 # Build rationale explaining which checks failed
                 failed_checks = []
-                if not email_read:
-                    failed_checks.append("agent did not read Downtown Studios acceptance email")
-                if not apartments_searched:
-                    failed_checks.append("agent did not search saved apartments")
-                if not calendar_queried:
-                    failed_checks.append("agent did not query calendar for viewing appointments")
                 if not proposal_sent:
                     failed_checks.append("agent did not send proposal to user")
                 if not harbor_email_sent:

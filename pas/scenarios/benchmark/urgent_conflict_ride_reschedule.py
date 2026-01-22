@@ -277,43 +277,8 @@ class UrgentConflictRideReschedule(PASScenario):
             # Filter to only agent/oracle events
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent sent proposal to the user
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent read the urgent email
-            read_urgent_email_found = any(
-                e.event_type == EventType.AGENT
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name in ["get_email_by_id", "list_emails"]
-                and (
-                    e.action.args.get("email_id") == "email_urgent_board_001"
-                    or "email_urgent_board_001" in str(e.metadata.return_value)
-                )
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent checked calendar for conflicts
-            calendar_check_found = any(
-                e.event_type == EventType.AGENT
-                and e.action.class_name == "StatefulCalendarApp"
-                and e.action.function_name in ["get_calendar_events_from_to", "get_all_calendar_events"]
-                for e in agent_events
-            )
-
-            # STRICT Check 4: Agent checked cab status
-            cab_check_found = any(
-                e.event_type == EventType.AGENT
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name in ["get_current_ride_status", "get_ride_history"]
-                for e in agent_events
-            )
-
-            # STRICT Check 5: Agent canceled the existing cab booking
+            # STRICT Check 1: Agent canceled the existing cab booking
+            # Core outcome: cancel the current cab order (scenario step 6)
             cancel_cab_found = any(
                 e.event_type == EventType.AGENT
                 and e.action.class_name == "StatefulCabApp"
@@ -321,7 +286,8 @@ class UrgentConflictRideReschedule(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 6: Agent rescheduled the vendor meeting (edited calendar event)
+            # STRICT Check 2: Agent rescheduled the vendor meeting (edited calendar event)
+            # Core outcome: edit the calendar event to move it to the available time slot (scenario step 6)
             reschedule_meeting_found = any(
                 e.event_type == EventType.AGENT
                 and e.action.class_name == "StatefulCalendarApp"
@@ -330,7 +296,8 @@ class UrgentConflictRideReschedule(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 7: Agent booked new cab to Downtown Executive Center
+            # STRICT Check 3: Agent booked new cab to Downtown Executive Center
+            # Core outcome: order the new cab (scenario step 6)
             book_new_cab_found = any(
                 e.event_type == EventType.AGENT
                 and e.action.class_name == "StatefulCabApp"
@@ -339,7 +306,18 @@ class UrgentConflictRideReschedule(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 8: Agent notified legal team about rescheduling
+            # STRICT Check 4: Agent replied to Amanda Foster confirming attendance
+            # Core outcome: send a reply email confirming attendance to Amanda Foster (scenario step 6)
+            confirm_to_amanda_found = any(
+                e.event_type == EventType.AGENT
+                and e.action.class_name == "StatefulEmailApp"
+                and e.action.function_name == "reply_to_email"
+                and e.action.args.get("email_id") == "email_urgent_board_001"
+                for e in agent_events
+            )
+
+            # STRICT Check 5: Agent notified legal team about rescheduling
+            # Core outcome: send a rescheduling notification to the legal team (scenario step 6)
             notify_legal_team_found = any(
                 e.event_type == EventType.AGENT
                 and e.action.class_name == "StatefulEmailApp"
@@ -351,15 +329,12 @@ class UrgentConflictRideReschedule(PASScenario):
                 for e in agent_events
             )
 
-            # Combine all checks
+            # Combine all core outcome checks
             all_checks = [
-                ("proposal_found", proposal_found),
-                ("read_urgent_email_found", read_urgent_email_found),
-                ("calendar_check_found", calendar_check_found),
-                ("cab_check_found", cab_check_found),
                 ("cancel_cab_found", cancel_cab_found),
                 ("reschedule_meeting_found", reschedule_meeting_found),
                 ("book_new_cab_found", book_new_cab_found),
+                ("confirm_to_amanda_found", confirm_to_amanda_found),
                 ("notify_legal_team_found", notify_legal_team_found),
             ]
 

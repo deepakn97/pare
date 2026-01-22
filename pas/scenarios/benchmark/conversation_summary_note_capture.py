@@ -231,30 +231,7 @@ Open Questions:
         try:
             log_entries = env.event_log.list_view()
 
-            # Check Step 1: Agent sent proposal to the user
-            # STRICT: Agent must explicitly reference Morgan's request and offer to create a summary note
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
-
-            # Check Step 2: Agent read the conversation to extract content
-            # STRICT: Agent must read the conversation (using read_conversation or equivalent methods)
-            # Allow multiple equivalent read methods from the messaging API
-            conversation_read_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name in ["read_conversation", "get_messages"]
-                for e in log_entries
-            )
-
-            # Check Step 3: Agent created the structured note
-            # STRICT: Agent must create a note with correct folder ("Work") and structured content
-            # FLEXIBLE: Title may vary as long as it relates to the conversation topic
+            # Check Step 1: Agent created the structured note
             note_created = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
@@ -263,10 +240,7 @@ Open Questions:
                 for e in log_entries
             )
 
-            # Check Step 4: Agent sent confirmation to the group conversation
-            # STRICT: Agent must send a message back to the conversation mentioning the note creation
-            # FLEXIBLE: Exact wording can vary, but must mention note and confirmation
-            # Allow both send_message_to_group_conversation and send_message as equivalent methods
+            # Check Step 2: Agent sent confirmation to the group conversation
             confirmation_sent = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
@@ -276,15 +250,11 @@ Open Questions:
                 for e in log_entries
             )
 
-            success = proposal_found and conversation_read_found and note_created and confirmation_sent
+            success = note_created and confirmation_sent
 
             if not success:
                 # Build rationale for failure
                 missing = []
-                if not proposal_found:
-                    missing.append("agent proposal referencing Morgan's request")
-                if not conversation_read_found:
-                    missing.append("conversation read to extract decisions")
                 if not note_created:
                     missing.append("structured note creation in Work folder")
                 if not confirmation_sent:

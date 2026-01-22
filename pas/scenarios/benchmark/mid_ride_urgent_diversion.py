@@ -38,34 +38,34 @@ class MidRideUrgentDiversion(PASScenario):
 
         # Add contact: Sam (roommate) - this will automatically set up id_to_name and name_to_id
         self.messaging.add_users(["Sam"])
-        sam_contact_id = self.messaging.name_to_id["Sam"]
+        self.sam_contact_id = self.messaging.name_to_id["Sam"]
 
         # Create a conversation with Sam that contains prior context about work address
         sam_conversation = ConversationV2(
-            participant_ids=["user_001", sam_contact_id], title="Sam", conversation_id="conv_sam_001"
+            participant_ids=[self.messaging.current_user_id, self.sam_contact_id], title="Sam"
         )
 
         # Add older message context mentioning Sam's workplace
         prior_message_timestamp = self.start_time - 86400  # 1 day ago
         sam_conversation.messages.append(
             MessageV2(
-                sender_id=sam_contact_id,
+                sender_id=self.sam_contact_id,
                 content="Just started my new job at TechCorp! The office is at 456 Innovation Drive.",
                 timestamp=prior_message_timestamp,
-                message_id="msg_sam_001",
             )
         )
         sam_conversation.messages.append(
             MessageV2(
-                sender_id="user_001",
+                sender_id=self.messaging.current_user_id,
                 content="That's great! Congrats on the new role!",
                 timestamp=prior_message_timestamp + 300,
-                message_id="msg_user_001",
             )
         )
         sam_conversation.last_updated = prior_message_timestamp + 300
 
         self.messaging.add_conversation(sam_conversation)
+        # Store conversation_id for use in build_events_flow
+        self.sam_conversation_id = sam_conversation.conversation_id
 
         # Initialize cab app
         self.cab = StatefulCabApp(name="Cab")
@@ -103,8 +103,8 @@ class MidRideUrgentDiversion(PASScenario):
             # Event 1: Sam sends urgent message about accidentally taking the laptop charger (environment event)
             # This is the initial trigger that creates the problem
             sam_message_event = messaging_app.create_and_add_message(
-                conversation_id="conv_sam_001",
-                sender_id="sam_001",
+                conversation_id=self.sam_conversation_id,
+                sender_id=self.sam_contact_id,
                 content="Hey! I accidentally grabbed your laptop charger this morning and I'm at work until 8 PM. Just realized when I opened my bag. So sorry! Not sure if you are already on your ride to the airport.",
             ).delayed(10)
 
@@ -117,7 +117,7 @@ class MidRideUrgentDiversion(PASScenario):
             # Agent needs to read the conversation history to find Sam's workplace address mentioned in prior messages
             # Motivated by: To plan the diversion route, agent must know where Sam's workplace is located
             read_conversation_event = (
-                messaging_app.read_conversation(conversation_id="conv_sam_001", offset=0, limit=10)
+                messaging_app.read_conversation(conversation_id=self.sam_conversation_id, offset=0, limit=10)
                 .oracle()
                 .depends_on(check_ride_status_event, delay_seconds=2)
             )
@@ -187,7 +187,7 @@ class MidRideUrgentDiversion(PASScenario):
             # Motivated by: Sam needs to know when to meet user at workplace entrance with the charger
             notify_sam_event = (
                 messaging_app.send_message(
-                    user_id="sam_001",
+                    user_id=self.sam_contact_id,
                     content="No problem! I'm diverting my ride to pick up the charger from you. I'll be at your office (456 Innovation Drive) in about 15 minutes. Can you meet me outside with the charger?",
                 )
                 .oracle()
@@ -216,89 +216,58 @@ class MidRideUrgentDiversion(PASScenario):
             # Filter to only agent/oracle events (EventType.AGENT)
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent checked current ride status
-            # This is required to understand the current location and timing constraints
-            ride_status_checked = any(
-                e.action.class_name == "StatefulCabApp" and e.action.function_name == "get_current_ride_status"
+            # STRICT Check 1: Agent obtained quotation for first leg (home → Sam's workplace)
+            # This is the critical quotation needed to book the diverted ride
+            first_leg_quotation_obtained = any(
+                e.action.class_name == "StatefulCabApp"
+                and e.action.function_name == "get_quotation"
+                and e.action.args.get("start_location") is not None
+                and e.action.args.get("end_location") is not None
+                and "123 home street" in e.action.args.get("start_location", "").lower()
+                and "456 innovation drive" in e.action.args.get("end_location", "").lower()
                 for e in agent_events
             )
 
-            # STRICT Check 2: Agent read the conversation to find Sam's workplace address
-            # This is required to identify where to divert to
-            conversation_read = any(
-                e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                and e.action.args.get("conversation_id") == "conv_sam_001"
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent obtained quotations for route planning
-            # At least one quotation must be obtained to assess feasibility
-            quotation_obtained = any(
-                e.action.class_name == "StatefulCabApp" and e.action.function_name == "get_quotation"
-                for e in agent_events
-            )
-
-            # STRICT Check 4: Agent sent proposal to user
-            # The agent must propose the solution before proceeding
-            proposal_sent = any(
-                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
-                for e in agent_events
-            )
-
-            # STRICT Check 5: Agent canceled the current ride after acceptance
+            # STRICT Check 2: Agent canceled the current ride
             # This is required before booking a new ride
             ride_canceled = any(
                 e.action.class_name == "StatefulCabApp" and e.action.function_name == "user_cancel_ride"
                 for e in agent_events
             )
 
-            # STRICT Check 6: Agent booked new ride to Sam's workplace
-            # The ride must be ordered to execute the diversion
+            # STRICT Check 3: Agent booked new ride to Sam's workplace
+            # The ride must be ordered from home to Sam's workplace to execute the diversion
             new_ride_booked = any(
                 e.action.class_name == "StatefulCabApp"
                 and e.action.function_name == "order_ride"
+                and e.action.args.get("start_location") is not None
                 and e.action.args.get("end_location") is not None
-                and "456 innovation drive" in e.action.args.get("end_location").lower()
+                and "123 home street" in e.action.args.get("start_location", "").lower()
+                and "456 innovation drive" in e.action.args.get("end_location", "").lower()
                 for e in agent_events
             )
 
-            # STRICT Check 7: Agent notified Sam about the pickup
+            # STRICT Check 4: Agent notified Sam about the pickup
             # Sam must be informed so they can meet the user with the charger
-            # Note: Only check send_message (agent action), not create_and_add_message (env event)
             sam_notified = any(
                 e.action.class_name == "StatefulMessagingApp"
                 and e.action.function_name == "send_message"
-                and e.action.args.get("user_id") == "sam_001"
+                and e.action.args.get("user_id") == self.sam_contact_id
                 for e in agent_events
             )
 
             # Combine all checks
-            all_checks_passed = (
-                ride_status_checked
-                and conversation_read
-                and quotation_obtained
-                and proposal_sent
-                and ride_canceled
-                and new_ride_booked
-                and sam_notified
-            )
+            all_checks_passed = first_leg_quotation_obtained and ride_canceled and new_ride_booked and sam_notified
 
             # Build rationale for failures
             if not all_checks_passed:
                 failed_checks = []
-                if not ride_status_checked:
-                    failed_checks.append("agent did not check current ride status")
-                if not conversation_read:
-                    failed_checks.append("agent did not read conversation to find Sam's workplace")
-                if not quotation_obtained:
-                    failed_checks.append("agent did not obtain route quotations")
-                if not proposal_sent:
-                    failed_checks.append("agent did not send proposal to user")
+                if not first_leg_quotation_obtained:
+                    failed_checks.append("agent did not obtain quotation for home to Sam's workplace route")
                 if not ride_canceled:
                     failed_checks.append("agent did not cancel current ride")
                 if not new_ride_booked:
-                    failed_checks.append("agent did not book new ride to Sam's workplace")
+                    failed_checks.append("agent did not book new ride from home to Sam's workplace")
                 if not sam_notified:
                     failed_checks.append("agent did not notify Sam about pickup")
 

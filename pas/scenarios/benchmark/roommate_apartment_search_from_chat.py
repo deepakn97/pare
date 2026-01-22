@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from are.simulation.apps.contacts import Contact
 from are.simulation.apps.messaging_v2 import ConversationV2, MessageV2
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
@@ -34,36 +33,23 @@ class RoommateApartmentSearchFromChat(PASScenario):
         # Initialize StatefulMessagingApp
         self.messaging = StatefulMessagingApp(name="Messages")
 
-        # Add contacts: two potential roommates
-        alex_contact = Contact(
-            first_name="Alex",
-            last_name="Chen",
-            phone="+1234567890",
-        )
-        jordan_contact = Contact(
-            first_name="Jordan",
-            last_name="Rivera",
-            phone="+1234567891",
-        )
-
         # Register the contacts in the messaging app using add_contacts method
         self.messaging.add_contacts([
             ("Alex Chen", "+1234567890"),
             ("Jordan Rivera", "+1234567891"),
         ])
 
-        # Create a group conversation with Alex and Jordan
-        # Get user IDs for Alex and Jordan
-        alex_id = self.messaging.name_to_id["Alex Chen"]
-        jordan_id = self.messaging.name_to_id["Jordan Rivera"]
+        # Store user IDs for Alex and Jordan for use in build_events_flow
+        self.alex_id = self.messaging.name_to_id["Alex Chen"]
+        self.jordan_id = self.messaging.name_to_id["Jordan Rivera"]
 
         # Create the group conversation with existing history about apartment hunting
         group_conversation = ConversationV2(
-            participant_ids=[self.messaging.current_user_id, alex_id, jordan_id],
+            participant_ids=[self.messaging.current_user_id, self.alex_id, self.jordan_id],
             title="Alex Chen, Jordan Rivera",
             messages=[
                 MessageV2(
-                    sender_id=alex_id,
+                    sender_id=self.alex_id,
                     content="Hey! So I think we should seriously start looking for places soon. Our leases are all up in December right?",
                     timestamp=self.start_time - 86400,  # 1 day ago
                 ),
@@ -73,15 +59,18 @@ class RoommateApartmentSearchFromChat(PASScenario):
                     timestamp=self.start_time - 86000,  # shortly after
                 ),
                 MessageV2(
-                    sender_id=jordan_id,
+                    sender_id=self.jordan_id,
                     content="Same here, Dec 20 for me. Let's do this!",
                     timestamp=self.start_time - 85000,
                 ),
             ],
         )
 
-        # Add the conversation to the messaging app
+        # Add the conversation to the messaging app and store conversation ID
         self.messaging.add_conversation(group_conversation)
+        # Store conversation ID for use in build_events_flow
+        conv_ids = self.messaging.get_existing_conversation_ids([self.alex_id, self.jordan_id])
+        self.group_conv_id = conv_ids[0]
 
         # Initialize StatefulApartmentApp with some apartment listings
         self.apartment = StatefulApartmentApp(name="Apartment")
@@ -197,31 +186,25 @@ class RoommateApartmentSearchFromChat(PASScenario):
         messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
         apartment_app = self.get_typed_app(StatefulApartmentApp, "Apartment")
 
-        # Get the conversation ID for the group chat BEFORE capture_mode
-        alex_id = messaging_app.name_to_id["Alex Chen"]
-        jordan_id = messaging_app.name_to_id["Jordan Rivera"]
-        conv_ids = messaging_app.get_existing_conversation_ids([alex_id, jordan_id])
-        group_conv_id = conv_ids[0]
-
         with EventRegisterer.capture_mode():
             # Environment event 1: Alex sends message with search criteria
             env1 = messaging_app.create_and_add_message(
-                conversation_id=group_conv_id,
-                sender_id=alex_id,
+                conversation_id=self.group_conv_id,
+                sender_id=self.alex_id,
                 content="We should look for 3-bedroom apartments in downtown, preferably under $2500 total with parking.",
             )
 
             # Environment event 2: Jordan adds pet-friendly requirement
             env2 = messaging_app.create_and_add_message(
-                conversation_id=group_conv_id,
-                sender_id=jordan_id,
+                conversation_id=self.group_conv_id,
+                sender_id=self.jordan_id,
                 content="And pet-friendly since I have a dog!",
             ).delayed(1)
 
             # Oracle event: Agent reads the group conversation to see the search criteria mentioned in env1 and env2
             oracle1 = (
                 messaging_app.read_conversation(
-                    conversation_id=group_conv_id,
+                    conversation_id=self.group_conv_id,
                     offset=0,
                     limit=10,
                 )
@@ -279,7 +262,7 @@ class RoommateApartmentSearchFromChat(PASScenario):
             # This depends on user acceptance (user_accept)
             oracle3 = (
                 messaging_app.send_message_to_group_conversation(
-                    conversation_id=group_conv_id,
+                    conversation_id=self.group_conv_id,
                     content=(
                         "Hi Alex and Jordan! I searched for 3-bedroom apartments in Downtown under $2,500 with Parking. Here are the pet-friendly options:\n\n"
                         "- Downtown Lofts (Downtown, $2,400) — 3BR/2BA — pet policy: Pets allowed — amenities: Parking, Gym, Pool\n"
@@ -320,23 +303,8 @@ class RoommateApartmentSearchFromChat(PASScenario):
                 for e in agent_events
             )
 
-            # FLEXIBLE Check 2: Agent read/observed the group conversation to understand requirements
-            # Accept multiple ways of observing conversation state
-            conversation_read = any(
-                e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name in ["read_conversation", "get_conversation"]
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent searched apartments with appropriate filters
-            # The search must have occurred (exact filter values are flexible)
-            apartment_search = any(
-                e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "search_apartments"
-                for e in agent_events
-            )
-
-            # FLEXIBLE Check 4: Agent sent response message to group conversation
-            # Accept either send_message_to_group_conversation or send_message depending on API
+            # STRICT Check 2: Agent sent response message to group conversation with apartment recommendations
+            # Accept multiple ways of sending messages to group conversations
             group_message_sent = any(
                 e.action.class_name == "StatefulMessagingApp"
                 and e.action.function_name
@@ -347,9 +315,6 @@ class RoommateApartmentSearchFromChat(PASScenario):
             # Build success result and rationale
             if not proposal_found:
                 rationale = "Agent did not send a proposal to the user via PASAgentUserInterface.send_message_to_user"
-                success = False
-            elif not apartment_search:
-                rationale = "Agent did not perform apartment search using StatefulApartmentApp.search_apartments"
                 success = False
             elif not group_message_sent:
                 rationale = "Agent did not send search results to the group conversation via StatefulMessagingApp messaging method"

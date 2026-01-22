@@ -104,10 +104,11 @@ class GroupOrderSplitCoordination(PASScenario):
         messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
         shopping_app = self.get_typed_app(StatefulShoppingApp, "Shopping")
 
-        alice_id = "alice_123"
-        bob_id = "bob_456"
-        charlie_id = "charlie_789"
-        user_id = "user_me"
+        # Get user IDs from messaging app (not hardcoded)
+        alice_id = messaging_app.name_to_id["Alice"]
+        bob_id = messaging_app.name_to_id["Bob"]
+        charlie_id = messaging_app.name_to_id["Charlie"]
+        user_id = messaging_app.current_user_id
 
         # Create individual conversations with each friend in Step 2 to seed baseline state
         alice_conv = ConversationV2(participant_ids=[user_id, alice_id])
@@ -334,6 +335,12 @@ class GroupOrderSplitCoordination(PASScenario):
             # Filter to only agent events
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
+            # Get user IDs from messaging app (not hardcoded)
+            messaging_app = self.get_typed_app(StatefulMessagingApp, "Messages")
+            alice_id = messaging_app.name_to_id["Alice"]
+            bob_id = messaging_app.name_to_id["Bob"]
+            charlie_id = messaging_app.name_to_id["Charlie"]
+
             # STRICT Check 1: Agent sent proposal mentioning group order coordination with all three participants
             proposal_found = any(
                 isinstance(e.action, Action)
@@ -343,27 +350,18 @@ class GroupOrderSplitCoordination(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 2: Agent read conversations to understand requests
-            # Should have at least one read_conversation call (flexible on exact count)
-            read_conversations_found = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent created group conversation with all three participants
+            # STRICT Check 2: Agent created group conversation with all three participants
             group_conv_created = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulMessagingApp"
                 and e.action.function_name == "create_group_conversation"
-                and "alice_123" in e.action.args.get("user_ids", [])
-                and "bob_456" in e.action.args.get("user_ids", [])
-                and "charlie_789" in e.action.args.get("user_ids", [])
+                and alice_id in e.action.args.get("user_ids", [])
+                and bob_id in e.action.args.get("user_ids", [])
+                and charlie_id in e.action.args.get("user_ids", [])
                 for e in agent_events
             )
 
-            # STRICT Check 4: Agent searched for all three products by name
+            # STRICT Check 3: Agent searched for all three products by name
             # Look for searches that would find the requested items (flexible on exact search terms)
             headphones_search = any(
                 isinstance(e.action, Action)
@@ -389,7 +387,7 @@ class GroupOrderSplitCoordination(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 5: Agent added all three items to cart
+            # STRICT Check 4: Agent added all three items to cart
             headphones_added = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
@@ -414,7 +412,7 @@ class GroupOrderSplitCoordination(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 6: Agent checked or used discount code (flexible - either get_discount_code_info or direct checkout with code)
+            # STRICT Check 5: Agent checked or used discount code (flexible - either get_discount_code_info or direct checkout with code)
             discount_handled = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
@@ -431,7 +429,7 @@ class GroupOrderSplitCoordination(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 7: Agent completed checkout
+            # STRICT Check 6: Agent completed checkout
             checkout_completed = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
@@ -439,12 +437,12 @@ class GroupOrderSplitCoordination(PASScenario):
                 for e in agent_events
             )
 
-            # FLEXIBLE Check 8: Agent sent confirmation message (optional per guidelines)
-            # Not enforcing this as strictly required unless scenario explicitly demands it
+            # STRICT Check 7: Agent sent order confirmation to group conversation
+            # Scenario explicitly requires "Send the order confirmation details to the group conversation"
             confirmation_sent = any(
                 isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
+                and e.action.class_name == "StatefulMessagingApp"
+                and e.action.function_name == "send_message_to_group_conversation"
                 for e in agent_events
             )
 
@@ -454,12 +452,12 @@ class GroupOrderSplitCoordination(PASScenario):
 
             success = (
                 proposal_found
-                and read_conversations_found
                 and group_conv_created
                 and all_products_searched
                 and all_products_added
                 and discount_handled
                 and checkout_completed
+                and confirmation_sent
             )
 
             # Build rationale for failure
@@ -467,8 +465,6 @@ class GroupOrderSplitCoordination(PASScenario):
                 missing_checks = []
                 if not proposal_found:
                     missing_checks.append("agent proposal to coordinate group order")
-                if not read_conversations_found:
-                    missing_checks.append("reading conversations to understand requests")
                 if not group_conv_created:
                     missing_checks.append("group conversation creation with all participants")
                 if not all_products_searched:
@@ -479,6 +475,8 @@ class GroupOrderSplitCoordination(PASScenario):
                     missing_checks.append("discount code handling")
                 if not checkout_completed:
                     missing_checks.append("checkout completion")
+                if not confirmation_sent:
+                    missing_checks.append("order confirmation sent to group conversation")
 
                 rationale = f"Missing critical checks: {', '.join(missing_checks)}"
                 return ScenarioValidationResult(success=False, rationale=rationale)

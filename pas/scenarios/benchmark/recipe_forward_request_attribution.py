@@ -196,8 +196,8 @@ Shared with: Jessica Lee (October 2025)"""
 
         with EventRegisterer.capture_mode():
             # Environment event: Jessica sends a message requesting recipe forwarding to her cousin Sarah
-            # Use the hard-coded conversation ID from Step 2 initialization
-            jessica_phone = "+1-555-0150"
+            # Get Jessica's phone number from messaging app
+            jessica_phone = messaging_app.name_to_id["Jessica Lee"]
             jessica_conv_id = "jessica_conv_001"
 
             # Jessica sends the forwarding request message
@@ -329,27 +329,13 @@ Shared with: Jessica Lee (October 2025), Sarah Lee (November 2025)""",
             # Filter to agent/oracle events only
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent must read the conversation with Jessica to understand the request
-            read_conversation_found = any(
-                e.action.class_name == "StatefulMessagingApp" and e.action.function_name == "read_conversation"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent must search for the recipe content (messaging history OR notes)
-            # Accept either messaging search OR note search as valid content discovery
-            searched_recipe = any(
-                (e.action.class_name == "StatefulMessagingApp" and e.action.function_name == "search")
-                or (e.action.class_name == "StatefulNotesApp" and e.action.function_name == "search_notes")
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent must propose the forwarding action to the user
+            # STRICT Check 1: Agent must propose the forwarding action to the user
             proposal_found = any(
                 e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
                 for e in agent_events
             )
 
-            # STRICT Check 4: Agent must add Sarah to contacts with appropriate context
+            # STRICT Check 2: Agent must add Sarah to contacts with appropriate context
             # Check that add_new_contact was called with Sarah's phone number
             add_sarah_found = any(
                 e.action.class_name == "StatefulContactsApp"
@@ -358,7 +344,7 @@ Shared with: Jessica Lee (October 2025), Sarah Lee (November 2025)""",
                 for e in agent_events
             )
 
-            # STRICT Check 5: Agent must send the recipe to Sarah
+            # STRICT Check 3: Agent must send the recipe to Sarah
             # Accept either send_message or create_and_add_message as valid message-sending methods
             send_to_sarah_found = any(
                 (
@@ -370,13 +356,21 @@ Shared with: Jessica Lee (October 2025), Sarah Lee (November 2025)""",
                 for e in agent_events
             )
 
+            # STRICT Check 4: Agent must update the recipe note to document distribution history
+            # Check that update_note was called on the recipe note
+            note_updated_found = any(
+                e.action.class_name == "StatefulNotesApp"
+                and e.action.function_name == "update_note"
+                and str(e.action.args.get("note_id", "")) == str(self.recipe_note_id)
+                for e in agent_events
+            )
+
             # Build success result and rationale
             all_checks = {
-                "read_conversation": read_conversation_found,
-                "searched_recipe": searched_recipe,
                 "proposal": proposal_found,
                 "add_sarah_contact": add_sarah_found,
                 "send_recipe_to_sarah": send_to_sarah_found,
+                "update_note_distribution_history": note_updated_found,
             }
 
             success = all(all_checks.values())

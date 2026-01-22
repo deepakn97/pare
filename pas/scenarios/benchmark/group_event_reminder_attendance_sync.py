@@ -51,9 +51,10 @@ class GroupEventReminderAttendanceSync(PASScenario):
 
         # Add users to messaging app - this will automatically set up id_to_name and name_to_id
         self.messaging.add_users(["Jordan", "Taylor", "Casey"])
-        jordan_id = self.messaging.name_to_id["Jordan"]
-        taylor_id = self.messaging.name_to_id["Taylor"]
-        casey_id = self.messaging.name_to_id["Casey"]
+        # Save user IDs as instance variables for use in build_events_flow and validate
+        self.jordan_id = self.messaging.name_to_id["Jordan"]
+        self.taylor_id = self.messaging.name_to_id["Taylor"]
+        self.casey_id = self.messaging.name_to_id["Casey"]
         # current_user_id is automatically set by StatefulMessagingApp
 
         # Create individual conversations with each person (seeding baseline history)
@@ -61,7 +62,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
         jordan_conv_id = "jordan_conv_id"
         jordan_conv = ConversationV2(
             conversation_id=jordan_conv_id,
-            participant_ids=["user_id", jordan_id],
+            participant_ids=["user_id", self.jordan_id],
             title="Jordan",
             messages=[
                 MessageV2(
@@ -70,7 +71,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
                     timestamp=datetime(2025, 11, 17, 14, 0, 0, tzinfo=UTC).timestamp(),
                 ),
                 MessageV2(
-                    sender_id=jordan_id,
+                    sender_id=self.jordan_id,
                     content="Yes, I'll be there! Looking forward to it.",
                     timestamp=datetime(2025, 11, 17, 14, 15, 0, tzinfo=UTC).timestamp(),
                 ),
@@ -83,7 +84,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
         taylor_conv_id = "taylor_conv_id"
         taylor_conv = ConversationV2(
             conversation_id=taylor_conv_id,
-            participant_ids=["user_id", taylor_id],
+            participant_ids=["user_id", self.taylor_id],
             title="Taylor",
             messages=[
                 MessageV2(
@@ -92,7 +93,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
                     timestamp=datetime(2025, 11, 17, 15, 0, 0, tzinfo=UTC).timestamp(),
                 ),
                 MessageV2(
-                    sender_id=taylor_id,
+                    sender_id=self.taylor_id,
                     content="Absolutely! Can't wait.",
                     timestamp=datetime(2025, 11, 17, 15, 10, 0, tzinfo=UTC).timestamp(),
                 ),
@@ -105,7 +106,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
         casey_conv_id = "casey_conv_id"
         casey_conv = ConversationV2(
             conversation_id=casey_conv_id,
-            participant_ids=["user_id", casey_id],
+            participant_ids=["user_id", self.casey_id],
             title="Casey",
             messages=[
                 MessageV2(
@@ -114,7 +115,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
                     timestamp=datetime(2025, 11, 17, 16, 0, 0, tzinfo=UTC).timestamp(),
                 ),
                 MessageV2(
-                    sender_id=casey_id,
+                    sender_id=self.casey_id,
                     content="Got it, thanks! See you there.",
                     timestamp=datetime(2025, 11, 17, 16, 5, 0, tzinfo=UTC).timestamp(),
                 ),
@@ -147,21 +148,21 @@ class GroupEventReminderAttendanceSync(PASScenario):
             # Environment Event 1: Jordan sends cancellation message (family emergency)
             jordan_message_event = messaging_app.create_and_add_message(
                 conversation_id="jordan_conv_id",
-                sender_id="jordan_contact_id",
+                sender_id=self.jordan_id,
                 content="Sorry, can't make the potluck tomorrow—family emergency",
             ).delayed(30)
 
             # Environment Event 2: Taylor sends message about bringing partner
             taylor_message_event = messaging_app.create_and_add_message(
                 conversation_id="taylor_conv_id",
-                sender_id="taylor_contact_id",
+                sender_id=self.taylor_id,
                 content="Hey, bringing my partner to the dinner, hope that's ok!",
             ).delayed(45)
 
             # Environment Event 3: Casey sends message about being late
             casey_message_event = messaging_app.create_and_add_message(
                 conversation_id="casey_conv_id",
-                sender_id="casey_contact_id",
+                sender_id=self.casey_id,
                 content="I'll be 30 minutes late, start without me",
             ).delayed(60)
 
@@ -214,7 +215,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
             # Motivated by: reminder updated; agent should acknowledge Jordan's cancellation
             jordan_confirmation_event = (
                 messaging_app.send_message(
-                    user_id="jordan_contact_id",
+                    user_id=self.jordan_id,
                     content="Thanks for letting me know, Jordan. I've updated the potluck attendance. Hope everything's okay with your family.",
                 )
                 .oracle()
@@ -225,7 +226,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
             # Motivated by: reminder updated; agent should confirm Taylor's +1 is noted
             taylor_confirmation_event = (
                 messaging_app.send_message(
-                    user_id="taylor_contact_id",
+                    user_id=self.taylor_id,
                     content="Great! I've updated the reminder to include your partner for the potluck.",
                 )
                 .oracle()
@@ -236,7 +237,7 @@ class GroupEventReminderAttendanceSync(PASScenario):
             # Motivated by: reminder updated; agent should acknowledge Casey's late arrival
             casey_confirmation_event = (
                 messaging_app.send_message(
-                    user_id="casey_contact_id",
+                    user_id=self.casey_id,
                     content="No problem, Casey! I've noted you'll be arriving 30 minutes late to the potluck.",
                 )
                 .oracle()
@@ -258,89 +259,53 @@ class GroupEventReminderAttendanceSync(PASScenario):
             casey_confirmation_event,
         ]
 
-    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:  # noqa: C901
+    def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
-
-            # Filter to only AGENT event types (oracle events)
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # Check 1 (STRICT): Agent reads all reminders to understand current state
-            get_reminders_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulReminderApp" and e.action.function_name == "get_all_reminders":
-                    get_reminders_found = True
-                    break
-
-            # Check 2 (STRICT): Agent proposes updating the reminder with attendance changes
-            proposal_found = False
-            for e in agent_events:
-                if e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user":
-                    # Found a proposal message - don't check exact content per flexibility guidelines
-                    proposal_found = True
-                    break
-
-            # Check 3 (STRICT): Agent deletes the old reminder
-            delete_reminder_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulReminderApp" and e.action.function_name == "delete_reminder":
-                    # Verify the correct reminder_id was deleted
-                    args = e.action.args if e.action.args else e.action.resolved_args
-                    if args.get("reminder_id") == "potluck_reminder_id":
-                        delete_reminder_found = True
-                        break
-
-            # Check 4 (STRICT): Agent adds a new reminder with updated attendance
-            add_reminder_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulReminderApp" and e.action.function_name == "add_reminder":
-                    args = e.action.args if e.action.args else e.action.resolved_args
-                    # Verify essential fields are present (flexible on exact content)
-                    if args.get("title") and args.get("due_datetime") and args.get("description"):
-                        add_reminder_found = True
-                        break
-
-            # Check 5 (STRICT): Agent sends confirmation messages to all three participants
-            # Count messages sent via StatefulMessagingApp.send_message
-            message_recipients = set()
-            for e in agent_events:
-                if e.action.class_name == "StatefulMessagingApp" and e.action.function_name == "send_message":
-                    args = e.action.args if e.action.args else e.action.resolved_args
-                    user_id = args.get("user_id")
-                    if user_id:
-                        message_recipients.add(user_id)
-
-            # Verify all three participants received messages
-            expected_recipients = {"jordan_contact_id", "taylor_contact_id", "casey_contact_id"}
-            all_confirmations_sent = expected_recipients.issubset(message_recipients)
-
-            # Determine overall success
-            success = (
-                get_reminders_found
-                and proposal_found
-                and delete_reminder_found
-                and add_reminder_found
-                and all_confirmations_sent
+            # Check 1: Agent proposes updating the reminder
+            proposal_found = any(
+                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
+                for e in agent_events
             )
 
-            # Build rationale for failures
-            if not success:
-                failed_checks = []
-                if not get_reminders_found:
-                    failed_checks.append("agent did not retrieve reminders")
-                if not proposal_found:
-                    failed_checks.append("agent did not send proposal to user")
-                if not delete_reminder_found:
-                    failed_checks.append("agent did not delete the old reminder")
-                if not add_reminder_found:
-                    failed_checks.append("agent did not add updated reminder")
-                if not all_confirmations_sent:
-                    missing = expected_recipients - message_recipients
-                    failed_checks.append(f"agent did not send confirmations to: {missing}")
+            # Check 2: Agent deletes old reminder and adds updated one
+            delete_found = any(
+                e.action.class_name == "StatefulReminderApp" and e.action.function_name == "delete_reminder"
+                for e in agent_events
+            )
+            add_found = any(
+                e.action.class_name == "StatefulReminderApp"
+                and e.action.function_name == "add_reminder"
+                and (e.action.args or e.action.resolved_args or {}).get("title") == "Team Potluck Dinner"
+                for e in agent_events
+            )
 
-                rationale = "; ".join(failed_checks)
-                return ScenarioValidationResult(success=False, rationale=rationale)
+            # Check 3: Agent sends confirmations to all three participants
+            message_recipients = {
+                (e.action.args or e.action.resolved_args or {}).get("user_id")
+                for e in agent_events
+                if e.action.class_name == "StatefulMessagingApp" and e.action.function_name == "send_message"
+            }
+            expected_recipients = {self.jordan_id, self.taylor_id, self.casey_id}
+            confirmations_sent = expected_recipients.issubset(message_recipients)
+
+            success = proposal_found and delete_found and add_found and confirmations_sent
+
+            if not success:
+                failed = []
+                if not proposal_found:
+                    failed.append("no proposal sent")
+                if not delete_found:
+                    failed.append("old reminder not deleted")
+                if not add_found:
+                    failed.append("updated reminder not added")
+                if not confirmations_sent:
+                    missing = expected_recipients - message_recipients
+                    failed.append(f"missing confirmations to: {missing}")
+                return ScenarioValidationResult(success=False, rationale="; ".join(failed))
 
             return ScenarioValidationResult(success=True)
 

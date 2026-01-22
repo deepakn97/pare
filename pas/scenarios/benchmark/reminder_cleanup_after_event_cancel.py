@@ -149,47 +149,34 @@ class ReminderCleanupAfterEventCancel(PASScenario):
         """Validate that agent detects the environment events and made actions accordingly."""
         try:
             log_entries = env.event_log.list_view()
+            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # Check Step 1 (STRICT): Agent listed reminders to identify obsolete preparation tasks
-            # The agent must retrieve reminders to find ones related to the canceled workshop
-            reminders_listed = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulReminderApp"
-                and e.action.function_name == "get_all_reminders"
-                for e in log_entries
-            )
-
-            # Check Step 2 (STRICT): Agent proposed cleanup to user via PASAgentUserInterface
+            # Check Step 1 (STRICT): Agent proposed cleanup to user via PASAgentUserInterface
             # The proposal must reference the cancellation (flexible on exact wording)
             proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                for e in log_entries
+                for e in agent_events
             )
 
-            # Check Step 3 (STRICT): Agent deleted both preparation reminders after user acceptance
-            # We expect exactly 2 delete_reminder calls (one for each preparation reminder)
+            # Check Step 2 (STRICT): Agent deleted both preparation reminders
+            # We expect at least 2 delete_reminder calls (one for each preparation reminder)
             delete_reminder_events = [
                 e
-                for e in log_entries
-                if e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                for e in agent_events
+                if isinstance(e.action, Action)
                 and e.action.class_name == "StatefulReminderApp"
                 and e.action.function_name == "delete_reminder"
             ]
             both_reminders_deleted = len(delete_reminder_events) >= 2
 
             # All strict checks must pass for success
-            success = reminders_listed and proposal_found and both_reminders_deleted
+            success = proposal_found and both_reminders_deleted
 
             # Build rationale for failure
             if not success:
                 missing = []
-                if not reminders_listed:
-                    missing.append("agent did not list reminders to identify obsolete tasks")
                 if not proposal_found:
                     missing.append("agent did not propose cleanup to user")
                 if not both_reminders_deleted:

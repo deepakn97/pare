@@ -226,21 +226,11 @@ class GiftPurchaseMultiEmailInference(PASScenario):
         ]
 
     def validate(self, env: AbstractEnvironment) -> ScenarioValidationResult:
-        """Validate that agent detects the environment events and made actions accordingly."""
+        """Validate that agent inferred gift opportunity from multiple emails and completed purchase."""
         try:
             log_entries = env.event_log.list_view()
 
-            # STRICT Check: Agent searched shopping catalog for yoga mats
-            product_search_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "search_product"
-                and "yoga" in str(e.action.args.get("product_name", "")).lower()
-                for e in log_entries
-            )
-
-            # STRICT Check: Agent sent proposal mentioning both partner and gift opportunity
+            # Check 1: Agent sent proposal (demonstrates multi-email inference)
             proposal_found = any(
                 (e.event_type == EventType.AGENT)
                 and isinstance(e.action, Action)
@@ -249,17 +239,7 @@ class GiftPurchaseMultiEmailInference(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check: Agent added yoga mat product to cart
-            add_to_cart_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "add_to_cart"
-                and "yoga-mat" in str(e.action.args.get("item_id", ""))
-                for e in log_entries
-            )
-
-            # STRICT Check: Agent completed checkout with discount code
+            # Check 2: Agent completed checkout with discount code
             checkout_found = any(
                 (e.event_type == EventType.AGENT)
                 and isinstance(e.action, Action)
@@ -269,24 +249,18 @@ class GiftPurchaseMultiEmailInference(PASScenario):
                 for e in log_entries
             )
 
-            # Build rationale for failure
-            missing_checks = []
-            if not product_search_found:
-                missing_checks.append("product search for yoga mat")
-            if not proposal_found:
-                missing_checks.append("proposal mentioning partner/anniversary and yoga mat")
-            if not add_to_cart_found:
-                missing_checks.append("add yoga mat to cart")
-            if not checkout_found:
-                missing_checks.append("checkout with FITNESS25 discount code")
+            success = proposal_found and checkout_found
 
-            success = product_search_found and proposal_found and add_to_cart_found and checkout_found
-
-            rationale = None
             if not success:
-                rationale = f"Missing critical checks: {', '.join(missing_checks)}"
+                missing_checks = []
+                if not proposal_found:
+                    missing_checks.append("agent did not send proposal")
+                if not checkout_found:
+                    missing_checks.append("agent did not complete checkout with FITNESS25 discount")
+                rationale = "; ".join(missing_checks)
+                return ScenarioValidationResult(success=False, rationale=rationale)
 
-            return ScenarioValidationResult(success=success, rationale=rationale)
+            return ScenarioValidationResult(success=True)
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)

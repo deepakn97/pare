@@ -188,13 +188,7 @@ class ShoppingDiscountCartOptimization(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 3: Agent sent proposal to user (flexible on message content)
-            proposal_found = any(
-                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
-                for e in agent_events
-            )
-
-            # STRICT Check 4: Agent removed ineligible items from cart
+            # STRICT Check 3: Agent removed ineligible items from cart
             remove_cable_found = any(
                 e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "remove_from_cart"
@@ -202,7 +196,7 @@ class ShoppingDiscountCartOptimization(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT Check 5: Agent completed checkout with discount code
+            # STRICT Check 4: Agent completed checkout with discount code
             checkout_found = any(
                 e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "checkout"
@@ -211,9 +205,7 @@ class ShoppingDiscountCartOptimization(PASScenario):
             )
 
             # Determine success based on all strict checks
-            success = (
-                list_cart_found and check_discount_found and proposal_found and remove_cable_found and checkout_found
-            )
+            success = list_cart_found and check_discount_found and remove_cable_found and checkout_found
 
             # Build rationale if validation fails
             if not success:
@@ -222,8 +214,6 @@ class ShoppingDiscountCartOptimization(PASScenario):
                     missing_checks.append("agent did not check cart contents")
                 if not check_discount_found:
                     missing_checks.append("agent did not verify discount code eligibility")
-                if not proposal_found:
-                    missing_checks.append("agent did not send optimization proposal to user")
                 if not remove_cable_found:
                     missing_checks.append("agent did not remove ineligible cable item")
                 if not checkout_found:

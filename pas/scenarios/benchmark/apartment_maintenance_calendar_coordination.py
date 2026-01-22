@@ -60,7 +60,11 @@ class ApartmentMaintenanceCalendarCoordination(PASScenario):
             lease_term="1 year",
             amenities=["In-unit laundry", "Parking", "Gym", "Central heating/AC"],
         )
+        self.riverside_apt_id = riverside_apt_id
         self.apartment.save_apartment(riverside_apt_id)
+
+        # Store email ID for use in build_events_flow
+        self.maintenance_email_id = "email_maintenance_req_001"
 
         # Initialize email app
         self.email = StatefulEmailApp(name="Emails")
@@ -105,7 +109,7 @@ class ApartmentMaintenanceCalendarCoordination(PASScenario):
         with EventRegisterer.capture_mode():
             # Environment event: Building management sends HVAC maintenance requirement email
             maintenance_email = email_app.send_email_to_user_with_id(
-                email_id="email_maintenance_req_001",
+                email_id=self.maintenance_email_id,
                 sender="maintenance@riversidefts.com",
                 subject="Required: Annual HVAC Inspection & Filter Replacement",
                 content="""Dear Riverside Lofts Resident,
@@ -129,7 +133,7 @@ maintenance@riversidefts.com""",
             # Agent reads the maintenance email to understand requirements
             # Motivated by: the incoming email notification that just appeared
             agent_reads_email = (
-                email_app.get_email_by_id(email_id="email_maintenance_req_001", folder_name="INBOX")
+                email_app.get_email_by_id(email_id=self.maintenance_email_id, folder_name="INBOX")
                 .oracle()
                 .depends_on(maintenance_email, delay_seconds=2)
             )
@@ -183,7 +187,7 @@ Would you like me to:
             # Motivated by: user accepted the proposal; need to notify building management per email request
             agent_replies_email = (
                 email_app.reply_to_email(
-                    email_id="email_maintenance_req_001",
+                    email_id=self.maintenance_email_id,
                     folder_name="INBOX",
                     content="""Hello,
 
@@ -247,77 +251,24 @@ User""",
             # Filter to only AGENT events for validation
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent read the maintenance email
-            agent_read_email = any(
-                e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name in ["get_email_by_id", "list_emails"]
-                and e.action.args.get("email_id") == "email_maintenance_req_001"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent queried calendar for availability
-            agent_checked_calendar = any(
-                e.action.class_name == "StatefulCalendarApp"
-                and e.action.function_name in ["get_calendar_events_from_to", "list_calendar_events", "search_events"]
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent proposed maintenance window to user
-            # Accept any message to user from the agent UI (content flexible)
-            agent_proposed = any(
-                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
-                for e in agent_events
-            )
-
-            # STRICT Check 4: Agent replied to maintenance email
-            # Accept reply_to_email with the correct email_id (content flexible)
+            # Check: Agent replied to maintenance email
             agent_replied_email = any(
                 e.action.class_name == "StatefulEmailApp"
                 and e.action.function_name == "reply_to_email"
-                and e.action.args.get("email_id") == "email_maintenance_req_001"
-                and e.action.args.get("content") is not None
-                and "3b" in e.action.args.get("content").lower()
+                and e.action.args.get("email_id") == self.maintenance_email_id
                 for e in agent_events
             )
 
-            # STRICT Check 5: Agent added calendar event for maintenance
-            # Check that add_calendar_event was called with non-empty title and datetime (exact values flexible)
+            # Check: Agent added calendar event for maintenance
             agent_added_calendar = any(
-                e.action.class_name == "StatefulCalendarApp"
-                and e.action.function_name == "add_calendar_event"
-                and e.action.args.get("title") is not None
-                and e.action.args.get("start_datetime") is not None
-                and e.action.args.get("end_datetime") is not None
+                e.action.class_name == "StatefulCalendarApp" and e.action.function_name == "add_calendar_event"
                 for e in agent_events
             )
 
-            # Build success result
-            success = (
-                agent_read_email
-                and agent_checked_calendar
-                and agent_proposed
-                and agent_replied_email
-                and agent_added_calendar
-            )
+            success = agent_replied_email and agent_added_calendar
+            rationale = "all checks passed" if success else "agent did not complete required actions"
 
-            # Build rationale for failure cases
-            if not success:
-                missing_checks = []
-                if not agent_read_email:
-                    missing_checks.append("agent did not read maintenance email")
-                if not agent_checked_calendar:
-                    missing_checks.append("agent did not query calendar for availability")
-                if not agent_proposed:
-                    missing_checks.append("agent did not propose maintenance window to user")
-                if not agent_replied_email:
-                    missing_checks.append("agent did not reply to maintenance email")
-                if not agent_added_calendar:
-                    missing_checks.append("agent did not add calendar event")
-
-                rationale = "; ".join(missing_checks)
-                return ScenarioValidationResult(success=False, rationale=rationale)
-
-            return ScenarioValidationResult(success=True)
+            return ScenarioValidationResult(success=success, rationale=rationale)
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)

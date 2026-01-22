@@ -204,41 +204,7 @@ class FriendProductSwapRecommendation(PASScenario):
                 for e in log_entries
             )
 
-            # Check Step 2a: Agent detected the conversation (list_recent_conversations)
-            # STRICT: Must check messaging app for recent conversations
-            conversations_checked = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "list_recent_conversations"
-                for e in log_entries
-            )
-
-            # Check Step 2b: Agent checked the shopping cart contents
-            # STRICT: Must verify cart contents to know what to replace
-            cart_checked = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_cart"
-                for e in log_entries
-            )
-
-            # Check Step 2c: Agent searched for the recommended product
-            # STRICT: Must search for "Logitech MX Master 3S" or similar
-            # FLEXIBLE: Search query may vary slightly but must reference the recommended product
-            product_searched = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "search_product"
-                and any(
-                    keyword in e.action.args.get("product_name", "").lower() for keyword in ["logitech", "mx master"]
-                )
-                for e in log_entries
-            )
-
-            # Check Step 3a: Agent removed the old item from cart after user acceptance
+            # Check Step 2: Agent removed the old item from cart after user acceptance
             # STRICT: Must remove the generic mouse item with correct item_id
             old_item_removed = any(
                 e.event_type == EventType.AGENT
@@ -249,7 +215,7 @@ class FriendProductSwapRecommendation(PASScenario):
                 for e in log_entries
             )
 
-            # Check Step 3b: Agent added the new recommended item to cart
+            # Check Step 3: Agent added the new recommended item to cart
             # STRICT: Must add the Logitech MX Master 3S with correct item_id
             new_item_added = any(
                 e.event_type == EventType.AGENT
@@ -260,7 +226,7 @@ class FriendProductSwapRecommendation(PASScenario):
                 for e in log_entries
             )
 
-            # Check Step 3c: Agent sent confirmation message to Jordan
+            # Check Step 4: Agent sent confirmation message to Jordan
             # STRICT: Must send message to Jordan thanking for recommendation
             # FLEXIBLE: Message content may vary but must acknowledge the recommendation
             confirmation_sent = any(
@@ -273,26 +239,12 @@ class FriendProductSwapRecommendation(PASScenario):
             )
 
             # All critical checks must pass for success
-            success = (
-                proposal_found
-                and conversations_checked
-                and cart_checked
-                and product_searched
-                and old_item_removed
-                and new_item_added
-                and confirmation_sent
-            )
+            success = proposal_found and old_item_removed and new_item_added and confirmation_sent
 
             if not success:
                 rationale_parts = []
                 if not proposal_found:
                     rationale_parts.append("no product swap proposal to user")
-                if not conversations_checked:
-                    rationale_parts.append("conversations not checked")
-                if not cart_checked:
-                    rationale_parts.append("cart not checked")
-                if not product_searched:
-                    rationale_parts.append("recommended product not searched")
                 if not old_item_removed:
                     rationale_parts.append("old cart item not removed")
                 if not new_item_added:

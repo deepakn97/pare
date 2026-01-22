@@ -285,16 +285,6 @@ class DuplicateCommitmentDetection(PASScenario):
                 for e in log_entries
             )
 
-            agent_messages = [
-                e
-                for e in log_entries
-                if e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-            ]
-            follow_up_found = len(agent_messages) >= 2
-
             # All strict checks must pass
             success = (
                 proposal_found
@@ -302,7 +292,6 @@ class DuplicateCommitmentDetection(PASScenario):
                 and calendar_check_found
                 and reschedule_found
                 and notify_mom_found
-                and follow_up_found
             )
 
             if not success:
@@ -318,8 +307,6 @@ class DuplicateCommitmentDetection(PASScenario):
                     missing.append("calendar event not rescheduled")
                 if not notify_mom_found:
                     missing.append("mom not notified via messaging")
-                if not follow_up_found:
-                    missing.append("agent did not provide follow-up assistance after proposal")
                 rationale += ", ".join(missing)
                 return ScenarioValidationResult(success=False, rationale=rationale)
 

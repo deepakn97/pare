@@ -48,13 +48,14 @@ class MessageTaskReminderCreation(PASScenario):
 
         # Create three separate conversations (one with each contact)
         # Each conversation starts empty - messages will arrive during the event flow
-        sarah_id = self.messaging.name_to_id["Sarah"]
-        mom_id = self.messaging.name_to_id["Mom"]
-        alex_id = self.messaging.name_to_id["Alex"]
+        # Store user IDs for use in build_events_flow
+        self.sarah_id = self.messaging.name_to_id["Sarah"]
+        self.mom_id = self.messaging.name_to_id["Mom"]
+        self.alex_id = self.messaging.name_to_id["Alex"]
 
         # Create conversations between user and each contact
         sarah_conv = ConversationV2(
-            participant_ids=[self.messaging.current_user_id, sarah_id],
+            participant_ids=[self.messaging.current_user_id, self.sarah_id],
             title="Sarah",
             messages=[],
         )
@@ -63,7 +64,7 @@ class MessageTaskReminderCreation(PASScenario):
         self.sarah_conversation_id = sarah_conv.conversation_id
 
         mom_conv = ConversationV2(
-            participant_ids=[self.messaging.current_user_id, mom_id],
+            participant_ids=[self.messaging.current_user_id, self.mom_id],
             title="Mom",
             messages=[],
         )
@@ -72,7 +73,7 @@ class MessageTaskReminderCreation(PASScenario):
         self.mom_conversation_id = mom_conv.conversation_id
 
         alex_conv = ConversationV2(
-            participant_ids=[self.messaging.current_user_id, alex_id],
+            participant_ids=[self.messaging.current_user_id, self.alex_id],
             title="Alex",
             messages=[],
         )
@@ -95,12 +96,10 @@ class MessageTaskReminderCreation(PASScenario):
 
         with EventRegisterer.capture_mode():
             # Environment events: Three task request messages arrive from different contacts
-            # Get conversation IDs from stored instance variables
-            sarah_id = messaging_app.name_to_id["Sarah"]
-            mom_id = messaging_app.name_to_id["Mom"]
-            alex_id = messaging_app.name_to_id["Alex"]
-
-            # Get conversation IDs from stored instance variables
+            # Use stored user IDs and conversation IDs from init_and_populate_apps
+            sarah_id = self.sarah_id
+            mom_id = self.mom_id
+            alex_id = self.alex_id
             sarah_conv_id = self.sarah_conversation_id
             mom_conv_id = self.mom_conversation_id
             alex_conv_id = self.alex_conversation_id
@@ -261,36 +260,25 @@ class MessageTaskReminderCreation(PASScenario):
             log_entries = env.event_log.list_view()
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # Check final outcome 1: Three reminders created
+            # Check 1: Three reminders created with valid title and due_datetime
             reminder_count = sum(
                 1
                 for e in agent_events
                 if e.action.class_name == "StatefulReminderApp"
                 and e.action.function_name == "add_reminder"
-                and (e.action.args if e.action.args else e.action.resolved_args).get("title")
-                and (e.action.args if e.action.args else e.action.resolved_args).get("due_datetime")
+                and (e.action.resolved_args or e.action.args or {}).get("title")
+                and (e.action.resolved_args or e.action.args or {}).get("due_datetime")
             )
 
-            # Check final outcome 2: Confirmation messages sent to all three requesters
-            # Get messaging app from environment to access conversation IDs
-            messaging_app = next((app for app in env.apps if hasattr(app, "name") and app.name == "Messages"), None)
-            confirmation_count = 0
-            target_conv_ids = {
-                self.sarah_conversation_id,
-                self.mom_conversation_id,
-                self.alex_conversation_id,
-            }
-            # Check for confirmation messages
-            # Note: class_name might be "StatefulMessagingApp" or the app's name "Messages"
-            messaging_class_names = {"StatefulMessagingApp", "Messages"}
-            for e in agent_events:
-                if e.action.function_name == "send_message_to_group_conversation":
-                    # Get conversation_id from resolved_args first, then args
-                    event_args = e.action.resolved_args if e.action.resolved_args else (e.action.args or {})
-                    conv_id = event_args.get("conversation_id")
-                    # Check if this is a messaging app action and conversation_id matches
-                    if e.action.class_name in messaging_class_names and conv_id in target_conv_ids:
-                        confirmation_count += 1
+            # Check 2: Confirmation messages sent to all three requesters
+            target_conv_ids = {self.sarah_conversation_id, self.mom_conversation_id, self.alex_conversation_id}
+            confirmation_count = sum(
+                1
+                for e in agent_events
+                if e.action.class_name == "StatefulMessagingApp"
+                and e.action.function_name == "send_message_to_group_conversation"
+                and (e.action.resolved_args or e.action.args or {}).get("conversation_id") in target_conv_ids
+            )
 
             success = reminder_count == 3 and confirmation_count == 3
 
@@ -300,9 +288,7 @@ class MessageTaskReminderCreation(PASScenario):
                     missing.append(f"expected 3 reminders, found {reminder_count}")
                 if confirmation_count != 3:
                     missing.append(f"expected 3 confirmations, found {confirmation_count}")
-                return ScenarioValidationResult(
-                    success=False, rationale=f"Missing final outcomes: {'; '.join(missing)}"
-                )
+                return ScenarioValidationResult(success=False, rationale="; ".join(missing))
 
             return ScenarioValidationResult(success=True)
 

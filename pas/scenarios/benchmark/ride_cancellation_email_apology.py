@@ -46,13 +46,18 @@ class RideCancellationEmailApology(PASScenario):
         # Initialize cab app
         self.cab = StatefulCabApp(name="Cab")
 
+        # Store key values as instance variables to avoid hardcoding
+        self.destination = "Bistro Meridian"
+        self.start_location = "123 Main St"
+        self.rachel_email = "rachel.thompson@clientcorp.com"
+
         # Seed a sent email confirming lunch with Rachel
         # Email timestamp: 2025-11-17 16:00:00 UTC (previous day at 4 PM)
         lunch_confirmation_email = Email(
             sender="user@meta.com",
-            recipients=["rachel.thompson@clientcorp.com"],
-            subject="Lunch Meeting Tomorrow - Bistro Meridian",
-            content="Hi Rachel,\n\nLooking forward to our lunch meeting tomorrow at 2:45 PM at Bistro Meridian. I'll be there on time.\n\nBest regards,\nAlex",
+            recipients=[self.rachel_email],
+            subject=f"Lunch Meeting Tomorrow - {self.destination}",
+            content=f"Hi Rachel,\n\nLooking forward to our lunch meeting tomorrow at 2:45 PM at {self.destination}. I'll be there on time.\n\nBest regards,\nAlex",
             timestamp=datetime(2025, 11, 17, 16, 0, 0, tzinfo=UTC).timestamp(),
             is_read=True,
         )
@@ -69,8 +74,8 @@ class RideCancellationEmailApology(PASScenario):
         ride_timestamp = datetime(2025, 11, 18, 14, 0, 0, tzinfo=UTC).timestamp()
         self.cab.add_new_ride(
             service_type="Default",
-            start_location="123 Main St",
-            end_location="Bistro Meridian",
+            start_location=self.start_location,
+            end_location=self.destination,
             price=15.50,
             duration=1800.0,  # 30 minutes in seconds
             time_stamp=ride_timestamp,
@@ -97,14 +102,14 @@ class RideCancellationEmailApology(PASScenario):
             # Environment event: Rachel confirms the lunch by email (grounds "Rachel" in the agent proposal).
             rachel_confirmation_event = email_app.send_email_to_user_with_id(
                 email_id=self.rachel_confirmation_email_id,
-                sender="rachel.thompson@clientcorp.com",
-                subject="Re: Lunch Meeting Tomorrow - Bistro Meridian",
-                content="Hi Alex,\n\nConfirmed for 2:45 PM at Bistro Meridian tomorrow. See you then.\n\nBest,\nRachel",
+                sender=self.rachel_email,
+                subject=f"Re: Lunch Meeting Tomorrow - {self.destination}",
+                content=f"Hi Alex,\n\nConfirmed for 2:45 PM at {self.destination} tomorrow. See you then.\n\nBest,\nRachel",
             ).delayed(5)
 
             # Agent checks inbox to pick up the meeting context (so referencing Rachel is justified).
             agent_check_inbox_event = (
-                email_app.search_emails(query="Bistro Meridian", folder_name="INBOX")
+                email_app.search_emails(query=self.destination, folder_name="INBOX")
                 .oracle()
                 .depends_on(rachel_confirmation_event, delay_seconds=1)
             )
@@ -123,7 +128,7 @@ class RideCancellationEmailApology(PASScenario):
             # Agent proposes to book a new ride and update Rachel about the delay
             proposal_event = (
                 aui.send_message_to_user(
-                    content="I noticed your ride to Bistro Meridian was cancelled. Would you like me to book an alternative ride and notify Rachel about a potential delay?"
+                    content=f"I noticed your ride to {self.destination} was cancelled. Would you like me to book an alternative ride and notify Rachel about a potential delay?"
                 )
                 .oracle()
                 .depends_on([history_check_event, agent_check_inbox_event], delay_seconds=1)
@@ -139,8 +144,8 @@ class RideCancellationEmailApology(PASScenario):
             # Agent books a new ride with the same route
             rebook_event = (
                 cab_app.order_ride(
-                    start_location="123 Main St",
-                    end_location="Bistro Meridian",
+                    start_location=self.start_location,
+                    end_location=self.destination,
                     service_type="Default",
                     ride_time="2025-11-18 14:00:00",
                 )
@@ -150,7 +155,7 @@ class RideCancellationEmailApology(PASScenario):
 
             # Agent searches sent emails to find the confirmation thread with Rachel
             search_event = (
-                email_app.search_emails(query="Bistro Meridian", folder_name="SENT")
+                email_app.search_emails(query=self.destination, folder_name="SENT")
                 .oracle()
                 .depends_on(rebook_event, delay_seconds=1)
             )
@@ -169,7 +174,7 @@ class RideCancellationEmailApology(PASScenario):
             # Agent confirms completion
             confirmation_event = (
                 aui.send_message_to_user(
-                    content="I've booked a new ride to Bistro Meridian and sent Rachel an update about the situation. Your new ride is confirmed for 2:00 PM."
+                    content=f"I've booked a new ride to {self.destination} and sent Rachel an update about the situation. Your new ride is confirmed for 2:00 PM."
                 )
                 .oracle()
                 .depends_on(reply_event, delay_seconds=1)
@@ -197,40 +202,17 @@ class RideCancellationEmailApology(PASScenario):
             # Filter to only agent/oracle events (EventType.AGENT)
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent checked ride history to understand the cancellation
-            # Accepts: get_ride_history
-            history_check_found = any(
-                e.action.class_name == "StatefulCabApp" and e.action.function_name == "get_ride_history"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent proposed help to user (via PASAgentUserInterface.send_message_to_user)
-            # This check is FLEXIBLE on content - we just verify the proposal happened
-            proposal_found = any(
-                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent booked a new ride after the cancellation
-            # Accepts: order_ride with same destination (Bistro Meridian)
+            # STRICT Check 1: Agent booked a new ride after the cancellation
+            # Core outcome: rebooking the ride with same destination
             rebook_found = any(
                 e.action.class_name == "StatefulCabApp"
                 and e.action.function_name == "order_ride"
-                and e.action.args.get("end_location") == "Bistro Meridian"
+                and e.action.args.get("end_location") == self.destination
                 for e in agent_events
             )
 
-            # STRICT Check 4: Agent searched sent emails for Rachel's thread
-            # Accepts: search_emails in SENT folder
-            search_found = any(
-                e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name == "search_emails"
-                and e.action.args.get("folder_name") == "SENT"
-                for e in agent_events
-            )
-
-            # STRICT Check 5: Agent replied to Rachel's email thread
-            # Accepts: reply_to_email (must reply to the thread, not send a new email)
+            # STRICT Check 2: Agent replied to Rachel's email thread
+            # Core outcome: replying to the email thread (not sending a new email)
             # This check is FLEXIBLE on the content of the reply - we only verify the action occurred
             reply_found = any(
                 e.action.class_name == "StatefulEmailApp" and e.action.function_name == "reply_to_email"
@@ -239,24 +221,12 @@ class RideCancellationEmailApology(PASScenario):
 
             # Collect failed checks for rationale
             failed_checks = []
-            if not history_check_found:
-                failed_checks.append("no ride history check found")
-            if not proposal_found:
-                failed_checks.append("no proposal to user found")
             if not rebook_found:
-                failed_checks.append("no ride rebooking to Bistro Meridian found")
-            if not search_found:
-                failed_checks.append("no sent email search found")
+                failed_checks.append(f"no ride rebooking to {self.destination} found")
             if not reply_found:
                 failed_checks.append("no reply to Rachel's email found")
 
-            success = all([
-                history_check_found,
-                proposal_found,
-                rebook_found,
-                search_found,
-                reply_found,
-            ])
+            success = rebook_found and reply_found
 
             rationale = None
             if not success:

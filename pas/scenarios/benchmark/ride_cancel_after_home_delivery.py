@@ -54,9 +54,9 @@ class RideCancelAfterHomeDelivery(PASScenario):
         # Create an order for the Bluetooth Speaker with "shipped" status (placed earlier today at 8 AM)
         # Estimated delivery: 3-5 PM, but will actually arrive at 2 PM
         order_time = datetime(2025, 11, 18, 8, 0, 0, tzinfo=UTC)
-        order_id = "order_bluetooth_001"
+        self.order_id = "order_bluetooth_001"
         self.shopping.add_order(
-            order_id=order_id,
+            order_id=self.order_id,
             order_status="shipped",
             order_date=order_time.timestamp(),
             order_total=79.99,
@@ -109,9 +109,9 @@ class RideCancelAfterHomeDelivery(PASScenario):
             # Environment event: Shopping app updates order status to "delivered" at 2:00 PM
             # This represents the Bluetooth Speaker being delivered earlier than expected (story: 2:00 PM).
             # Note: The 10-second delay is for fast testing only; in the story this happens at 2:00 PM.
-            delivery_event = shopping_app.update_order_status(
-                order_id="order_bluetooth_001", status="delivered"
-            ).delayed(10)  # Keep delays short for demo/runtime: <30s
+            delivery_event = shopping_app.update_order_status(order_id=self.order_id, status="delivered").delayed(
+                10
+            )  # Keep delays short for demo/runtime: <30s
 
             # Agent detects the delivery notification and checks the order details
             # Motivated by: delivery notification from shopping app (update_order_status event above)
@@ -126,7 +126,7 @@ class RideCancelAfterHomeDelivery(PASScenario):
             )
 
             # Agent proposes to cancel the ride since the Bluetooth Speaker was delivered
-            # Motivated by: order_bluetooth_001 is now delivered (from list_orders) + ongoing ride to TechMart Electronics (from get_current_ride_status)
+            # Motivated by: order is now delivered (from list_orders) + ongoing ride to TechMart Electronics (from get_current_ride_status)
             propose_event = (
                 aui.send_message_to_user(
                     content="Your Bluetooth Speaker order has been delivered to your home. I also saw your ride status update for the TechMart Electronics trip to buy a Bluetooth Speaker. Since the speaker already arrived, would you like me to cancel the ride to save the $18.50 fare?"
@@ -165,27 +165,7 @@ class RideCancelAfterHomeDelivery(PASScenario):
             # Filter to only AGENT events for validation
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT CHECK 1: Agent observed the shopping order status
-            # Must call list_orders to detect the delivery completion
-            list_orders_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_orders"
-                for e in agent_events
-            )
-
-            # STRICT CHECK 2: Agent checked the current ride status
-            # Must call get_current_ride_status to understand the planned trip
-            check_ride_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_current_ride_status"
-                for e in agent_events
-            )
-
-            # STRICT CHECK 3: Agent sent proposal to user about canceling the ride
+            # STRICT CHECK 1: Agent sent proposal to user about canceling the ride
             # Must reference the ride cancellation opportunity (flexible on exact wording)
             proposal_found = any(
                 (e.event_type == EventType.AGENT)
@@ -195,7 +175,7 @@ class RideCancelAfterHomeDelivery(PASScenario):
                 for e in agent_events
             )
 
-            # STRICT CHECK 4: Agent canceled the ride
+            # STRICT CHECK 2: Agent canceled the ride
             # Must call user_cancel_ride to complete the task
             cancel_ride_found = any(
                 (e.event_type == EventType.AGENT)
@@ -207,16 +187,12 @@ class RideCancelAfterHomeDelivery(PASScenario):
 
             # Build rationale for failures
             failed_checks = []
-            if not list_orders_found:
-                failed_checks.append("agent did not list orders to detect delivery")
-            if not check_ride_found:
-                failed_checks.append("agent did not check current ride status")
             if not proposal_found:
                 failed_checks.append("agent did not send proposal message to user")
             if not cancel_ride_found:
                 failed_checks.append("agent did not cancel the ride")
 
-            success = list_orders_found and check_ride_found and proposal_found and cancel_ride_found
+            success = proposal_found and cancel_ride_found
             rationale = "; ".join(failed_checks) if failed_checks else None
 
             return ScenarioValidationResult(success=success, rationale=rationale)

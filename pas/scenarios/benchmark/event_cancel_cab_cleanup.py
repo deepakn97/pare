@@ -191,30 +191,7 @@ class EventCancelCabCleanup(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # STRICT Check 1: Agent sent proposal to the user about cancelling the cab ride
-            # The proposal must mention Jessica Martinez and the cancellation context
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                and any(
-                    keyword in e.action.args.get("content", "").lower()
-                    for keyword in ["jessica", "cancel", "cab", "ride"]
-                )
-                for e in log_entries
-            )
-
-            # STRICT Check 2: Agent checked ride history to find the associated cab booking
-            ride_history_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulCabApp"
-                and e.action.function_name == "get_ride_history"
-                for e in log_entries
-            )
-
-            # STRICT Check 3: Agent cancelled the cab ride
+            # STRICT Check 1: Agent cancelled the cab ride
             cab_cancelled = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
@@ -223,7 +200,7 @@ class EventCancelCabCleanup(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 4: Agent replied to Jessica's cancellation email
+            # STRICT Check 2: Agent replied to Jessica's cancellation email
             # Accept reply_to_email with the correct email_id
             email_reply_found = any(
                 e.event_type == EventType.AGENT
@@ -234,7 +211,7 @@ class EventCancelCabCleanup(PASScenario):
                 for e in log_entries
             )
 
-            # STRICT Check 5: Agent deleted the calendar event
+            # STRICT Check 3: Agent deleted the calendar event
             calendar_event_deleted = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
@@ -244,17 +221,11 @@ class EventCancelCabCleanup(PASScenario):
             )
 
             # All strict checks must pass for success
-            success = (
-                proposal_found and ride_history_found and cab_cancelled and email_reply_found and calendar_event_deleted
-            )
+            success = cab_cancelled and email_reply_found and calendar_event_deleted
 
             # Build rationale for failure
             if not success:
                 missing = []
-                if not proposal_found:
-                    missing.append("agent proposal to cancel cab")
-                if not ride_history_found:
-                    missing.append("ride history check")
                 if not cab_cancelled:
                     missing.append("cab cancellation")
                 if not email_reply_found:

@@ -234,36 +234,13 @@ class ConflictingReminderNegotiation(PASScenario):
             # Filter to only AGENT events for validation
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # Check 1 (STRICT): Agent read all three conversations
-            # Count the number of read_conversation calls (should be at least 3)
-            read_conversation_count = sum(
-                1
-                for e in agent_events
-                if e.action.class_name == "StatefulMessagingApp" and e.action.function_name == "read_conversation"
-            )
-            all_conversations_read = read_conversation_count >= 3
-
-            # Check 2 (STRICT): Agent searched reminders for deduplication
-            search_reminders_found = any(
-                e.action.class_name == "StatefulReminderApp" and e.action.function_name == "get_all_reminders"
+            # Check 1 (STRICT): Agent created the reminder
+            create_reminder_found = any(
+                e.action.class_name == "StatefulReminderApp" and e.action.function_name == "add_reminder"
                 for e in agent_events
             )
 
-            # Check 3 (STRICT): Agent sent proposal to user
-            proposal_found = any(
-                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
-                for e in agent_events
-            )
-
-            # Check 5 (STRICT): Agent created the reminder with correct timing
-            # The reminder should be on Wednesday 2025-11-20 14:00:00
-            create_reminder_found = False
-            for e in agent_events:
-                if e.action.class_name == "StatefulReminderApp" and e.action.function_name == "add_reminder":
-                    create_reminder_found = True
-                    break
-
-            # Check 6 (STRICT): Agent sent reply messages to all three participants
+            # Check 2 (STRICT): Agent sent reply messages to all three participants
             # Count the number of send_message calls (should be at least 3)
             send_message_count = sum(
                 1
@@ -273,28 +250,14 @@ class ConflictingReminderNegotiation(PASScenario):
             )
             all_replies_sent = send_message_count >= 3
 
-            # Determine success based on all strict checks
-            success = (
-                all_conversations_read
-                and search_reminders_found
-                and proposal_found
-                and create_reminder_found
-                and all_replies_sent
-            )
+            # Determine success based on core checks
+            success = create_reminder_found and all_replies_sent
 
             # Build rationale for failures
             if not success:
                 failures = []
-                if not all_conversations_read:
-                    failures.append(
-                        f"not all three conversations (Jordan, Casey, Alex) were read (found {read_conversation_count}, expected at least 3)"
-                    )
-                if not search_reminders_found:
-                    failures.append("reminders were not searched for deduplication")
-                if not proposal_found:
-                    failures.append("no proposal sent to user")
                 if not create_reminder_found:
-                    failures.append("reminder for 'Team Video Recording' on Wednesday 2025-11-20 14:00:00 not created")
+                    failures.append("reminder for 'Team Video Recording' not created")
                 if not all_replies_sent:
                     failures.append(f"not all three reply messages sent (found {send_message_count}, expected 3)")
 

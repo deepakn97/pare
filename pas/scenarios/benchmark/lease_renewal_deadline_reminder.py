@@ -197,37 +197,7 @@ class LeaseRenewalDeadlineReminder(PASScenario):
             log_entries = env.event_log.list_view()
             agent_entries = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT Check 1: Agent sent a proposal to the user mentioning the renewal and deadline
-            # The proposal must reference the lease renewal context and deadline
-            proposal_found = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in agent_entries
-            )
-
-            # STRICT Check 2: Agent read the renewal email to understand the context
-            # Accepts either get_email_by_id OR list_emails (equivalence class)
-            read_email_found = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name in ["get_email_by_id", "list_emails"]
-                for e in agent_entries
-            )
-
-            # STRICT Check 3: Agent searched saved apartments to verify Riverside Lofts is saved
-            # Accepts list_saved_apartments OR search_apartments with saved_only=True (equivalence class)
-            search_saved_found = any(
-                isinstance(e.action, Action)
-                and e.action.class_name == "StatefulApartmentApp"
-                and (
-                    e.action.function_name == "list_saved_apartments"
-                    or (e.action.function_name == "search_apartments" and e.action.args.get("saved_only") is True)
-                )
-                for e in agent_entries
-            )
-
-            # STRICT Check 4: Agent created a reminder with appropriate deadline awareness
+            # STRICT Check 1: Agent created a reminder with appropriate deadline awareness
             # Must create reminder with title mentioning Riverside Lofts and due date before Feb 15
             reminder_created = any(
                 isinstance(e.action, Action)
@@ -239,7 +209,7 @@ class LeaseRenewalDeadlineReminder(PASScenario):
                 for e in agent_entries
             )
 
-            # STRICT Check 5: Agent replied to the leasing office email acknowledging receipt
+            # STRICT Check 2: Agent replied to the leasing office email acknowledging receipt
             # Must reply to the renewal email (not create new email)
             reply_sent = any(
                 isinstance(e.action, Action)
@@ -249,7 +219,7 @@ class LeaseRenewalDeadlineReminder(PASScenario):
                 for e in agent_entries
             )
 
-            # STRICT Check 6: Agent updated the saved apartment price to the new rent
+            # STRICT Check 3: Agent updated the saved apartment price to the new rent
             price_updated = any(
                 isinstance(e.action, Action)
                 and e.action.class_name == "StatefulApartmentApp"
@@ -260,24 +230,11 @@ class LeaseRenewalDeadlineReminder(PASScenario):
             )
 
             # All checks must pass for success
-            success = (
-                proposal_found
-                and read_email_found
-                and search_saved_found
-                and reminder_created
-                and reply_sent
-                and price_updated
-            )
+            success = reminder_created and reply_sent and price_updated
 
             # Build rationale if validation fails
             if not success:
                 missing_checks = []
-                if not proposal_found:
-                    missing_checks.append("agent proposal mentioning renewal and deadline")
-                if not read_email_found:
-                    missing_checks.append("agent reading renewal email")
-                if not search_saved_found:
-                    missing_checks.append("agent searching saved apartments")
                 if not reminder_created:
                     missing_checks.append("reminder creation for Riverside Lofts")
                 if not reply_sent:

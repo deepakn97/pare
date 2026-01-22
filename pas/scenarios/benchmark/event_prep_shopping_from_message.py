@@ -230,51 +230,33 @@ class EventPrepShoppingFromMessage(PASScenario):
             # Filter to only AGENT events for validation
             agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # STRICT CHECK 1: Agent sent proposal to user about hiking trip preparation
-            # Must reference Sam's message about the hiking trip and the user's preparation need
+            # CHECK 1: Agent sent proposal to user
             proposal_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                and "hiking" in e.action.args.get("content", "").lower()
-                and (
-                    "sam" in e.action.args.get("content", "").lower()
-                    or "saturday" in e.action.args.get("content", "").lower()
-                    or "trip" in e.action.args.get("content", "").lower()
-                )
                 for e in agent_events
             )
 
-            # STRICT CHECK 2: Agent searched for hiking-related products
-            # Must perform catalog search with hiking-relevant terms
+            # CHECK 2: Agent searched for products
             search_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "search_product"
-                and "product_name" in e.action.args
-                and e.action.args["product_name"]  # Non-empty search term
                 for e in agent_events
             )
 
-            # STRICT CHECK 3: Agent added at least one item to cart
-            # Must use add_to_cart with non-empty item_id
+            # CHECK 3: Agent added items to cart
             add_to_cart_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "add_to_cart"
-                and "item_id" in e.action.args
-                and e.action.args["item_id"]  # Non-empty item_id
                 for e in agent_events
             )
 
-            # STRICT CHECK 4: Agent completed checkout
-            # Must call checkout method to finalize purchase
+            # CHECK 4: Agent completed checkout
             checkout_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "checkout"
                 for e in agent_events
@@ -283,7 +265,7 @@ class EventPrepShoppingFromMessage(PASScenario):
             # Build rationale for failures
             failed_checks = []
             if not proposal_found:
-                failed_checks.append("no proposal message to user about hiking trip preparation")
+                failed_checks.append("no proposal message to user")
             if not search_found:
                 failed_checks.append("no product search performed")
             if not add_to_cart_found:

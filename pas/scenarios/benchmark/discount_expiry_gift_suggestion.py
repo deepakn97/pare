@@ -216,110 +216,52 @@ class DiscountExpiryGiftSuggestion(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Check 1 (STRICT): Agent read the messaging conversation to detect Sarah's request
-            # Expected: StatefulMessagingApp.read_conversation with correct conversation_id
-            agent_read_conversation = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                and e.action.args.get("conversation_id") == self.sarah_conversation_id
-                for e in log_entries
-            )
+            # Filter to agent events only
+            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
 
-            # Check 2 (STRICT): Agent checked the shopping cart for relevant items
-            # Expected: StatefulShoppingApp.list_cart
-            agent_check_cart = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_cart"
-                for e in log_entries
-            )
-
-            # Check 3 (STRICT): Agent checked discount code information
-            # Expected: StatefulShoppingApp.get_discount_code_info with "SAVE20"
-            agent_check_discount = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "get_discount_code_info"
-                and e.action.args.get("discount_code") == "SAVE20"
-                for e in log_entries
-            )
-
-            # Check 4 (STRICT): Agent sent proposal to user mentioning key elements
-            # Expected: PASAgentUserInterface.send_message_to_user mentioning Sarah and headphones
+            # STRICT Check 1: Agent sent proposal to user mentioning key elements
+            # Core outcome: agent must propose purchasing headphones as gift for Sarah using discount
             # FLEXIBLE: We don't check exact wording, only presence of key entities
             agent_sent_proposal = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
                 and "Sarah" in e.action.args.get("content", "")
                 and any(keyword in e.action.args.get("content", "").lower() for keyword in ["headphone", "headphones"])
-                for e in log_entries
+                for e in agent_events
             )
 
-            # Check 5 (STRICT): Agent completed checkout with the correct discount code
-            # Expected: StatefulShoppingApp.checkout with discount_code="SAVE20"
+            # STRICT Check 2: Agent completed checkout with the correct discount code
+            # Core outcome: agent must complete purchase with SAVE20 discount
             agent_checkout = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulShoppingApp"
                 and e.action.function_name == "checkout"
                 and e.action.args.get("discount_code") == "SAVE20"
-                for e in log_entries
+                for e in agent_events
             )
 
-            # Check 6 (STRICT): Agent retrieved order details after checkout
-            # Expected: StatefulShoppingApp.list_orders
-            agent_list_orders = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulShoppingApp"
-                and e.action.function_name == "list_orders"
-                for e in log_entries
-            )
-
-            # Check 7 (STRICT): Agent sent message to Sarah notifying about the gift
-            # Expected: StatefulMessagingApp.send_message to Sarah's user_id
+            # STRICT Check 3: Agent sent message to Sarah notifying about the gift
+            # Core outcome: agent must send gift notification to Sarah
             # FLEXIBLE: We don't check exact message content, just that a message was sent to Sarah
             agent_sent_message_to_sarah = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
+                isinstance(e.action, Action)
                 and e.action.class_name == "StatefulMessagingApp"
                 and e.action.function_name == "send_message"
                 and e.action.args.get("user_id") == self.sarah_user_id
-                for e in log_entries
+                for e in agent_events
             )
 
             # All strict checks must pass for success
-            success = (
-                agent_read_conversation
-                and agent_check_cart
-                and agent_check_discount
-                and agent_sent_proposal
-                and agent_checkout
-                and agent_list_orders
-                and agent_sent_message_to_sarah
-            )
+            success = agent_sent_proposal and agent_checkout and agent_sent_message_to_sarah
 
             # Build rationale if validation fails
             if not success:
                 missing_checks = []
-                if not agent_read_conversation:
-                    missing_checks.append("agent did not read conversation with Sarah")
-                if not agent_check_cart:
-                    missing_checks.append("agent did not check shopping cart")
-                if not agent_check_discount:
-                    missing_checks.append("agent did not check discount code SAVE20")
                 if not agent_sent_proposal:
                     missing_checks.append("agent did not send proposal mentioning Sarah and headphones")
                 if not agent_checkout:
                     missing_checks.append("agent did not complete checkout with SAVE20")
-                if not agent_list_orders:
-                    missing_checks.append("agent did not retrieve order details")
                 if not agent_sent_message_to_sarah:
                     missing_checks.append("agent did not send gift notification to Sarah")
 

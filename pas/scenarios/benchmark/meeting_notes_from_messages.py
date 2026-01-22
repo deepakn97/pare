@@ -56,6 +56,7 @@ class MeetingNotesFromMessages(PASScenario):
             job="Product Manager",
         )
         self.contacts.add_contact(user_contact)
+        self.user_contact = user_contact  # Store for use in build_events_flow
 
         # Add Sarah Martinez - the colleague who will send the meeting notes
         sarah_contact = Contact(
@@ -66,6 +67,7 @@ class MeetingNotesFromMessages(PASScenario):
             job="Senior Designer",
         )
         self.contacts.add_contact(sarah_contact)
+        self.sarah_contact = sarah_contact  # Store for use in build_events_flow
 
         # Add other team members who might be mentioned in the meeting
         david_contact = Contact(
@@ -76,6 +78,14 @@ class MeetingNotesFromMessages(PASScenario):
             job="Engineering Lead",
         )
         self.contacts.add_contact(david_contact)
+        self.david_contact = david_contact  # Store for use in build_events_flow
+
+        # Store Emily Wong's contact info (will be added by agent during scenario)
+        self.emily_first_name = "Emily"
+        self.emily_last_name = "Wong"
+        self.emily_phone = "+1-555-0103"
+        self.emily_email = "emily.wong@company.com"
+        self.emily_job = "Marketing Lead"
 
         # Initialize Messaging app with conversation history
         self.messaging = StatefulMessagingApp(name="Messages")
@@ -104,7 +114,8 @@ class MeetingNotesFromMessages(PASScenario):
 
         # Create a "Work - Project Planning" folder (baseline state before the scenario begins)
         # This folder already exists but is empty
-        self.note.new_folder("Work - Project Planning")
+        self.project_folder_name = "Work - Project Planning"
+        self.note.new_folder(self.project_folder_name)
 
         # Register all apps
         self.apps = [self.agent_ui, self.system_app, self.contacts, self.messaging, self.note]
@@ -118,8 +129,8 @@ class MeetingNotesFromMessages(PASScenario):
         contacts_app = self.get_typed_app(StatefulContactsApp, "Contacts")
 
         # Get the conversation_id for the existing Sarah conversation BEFORE entering capture mode
-        sarah_phone = "+1-555-0101"
-        user_phone = "+1-555-0100"
+        sarah_phone = self.sarah_contact.phone
+        user_phone = self.user_contact.phone
         conversation_ids = messaging_app.get_existing_conversation_ids([sarah_phone])
         if len(conversation_ids) > 0:
             sarah_conversation_id = conversation_ids[0]
@@ -134,7 +145,7 @@ class MeetingNotesFromMessages(PASScenario):
             msg1 = messaging_app.create_and_add_message(
                 conversation_id=sarah_conversation_id,
                 sender_id=sarah_phone,
-                content="Hey Alex! Quick recap from our project planning meeting today. Attendees: you, me, David Park, and Emily Wong (new marketing lead, if you haven't save her info to your contact please save it now - emily.wong@company.com, +1-555-0103).",
+                content=f"Hey Alex! Quick recap from our project planning meeting today. Attendees: you, me, David Park, and Emily Wong (new marketing lead, if you haven't save her info to your contact please save it now - {self.emily_email}, {self.emily_phone}).",
             )
 
             # Message 2: Key decisions
@@ -170,7 +181,7 @@ class MeetingNotesFromMessages(PASScenario):
             # Agent sends a proposal to the user summarizing what was captured (motivated by the incoming messages and completed organization work)
             proposal = (
                 aui.send_message_to_user(
-                    content="I noticed Sarah sent fragmented meeting notes across three messages. Do you want me to organize the information into a structured note in your 'Work - Project Planning' folder, including attendees, decisions, and action items with deadlines? I also noticed there is a new member mentioned -- Emily Wong (new marketing lead), do you want to add her to your contacts?"
+                    content=f"I noticed Sarah sent fragmented meeting notes across three messages. Do you want me to organize the information into a structured note in your '{self.project_folder_name}' folder, including attendees, decisions, and action items with deadlines? I also noticed there is a new member mentioned -- Emily Wong (new marketing lead), do you want to add her to your contacts?"
                 )
                 .oracle()
                 .depends_on(search_emily, delay_seconds=2)
@@ -179,7 +190,7 @@ class MeetingNotesFromMessages(PASScenario):
             # User accepts the proposal
             acceptance = (
                 aui.accept_proposal(
-                    content="Yes, please organize the information into 'Work - Project Planning' folder and create a new contact."
+                    content=f"Yes, please organize the information into '{self.project_folder_name}' folder and create a new contact."
                 )
                 .oracle()
                 .depends_on(proposal, delay_seconds=3)
@@ -188,11 +199,11 @@ class MeetingNotesFromMessages(PASScenario):
             # Agent adds Emily Wong as a new contact (motivated by the contact info provided in msg1 and empty search results)
             add_emily = (
                 contacts_app.add_new_contact(
-                    first_name="Emily",
-                    last_name="Wong",
-                    phone="+1-555-0103",
-                    email="emily.wong@company.com",
-                    job="Marketing Lead",
+                    first_name=self.emily_first_name,
+                    last_name=self.emily_last_name,
+                    phone=self.emily_phone,
+                    email=self.emily_email,
+                    job=self.emily_job,
                 )
                 .oracle()
                 .depends_on(acceptance, delay_seconds=2)
@@ -201,7 +212,7 @@ class MeetingNotesFromMessages(PASScenario):
             # Agent creates a note with the organized meeting information (motivated by the fragmented meeting notes in messages)
             create_note = (
                 note_app.create_note(
-                    folder="Work - Project Planning",
+                    folder=self.project_folder_name,
                     title="Project Planning Meeting - Nov 18, 2025",
                     content="""Meeting Recap - November 18, 2025
 
@@ -245,59 +256,71 @@ Action Items & Deadlines:
         try:
             log_entries = env.event_log.list_view()
 
-            # Check 1: Agent sent proposal to the user (STRICT - content flexible, presence strict)
-            # Must mention organizing meeting notes/information
-            proposal_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "PASAgentUserInterface"
-                and e.action.function_name == "send_message_to_user"
-                for e in log_entries
-            )
-
-            # Check 2: Agent read the conversation to detect the meeting notes (STRICT)
-            read_conversation_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "read_conversation"
-                for e in log_entries
-            )
-
-            # Check 3: Agent created a note in the Work - Project Planning folder (STRICT)
+            # Check 1: Agent created a note in the Work - Project Planning folder with valid content (STRICT)
+            # Must create note in correct folder and contain key meeting information
             note_created_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulNotesApp"
                 and e.action.function_name == "create_note"
+                and e.action.args.get("folder", "").strip() == self.project_folder_name
                 for e in log_entries
             )
 
-            # Check 4: Agent added Emily Wong as a new contact (STRICT - action required, exact details flexible)
+            # Check 2: Note content contains key meeting information (STRICT)
+            # Must include attendees (Emily Wong), decisions (launch date Jan 15), and action items
+            note_content_valid = any(
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulNotesApp"
+                and e.action.function_name == "create_note"
+                and e.action.args.get("folder", "").strip() == self.project_folder_name
+                and (
+                    (
+                        self.emily_first_name.lower() in str(e.action.args.get("content", "")).lower()
+                        and self.emily_last_name.lower() in str(e.action.args.get("content", "")).lower()
+                    )
+                    or (
+                        f"{self.emily_first_name} {self.emily_last_name}".lower()
+                        in str(e.action.args.get("content", "")).lower()
+                    )
+                )
+                and (
+                    ("jan 15" in str(e.action.args.get("content", "")).lower())
+                    or ("january 15" in str(e.action.args.get("content", "")).lower())
+                )
+                and (
+                    ("action" in str(e.action.args.get("content", "")).lower())
+                    or ("deadline" in str(e.action.args.get("content", "")).lower())
+                )
+                for e in log_entries
+            )
+
+            # Check 3: Agent added Emily Wong as a new contact (STRICT)
             # Accept add_new_contact or create_contact (if both exist in API)
             emily_contact_added = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulContactsApp"
                 and e.action.function_name in ["add_new_contact", "create_contact"]
-                and "emily" in str(e.action.args.get("first_name", "")).lower()
-                and "wong" in str(e.action.args.get("last_name", "")).lower()
+                and self.emily_first_name.lower() in str(e.action.args.get("first_name", "")).lower()
+                and self.emily_last_name.lower() in str(e.action.args.get("last_name", "")).lower()
                 for e in log_entries
             )
 
             # All checks are strict and required for success
-            success = proposal_found and read_conversation_found and note_created_found and emily_contact_added
+            success = note_created_found and note_content_valid and emily_contact_added
 
             if not success:
                 missing_checks = []
-                if not proposal_found:
-                    missing_checks.append("agent proposal to user")
-                if not read_conversation_found:
-                    missing_checks.append("read conversation with Sarah")
                 if not note_created_found:
-                    missing_checks.append("create note in Work - Project Planning folder")
+                    missing_checks.append(f"create note in {self.project_folder_name} folder")
+                if note_created_found and not note_content_valid:
+                    missing_checks.append(
+                        "note content missing key meeting information (attendees, decisions, or action items)"
+                    )
                 if not emily_contact_added:
-                    missing_checks.append("add Emily Wong to contacts")
+                    missing_checks.append(f"add {self.emily_first_name} {self.emily_last_name} to contacts")
 
                 rationale = f"Missing required actions: {', '.join(missing_checks)}"
                 return ScenarioValidationResult(success=False, rationale=rationale)

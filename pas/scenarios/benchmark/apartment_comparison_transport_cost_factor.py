@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
-from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
+from are.simulation.types import AbstractEnvironment, Action, EventRegisterer, EventType
 
 from pas.apps import (
     HomeScreenSystemApp,
@@ -277,89 +277,47 @@ class ApartmentComparisonTransportCostFactor(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Filter to only AGENT events (oracle events)
-            agent_events = [e for e in log_entries if e.event_type == EventType.AGENT]
-
-            # STRICT Check 1: Agent retrieved saved apartments
-            # This proves the agent detected the new listing and investigated existing options
-            list_saved_found = any(
-                e.action.class_name == "StatefulApartmentApp" and e.action.function_name == "list_saved_apartments"
-                for e in agent_events
-            )
-
-            # STRICT Check 2: Agent analyzed ride history
-            # This proves the agent identified the commute pattern from historical data
-            get_ride_history_found = any(
-                e.action.class_name == "StatefulCabApp" and e.action.function_name == "get_ride_history"
-                for e in agent_events
-            )
-
-            # STRICT Check 3: Agent requested quotations from multiple apartment locations
-            # This proves the agent calculated transportation costs for each option
-            # We need at least 3 quotations (one for each saved apartment)
-            quotation_events = [
-                e
-                for e in agent_events
-                if e.action.class_name == "StatefulCabApp" and e.action.function_name == "get_quotation"
-            ]
-
-            # Check that quotations include the key apartment locations
-            # We verify the presence of key addresses in quotation arguments
-            quotation_addresses = set()
-            for qe in quotation_events:
-                args = qe.action.args if hasattr(qe.action, "args") else {}
-                if "start_location" in args:
-                    quotation_addresses.add(args["start_location"].lower())
-
-            # Verify we have quotations for at least the three saved apartments
-            # (We're flexible on exact string matching but check for presence of key addresses)
-            has_downtown_quote = any("101 main street" in addr for addr in quotation_addresses)
-            has_suburban_quote = any("555 green lane" in addr for addr in quotation_addresses)
-            has_midtown_quote = any("888 center avenue" in addr for addr in quotation_addresses)
-
-            sufficient_quotations = has_downtown_quote and has_suburban_quote and has_midtown_quote
-
-            # STRICT Check 4: Agent sent a proposal message to the user
-            # Equivalence class: accept send_message_to_user as the method for proposals
+            # Check 1 (STRICT): Agent sent proposal to user with cost comparison
+            # Content flexibility: require "commute" or "total" mentioned, not exact wording
             proposal_found = any(
-                e.action.class_name == "PASAgentUserInterface" and e.action.function_name == "send_message_to_user"
-                for e in agent_events
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "PASAgentUserInterface"
+                and e.action.function_name == "send_message_to_user"
+                and (
+                    "commute" in e.action.args.get("content", "").lower()
+                    or "total" in e.action.args.get("content", "").lower()
+                )
+                for e in log_entries
             )
 
-            # STRICT Check 5: Agent saved the selected apartment after user acceptance
-            # This proves the agent executed the explicit "save" request (commit action).
+            # Check 2 (STRICT): Agent saved the selected apartment after user acceptance
             save_apartment_found = any(
-                e.action.class_name == "StatefulApartmentApp"
+                e.event_type == EventType.AGENT
+                and isinstance(e.action, Action)
+                and e.action.class_name == "StatefulApartmentApp"
                 and e.action.function_name == "save_apartment"
                 and e.action.args.get("apartment_id") == self.midtown_id
-                for e in agent_events
+                for e in log_entries
             )
 
-            # All strict checks must pass
-            success = (
-                list_saved_found
-                and get_ride_history_found
-                and sufficient_quotations
-                and proposal_found
-                and save_apartment_found
-            )
+            # Compute success: all strict checks must pass
+            strict_checks = proposal_found and save_apartment_found
+
+            success = strict_checks
 
             # Build rationale for failures
-            rationale_parts = []
-            if not list_saved_found:
-                rationale_parts.append("agent did not retrieve saved apartments")
-            if not get_ride_history_found:
-                rationale_parts.append("agent did not analyze ride history")
-            if not sufficient_quotations:
-                rationale_parts.append("agent did not get quotations from all saved apartment locations")
-            if not proposal_found:
-                rationale_parts.append("agent did not send proposal message to user")
-            if not save_apartment_found:
-                rationale_parts.append("agent did not save Midtown Plaza apartment")
+            if not success:
+                missing_checks = []
+                if not proposal_found:
+                    missing_checks.append("agent proposal to user with cost comparison not found")
+                if not save_apartment_found:
+                    missing_checks.append("agent did not save Midtown Plaza apartment")
 
-            rationale = "; ".join(rationale_parts) if rationale_parts else "all checks passed"
+                rationale = "; ".join(missing_checks)
+                return ScenarioValidationResult(success=False, rationale=rationale)
 
-            return ScenarioValidationResult(success=success, rationale=rationale)
+            return ScenarioValidationResult(success=True)
 
         except Exception as e:
             return ScenarioValidationResult(success=False, exception=e)

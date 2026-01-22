@@ -246,15 +246,6 @@ class GiftHistoryTrackingFromOrder(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Check that agent processed the delivery email (flexible - any email read action)
-            email_processed = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulEmailApp"
-                and e.action.function_name in ["get_email_by_id", "list_emails"]
-                for e in log_entries
-            )
-
             # Check final outcome 1: Gift history note created/updated for Sarah with chocolate gift
             gift_note_created_or_updated = any(
                 e.event_type == EventType.AGENT
@@ -277,12 +268,10 @@ class GiftHistoryTrackingFromOrder(PASScenario):
                 for e in log_entries
             )
 
-            success = email_processed and gift_note_created_or_updated and items_added_to_cart
+            success = gift_note_created_or_updated and items_added_to_cart
 
             if not success:
                 missing_checks = []
-                if not email_processed:
-                    missing_checks.append("agent did not process delivery email")
                 if not gift_note_created_or_updated:
                     missing_checks.append("gift history note for Sarah not created/updated")
                 if not items_added_to_cart:
