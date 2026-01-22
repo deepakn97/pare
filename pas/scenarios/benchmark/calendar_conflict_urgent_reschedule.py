@@ -46,8 +46,8 @@ class CalendarConflictUrgentReschedule(PASScenario):
     # Scenario starts on 2025-11-18 at 9:00 AM UTC (Monday morning)
     # Design Review is scheduled for next day (Nov 19), manager's email arrives today
     start_time = datetime(2025, 11, 18, 9, 0, 0, tzinfo=UTC).timestamp()
-    status = ScenarioStatus.Draft
-    is_benchmark_ready = False
+    status = ScenarioStatus.Valid
+    is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize apps with test data."""

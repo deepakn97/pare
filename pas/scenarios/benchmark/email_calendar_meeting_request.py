@@ -32,8 +32,8 @@ class EmailCalendarMeetingRequest(PASScenario):
     # Scenario starts on 2025-11-11 at 9:00 AM UTC (ecologically valid timestamp)
     # This ensures notification timestamps align with calendar event dates
     start_time = datetime(2025, 11, 11, 9, 0, 0, tzinfo=UTC).timestamp()
-    status = ScenarioStatus.Draft
-    is_benchmark_ready = False
+    status = ScenarioStatus.Valid
+    is_benchmark_ready = True
 
     def init_and_populate_apps(self, *args: Any, **kwargs: Any) -> None:
         """Initialize apps with test data."""
