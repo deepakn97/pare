@@ -75,6 +75,7 @@ def run_scenarios(
     env_events_per_min: float = 0.0,
     env_events_seed: int = 42,
     stop_on_failure: bool = False,
+    log_level: str = "WARNING",
 ) -> ResultsSummary:
     """Run specified scenarios and collect results.
 
@@ -95,6 +96,7 @@ def run_scenarios(
         env_events_per_min: Average number of environmental noise events per minute.
         env_events_seed: Random seed for reproducible noise generation.
         stop_on_failure: Whether to stop on first failure.
+        log_level: Logging level to use for console.
 
     Returns:
         ResultsSummary: Summary of all scenario results.
@@ -138,7 +140,7 @@ def run_scenarios(
 
         # Setup logging for this scenario
         setup_logging(
-            level="WARNING",
+            level=log_level,
             log_dir=current_logs_dir,
             use_tqdm=True,
             log_to_file=True,
@@ -340,6 +342,12 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Stop execution on first scenario failure",
     )
+    parser.add_argument(
+        "--log-level",
+        default="WARNING",
+        help="Logging level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+    )
 
     args = parser.parse_args(argv)
 
@@ -421,6 +429,7 @@ def main(argv: list[str] | None = None) -> None:
         env_events_per_min=args.env_events_per_min,
         env_events_seed=args.env_events_seed,
         stop_on_failure=args.stop_on_failure,
+        log_level=args.log_level,
     )
 
     # Save results summary inside the model directory

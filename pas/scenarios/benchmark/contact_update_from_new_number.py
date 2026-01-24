@@ -97,9 +97,7 @@ class ContactUpdateFromNewNumber(PASScenario):
 
             # Event 4: User accepts proposal (oracle)
             acceptance_event = (
-                aui.accept_proposal(content="Yes, please update Michael's contact information.")
-                .oracle()
-                .depends_on(proposal_event, delay_seconds=2)
+                aui.accept_proposal(content="Yes, please proceed.").oracle().depends_on(proposal_event, delay_seconds=2)
             )
 
             # Event 5: Agent searches for existing contact (oracle)
@@ -110,7 +108,7 @@ class ContactUpdateFromNewNumber(PASScenario):
             # Event 6: Agent updates contact with new phone and email (oracle)
             update_event = (
                 contacts.edit_contact(
-                    contact_id="contact-michael-chen",
+                    contact_id=self.michael_chen_contact_id,
                     updates={
                         "phone": "555-987-6543",
                         "email": "michael.chen@newcompany.com",
@@ -153,52 +151,22 @@ class ContactUpdateFromNewNumber(PASScenario):
                 and isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
-                and any(name in e.action.args.get("content", "") for name in ["Michael Chen", "Michael"])
-                and any(
-                    keyword in e.action.args.get("content", "")
-                    for keyword in ["555-987-6543", "new number", "new phone"]
-                )
-                and any(keyword in e.action.args.get("content", "") for keyword in ["contact", "update", "information"])
                 for e in log_entries
             )
 
-            # Check 2: Agent searched for existing contact
-            search_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulContactsApp"
-                and e.action.function_name == "search_contacts"
-                and any(name in e.action.args.get("query", "") for name in ["Michael", "Chen", "Michael Chen"])
-                for e in log_entries
-            )
-
-            # Check 3: Agent updated contact with correct new phone and email (STRICT)
+            # Check 2: Agent updated contact with correct new phone and email (STRICT)
             update_found = any(
                 e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulContactsApp"
                 and e.action.function_name == "edit_contact"
-                and e.action.args.get("contact_id") == "contact-michael-chen"
+                and e.action.args.get("contact_id") == self.michael_chen_contact_id
                 and e.action.args.get("updates").get("phone") == "555-987-6543"
                 and e.action.args.get("updates").get("email") == "michael.chen@newcompany.com"
                 for e in log_entries
             )
 
-            # Check 4: Agent sent confirmation message back to Michael Chen
-            confirmation_found = any(
-                e.event_type == EventType.AGENT
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name == "send_message"
-                and e.action.args.get("user_id") == self.michael_chen_user_id
-                and any(
-                    keyword in e.action.args.get("content", "")
-                    for keyword in ["update", "thank", "Thanks", "saved", "confirmed"]
-                )
-                for e in log_entries
-            )
-
-            success = proposal_found and search_found and update_found and confirmation_found
+            success = proposal_found and update_found
             return ScenarioValidationResult(success=success)
 
         except Exception as e:

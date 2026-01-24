@@ -90,7 +90,7 @@ class EmailCalendarMeetingRequest(PASScenario):
             email_event = email.send_email_to_user_only(
                 sender="sarah.johnson@company.com",
                 subject="Project Planning Meeting - Next Tuesday",
-                content="Hi! I'd like to schedule a project planning meeting next Tuesday, November 19th at 2:00 PM. The meeting will be 1 hour long and we'll meet at Downtown Office - Conference Room A. Let me know if this works for you!",
+                content="Hi! I'd like to schedule a project planning meeting next Tuesday, November 19th at 2:00 PM. The meeting will be 1 hour long and we'll meet at Downtown Office - Conference Room A. Let me know if this works for you without any calendar conflicts!",
             ).delayed(20)
 
             # Event 2: Agent proactively proposes to check calendar and add meeting (oracle)

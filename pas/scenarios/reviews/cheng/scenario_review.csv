@@ -1,50 +1,50 @@
 Scenario Name,Folder,Review Status,Comments
-AbandonedCartCheckoutNudge,pas/scenarios/reviews/cheng,,
-ApartmentApplicationDocumentReminder,pas/scenarios/reviews/cheng,,
-ApartmentComparisonDecisionAid,pas/scenarios/reviews/cheng,,
-ApartmentFeatureComparisonQuery,pas/scenarios/reviews/cheng,,
-ApartmentLeaseExpiryRenewalPrep,pas/scenarios/reviews/cheng,,
-ApartmentPriceUpdateSync,pas/scenarios/reviews/cheng,,
-ApartmentViewingReminderPrep,pas/scenarios/reviews/cheng,,
-ApartmentViewingRideCoordination,pas/scenarios/reviews/cheng,,
-ApartmentViewingScheduleConflict,pas/scenarios/reviews/cheng,,
-BudgetConstrainedApartmentFilter,pas/scenarios/reviews/cheng,,
-BulkOrderSpaceConstraint,pas/scenarios/reviews/cheng,,
-CabIssueFollowupWithDetails,pas/scenarios/reviews/cheng,,
-CalendarProductSearchSuggestion,pas/scenarios/reviews/cheng,,
-CancelledGiftOrderContactTracking,pas/scenarios/reviews/cheng,,
-CancelledMeetingNoteCleanup,pas/scenarios/reviews/cheng,,
-CartOrderDiscountConsolidation,pas/scenarios/reviews/cheng,,
-ColleagueRideEmergencyAssist,pas/scenarios/reviews/cheng,,
-DelayedRideEmailCoordination,pas/scenarios/reviews/cheng,,
-DelayedRideIncidentClaim,pas/scenarios/reviews/cheng,,
-DeliveryConflictCancellation,pas/scenarios/reviews/cheng,,
-DiscountCodeExpiryCartReminder,pas/scenarios/reviews/cheng,,
-EmailAttachmentCartSuggestion,pas/scenarios/reviews/cheng,,
-EmailDrivenNoteCleanup,pas/scenarios/reviews/cheng,,
-EmailForwardApartmentInquiry,pas/scenarios/reviews/cheng,,
-EmailNoteDiscrepancyCorrection,pas/scenarios/reviews/cheng,,
-FamilyApartmentRecommendationRequest,pas/scenarios/reviews/cheng,,
-GroupConversationSplitPrivate,pas/scenarios/reviews/cheng,,
-GroupRideCoordinationSplitPayment,pas/scenarios/reviews/cheng,,
-LeaseEndApartmentSearchUrgency,pas/scenarios/reviews/cheng,,
-MeetingAgendaAttachmentCorrection,pas/scenarios/reviews/cheng,,
-MeetingFollowupReminderCreation,pas/scenarios/reviews/cheng,,
-MeetingPrepNotesFromCalendar,pas/scenarios/reviews/cheng,,
-NoteConsolidationSyllabusUpdate,pas/scenarios/reviews/cheng,,
-OrderFailureStoreVisitSuggestion,pas/scenarios/reviews/cheng,,
-OutOfStockNoteAlternative,pas/scenarios/reviews/cheng,,
-OutdatedNoteAttachmentReplacement,pas/scenarios/reviews/cheng,,
-PetPolicyChangeRefiltering,pas/scenarios/reviews/cheng,,
-PrepReminderAfterCalendarReschedule,pas/scenarios/reviews/cheng,,
-ProductExchangeWindowReminder,pas/scenarios/reviews/cheng,,
-ProductRecallSafeReplacement,pas/scenarios/reviews/cheng,,
-ProductRecommendationFromNotes,pas/scenarios/reviews/cheng,,
-RideBookingForCalendarEvent,pas/scenarios/reviews/cheng,,
-UnknownSenderContactMerge,pas/scenarios/reviews/cheng,,
-cart_pause_for_urgent_loan,pas/scenarios/reviews/cheng,,
-enrich_contacts_from_signatures,pas/scenarios/reviews/cheng,,
-expiring_discount_cart_checkout,pas/scenarios/reviews/cheng,,
-project_task_filtering_calendar,pas/scenarios/reviews/cheng,,
-sublet_inquiry_response_triage,pas/scenarios/reviews/cheng,,
-travel_conflict_recurring_meeting,pas/scenarios/reviews/cheng,,
+AbandonedCartCheckoutNudge,pas/scenarios/reviews/cheng,Valid,
+ApartmentApplicationDocumentReminder,pas/scenarios/reviews/cheng,Requires Modification,trigger to search didn't mention clearly
+ApartmentComparisonDecisionAid,pas/scenarios/reviews/cheng,Requires Modification,trigger to search didn't mention clearly
+ApartmentFeatureComparisonQuery,pas/scenarios/reviews/cheng,Valid,
+ApartmentLeaseExpiryRenewalPrep,pas/scenarios/reviews/cheng,Requires Modification,"use the specific results from search_apartments to validate, remove redundant actions"
+ApartmentPriceUpdateSync,pas/scenarios/reviews/cheng,Invalid,update_apartment a valid notification? why search for notes?
+ApartmentViewingReminderPrep,pas/scenarios/reviews/cheng,Requires Modification,add task trigger
+ApartmentViewingRideCoordination,pas/scenarios/reviews/cheng,Requires Modification,add cab booking trigger
+ApartmentViewingScheduleConflict,pas/scenarios/reviews/cheng,Requires Modification,modify validate func, remove specific hrs
+BudgetConstrainedApartmentFilter,pas/scenarios/reviews/cheng,Requires Modification,specific the trigger email content
+BulkOrderSpaceConstraint,pas/scenarios/reviews/cheng,Requires Modification,add trigger to list/remove saved apts
+CabIssueFollowupWithDetails,pas/scenarios/reviews/cheng,Valid,
+CalendarProductSearchSuggestion,pas/scenarios/reviews/cheng,Requires Modification,trigger to add to cart proposal
+CancelledGiftOrderContactTracking,pas/scenarios/reviews/cheng,Invalid,
+CancelledMeetingNoteCleanup,pas/scenarios/reviews/cheng,Requires Modification,add an event trigger for specific action
+CartOrderDiscountConsolidation,pas/scenarios/reviews/cheng,Requires Modification,add env event to contain more info
+ColleagueRideEmergencyAssist,pas/scenarios/reviews/cheng,Requires Modification,rm redundant events
+DelayedRideEmailCoordination,pas/scenarios/reviews/cheng,Requires Modification,simplify
+DelayedRideIncidentClaim,pas/scenarios/reviews/cheng,Requires Modification,remove 1/3 task to simplify
+DeliveryConflictCancellation,pas/scenarios/reviews/cheng,Requires Modification,add mode details to triggers
+DiscountCodeExpiryCartReminder,pas/scenarios/reviews/cheng,Requires Modification,rm one validation check
+EmailAttachmentCartSuggestion,pas/scenarios/reviews/cheng,Requires Modification,simplify validation check
+EmailDrivenNoteCleanup,pas/scenarios/reviews/cheng,Valid,
+EmailForwardApartmentInquiry,pas/scenarios/reviews/cheng,Requires Modification,forward email trigger mention more clearly
+EmailNoteDiscrepancyCorrection,pas/scenarios/reviews/cheng,Requires Modification,add more detailed triggers
+FamilyApartmentRecommendationRequest,pas/scenarios/reviews/cheng,Valid,add lower() in validation
+GroupConversationSplitPrivate,pas/scenarios/reviews/cheng,Requires Modification,add one more trigger
+GroupRideCoordinationSplitPayment,pas/scenarios/reviews/cheng,Requires Modification,add one more trigger
+LeaseEndApartmentSearchUrgency,pas/scenarios/reviews/cheng,Requires Modification,rm useless calendar app. simplify
+MeetingAgendaAttachmentCorrection,pas/scenarios/reviews/cheng,Valid,
+MeetingFollowupReminderCreation,pas/scenarios/reviews/cheng,Valid,change me to you
+MeetingPrepNotesFromCalendar,pas/scenarios/reviews/cheng,Valid,minor change
+NoteConsolidationSyllabusUpdate,pas/scenarios/reviews/cheng,Valid,"add lower() in validation, fix raw bytes can’t be JSON-serialized"
+OrderFailureStoreVisitSuggestion,pas/scenarios/reviews/cheng,Requires Modification,add store visit trigger
+OutOfStockNoteAlternative,pas/scenarios/reviews/cheng,Valid,is trigger enough?
+OutdatedNoteAttachmentReplacement,pas/scenarios/reviews/cheng,Valid,
+PetPolicyChangeRefiltering,pas/scenarios/reviews/cheng,Invalid,"add_new_apartment，delete_apartment not valid env events"
+PrepReminderAfterCalendarReschedule,pas/scenarios/reviews/cheng,Requires Modification,add more details to trigger
+ProductExchangeWindowReminder,pas/scenarios/reviews/cheng,Valid,a complex one
+ProductRecallSafeReplacement,pas/scenarios/reviews/cheng,Valid,search_notes logic check??
+ProductRecommendationFromNotes,pas/scenarios/reviews/cheng,Requires Modification,loosen the validation by adding send_message
+RideBookingForCalendarEvent,pas/scenarios/reviews/cheng,Requires Modification,simplify scenario
+UnknownSenderContactMerge,pas/scenarios/reviews/cheng,Requires Modification,add more details to trigger
+cart_pause_for_urgent_loan,pas/scenarios/reviews/cheng,Requires Modification,change trigger cue
+enrich_contacts_from_signatures,pas/scenarios/reviews/cheng,Requires Modification,add more details to trigger
+expiring_discount_cart_checkout,pas/scenarios/reviews/cheng,Valid,
+project_task_filtering_calendar,pas/scenarios/reviews/cheng,Valid,"add more details to trigger, rm one validation check"
+sublet_inquiry_response_triage,pas/scenarios/reviews/cheng,Valid,rm redundant action
+travel_conflict_recurring_meeting,pas/scenarios/reviews/cheng,Requires Modification,add more details to trigger
