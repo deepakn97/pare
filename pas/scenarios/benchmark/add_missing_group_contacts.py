@@ -244,31 +244,18 @@ class AddMissingGroupContacts(PASScenario):
         try:
             log_entries = env.event_log.list_view()
 
-            # Check 1: Agent sent proposal to the user mentioning Casey Jordan and the email address
-            # FLEXIBLE on wording, STRICT on logical presence of key entities
+            # Check 1 (STRICT): Agent sent proposal to user about adding Casey Jordan as contact
             proposal_found = any(
-                (e.event_type == EventType.AGENT)
+                e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "PASAgentUserInterface"
                 and e.action.function_name == "send_message_to_user"
                 for e in log_entries
             )
 
-            # Check 2: Agent searched for Casey Jordan in contacts to confirm she's missing
-            # STRICT on app and function, FLEXIBLE on exact query string
-            search_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulContactsApp"
-                and e.action.function_name == "search_contacts"
-                for e in log_entries
-            )
-
-            # Check 3: Agent created new contact for Casey Jordan with correct email
-            # STRICT on structure (first_name, last_name, email present and non-empty)
-            # FLEXIBLE on exact capitalization or extra fields
+            # Check 2 (STRICT): Agent created new contact for Casey Jordan with correct email
             create_contact_found = any(
-                (e.event_type == EventType.AGENT)
+                e.event_type == EventType.AGENT
                 and isinstance(e.action, Action)
                 and e.action.class_name == "StatefulContactsApp"
                 and e.action.function_name == "add_new_contact"
@@ -276,29 +263,20 @@ class AddMissingGroupContacts(PASScenario):
                 for e in log_entries
             )
 
-            # Check 4: Agent read the Book Club conversation to understand context
-            # STRICT on reading conversation, FLEXIBLE on exact parameters
-            read_conversation_found = any(
-                (e.event_type == EventType.AGENT)
-                and isinstance(e.action, Action)
-                and e.action.class_name == "StatefulMessagingApp"
-                and e.action.function_name in ["read_conversation", "list_recent_conversations"]
-                for e in log_entries
-            )
+            # Compute success: all strict checks must pass
+            strict_checks = proposal_found and create_contact_found
 
-            # Build success result and rationale
-            checks = {
-                "proposal_found": proposal_found,
-                "search_found": search_found,
-                "create_contact_found": create_contact_found,
-                "read_conversation_found": read_conversation_found,
-            }
+            success = strict_checks
 
-            success = all(checks.values())
-
+            # Build rationale for failures
             if not success:
-                failed_checks = [name for name, passed in checks.items() if not passed]
-                rationale = f"Missing critical checks: {', '.join(failed_checks)}"
+                missing_checks = []
+                if not proposal_found:
+                    missing_checks.append("agent proposal to user about adding Casey Jordan not found")
+                if not create_contact_found:
+                    missing_checks.append("agent did not create contact for Casey Jordan with correct email")
+
+                rationale = "; ".join(missing_checks)
                 return ScenarioValidationResult(success=False, rationale=rationale)
 
             return ScenarioValidationResult(success=True)

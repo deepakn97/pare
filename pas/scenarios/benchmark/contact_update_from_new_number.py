@@ -57,6 +57,8 @@ class ContactUpdateFromNewNumber(PASScenario):
         )
         self.messaging.add_users(["John Doe", "Michael Chen"])
         self.user_id = self.messaging.current_user_id
+        # Store Michael Chen's user_id for messaging
+        self.michael_chen_user_id = self.messaging.name_to_id["Michael Chen"]
         self.unknown_conversation = ConversationV2(participant_ids=[self.user_id, "555-6787-897"])
         self.messaging.add_conversation(self.unknown_conversation)
 
@@ -117,9 +119,10 @@ class ContactUpdateFromNewNumber(PASScenario):
             )
 
             # Event 7: Agent sends confirmation to new number (oracle)
+            # Send message to Michael Chen using his user_id in messaging app
             confirmation_event = (
                 messaging.send_message(
-                    user_id=self.michael_chen_contact_id,
+                    user_id=self.michael_chen_user_id,
                     content="Thanks Michael! I've updated your contact information.",
                 )
                 .oracle()
