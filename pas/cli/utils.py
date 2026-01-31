@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from are.simulation.agents.are_simulation_agent_config import (
-    ARESimulationReactBaseAgentConfig,
     LLMEngineConfig,
 )
 from are.simulation.scenario_runner import ScenarioRunnerConfig
@@ -61,18 +60,19 @@ MODELS_MAP = {
     "deepseek-v3.2": {"model_name": "accounts/fireworks/models/deepseek-v3p2", "provider": "fireworks_ai"},
     "qwen-3-8B-base": {"model_name": "accounts/fireworks/models/qwen3-8b", "provider": "fireworks_ai"},
     # These models do not support serverless so we use a autoscaled deployment.
-    "llama-3.2-3B": {
-        "model_name": "accounts/eric-lab/deployedModels/llama-v3p2-3b-instruct-lifkiscw",
+    "llama-3.2-3b-it": {
+        "model_name": "accounts/eric-lab/deployments/zxezvdmp",
         "provider": "fireworks_ai",
     },
-    "gemma-4b-it": {
-        "model_name": "accounts/eric-lab/deployedModels/gemma-3-4b-it-gy3oiawa",
+    "gemma-3-4b-it": {
+        "model_name": "accounts/eric-lab/deployments/pmewm76x",
         "provider": "fireworks_ai",
     },
     "qwen-3-4b-it": {
-        "model_name": "accounts/eric-lab/deployedModels/qwen3-4b-instruct-2507-vklwbqxi",
+        "model_name": "accounts/eric-lab/deployments/y4tn93dp",
         "provider": "fireworks_ai",
     },
+    "ministral-3-3b-it": {"model_name": "accounts/eric-lab/deployments/ncvfom3m", "provider": "fireworks_ai"},
 }
 
 
@@ -190,27 +190,16 @@ def run_scenario_by_id(
             f"Provided proactive model {proactive_model} not found in MODELS_MAP. Provider information may be incorrect."
         )
 
-    # Create agent configurations
-    user_config = ARESimulationReactBaseAgentConfig(
-        llm_engine_config=LLMEngineConfig(model_name=user_model, provider=user_model_provider),
-        max_iterations=user_max_iterations,  # User agent typically takes fewer iterations per turn
-        use_custom_logger=False,
-    )
-
-    proactive_observe_config = ARESimulationReactBaseAgentConfig(
-        llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider=proactive_model_provider),
-        max_iterations=observe_max_iterations,  # Observation might need more reasoning
-        use_custom_logger=False,
-    )
-
-    proactive_execute_config = ARESimulationReactBaseAgentConfig(
-        llm_engine_config=LLMEngineConfig(model_name=proactive_model, provider=proactive_model_provider),
-        max_iterations=execute_max_iterations,  # Execution might need multiple tool calls
-        use_custom_logger=False,
-    )
-
-    # ! TODO: Support dumping agent traces as well, I think right now it is only dumping the user agent logs. We also don't use this config anywhere.
+    # Create runner configuration
     runner_config = ScenarioRunnerConfig(
+        user_engine_config=LLMEngineConfig(model_name=user_model, provider=user_model_provider),
+        user_max_iterations=user_max_iterations,
+        observe_engine_config=LLMEngineConfig(model_name=proactive_model, provider=proactive_model_provider),
+        observe_max_iterations=observe_max_iterations,
+        execute_engine_config=LLMEngineConfig(model_name=proactive_model, provider=proactive_model_provider),
+        execute_max_iterations=execute_max_iterations,
+        max_turns=max_turns,
+        oracle=oracle_mode,
         output_dir=traces_dir,
         export=True,
         use_custom_logger=False,
@@ -220,15 +209,7 @@ def run_scenario_by_id(
     runner = TwoAgentScenarioRunner()
 
     logger.info("Starting scenario execution...")
-    validation_result = runner.run_pas_scenario(
-        scenario=scenario,
-        user_config=user_config,
-        proactive_observe_config=proactive_observe_config,
-        proactive_execute_config=proactive_execute_config,
-        max_turns=max_turns,
-        oracle_mode=oracle_mode,
-        traces_dir=traces_dir,
-    )
+    validation_result = runner.run(runner_config, scenario)
 
     # Display results
     logger.info("=" * 80)
