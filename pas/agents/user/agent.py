@@ -11,6 +11,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from are.simulation.agents.agent_log import ToolCallLog
 from are.simulation.agents.default_agent.base_agent import (
     DEFAULT_STEP_2_MESSAGE,
     DEFAULT_STEP_2_ROLE,
@@ -336,3 +337,48 @@ class UserAgent:
             raise RuntimeError(f"User agent failed. {error_message}")
 
         return result
+
+    # ==================== Metric Extraction Methods ====================
+
+    def get_acceptance_count(self) -> int:
+        """Count the number of proposal acceptances from the user.
+
+        Acceptances are identified by calls to accept_proposal tool.
+
+        Returns:
+            Number of acceptances.
+        """
+        count = 0
+        for log in self.react_agent.get_agent_logs():
+            if isinstance(log, ToolCallLog) and "accept_proposal" in log.tool_name.lower():
+                count += 1
+        return count
+
+    def get_read_only_actions(self) -> int:
+        """Count read-only actions from the user agent.
+
+        Returns:
+            Number of read-only tool calls.
+        """
+        count = 0
+        for log in self.react_agent.get_agent_logs():
+            if isinstance(log, ToolCallLog):
+                tool = self.react_agent.tools.get(log.tool_name)
+                # write_operation=False or None means read-only
+                if tool is not None and not getattr(tool, "write_operation", False):
+                    count += 1
+        return count
+
+    def get_write_actions(self) -> int:
+        """Count write actions from the user agent.
+
+        Returns:
+            Number of write tool calls.
+        """
+        count = 0
+        for log in self.react_agent.get_agent_logs():
+            if isinstance(log, ToolCallLog):
+                tool = self.react_agent.tools.get(log.tool_name)
+                if tool is not None and getattr(tool, "write_operation", False):
+                    count += 1
+        return count

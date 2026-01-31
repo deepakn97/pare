@@ -559,3 +559,58 @@ class ProactiveAgent:
         self.pending_goal = None
 
         return result
+
+    # ==================== Metric Extraction Methods ====================
+
+    def get_proposal_count(self) -> int:
+        """Count the number of proposals made by the observe agent.
+
+        Proposals are identified by calls to send_message_to_user tool.
+
+        Returns:
+            Number of proposals made.
+        """
+        count = 0
+        for log in self.observe_agent.get_agent_logs():
+            if isinstance(log, ToolCallLog) and "send_message_to_user" in log.tool_name.lower():
+                count += 1
+        return count
+
+    def get_read_only_actions(self) -> int:
+        """Count read-only actions from both observe and execute agents.
+
+        Returns:
+            Number of read-only tool calls.
+        """
+        count = 0
+        for log in self.observe_agent.get_agent_logs():
+            if isinstance(log, ToolCallLog):
+                tool = self.observe_agent.tools.get(log.tool_name)
+                # write_operation=False or None means read-only
+                if tool is not None and not getattr(tool, "write_operation", False):
+                    count += 1
+        for log in self.execute_agent.get_agent_logs():
+            if isinstance(log, ToolCallLog):
+                tool = self.execute_agent.tools.get(log.tool_name)
+                if tool is not None and not getattr(tool, "write_operation", False):
+                    count += 1
+        return count
+
+    def get_write_actions(self) -> int:
+        """Count write actions from both observe and execute agents.
+
+        Returns:
+            Number of write tool calls.
+        """
+        count = 0
+        for log in self.observe_agent.get_agent_logs():
+            if isinstance(log, ToolCallLog):
+                tool = self.observe_agent.tools.get(log.tool_name)
+                if tool is not None and getattr(tool, "write_operation", False):
+                    count += 1
+        for log in self.execute_agent.get_agent_logs():
+            if isinstance(log, ToolCallLog):
+                tool = self.execute_agent.tools.get(log.tool_name)
+                if tool is not None and getattr(tool, "write_operation", False):
+                    count += 1
+        return count
