@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
-import typing
-from pathlib import Path
+from pathlib import Path  # noqa: TC003 - used at runtime for directory operations
 
 from are.simulation.logging_config import (
     ScenarioAwareFormatter,
@@ -50,7 +49,13 @@ class PASFormatter(ScenarioAwareFormatter):
         return formatter.format(record)
 
 
-def configure_logging(level: int = logging.INFO, use_tqdm: bool = False, log_dir: Path | None = None) -> None:
+def configure_logging(
+    level: int = logging.INFO,
+    use_tqdm: bool = False,
+    log_dir: Path | None = None,
+    scenario_id: str | None = None,
+    run_number: int | None = None,
+) -> None:
     """Configure logging for PAS application.
 
     This configures the root logger, which all other loggers propogate to.
@@ -60,6 +65,8 @@ def configure_logging(level: int = logging.INFO, use_tqdm: bool = False, log_dir
         level: The logging level (default: logging.INFO)
         use_tqdm: Whether to use tqdm-compatible logging (for progress bars)
         log_dir: The directory to log to (default: None)
+        scenario_id: The scenario ID to log to (default: None)
+        run_number: The run number to log to (default: None)
     """
     standard_formatter = PASFormatter()
     console_handler = TqdmLoggingHandler() if use_tqdm else logging.StreamHandler(stream=sys.stdout)
@@ -77,25 +84,39 @@ def configure_logging(level: int = logging.INFO, use_tqdm: bool = False, log_dir
     root_logger.addHandler(console_handler)
 
     if log_dir is not None:
-        file_formatter = PASFormatter(use_colors=False)
+        if scenario_id is None:
+            import warnings
 
-        # Any logs other than Agents
-        pas_file_handler = logging.FileHandler(log_dir / "pas.log", encoding="utf-8")
-        pas_file_handler.setLevel(logging.DEBUG)
-        pas_file_handler.setFormatter(file_formatter)
-        pas_file_handler.addFilter(_ExcludeAgentLogsFilter())
-        root_logger.addHandler(pas_file_handler)
+            warnings.warn("log_dir provided but scenario_id is None - skipping file logging", stacklevel=2)
+        else:
+            file_formatter = PASFormatter(use_colors=False)
+            run_suffix = run_number if run_number is not None else 0
 
-        # Agent logs only
-        agent_file_handler = logging.FileHandler(log_dir / "agent.log", encoding="utf-8")
-        agent_file_handler.setLevel(logging.DEBUG)
-        agent_file_handler.setFormatter(file_formatter)
+            # Build per-scenario log directories
+            pas_log_dir = log_dir / f"{scenario_id}" / "pas"
+            agent_log_dir = log_dir / f"{scenario_id}" / "agent"
 
-        for logger_name in ["are.simulation.agents", "pas.agents"]:
-            agent_logger = logging.getLogger(logger_name)
-            for handler in agent_logger.handlers[:]:
-                agent_logger.removeHandler(handler)
-            agent_logger.addHandler(agent_file_handler)
+            # Create directories if they don't exist
+            pas_log_dir.mkdir(parents=True, exist_ok=True)
+            agent_log_dir.mkdir(parents=True, exist_ok=True)
+
+            # Any logs other than Agents
+            pas_file_handler = logging.FileHandler(pas_log_dir / f"run_{run_suffix}.log", encoding="utf-8")
+            pas_file_handler.setLevel(logging.DEBUG)
+            pas_file_handler.setFormatter(file_formatter)
+            pas_file_handler.addFilter(_ExcludeAgentLogsFilter())
+            root_logger.addHandler(pas_file_handler)
+
+            # Agent logs only
+            agent_file_handler = logging.FileHandler(agent_log_dir / f"run_{run_suffix}.log", encoding="utf-8")
+            agent_file_handler.setLevel(logging.DEBUG)
+            agent_file_handler.setFormatter(file_formatter)
+
+            for logger_name in ["are.simulation.agents", "pas.agents"]:
+                agent_logger = logging.getLogger(logger_name)
+                for handler in agent_logger.handlers[:]:
+                    agent_logger.removeHandler(handler)
+                agent_logger.addHandler(agent_file_handler)
 
 
 class _ExcludeAgentLogsFilter(logging.Filter):
@@ -106,6 +127,12 @@ class _ExcludeAgentLogsFilter(logging.Filter):
 
 
 def suppress_noisy_loggers() -> None:
+    """Suppress noisy loggers from third-party libraries and ARE simulation module."""
+    import litellm
+
+    # Suppress litellm's "Give Feedback" messages printed during retries
+    litellm.suppress_debug_info = True
+
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -117,6 +144,7 @@ def suppress_noisy_loggers() -> None:
 
 
 def suppress_noisy_are_loggers() -> None:
+    """Suppress noisy loggers from the ARE simulation module."""
     logger_names = [
         "are.simulation.agents",
         "are.simulation.agents.default_agent",
@@ -127,47 +155,3 @@ def suppress_noisy_are_loggers() -> None:
         for handler in lg.handlers[:]:
             lg.removeHandler(handler)
         lg.setLevel(logging.WARNING)
-
-
-def initialise_pas_logs(*, clear_existing: bool, log_paths: typing.Sequence[Path]) -> None:
-    """Prepare PAS log files, optionally clearing previous runs before logging."""
-    for path in log_paths:
-        resolved = path if path.is_absolute() else (Path.cwd() / path)
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-        if clear_existing and resolved.exists():
-            resolved.unlink()
-
-
-def get_pas_file_logger(name: str, log_path: Path, level: int = logging.INFO) -> logging.Logger:
-    """Return a logger writing to ``log_path`` without duplicating handlers."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    log_path = log_path if log_path.is_absolute() else (Path.cwd() / log_path)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if not _has_handler(logger.handlers, log_path):
-        file_handler = logging.FileHandler(log_path, encoding="utf-8")
-        formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
-        file_handler.setFormatter(formatter)
-        file_handler.setLevel(level)
-        logger.addHandler(file_handler)
-    else:
-        for existing_handler in logger.handlers:
-            if (
-                isinstance(existing_handler, logging.FileHandler)
-                and Path(existing_handler.baseFilename).resolve() == log_path.resolve()
-            ):
-                existing_handler.setLevel(level)
-    logger.propagate = False
-    return logger
-
-
-def _has_handler(handlers: typing.Sequence[logging.Handler], log_path: Path) -> bool:
-    resolved = log_path.resolve()
-    for handler in handlers:
-        if isinstance(handler, logging.FileHandler) and Path(handler.baseFilename).resolve() == resolved:
-            return True
-    return False
-
-
-__all__ = ["get_pas_file_logger", "initialise_pas_logs"]

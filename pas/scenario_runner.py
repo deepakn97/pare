@@ -5,77 +5,118 @@ from __future__ import annotations
 import logging
 import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from are.simulation.agents.default_agent.base_agent import BaseAgent
-from are.simulation.agents.default_agent.tools.json_action_executor import JsonActionExecutor
-from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
 from are.simulation.environment import EnvironmentConfig
 from are.simulation.notification_system import VerbosityLevel
-from are.simulation.scenario_runner import ScenarioRunner
-from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
+from are.simulation.scenarios.scenario import ScenarioStatus
 from are.simulation.types import EnvironmentState, EnvironmentType
-from tqdm import tqdm
 
-from pas.agents import ProactiveAgent, UserAgent
-from pas.agents.proactive.prompts.execute_prompt import (
-    DEFAULT_PROACTIVE_EXECUTE_PROMPT_WITH_HINTS,
-)
-from pas.agents.proactive.prompts.observe_prompt import DEFAULT_PROACTIVE_OBSERVE_PROMPT_WITH_HINTS
-from pas.agents.proactive.steps import get_proactive_agent_pre_step
-from pas.agents.user.prompts.system_prompt import DEFAULT_USER_AGENT_SYSTEM_PROMPT
-from pas.agents.user.steps import get_user_agent_pre_step
+from pas.agents.agent_builder import ProactiveAgentBuilder, UserAgentBuilder
+from pas.agents.agent_config_builder import ProactiveAgentConfigBuilder, UserAgentConfigBuilder
 from pas.apps import StatefulApp
 from pas.data_handler.exporter import PASJsonScenarioExporter
 from pas.environment import StateAwareEnvironmentWrapper
 from pas.notification_system import PASNotificationSystem
+from pas.scenarios.validation_result import PASScenarioValidationResult
 
 if TYPE_CHECKING:
-    from are.simulation.agents.are_simulation_agent_config import ARESimulationReactBaseAgentConfig
-    from are.simulation.scenarios import Scenario
+    from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
+
+    from pas.agents.pas_agent_config import ProactiveObserveExecuteAgentConfig, UserDefaultAgentConfig
+    from pas.agents.proactive.agent import ProactiveAgent
+    from pas.agents.user.agent import UserAgent
+    from pas.scenarios.config import ScenarioRunnerConfig
+    from pas.scenarios.scenario import PASScenario
 
 
 logger = logging.getLogger(__name__)
 
 
-class TwoAgentScenarioRunner(ScenarioRunner):
-    """Extends Meta-ARE's ScenarioRunner for two-agent proactive system.
+class TwoAgentScenarioRunner:
+    """Standalone scenario runner for two-agent proactive system.
 
-    Inherits:
-        - Scenario parsing (JSON → Scenario object)
-        - Oracle validation (OracleEvent checking via scenario.validate())
-        - Trace export
-        - Environment setup and teardown
-        - Agent configuration infrastructure
+    This runner orchestrates UserAgent and ProactiveAgent instances to execute
+    PAS scenarios. It supports both normal mode (with agents) and oracle mode
+    (without agents, for testing scenario validity).
 
-    Implements:
-        - Custom two-agent turn-based loop (_run_with_two_agents)
-        - UserAgent and ProactiveAgent orchestration
+    Features:
+        - Agent creation via configurable builders (UserAgentBuilder, ProactiveAgentBuilder)
+        - Two-agent turn-based execution loop
+        - Oracle mode for automated scenario validation
+        - Trace export for debugging and analysis
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        user_agent_config_builder: UserAgentConfigBuilder | None = None,
+        user_agent_builder: UserAgentBuilder | None = None,
+        proactive_agent_config_builder: ProactiveAgentConfigBuilder | None = None,
+        proactive_agent_builder: ProactiveAgentBuilder | None = None,
+    ) -> None:
         """Initialize the TwoAgentScenarioRunner.
 
         Args:
-            *args: The arguments to pass to the ScenarioRunner.
-            **kwargs: The keyword arguments to pass to the ScenarioRunner.
+            user_agent_config_builder: Builder for user agent configs. Uses default if None.
+            user_agent_builder: Builder for user agents. Uses default if None.
+            proactive_agent_config_builder: Builder for proactive agent configs. Uses default if None.
+            proactive_agent_builder: Builder for proactive agents. Uses default if None.
         """
-        super().__init__(*args, **kwargs)
+        self.user_agent_config_builder = user_agent_config_builder or UserAgentConfigBuilder()
+        self.user_agent_builder = user_agent_builder or UserAgentBuilder()
+        self.proactive_agent_config_builder = proactive_agent_config_builder or ProactiveAgentConfigBuilder()
+        self.proactive_agent_builder = proactive_agent_builder or ProactiveAgentBuilder()
+
+    def _run_without_agent(
+        self,
+        scenario_id: str,
+        scenario: PASScenario,
+        env: StateAwareEnvironmentWrapper,
+    ) -> PASScenarioValidationResult:
+        """Run scenario in oracle mode without agents.
+
+        In oracle mode, the environment executes all OracleEvents automatically.
+        This method waits for the environment to finish and validates the scenario.
+
+        Args:
+            scenario_id: The ID of the scenario being run.
+            scenario: The scenario to run.
+            env: The environment to run the scenario in.
+
+        Returns:
+            The validation result of the scenario.
+        """
+        logger.info(f"Running scenario {scenario_id} in oracle mode (no agents)")
+        env.join()
+        logger.info("Validating Scenario...")
+        base_result = scenario.validate(env)
+        logger.info(f"Validation Result: {base_result}")
+
+        # Convert to PASScenarioValidationResult (no agent metrics in oracle mode)
+        return PASScenarioValidationResult(
+            success=base_result.success,
+            exception=base_result.exception,
+            export_path=base_result.export_path,
+            rationale=base_result.rationale,
+            duration=base_result.duration,
+            # No agent metrics in oracle mode - defaults to 0
+        )
 
     def _export_pas_trace(
         self,
         env: StateAwareEnvironmentWrapper,
-        scenario: Scenario,
+        scenario: PASScenario,
         user_model: str,
         user_agent: str,
         observe_model: str,
         execute_model: str,
         proactive_agent: str,
-        validation_result: ScenarioValidationResult,
+        validation_result: PASScenarioValidationResult,
         run_duration: float,
         output_dir: str | None = None,
         export_apps: bool = True,
         trace_dump_format: str = "hf",
+        runner_config: ScenarioRunnerConfig | None = None,
     ) -> str | None:
         """Export the trace of the PAS scenario.
 
@@ -92,6 +133,7 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             output_dir: The directory to export the trace to.
             export_apps: Whether to export the apps or not.
             trace_dump_format: The format of the trace.
+            runner_config: The configuration used to run the scenario.
 
         Returns:
             The path to the exported trace.
@@ -126,106 +168,71 @@ class TwoAgentScenarioRunner(ScenarioRunner):
     def _run_with_two_agents(
         self,
         scenario_id: str,
-        scenario: Scenario,
+        scenario: PASScenario,
         env: StateAwareEnvironmentWrapper,
-        user_config: ARESimulationReactBaseAgentConfig,
-        proactive_observe_config: ARESimulationReactBaseAgentConfig,
-        proactive_execute_config: ARESimulationReactBaseAgentConfig,
+        user_engine_config: LLMEngineConfig,
+        observe_engine_config: LLMEngineConfig,
+        execute_engine_config: LLMEngineConfig,
         max_turns: int | None = None,
-    ) -> tuple[ScenarioValidationResult, UserAgent | None, ProactiveAgent | None]:
+        user_max_iterations: int = 1,
+        observe_max_iterations: int = 5,
+        execute_max_iterations: int = 10,
+        use_custom_logger: bool = True,
+    ) -> tuple[PASScenarioValidationResult, UserAgent | None, ProactiveAgent | None]:
         """Run scenario with two-agent turn-based loop.
 
         Flow:
-        1. Build three BaseAgent instances (user, observe, execute)
-        2. Wrap in UserAgent and ProactiveAgent
-        3. Turn-based loop:
+        1. Build UserAgent and ProactiveAgent using builders
+        2. Turn-based loop:
             - user_agent.agent_loop()
             - proactive_agent.agent_loop()
             - Check termination (max_turns or env stopped)
-        4. Validate using scenario.validate(env) (handles OracleEvent checking)
-        5. Return ScenarioValidationResult
+        3. Validate using scenario.validate(env) (handles OracleEvent checking)
+        4. Return ScenarioValidationResult
 
         Args:
             scenario_id: The ID of the scenario to run.
             scenario: The scenario to run.
             env: The environment to run the scenario in.
-            user_config: The configuration for the user agent.
-            proactive_observe_config: The configuration for the proactive observe agent.
-            proactive_execute_config: The configuration for the proactive execute agent.
+            user_engine_config: LLM engine configuration for the user agent.
+            observe_engine_config: LLM engine configuration for the observe agent.
+            execute_engine_config: LLM engine configuration for the execute agent.
             max_turns: The maximum number of turns to run.
+            user_max_iterations: Max iterations per turn for user agent.
+            observe_max_iterations: Max iterations per turn for observe agent.
+            execute_max_iterations: Max iterations per turn for execute agent.
+            use_custom_logger: Whether to use custom logger in agents.
 
         Returns:
             A tuple containing the validation result, the user agent, and the proactive agent.
         """
-        # ! TODO: Will be replaced by an agent builder class.
-        user_llm_engine = LLMEngineBuilder().create_engine(user_config.llm_engine_config)
-        user_base_agent = BaseAgent(
-            llm_engine=user_llm_engine,
-            tools={},  # Will be set by the UsetAgent.init_tools()
-            max_iterations=user_config.max_iterations,
-            conditional_pre_steps=[get_user_agent_pre_step()],
-            action_executor=JsonActionExecutor(
-                tools={},
-                use_custom_logger=user_config.use_custom_logger,
-            ),
-            system_prompts={"system_prompt": DEFAULT_USER_AGENT_SYSTEM_PROMPT},
-            use_custom_logger=user_config.use_custom_logger,
-        )
+        # Build user agent config
+        user_agent_config: UserDefaultAgentConfig = self.user_agent_config_builder.build("default")  # type: ignore[assignment]
+        user_agent_config.max_turns = max_turns
+        user_agent_config.base_agent_config.llm_engine_config = user_engine_config
+        user_agent_config.base_agent_config.max_iterations = user_max_iterations
+        user_agent_config.base_agent_config.use_custom_logger = use_custom_logger
 
-        observe_llm_engine = LLMEngineBuilder().create_engine(proactive_observe_config.llm_engine_config)
-        observe_base_agent = BaseAgent(
-            llm_engine=observe_llm_engine,
-            tools={},  # Will be set by the ProactiveAgent.init_tools()
-            max_iterations=proactive_observe_config.max_iterations,
-            conditional_pre_steps=[get_proactive_agent_pre_step()],
-            action_executor=JsonActionExecutor(
-                tools={},
-                use_custom_logger=proactive_observe_config.use_custom_logger,
-            ),
-            system_prompts={"system_prompt": DEFAULT_PROACTIVE_OBSERVE_PROMPT_WITH_HINTS},
-            use_custom_logger=proactive_observe_config.use_custom_logger,
-        )
+        # Build proactive agent config
+        proactive_agent_config: ProactiveObserveExecuteAgentConfig = self.proactive_agent_config_builder.build(
+            "observe-execute"
+        )  # type: ignore[assignment]
+        proactive_agent_config.max_turns = max_turns
+        proactive_agent_config.observe_base_agent_config.llm_engine_config = observe_engine_config
+        proactive_agent_config.observe_base_agent_config.max_iterations = observe_max_iterations
+        proactive_agent_config.observe_base_agent_config.use_custom_logger = use_custom_logger
+        proactive_agent_config.execute_base_agent_config.llm_engine_config = execute_engine_config
+        proactive_agent_config.execute_base_agent_config.max_iterations = execute_max_iterations
+        proactive_agent_config.execute_base_agent_config.use_custom_logger = use_custom_logger
 
-        execute_llm_engine = LLMEngineBuilder().create_engine(proactive_execute_config.llm_engine_config)
-        execute_base_agent = BaseAgent(
-            llm_engine=execute_llm_engine,
-            tools={},  # Will be set by the ProactiveAgent.init_tools()
-            max_iterations=proactive_execute_config.max_iterations,
-            conditional_pre_steps=[get_proactive_agent_pre_step()],
-            action_executor=JsonActionExecutor(
-                tools={},
-                use_custom_logger=proactive_execute_config.use_custom_logger,
-            ),
-            system_prompts={"system_prompt": DEFAULT_PROACTIVE_EXECUTE_PROMPT_WITH_HINTS},
-            use_custom_logger=proactive_execute_config.use_custom_logger,
+        # Build agents using builders
+        user_agent = self.user_agent_builder.build(
+            agent_config=user_agent_config,
+            env=env,
         )
-
-        user_agent = UserAgent(
-            log_callback=env.append_to_world_logs,
-            pause_env=env.pause,
-            resume_env=env.resume_with_offset,
-            llm_engine=user_llm_engine,
-            base_agent=user_base_agent,
-            time_manager=env.time_manager,
-            max_iterations=user_config.max_iterations,
-            max_turns=max_turns,
-            simulated_generation_time_config=user_config.simulated_generation_time_config,
-        )
-
-        proactive_agent = ProactiveAgent(
-            log_callback=env.append_to_world_logs,
-            pause_env=env.pause,
-            resume_env=env.resume_with_offset,
-            observe_llm_engine=observe_llm_engine,
-            observe_agent=observe_base_agent,
-            execute_llm_engine=execute_llm_engine,
-            execute_agent=execute_base_agent,
-            time_manager=env.time_manager,
-            tools=[],
-            observe_max_iterations=proactive_observe_config.max_iterations,
-            execute_max_iterations=proactive_execute_config.max_iterations,
-            max_turns=max_turns,
-            simulated_generation_time_config=proactive_observe_config.simulated_generation_time_config,
+        proactive_agent = self.proactive_agent_builder.build(
+            agent_config=proactive_agent_config,
+            env=env,
         )
 
         # Prepare both agents
@@ -240,34 +247,16 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         user_reset = True
         proactive_reset = True
 
-        # Create tqdm progress bar for turns
-        pbar = tqdm(
-            total=max_turns,
-            desc=f"Turn 0/{max_turns}",
-            bar_format="{desc} |{bar}| {unit}",
-            leave=True,
-        )
-
         while (max_turns is None or turn_count < max_turns) and env.state != EnvironmentState.STOPPED:
             user_tools = env.get_user_tools()
             current_app = env.active_app
             current_state = current_app.current_state if current_app and isinstance(current_app, StatefulApp) else None
-
-            # Update progress bar for user agent
-            pbar.set_description(f"Turn {turn_count + 1}/{max_turns}")
-            pbar.unit = "User Agent"
-            pbar.refresh()
 
             user_result = user_agent.agent_loop(
                 user_tools, current_app, current_state, reset=user_reset or not user_agent.react_agent.is_initialized()
             )
             logger.info(f"User-Agent Turn {turn_count} Output: {user_result}")
             user_reset = False
-
-            # Update progress bar for proactive agent with current mode
-            proactive_mode = proactive_agent.mode.value
-            pbar.unit = f"Proactive Agent ({proactive_mode})"
-            pbar.refresh()
 
             proactive_result = proactive_agent.agent_loop(
                 reset=proactive_reset or not proactive_agent.observe_agent.is_initialized()
@@ -276,48 +265,55 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             proactive_reset = False
 
             turn_count += 1
-            pbar.update(1)
-
-        pbar.close()
 
         logger.info("Validating Scenario...")
-        validation_result = scenario.validate(env)
-        logger.info(f"Validation Result: {validation_result}")
+        base_result = scenario.validate(env)
+        logger.info(f"Validation Result: {base_result}")
+
+        # Extract metrics from agents
+        proposal_count = proactive_agent.get_proposal_count()
+        acceptance_count = user_agent.get_acceptance_count()
+        read_only_actions = proactive_agent.get_read_only_actions() + user_agent.get_read_only_actions()
+        write_actions = proactive_agent.get_write_actions() + user_agent.get_write_actions()
+
+        # Convert to PASScenarioValidationResult with metrics
+        validation_result = PASScenarioValidationResult(
+            success=base_result.success,
+            exception=base_result.exception,
+            export_path=base_result.export_path,
+            rationale=base_result.rationale,
+            duration=base_result.duration,
+            proposal_count=proposal_count,
+            acceptance_count=acceptance_count,
+            read_only_actions=read_only_actions,
+            write_actions=write_actions,
+            number_of_turns=turn_count,
+        )
 
         return validation_result, user_agent, proactive_agent
 
     def _run_pas_scenario(
         self,
-        scenario: Scenario,
-        user_config: ARESimulationReactBaseAgentConfig,
-        proactive_observe_config: ARESimulationReactBaseAgentConfig,
-        proactive_execute_config: ARESimulationReactBaseAgentConfig,
-        max_turns: int | None = None,
-        oracle_mode: bool = False,
-        traces_dir: str = "traces/demo",
-    ) -> ScenarioValidationResult:
+        config: ScenarioRunnerConfig,
+        scenario: PASScenario,
+    ) -> PASScenarioValidationResult:
         """Run a Proactive Agent Sandbox scenario.
 
         Args:
+            config: The configuration for running the scenario.
             scenario: The scenario to run.
-            user_config: The configuration for the user agent.
-            proactive_observe_config: The configuration for the proactive observe agent.
-            proactive_execute_config: The configuration for the proactive execute agent.
-            max_turns: The maximum number of turns to cycles.
-            oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
-            traces_dir: The directory to export traces to.
 
         Returns:
-            ScenarioValidationResult: The validation result of the scenario.
+            PASScenarioValidationResult: The validation result of the scenario.
         """
         env_config = EnvironmentConfig(
-            oracle_mode=oracle_mode,
-            queue_based_loop=oracle_mode,
+            oracle_mode=config.oracle,
+            queue_based_loop=config.oracle,
             wait_for_user_input_timeout=None,
             time_increment_in_seconds=scenario.time_increment_in_seconds,
             start_time=scenario.start_time,
-            dump_dir=traces_dir if oracle_mode else None,
-            exit_when_no_events=oracle_mode,
+            dump_dir=config.output_dir if config.oracle else None,
+            exit_when_no_events=config.oracle,
         )
 
         if scenario.start_time and scenario.start_time > 0:
@@ -334,8 +330,8 @@ class TwoAgentScenarioRunner(ScenarioRunner):
         env.run(scenario, wait_for_end=False)
 
         try:
-            if oracle_mode:
-                # Oracle mode: use inherited _run_without_agent from ScenarioRunner
+            if config.oracle:
+                # Oracle mode: use _run_without_agent
                 # The environment will execute all OracleEvents automatically
                 validation_result = self._run_without_agent(
                     scenario_id=scenario.scenario_id,
@@ -349,15 +345,19 @@ class TwoAgentScenarioRunner(ScenarioRunner):
                     scenario_id=scenario.scenario_id,
                     scenario=scenario,
                     env=env,
-                    user_config=user_config,
-                    proactive_observe_config=proactive_observe_config,
-                    proactive_execute_config=proactive_execute_config,
-                    max_turns=max_turns,
+                    user_engine_config=config.user_engine_config,
+                    observe_engine_config=config.observe_engine_config,
+                    execute_engine_config=config.execute_engine_config,
+                    max_turns=config.max_turns,
+                    user_max_iterations=config.user_max_iterations or 1,
+                    observe_max_iterations=config.observe_max_iterations or 5,
+                    execute_max_iterations=config.execute_max_iterations or 10,
+                    use_custom_logger=config.use_custom_logger,
                 )
         except Exception as exception:
             logger.exception("Failed to run scenario")
             validation_result, user_agent, proactive_agent = (
-                ScenarioValidationResult(success=None, exception=exception),
+                PASScenarioValidationResult(success=None, exception=exception),
                 None,
                 None,
             )
@@ -380,38 +380,28 @@ class TwoAgentScenarioRunner(ScenarioRunner):
                 proactive_agent.agent_framework,
                 validation_result,
                 run_duration,
-                output_dir=traces_dir,
+                output_dir=config.output_dir,
                 export_apps=not has_hf_metadata,
-                trace_dump_format="hf",
+                trace_dump_format=config.trace_dump_format,
+                runner_config=config,
             )
         validation_result.export_path = export_path
         env.stop()
         return validation_result
 
-    # ! TODO: Accept a config object instead of individual arguments. See ScenarioRunnerConfig for reference.
-    def run_pas_scenario(
+    def run(
         self,
-        scenario: Scenario,
-        user_config: ARESimulationReactBaseAgentConfig,
-        proactive_observe_config: ARESimulationReactBaseAgentConfig,
-        proactive_execute_config: ARESimulationReactBaseAgentConfig,
-        max_turns: int | None = None,
-        oracle_mode: bool = False,
-        traces_dir: str = "traces/demo",
-    ) -> ScenarioValidationResult:
+        config: ScenarioRunnerConfig,
+        scenario: PASScenario,
+    ) -> PASScenarioValidationResult:
         """Run a Proactive Agent Sandbox scenario.
 
         Args:
+            config: The configuration for running the scenario.
             scenario: The scenario to run.
-            user_config: The configuration for the user agent.
-            proactive_observe_config: The configuration for the proactive observe agent.
-            proactive_execute_config: The configuration for the proactive execute agent.
-            max_turns: The maximum number of turns to cycles.
-            oracle_mode: Whether to run in oracle mode (executes OracleEvents without agents).
-            traces_dir: The directory to export traces to.
 
         Returns:
-            ScenarioValidationResult: The validation result of the scenario.
+            PASScenarioValidationResult: The validation result of the scenario.
 
         Raises:
             NotImplementedError: If scenario loading from string is not implemented yet.
@@ -429,18 +419,10 @@ class TwoAgentScenarioRunner(ScenarioRunner):
             set_logger_scenario_id(scenario.scenario_id, run_number)
 
         try:
-            result = self._run_pas_scenario(
-                scenario,
-                user_config,
-                proactive_observe_config,
-                proactive_execute_config,
-                max_turns,
-                oracle_mode,
-                traces_dir,
-            )
+            result = self._run_pas_scenario(config, scenario)
         except Exception as exception:
             logger.exception("Failed to run scenario")
-            result = ScenarioValidationResult(success=None, exception=exception)
+            result = PASScenarioValidationResult(success=None, exception=exception)
 
         # Log result
         logger.info(f"{'✅' if result.success is True else '❌' if result.success is False else '⚠️'} Result: {result}")

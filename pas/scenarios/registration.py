@@ -40,7 +40,7 @@ def register_pas_scenarios(registry: ScenarioRegistry) -> None:
     base_scenarios_dir = Path(__file__).parent
 
     # Get scenarios directory from environment variable or use default
-    scenarios_dirs_config = os.getenv("PAS_SCENARIOS_DIR", "user_scenarios")
+    scenarios_dirs_config = os.getenv("PAS_SCENARIOS_DIR", "benchmark")
 
     # Support multiple directories separated by commas
     scenarios_dirs = [d.strip() for d in scenarios_dirs_config.split(",")]
