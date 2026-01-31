@@ -3,14 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from are.simulation.apps.reminder import Reminder  # noqa: TC002 - runtime import required for get_type_hints()
 from are.simulation.types import OperationType, disable_events
 
 from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
-    from are.simulation.apps.reminder import Reminder
-
     from pas.apps.reminder.app import StatefulReminderApp
 
 

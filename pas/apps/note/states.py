@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, cast
 from are.simulation.types import OperationType, disable_events
 
 from pas.apps.core import AppState
+from pas.apps.note.types import Note, ReturnedNotes  # noqa: TC001 - runtime import required for get_type_hints()
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
-    from pas.apps.note.app import Note, ReturnedNotes, StatefulNotesApp
+    from pas.apps.note.app import StatefulNotesApp
 
 
 class NoteList(AppState):

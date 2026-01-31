@@ -3,14 +3,15 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+from are.simulation.apps.apartment_listing import (
+    Apartment,  # noqa: TC002 - runtime import required for get_type_hints()
+)
 from are.simulation.types import OperationType, disable_events
 
 from pas.apps.core import AppState
 from pas.apps.tool_decorators import pas_event_registered, user_tool
 
 if TYPE_CHECKING:
-    from are.simulation.apps.apartment_listing import Apartment
-
     from pas.apps.apartment.app import StatefulApartmentApp
 
 logger = logging.getLogger(__name__)
