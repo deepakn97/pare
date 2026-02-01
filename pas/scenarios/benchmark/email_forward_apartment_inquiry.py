@@ -3,16 +3,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from are.simulation.apps.contacts import Contact, ContactsApp
+from are.simulation.apps.contacts import Contact
 from are.simulation.apps.sandbox_file_system import SandboxLocalFileSystem
 from are.simulation.scenarios.scenario import ScenarioStatus, ScenarioValidationResult
 from are.simulation.types import AbstractEnvironment, EventRegisterer, EventType
 
-from pas.apps import (
-    HomeScreenSystemApp,
-    PASAgentUserInterface,
-    StatefulEmailApp,
-)
+from pas.apps import HomeScreenSystemApp, PASAgentUserInterface, StatefulContactsApp, StatefulEmailApp
 from pas.apps.apartment import StatefulApartmentApp
 from pas.scenarios import PASScenario
 from pas.scenarios.utils.registry import register_scenario
@@ -80,7 +76,7 @@ class EmailForwardApartmentInquiry(PASScenario):
         self.riverside_apt_id = riverside_apt_id
 
         # Initialize contacts app for leasing office reference
-        self.contacts = ContactsApp(name="Contacts")
+        self.contacts = StatefulContactsApp(name="Contacts")
 
         # Add partner contact
         partner_contact = Contact(
