@@ -132,20 +132,90 @@ Logs are written to `logs/pas/`:
 
 All demos use oracle expectations to validate that the proactive agent correctly completes the intended task. If oracle criteria aren't met, the session raises an error rather than silently accepting a partial result.
 
+### Running Benchmarks
+
+PAS includes a CLI for running benchmark experiments with config sweeps, multiple runs, caching, and reporting.
+
+#### Quick Start
+
+```bash
+# Run a single scenario
+pas benchmark sweep --scenarios email_notification --observe-model gpt-5 --execute-model gpt-5
+
+# Run benchmark with specific scenarios (comma-separated or file path)
+pas benchmark sweep --scenarios scenario1,scenario2,scenario3 --observe-model gpt-5 --execute-model gpt-5 --runs 3
+
+# Run benchmark with model sweep (zipped pairs)
+pas benchmark sweep --split full \
+  --observe-model gpt-5 --observe-model claude-4.5-sonnet \
+  --execute-model gpt-5 --execute-model claude-4.5-sonnet \
+  --runs 3
+
+# Run benchmark with noise sweep
+pas benchmark sweep --split full \
+  --observe-model gpt-5 --execute-model gpt-5 \
+  --tool-failure-probability 0.0 --tool-failure-probability 0.1 \
+  --runs 3
+```
+
+#### CLI Options
+
+| Flag | Description |
+|------|-------------|
+| `--scenarios` / `-s` | Scenario IDs: single ID, comma-separated, or file path |
+| `--split` | Benchmark split: `full` or `ablation` |
+| `--observe-model` / `-om` | Observe model(s) for sweep (zipped with `--execute-model`) |
+| `--execute-model` / `-em` | Execute model(s) for sweep (zipped with `--observe-model`) |
+| `--user-model` / `-um` | User agent model (default: `gpt-5-mini`) |
+| `--max-turns` / `-mt` | Maximum turns per scenario (default: 10) |
+| `--runs` / `-r` | Number of runs per scenario (default: 1) |
+| `--max-concurrent` / `-c` | Max concurrent scenarios (default: CPU count) |
+| `--timeout` / `-t` | Timeout per scenario in seconds |
+| `--executor-type` | Executor: `sequential`, `thread`, or `process` (default: `thread`) |
+| `--results-dir` | Directory for JSON result files (default: `results`) |
+| `--output-dir` | Directory for trace exports (requires `--export`) |
+| `--export` / `--no-export` | Export scenario traces |
+| `--experiment-name` / `-n` | Name for this experiment |
+| `--log-level` | Logging level: DEBUG, INFO, WARNING, ERROR |
+| `--no-cache` | Disable result caching |
+| `--limit` / `-l` | Limit number of scenarios to load |
+
+See `pas benchmark sweep --help` for full details.
+
+#### Output
+
+Results are saved in a structured directory:
+
+```
+results/
+└── {experiment}_{split}_user_{model}_mt_{turns}_umi_..._omi_..._emi_.../
+    ├── obs_{model}_exec_{model}_enmi_0_es_42_tfp_0.0_result.json
+    ├── obs_{model}_exec_{model}_enmi_0_es_42_tfp_0.0_report.txt
+    └── combined_report.txt
+```
+
+### Platform Notes
+
+#### macOS: Process-Based Execution
+
+On macOS, the `--executor-type process` option may fail with `FileNotFoundError` during process spawn. This is a known issue with Python's multiprocessing 'spawn' method on macOS, where semaphore file handles cannot be properly reconstructed in child processes.
+
+**Workaround**: Use `--executor-type thread` (the default) instead of `--executor-type process` on macOS.
+
 ### Scenario Integration Options
 
 - **Meta-authored scenarios** – use `pas.meta_adapter.build_meta_scenario_components`
   to convert any Meta ARE `Scenario` (e.g. `ScenarioTutorial`) into the PAS
-  runtime stack. The adapter preserves Meta’s apps, events, and oracles, so the
+  runtime stack. The adapter preserves Meta's apps, events, and oracles, so the
   proactive session will enforce the same validation rules.
 - **PAS-authored scenarios** – build directly with `pas.scenarios.contacts_followup.build_contacts_followup_components`
   (or your own builder). This path gives full control over seeding the PAS
   stateful apps while still supplying `OracleAction` entries for validation.
 
-In practice new scenarios should follow Meta’s format whenever possible: emit a
+In practice new scenarios should follow Meta's format whenever possible: emit a
 standard `Scenario` with events + oracle expectations, then reuse the adapter to
 obtain a PAS environment. This keeps the codebase minimal and lets us leverage
-Meta’s judge ecosystem while adding PAS-specific UX (stateful navigation,
+Meta's judge ecosystem while adding PAS-specific UX (stateful navigation,
 decision prompts, etc.). If a scenario truly needs bespoke PAS state, use the
 contacts example as a template and provide matching oracle actions so the loop
 still detects success.

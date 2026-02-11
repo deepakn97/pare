@@ -15,6 +15,7 @@ nav:
       - Scenario Generation: scenario_generator.md
   - Architecture:
       - Visual Overview: architecture_visual.md
+      - Environment Formalization: dec_pomdp_formulation.md
   - Apps:
       - App APIs Overview: apps/index.md
       - Adding a Stateful App: apps/adding_stateful_app.md
