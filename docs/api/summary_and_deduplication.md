@@ -16,7 +16,7 @@ The `SummaryGeneratingAgent` is a specialized agent that analyzes scenario Pytho
 
 ### Location
 
-`pas/scenario_generator/agent/summary_generating_agent.py`
+`pas/scenarios/generator/agent/summary_generating_agent.py`
 
 ### Features
 
@@ -48,7 +48,7 @@ Generate a summary for the given scenario code.
 ```python
 from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
 from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
-from pas.scenario_generator.agent.summary_generating_agent import SummaryGeneratingAgent
+from pas.scenarios.generator.agent.summary_generating_agent import SummaryGeneratingAgent
 
 config = LLMEngineConfig(model_name="gpt-4o-mini", provider="openai")
 engine = LLMEngineBuilder().create_engine(engine_config=config)

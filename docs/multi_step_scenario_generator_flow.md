@@ -5,8 +5,8 @@ This document describes the **code-level execution flow** for the multi-step sce
 The examples assume a command like:
 
 ```bash
-python -m pas.scenario_generator.multi_steps_scenario_generator \
-  --output-dir pas/scenario_generator/generated_scenarios \
+python -m pas.scenarios.generator.scenario_generator \
+  --debug-prompts \
   --max-iterations 3
 ```
 
@@ -14,9 +14,9 @@ The `--resume-from-step` flag only changes which steps are *skipped* or *resumed
 
 ---
 
-### 1. Entry Point: `multi_steps_scenario_generator.py`
+### 1. Entry Point: `scenario_generator.py`
 
-**Module:** `pas.scenario_generator.multi_steps_scenario_generator`
+**Module:** `pas.scenarios.generator.scenario_generator`
 **Function:** `main()`
 
 1. **Argument parsing**
@@ -59,10 +59,10 @@ The `--resume-from-step` flag only changes which steps are *skipped* or *resumed
 
 ---
 
-### 2. Orchestrator Setup: `MultiStepScenarioGeneratingAgentsOrchestrator.__init__`
+### 2. Orchestrator Setup: `ScenarioGeneratingAgentOrchestrator.__init__`
 
-**Module:** `pas.scenario_generator.agent.multi_step_scenario_generating_agent.multi_step_scenario_generating_agent`
-**Class:** `MultiStepScenarioGeneratingAgentsOrchestrator`
+**Module:** `pas.scenarios.generator.agent.scenario_generating_agent_orchestrator`
+**Class:** `ScenarioGeneratingAgentOrchestrator`
 
 Key responsibilities:
 
@@ -70,7 +70,7 @@ Key responsibilities:
    - Computes `base_dir` (scenario generator root) and `self.repo_root`.
    - Sets:
      - `self.output_dir` (CLI `--output-dir`; defaults to `base_dir / "generated_scenarios"`).
-     - `self.scenario_file` (single working file that Claude edits, now under `pas/scenarios/generated_scenarios_w_claude_agent/editable_seed_scenario.py`).
+     - `self.scenario_file` (single working file that Claude edits, now under `pas/scenarios/default_generation_output/editable_seed_scenario.py`).
      - `self.generated_dir`, `success_dir`, `failed_dir`, `failed_no_runtime_dir`.
      - `self.scenario_metadata_path` (`pas/scenarios/scenario_metadata.json`) which stores description, apps used, and other metadata for each scenario.
 
@@ -126,9 +126,9 @@ Key responsibilities:
 
 ---
 
-### 3. High-Level Pipeline: `MultiStepScenarioGeneratingAgentsOrchestrator.run`
+### 3. High-Level Pipeline: `ScenarioGeneratingAgentOrchestrator.run`
 
-**Method:** `MultiStepScenarioGeneratingAgentsOrchestrator.run(self) -> dict[str, Any]`
+**Method:** `ScenarioGeneratingAgentOrchestrator.run(self) -> dict[str, Any]`
 **Decorator:** `# noqa: C901` (complex, but intentionally centralized)
 
 #### 3.1. Resume mode selection
@@ -410,10 +410,10 @@ They do **not** perform any file I/O or scenario execution themselves; those res
 
 ### 5. Summary: End-to-End Flow (Code-Centric)
 
-1. `python -m pas.scenario_generator.multi_steps_scenario_generator`
-   → `main()` parses args, prepares `prompt_context`, constructs `MultiStepScenarioGeneratingAgentsOrchestrator`.
+1. `python -m pas.scenarios.generator.scenario_generator`
+   → `main()` parses args, prepares `prompt_context`, constructs `ScenarioGeneratingAgentOrchestrator`.
 
-2. `MultiStepScenarioGeneratingAgentsOrchestrator.__init__`
+2. `ScenarioGeneratingAgentOrchestrator.__init__`
    → Configures paths, Claude filesystem policy, per-step runtime configs, dynamic prompts, and step agents.
 
 3. `orchestrator.run()`:
