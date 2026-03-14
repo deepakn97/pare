@@ -1,6 +1,13 @@
-# Using Local LLM Models with Meta-ARE
+# Running Local LLM Models
 
-This guide explains how to set up and use local Large Language Models (LLMs) with the Meta-ARE framework using Ollama.
+This page is primarily about local Ollama-style model setup for Meta-ARE-compatible backends.
+
+For PARE-specific scenario commands, prefer the `pare` CLI and the scenarios docs:
+
+- `docs/scenarios/cli_usage.md`
+- `docs/scenario_generator.md`
+
+This guide explains how to set up and use local Large Language Models (LLMs) with Ollama.
 
 ## Prerequisites
 
@@ -84,7 +91,7 @@ ollama run qwen2.5:1.5b-instruct "test"
 ```
 
 
-## Using Meta-ARE with Local Models
+## Using Meta-ARE-Compatible Commands with Local Models
 
 ### Basic Command Structure
 

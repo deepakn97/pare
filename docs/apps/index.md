@@ -1,6 +1,6 @@
-# PAS App APIs
+# PARE App APIs
 
-Use these pages to explore the current user-facing tool surface for each PAS stateful app. Every document lists all `@user_tool` methods, the Meta-ARE calls they wrap, return values, and navigation effects.
+Use these pages to explore the current user-facing tool surface for each PARE stateful app. Every document lists all `@user_tool` methods, the Meta-ARE calls they wrap, return values, and navigation effects.
 
 - Need to create another app surface? Follow the [Adding a Stateful App](./adding_stateful_app.md) guide.
 
@@ -16,6 +16,6 @@ Use these pages to explore the current user-facing tool surface for each PAS sta
 
 
 ## Navigation Framework Recap
-- Every stateful app inherits from `pas.apps.core.StatefulApp`, which binds a navigation state (`AppState`) before surfacing its tools.
+- Every stateful app inherits from `pare.apps.core.StatefulApp`, which binds a navigation state (`AppState`) before surfacing its tools.
 - `AppState.get_available_actions()` inspects the bound instance for `@user_tool`s so only the active screen's tools appear.
 - `go_back()` is automatically available when the navigation stack contains history and removes the topmost state while returning a short confirmation string.

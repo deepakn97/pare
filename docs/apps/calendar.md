@@ -1,6 +1,6 @@
 # Stateful Calendar App
 
-`pas.apps.calendar.app.StatefulCalendarApp` layers PAS navigation on top of the Meta-ARE `CalendarV2`. It opens in an `AgendaView` for the simulated current day and transitions into event detail or edit states when the corresponding tools complete.
+`pare.apps.calendar.app.StatefulCalendarApp` layers PARE navigation on top of the Meta-ARE `CalendarV2`. It opens in an `AgendaView` for the simulated current day and transitions into event detail or edit states when the corresponding tools complete.
 
 ## Navigation States
 

@@ -1,6 +1,6 @@
 # Stateful Cab App
 
-`pas.apps.cab.app.StatefulCabApp` extends the Meta-ARE `CabApp` with PAS navigation.
+`pare.apps.cab.app.StatefulCabApp` extends the Meta-ARE `CabApp` with PARE navigation.
 It launches in `CabHome` and transitions between home, service selection,
 quotation, and ride detail flows based on completed cab backend operations.
 

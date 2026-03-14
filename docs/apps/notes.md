@@ -1,6 +1,6 @@
 # Stateful Notes App
 
-`pas.apps.note.app.StatefulNotesApp` extends PAS with folder-based note management.
+`pare.apps.note.app.StatefulNotesApp` extends PARE with folder-based note management.
 It launches in `NoteList("Inbox")` and transitions between list, detail, edit, and folder views
 based on completed note operations.
 

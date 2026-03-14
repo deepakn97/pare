@@ -1,24 +1,36 @@
 # Stateful Apps API
 
-Stateful wrappers around Meta-ARE mobile apps with navigation state machines.
+## Package Exports
 
-## Core Base Classes
+::: pas.apps
+
+## Core Framework
 
 ::: pas.apps.core
+
+::: pas.apps.tool_decorators
+
+## System and Agent UI Apps
+
+::: pas.apps.system
+
+::: pas.apps.proactive_aui
 
 ## Contacts App
 
 ::: pas.apps.contacts.app
 
-### Contacts States
-
 ::: pas.apps.contacts.states
+
+## Messaging App
+
+::: pas.apps.messaging.app
+
+::: pas.apps.messaging.states
 
 ## Email App
 
 ::: pas.apps.email.app
-
-### Email States
 
 ::: pas.apps.email.states
 
@@ -26,22 +38,36 @@ Stateful wrappers around Meta-ARE mobile apps with navigation state machines.
 
 ::: pas.apps.calendar.app
 
-### Calendar States
-
 ::: pas.apps.calendar.states
 
-## Messaging App
+## Cab App
 
-::: pas.apps.messaging.app
+::: pas.apps.cab.app
 
-### Messaging States
+::: pas.apps.cab.states
 
-::: pas.apps.messaging.states
+## Apartment App
 
-## Proactive Agent UI
+::: pas.apps.apartment.app
 
-::: pas.apps.proactive_aui
+::: pas.apps.apartment.states
 
-## System Apps
+## Reminder App
 
-::: pas.apps.system
+::: pas.apps.reminder.app
+
+::: pas.apps.reminder.states
+
+## Shopping App
+
+::: pas.apps.shopping.app
+
+::: pas.apps.shopping.states
+
+## Notes App
+
+::: pas.apps.note.app
+
+::: pas.apps.note.states
+
+::: pas.apps.note.types

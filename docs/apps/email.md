@@ -1,6 +1,6 @@
 # Stateful Email App
 
-`pas.apps.email.app.StatefulEmailApp` pairs PAS navigation with the Meta-ARE `EmailClientV2`. It starts in `MailboxView("INBOX")` and pushes additional states for email detail and compose flows.
+`pare.apps.email.app.StatefulEmailApp` pairs PARE navigation with the Meta-ARE `EmailClientV2`. It starts in `MailboxView("INBOX")` and pushes additional states for email detail and compose flows.
 
 ## Navigation States
 

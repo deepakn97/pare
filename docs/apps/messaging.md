@@ -1,6 +1,6 @@
 # Stateful Messaging App
 
-`pas.apps.messaging.app.StatefulMessagingApp` mixes PAS navigation with the Meta-ARE `MessagingAppV2`. It begins in `ConversationList` and switches states when conversations are opened or the user goes back.
+`pare.apps.messaging.app.StatefulMessagingApp` mixes PARE navigation with the Meta-ARE `MessagingAppV2`. It begins in `ConversationList` and switches states when conversations are opened or the user goes back.
 
 ## Navigation States
 

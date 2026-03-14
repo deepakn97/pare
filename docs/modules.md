@@ -1,35 +1,33 @@
 # API Reference Overview
 
-This section provides comprehensive API documentation for all PAS modules, automatically generated from the codebase.
+The API docs are grouped by major PARE subsystems.
 
-## Core Modules
+## Agents
 
-### [Environment](api/environment.md)
-State-aware environment wrapper that monitors events and triggers navigation transitions.
+- `pare.agents.*`
+- user/proactive agent wrappers, config builders, and factories
 
-- `StateAwareEnvironmentWrapper` – Core environment wrapper
+## Stateful Apps
 
-### [Stateful Apps](api/apps.md)
-Stateful wrappers around Meta-ARE mobile apps with navigation state machines.
+- `pare.apps.*`
+- app state machines, app tool surfaces, and system/proactive UI apps
 
-- `core` – Base classes (`AppState`, `StatefulApp`)
-- `contacts` – Contacts app and states
-- `email` – Email app and states
-- `calendar` – Calendar app and states
-- `messaging` – Messaging app and states
-- `proactive_agent_ui` – Proactive agent user interface
-- `system` – System-level apps
+## Scenarios
 
-## Scenario System
+- `pare.scenarios.*`
+- benchmark registration, scenario base classes, runner config, and validation structures
 
-### [Scenarios](api/scenarios.md)
-Scenario builders and configuration for proactive experiments.
+## Scenario Generator
 
-- `base` – Base scenario builder (`build_proactive_stack`)
-- `types` – Type definitions (`OracleAction`, etc.)
-- `contacts_followup` – Example scenario
+- `pare.scenarios.generator.*`
+- multi-step generation orchestrator, step agents, prompts, and dedup utilities
 
-### [Scenario Generator](api/scenario_generator.md)
-Automated scenario generation pipeline.
+## Annotation
 
-- `ScenarioGeneratingAgent` – Main generator class
+- `pare.annotation.*`
+- trace parsing, sample creation, annotation server, and agreement metrics
+
+## Environment and Logging
+
+- `pare.environment`
+- `pare.logging_config`

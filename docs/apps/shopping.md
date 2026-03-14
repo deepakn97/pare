@@ -1,6 +1,6 @@
 # Stateful Shopping App
 
-`pas.apps.shopping.app.StatefulShoppingApp` pairs PAS navigation with the Meta-ARE `ShoppingApp`.
+`pare.apps.shopping.app.StatefulShoppingApp` pairs PARE navigation with the Meta-ARE `ShoppingApp`.
 It starts in `ShoppingHome()` and pushes additional states for product detail, variant detail, cart, and order views.
 
 ## Navigation States
