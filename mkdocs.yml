@@ -11,6 +11,7 @@ nav:
   - Home: index.md
   - Getting Started:
       - Running Local LLM Models Guide: run_local_llm_model.md
+      - Dec-POMDP Formulation: dec_pomdp_formulation.md
   - Architecture:
       - Visual Overview: architecture_visual.md
       - Runtime Spine: runtime_spine.md
