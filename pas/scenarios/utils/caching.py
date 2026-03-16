@@ -192,10 +192,10 @@ def _generate_config_hash(runner_config: ScenarioRunnerConfig) -> str:
         "oracle": runner_config.oracle,
         "max_turns": runner_config.max_turns,
         "simulated_generation_time_mode": runner_config.simulated_generation_time_mode,
-        "tool_augmentation": runner_config.tool_augmentation_config.model_dump()
+        "tool_augmentation": asdict(runner_config.tool_augmentation_config)
         if runner_config.tool_augmentation_config
         else None,
-        "env_events_config": runner_config.env_events_config.model_dump() if runner_config.env_events_config else None,
+        "env_events_config": asdict(runner_config.env_events_config) if runner_config.env_events_config else None,
     }
     config_json = json.dumps(config_dict, sort_keys=True)
     return xxhash.xxh64(config_json.encode()).hexdigest()[:16]

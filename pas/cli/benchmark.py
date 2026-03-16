@@ -188,7 +188,7 @@ def generate_config_sweep(
 
     model_pairs = list(zip(observe_models, execute_models, strict=True))
 
-    # Validate noise params are mutually exclusive
+    # Noise params are treated independently - tfp and epm each produce separate configs, never combined together.
     if tool_failure_probs and env_events_per_min:
         logger.info(
             "Both tool failure probability and env events per min provided; they will be treated as separate configurations in the sweep."
@@ -204,14 +204,14 @@ def generate_config_sweep(
             # tfp=0 is equivalent to no tool augmentation - use None for cache compatibility
             tool_aug = ToolAugmentationConfig(tool_failure_probability=tfp) if tfp > 0 else None
             noise_configs.append((tool_aug, None))
-    elif env_events_per_min:
+    if env_events_per_min:
         for epm in env_events_per_min:
             # epm=0 is equivalent to no env events - use None for cache compatibility
             env_events = (
                 EnvEventsConfig(num_env_events_per_minute=epm, env_events_seed=env_events_seed) if epm > 0 else None
             )
             noise_configs.append((None, env_events))
-    else:
+    if not noise_configs:
         # No noise - single config with no augmentation
         noise_configs.append((None, None))
 
