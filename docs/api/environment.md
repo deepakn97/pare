@@ -10,7 +10,7 @@ Key responsibilities:
 - navigation callback wiring through `HomeScreenSystemApp`
 - completed-event processing and PARE metadata injection
 
-For the end-to-end execution path, see the Architecture page [Runtime Spine](../runtime_spine.md).
+For the end-to-end execution path, see the Architecture page [Runtime Execution Flow](../runtime_execution_flow.md).
 
 ## StateAwareEnvironmentWrapper
 

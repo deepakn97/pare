@@ -5,7 +5,7 @@ This page is primarily about local Ollama-style model setup for Meta-ARE-compati
 For PARE-specific scenario commands, prefer the `pare` CLI and the scenarios docs:
 
 - `docs/scenarios/cli_usage.md`
-- `docs/scenario_generator.md`
+- `docs/scenarios/scenario_generator_flow.md`
 
 This guide explains how to set up and use local Large Language Models (LLMs) with Ollama.
 

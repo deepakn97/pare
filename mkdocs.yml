@@ -14,12 +14,12 @@ nav:
       - Dec-POMDP Formulation: dec_pomdp_formulation.md
   - Architecture:
       - Visual Overview: architecture_visual.md
-      - Runtime Spine: runtime_spine.md
+      - Runtime Execution Flow: runtime_execution_flow.md
       - Runtime Execution Config: runtime_execution.md
       - Trace Export Semantics: trace_export.md
-      - Agent Interaction Lifecycle: agent_interaction_lifecycle.md
   - Agents:
       - Agents Overview: agents/index.md
+      - Agent Interaction Lifecycle: agents/interaction_lifecycle.md
   - Apps:
       - App APIs Overview: apps/index.md
       - Adding a Stateful App: apps/adding_stateful_app.md
@@ -37,11 +37,7 @@ nav:
       - Scenario Authoring Guide: scenario_author_guide.md
       - Benchmark Scenarios: scenarios/benchmark.md
       - Scenarios CLI Usage: scenarios/cli_usage.md
-      - Scenario Generation: scenario_generator.md
-      - Multi-Step Scenario Generator Flow: scenario_generator_flow.md
-      - Scenarios API: scenarios/scenarios.md
-      - Scenario Generator API: scenarios/scenario_generator.md
-      - Summary and Deduplication: scenarios/summary_and_deduplication.md
+      - Multi-Step Scenario Generator Flow: scenarios/scenario_generator_flow.md
   - Scripts:
       - Scripts Overview: scripts/index.md
   - Annotation:
@@ -51,6 +47,9 @@ nav:
       - Environment: api/environment.md
       - Agents: api/agents.md
       - Stateful Apps: api/apps.md
+      - Scenarios: api/scenarios.md
+      - Scenario Generator: api/scenario_generator.md
+      - Summary and Deduplication: api/summary_and_deduplication.md
       - Annotation: api/annotation.md
       - Logging: api/logging.md
 

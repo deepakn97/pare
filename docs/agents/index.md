@@ -21,8 +21,8 @@ Agent construction is consumed by the scenario runtime:
 
 See also:
 
-- [Agent Interaction Lifecycle](../agent_interaction_lifecycle.md)
-- [Runtime Spine](../runtime_spine.md)
+- [Agent Interaction Lifecycle](interaction_lifecycle.md)
+- [Runtime Execution Flow](../runtime_execution_flow.md)
 
 ## Typical Flow
 

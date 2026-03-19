@@ -1,4 +1,4 @@
-# Runtime Spine
+# Runtime Execution Flow
 
 This page documents the execution path that connects scenarios, environment state, agents, notifications, and trace export.
 
@@ -6,7 +6,7 @@ Related deep dives:
 
 - [Runtime Execution Config](runtime_execution.md)
 - [Trace Export Semantics](trace_export.md)
-- [Agent Interaction Lifecycle](agent_interaction_lifecycle.md)
+- [Agent Interaction Lifecycle](agents/interaction_lifecycle.md)
 
 ## Core Runtime Modules
 

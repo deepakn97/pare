@@ -42,5 +42,5 @@ Outputs:
 See:
 
 - [Benchmark Scenarios](benchmark.md)
-- [Scenario Generation](../scenario_generator.md)
-- [Multi-Step Scenario Generator Flow](../scenario_generator_flow.md)
+- [Scenarios CLI Usage](cli_usage.md)
+- [Multi-Step Scenario Generator Flow](scenario_generator_flow.md)
