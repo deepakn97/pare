@@ -34,7 +34,7 @@ nav:
       - Notes App: apps/notes.md
   - Scenarios:
       - Scenarios Overview: scenarios/index.md
-      - Scenario Authoring Guide: scenario_author_guide.md
+      - Scenario Authoring Guide: scenarios/authoring.md
       - Benchmark Scenarios: scenarios/benchmark.md
       - Scenarios CLI Usage: scenarios/cli_usage.md
       - Multi-Step Scenario Generator Flow: scenarios/scenario_generator_flow.md
