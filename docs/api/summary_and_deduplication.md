@@ -16,7 +16,7 @@ The `SummaryGeneratingAgent` is a specialized agent that analyzes scenario Pytho
 
 ### Location
 
-`pas/scenario_generator/agent/summary_generating_agent.py`
+`pare/scenario_generator/agent/summary_generating_agent.py`
 
 ### Features
 
@@ -48,7 +48,7 @@ Generate a summary for the given scenario code.
 ```python
 from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
 from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
-from pas.scenario_generator.agent.summary_generating_agent import SummaryGeneratingAgent
+from pare.scenario_generator.agent.summary_generating_agent import SummaryGeneratingAgent
 
 config = LLMEngineConfig(model_name="gpt-4o-mini", provider="openai")
 engine = LLMEngineBuilder().create_engine(engine_config=config)
@@ -95,21 +95,21 @@ A command-line script for batch generating summaries for scenario files.
 
 ### Location
 
-`pas/scenario_generator/utils/generate_scenario_summaries.py`
+`pare/scenario_generator/utils/generate_scenario_summaries.py`
 
 ### Usage
 
 #### Generate Summary for a Single File
 
 ```bash
-uv run python pas/scenario_generator/utils/generate_scenario_summaries.py \
-  --file pas/scenarios/generated_scenarios/meeting_invite_coordination.py
+uv run python pare/scenario_generator/utils/generate_scenario_summaries.py \
+  --file pare/scenarios/generated_scenarios/meeting_invite_coordination.py
 ```
 
 #### Generate Summaries for All Scenarios
 
 ```bash
-uv run python pas/scenario_generator/utils/generate_scenario_summaries.py --all
+uv run python pare/scenario_generator/utils/generate_scenario_summaries.py --all
 ```
 
 This recursively searches all subdirectories in `generated_scenarios/` for Python files.
@@ -117,13 +117,13 @@ This recursively searches all subdirectories in `generated_scenarios/` for Pytho
 #### Force Regeneration of Existing Summaries
 
 ```bash
-uv run python pas/scenario_generator/utils/generate_scenario_summaries.py --all --force
+uv run python pare/scenario_generator/utils/generate_scenario_summaries.py --all --force
 ```
 
 #### Custom LLM Configuration
 
 ```bash
-uv run python pas/scenario_generator/utils/generate_scenario_summaries.py \
+uv run python pare/scenario_generator/utils/generate_scenario_summaries.py \
   --file scenario.py \
   --model gpt-4 \
   --provider openai
@@ -132,7 +132,7 @@ uv run python pas/scenario_generator/utils/generate_scenario_summaries.py \
 #### Custom Output File
 
 ```bash
-uv run python pas/scenario_generator/utils/generate_scenario_summaries.py \
+uv run python pare/scenario_generator/utils/generate_scenario_summaries.py \
   --all \
   --output custom_summaries.json
 ```
@@ -167,21 +167,21 @@ A validation script that generates a summary for a scenario file, compares it ag
 
 ### Location
 
-`pas/scenario_generator/utils/validate_and_add_scenario_summary.py`
+`pare/scenario_generator/utils/validate_and_add_scenario_summary.py`
 
 ### Usage
 
 #### Basic Validation and Addition
 
 ```bash
-uv run python pas/scenario_generator/utils/validate_and_add_scenario_summary.py \
-  --file pas/scenarios/generated_scenarios/new_scenario.py
+uv run python pare/scenario_generator/utils/validate_and_add_scenario_summary.py \
+  --file pare/scenarios/generated_scenarios/new_scenario.py
 ```
 
 #### Custom Similarity Thresholds
 
 ```bash
-uv run python pas/scenario_generator/utils/validate_and_add_scenario_summary.py \
+uv run python pare/scenario_generator/utils/validate_and_add_scenario_summary.py \
   --file scenario.py \
   --difflib-threshold 0.75 \
   --jaccard-threshold 0.75 \
@@ -193,7 +193,7 @@ uv run python pas/scenario_generator/utils/validate_and_add_scenario_summary.py 
 The script prints "True" to stdout if validation passes and the summary is added, or "False" if validation fails:
 
 ```bash
-if uv run python pas/scenario_generator/utils/validate_and_add_scenario_summary.py \
+if uv run python pare/scenario_generator/utils/validate_and_add_scenario_summary.py \
   --file scenario.py; then
   echo "Summary added successfully!"
 else
@@ -285,7 +285,7 @@ The summary system is integrated into the scenario generation workflow:
 ## File Structure
 
 ```
-pas/
+pare/
 ├── scenario_generator/
 │   ├── agent/
 │   │   └── summary_generating_agent.py      # SummaryGeneratingAgent class

@@ -1,5 +1,7 @@
 # Annotation Workflow
 
+Use annotation after you already have benchmark traces and want human judgments on proactive behavior. This section is about reviewing runs, not running the benchmark itself.
+
 The annotation subsystem supports human evaluation of proactive agent decisions using sampled trace decision points.
 
 ## Components

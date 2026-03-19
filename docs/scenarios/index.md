@@ -1,11 +1,37 @@
 # Scenarios Overview
 
-The scenarios subsystem has two parts:
+If you mainly want to use the benchmark, this is the most important section. The scenarios subsystem has two parts:
 
 - **Benchmark scenarios**: curated, registered scenarios used for evaluation.
 - **Scenario generator**: multi-step pipeline that produces new candidate scenarios.
 
-## Benchmark Side
+## Most Common Tasks
+
+### List available benchmark scenarios
+
+```bash
+uv run pare scenarios list
+```
+
+### Filter scenarios by app usage
+
+```bash
+uv run pare scenarios list --apps StatefulEmailApp --apps StatefulCalendarApp
+```
+
+### Run the benchmark
+
+```bash
+uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+```
+
+### Generate additional scenarios
+
+```bash
+uv run pare scenarios generate --num-scenarios 3
+```
+
+## Benchmark Scenarios
 
 Core modules:
 
@@ -24,7 +50,7 @@ Execution/runtime details:
 - [Runtime Execution Config](../runtime_execution.md)
 - [Trace Export Semantics](../trace_export.md)
 
-## Generator Side
+## Scenario Generator
 
 Core modules:
 
@@ -42,5 +68,6 @@ Outputs:
 See:
 
 - [Benchmark Scenarios](benchmark.md)
+- [Scenario Authoring Guide](../scenario_author_guide.md)
 - [Scenarios CLI Usage](cli_usage.md)
 - [Multi-Step Scenario Generator Flow](scenario_generator_flow.md)

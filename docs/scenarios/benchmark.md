@@ -2,6 +2,8 @@
 
 Benchmark scenarios are Python classes registered with `@register_scenario(...)` and loaded from `pare/scenarios/benchmark/`.
 
+This is the part of the docs most users need for day-to-day benchmark usage: how to inspect scenarios, choose subsets, and run sweeps.
+
 ## Where They Live
 
 - `pare/scenarios/benchmark/*.py`: benchmark scenario files.

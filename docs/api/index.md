@@ -4,30 +4,30 @@ The API docs are grouped by major PARE subsystems.
 
 ## Agents
 
-- `pas.agents.*`
+- `pare.agents.*`
 - user/proactive agent wrappers, config builders, and factories
 
 ## Stateful Apps
 
-- `pas.apps.*`
+- `pare.apps.*`
 - app state machines, app tool surfaces, and system/proactive UI apps
 
 ## Scenarios
 
-- `pas.scenarios.*`
+- `pare.scenarios.*`
 - benchmark registration, scenario base classes, runner config, and validation structures
 
 ## Scenario Generator
 
-- `pas.scenarios.generator.*`
+- `pare.scenarios.generator.*`
 - multi-step generation orchestrator, step agents, prompts, and dedup utilities
 
 ## Annotation
 
-- `pas.annotation.*`
+- `pare.annotation.*`
 - trace parsing, sample creation, annotation server, and agreement metrics
 
 ## Environment and Logging
 
-- `pas.environment`
-- `pas.logging_config`
+- `pare.environment`
+- `pare.logging_config`

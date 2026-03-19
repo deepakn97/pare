@@ -1,6 +1,21 @@
 # Scripts Overview
 
-The `scripts/` directory contains operational workflows around running experiments, generating scenarios in batches, and post-processing results.
+Most users should start with the `pare` CLI. The `scripts/` directory is for batch workflows, review-set preparation, and post-processing after benchmark runs.
+
+## When To Use Scripts
+
+Use the scripts in this folder when you need to:
+
+- run repeatable experiment wrappers beyond a single CLI invocation
+- batch-generate scenarios or distribute them to reviewers
+- aggregate results and produce analysis artifacts
+- inspect dataset or app-usage coverage across many runs
+
+If you only want to run the benchmark once, start here instead:
+
+```bash
+uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+```
 
 ## Core Scripts
 
