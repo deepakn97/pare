@@ -23,6 +23,3 @@
 ::: pas.scenarios.generator.utils.apps_init_instructions
 
 ::: pas.scenarios.generator.utils.deduplicate_scenarios
-# Scenario Generator API
-
-::: pas.scenario_generator.scenario_generator

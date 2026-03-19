@@ -21,7 +21,7 @@ nav:
       - Agents Overview: agents/index.md
       - Agent Interaction Lifecycle: agents/interaction_lifecycle.md
   - Apps:
-      - App APIs Overview: apps/index.md
+      - Apps Overview: apps/index.md
       - Adding a Stateful App: apps/adding_stateful_app.md
       - Contacts App: apps/contacts.md
       - Messaging App: apps/messaging.md
@@ -43,7 +43,7 @@ nav:
   - Annotation:
       - Annotation Workflow: annotation/index.md
   - API Reference:
-      - API Overview: modules.md
+      - API Overview: api/index.md
       - Environment: api/environment.md
       - Agents: api/agents.md
       - Stateful Apps: api/apps.md

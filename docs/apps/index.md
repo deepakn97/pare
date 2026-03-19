@@ -1,4 +1,4 @@
-# PARE App APIs
+# PARE Apps Overview
 
 Use these pages to explore the current user-facing tool surface for each PARE stateful app. Every document lists all `@user_tool` methods, the Meta-ARE calls they wrap, return values, and navigation effects.
 
