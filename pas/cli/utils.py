@@ -59,17 +59,18 @@ MODELS_MAP = {
     # FIREWORKS Models
     "deepseek-v3.2": {"model_name": "accounts/fireworks/models/deepseek-v3p2", "provider": "fireworks_ai"},
     "qwen-3-8B-base": {"model_name": "accounts/fireworks/models/qwen3-8b", "provider": "fireworks_ai"},
+    "minimax-2.5": {"model_name": "accounts/fireworks/models/minimax-m2p5", "provider": "fireworks_ai"},
     # These models do not support serverless so we use a autoscaled deployment.
     "llama-3.2-3b-it": {
-        "model_name": "accounts/eric-lab/deployments/zxezvdmp",
+        "model_name": "accounts/eric-lab/deployments/srcfs0r1",
         "provider": "fireworks_ai",
     },
     "gemma-3-4b-it": {
-        "model_name": "accounts/eric-lab/deployments/pmewm76x",
+        "model_name": "accounts/eric-lab/deployments/jwokodcv",
         "provider": "fireworks_ai",
     },
     "qwen-3-4b-it": {
-        "model_name": "accounts/eric-lab/deployments/y4tn93dp",
+        "model_name": "accounts/eric-lab/deployments/zwbkwsbz",
         "provider": "fireworks_ai",
     },
     "ministral-3-3b-it": {"model_name": "accounts/eric-lab/deployments/ncvfom3m", "provider": "fireworks_ai"},
