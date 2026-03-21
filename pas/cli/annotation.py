@@ -418,11 +418,18 @@ def process(  # noqa: C901
         int,
         typer.Option("--n-annotators", "-n", help="Number of top annotators to include (by completion count)"),
     ] = 2,
+    evaluations_file: Annotated[
+        Path | None,
+        typer.Option("--evaluations-file", help="Path to evaluation results parquet (from 'pas annotation evaluate')"),
+    ] = None,
 ) -> None:
     """Process annotations and compute agreement metrics.
 
     Calculates comprehensive metrics for measuring alignment between the
     ML model (user agent) and multiple human annotators.
+
+    When --evaluations-file is provided, computes metrics per user_model_id
+    from the evaluation dataframe instead of from the original samples.
 
     Metrics computed:
     - Fleiss' Kappa (human-human baseline)
@@ -434,7 +441,7 @@ def process(  # noqa: C901
     """
     import polars as pl
 
-    from pas.annotation.metrics import compute_agreement_metrics
+    from pas.annotation.metrics import compute_agreement_metrics, compute_per_model_agreement_metrics
 
     samples_file = get_samples_file()
     annotations_file = get_annotations_file()
@@ -459,6 +466,25 @@ def process(  # noqa: C901
     typer.echo("=" * 60)
 
     # Compute metrics
+    # Per-model metrics from evaluation dataframe
+    if evaluations_file is not None:
+        if not evaluations_file.exists():
+            typer.echo(f"Error: Evaluations file not found: {evaluations_file}", err=True)
+            raise typer.Exit(code=1)
+
+        evaluations_df = pl.read_parquet(evaluations_file)
+        per_model_metrics = compute_per_model_agreement_metrics(evaluations_df, annotations_df, n_annotators)
+
+        typer.echo("\n=== Per-Model Agreement Metrics ===")
+        for model_id, model_metrics in per_model_metrics.items():
+            typer.echo(f"\n--- {model_id} ---")
+            typer.echo(f"  Samples: {model_metrics['n_samples']}")
+            mv = model_metrics.get("majority_vote_metrics", {})
+            typer.echo(f"  Accuracy: {mv.get('accuracy', 'N/A')}")
+            typer.echo(f"  Cohen's Kappa: {mv.get('cohens_kappa', 'N/A')}")
+            typer.echo(f"  F1: {mv.get('f1', 'N/A')}")
+        return
+
     metrics = compute_agreement_metrics(samples_df, annotations_df, n_annotators)
 
     # Display basic counts

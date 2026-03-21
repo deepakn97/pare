@@ -23,6 +23,48 @@ import polars as pl
 logger = logging.getLogger(__name__)
 
 
+def compute_per_model_agreement_metrics(
+    evaluations_df: pl.DataFrame,
+    annotations_df: pl.DataFrame,
+    n_annotators: int = 2,
+) -> dict[str, dict[str, Any]]:
+    """Compute agreement metrics per user model from the evaluation dataframe.
+
+    For each user_model_id in the evaluations, aggregates runs via majority vote
+    and computes agreement metrics against human annotations.
+
+    Args:
+        evaluations_df: DataFrame from `pas annotation evaluate` with columns:
+            sample_id, user_model_id, user_agent_decision, run, valid_response.
+        annotations_df: DataFrame with human annotation data.
+        n_annotators: Number of top annotators to include (by completion count).
+
+    Returns:
+        Dictionary mapping user_model_id to agreement metrics dict.
+    """
+    user_models = evaluations_df["user_model_id"].unique().to_list()
+    results: dict[str, dict[str, Any]] = {}
+
+    for model_id in sorted(user_models):
+        model_evals = evaluations_df.filter((pl.col("user_model_id") == model_id) & pl.col("valid_response"))
+
+        # Majority vote across runs for each sample
+        majority_votes = model_evals.group_by("sample_id").agg(
+            (pl.col("user_agent_decision").mean() >= 0.5).alias("user_agent_decision"),
+            pl.col("scenario_id").first().alias("scenario_id"),
+        )
+
+        if len(majority_votes) == 0:
+            logger.warning(f"No valid evaluations for model {model_id}")
+            results[model_id] = _empty_metrics()
+            continue
+
+        # Use the existing compute_agreement_metrics with majority-voted decisions as "samples"
+        results[model_id] = compute_agreement_metrics(majority_votes, annotations_df, n_annotators)
+
+    return results
+
+
 def compute_agreement_metrics(
     samples_df: pl.DataFrame,
     annotations_df: pl.DataFrame,
