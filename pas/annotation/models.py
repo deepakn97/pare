@@ -69,7 +69,8 @@ class DecisionPoint:
     sample_id: str  # {scenario_id}_run_{run_number}_{content_hash}
     scenario_id: str
     run_number: int
-    model_id: str
+    proactive_model_id: str
+    user_model_id: str
     trace_file: Path
     meta_task_description: str  # From scenario metadata (may be empty)
     turns: list[Turn]  # All turns before this decision
@@ -100,7 +101,8 @@ class DecisionPoint:
             "sample_id": self.sample_id,
             "scenario_id": self.scenario_id,
             "run_number": self.run_number,
-            "model_id": self.model_id,
+            "proactive_model_id": self.proactive_model_id,
+            "user_model_id": self.user_model_id,
             "trace_file": str(self.trace_file),
             "user_agent_decision": self.user_agent_decision,
             "agent_proposal": self.agent_proposal,
@@ -118,7 +120,8 @@ class Sample(BaseModel):
     sample_id: str
     scenario_id: str
     run_number: int
-    model_id: str
+    proactive_model_id: str
+    user_model_id: str
     trace_file: str
     user_agent_decision: bool
     agent_proposal: str
@@ -153,18 +156,16 @@ class Annotation(BaseModel):
     sample_id: str
     annotator_id: str
     human_decision: bool
-    user_agent_decision: bool
     timestamp: str
 
     @classmethod
-    def create(cls, sample_id: str, annotator_id: str, human_decision: bool, user_agent_decision: bool) -> Annotation:
+    def create(cls, sample_id: str, annotator_id: str, human_decision: bool) -> Annotation:
         """Create a new annotation record.
 
         Args:
             sample_id: The sample being annotated.
             annotator_id: The annotator's anonymous ID.
             human_decision: The human's accept/reject decision.
-            user_agent_decision: The original user agent's decision.
 
         Returns:
             A new Annotation instance.
@@ -174,15 +175,14 @@ class Annotation(BaseModel):
             sample_id=sample_id,
             annotator_id=annotator_id,
             human_decision=human_decision,
-            user_agent_decision=user_agent_decision,
             timestamp=datetime.now().isoformat(),
         )
 
     def to_csv_row(self) -> str:
         """Convert to CSV row string."""
-        return f"{self.annotation_id},{self.sample_id},{self.annotator_id},{self.human_decision},{self.user_agent_decision},{self.timestamp}\n"
+        return f"{self.annotation_id},{self.sample_id},{self.annotator_id},{self.human_decision},{self.timestamp}\n"
 
     @classmethod
     def csv_header(cls) -> str:
         """Get CSV header row."""
-        return "annotation_id,sample_id,annotator_id,human_decision,user_agent_decision,timestamp\n"
+        return "annotation_id,sample_id,annotator_id,human_decision,timestamp\n"

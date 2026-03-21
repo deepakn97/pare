@@ -12,6 +12,7 @@ from pas.annotation.config import ensure_annotations_dir, get_samples_file
 from pas.annotation.models import DecisionPoint  # noqa: TC001
 from pas.annotation.trace_parser import (
     extract_model_id_from_dir,
+    extract_user_model_id_from_dir,
     is_excluded_model,
     is_no_noise_trace,
     parse_trace,
@@ -72,9 +73,11 @@ def extract_all_decision_points(
     all_decision_points = []
     messages_excluded = 0
 
+    user_model_id = extract_user_model_id_from_dir(traces_dir.name)
+
     for trace_dir in trace_dirs:
-        model_id = extract_model_id_from_dir(trace_dir.name)
-        logger.info(f"Processing {trace_dir.name} (model: {model_id})")
+        proactive_model_id = extract_model_id_from_dir(trace_dir.name)
+        logger.info(f"Processing {trace_dir.name} (proactive_model: {proactive_model_id}, user_model: {user_model_id})")
 
         trace_files = list(trace_dir.glob("*.json"))
         for trace_file in trace_files:
@@ -85,7 +88,7 @@ def extract_all_decision_points(
                 continue
 
             try:
-                decision_points = parse_trace(trace_file, model_id)
+                decision_points = parse_trace(trace_file, proactive_model_id, user_model_id)
                 all_decision_points.extend(decision_points)
             except Exception as e:
                 logger.warning(f"Failed to parse {trace_file}: {e}")

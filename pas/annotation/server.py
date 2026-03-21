@@ -160,7 +160,6 @@ class AnnotationServer:
                 sample_id=sample_id,
                 annotator_id=annotator_id,
                 human_decision=human_decision,
-                user_agent_decision=sample.user_agent_decision,
             )
 
             # Append to file
@@ -220,10 +219,6 @@ class AnnotationServer:
         total_annotations = sum(self._annotation_counts.values())
         unique_annotators = len(self._user_annotations)
 
-        # Balance stats
-        accepts = len(self.samples_df.filter(pl.col("user_agent_decision")))
-        rejects = total_samples - accepts
-
         return {
             "total_samples": total_samples,
             "complete": complete_count,
@@ -231,8 +226,6 @@ class AnnotationServer:
             "not_started": not_started_count,
             "total_annotations": total_annotations,
             "unique_annotators": unique_annotators,
-            "user_agent_accepts": accepts,
-            "user_agent_rejects": rejects,
             "annotators_per_sample": self.annotators_per_sample,
         }
 

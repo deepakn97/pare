@@ -14,12 +14,13 @@ from pas.annotation.observation_formatter import ObservationFormatter, format_no
 logger = logging.getLogger(__name__)
 
 
-def parse_trace(trace_path: Path, model_id: str) -> list[DecisionPoint]:
+def parse_trace(trace_path: Path, proactive_model_id: str, user_model_id: str = "unknown") -> list[DecisionPoint]:
     """Parse a trace file and extract all decision points.
 
     Args:
         trace_path: Path to the trace JSON file.
-        model_id: The model identifier (extracted from directory name).
+        proactive_model_id: The proactive model identifier (extracted from directory name).
+        user_model_id: The user model identifier.
 
     Returns:
         List of DecisionPoint objects, one per accept/reject event.
@@ -85,7 +86,8 @@ def parse_trace(trace_path: Path, model_id: str) -> list[DecisionPoint]:
             sample_id=sample_id,
             scenario_id=scenario_id,
             run_number=run_number,
-            model_id=model_id,
+            proactive_model_id=proactive_model_id,
+            user_model_id=user_model_id,
             trace_file=trace_path,
             meta_task_description=meta_task_description,
             turns=turns,
@@ -307,21 +309,38 @@ def _find_preceding_proposal(
 
 
 def extract_model_id_from_dir(dir_name: str) -> str:
-    """Extract the model ID from a trace directory name.
+    """Extract the proactive model ID from a trace subdirectory name.
 
     Example: obs_gpt-5_exec_gpt-5_enmi_0_es_42_tfp_0.0 -> gpt-5
 
     Args:
-        dir_name: The directory name.
+        dir_name: The subdirectory name.
 
     Returns:
-        The extracted model ID.
+        The extracted proactive model ID.
     """
     # Pattern: obs_{model}_exec_{model}_...
     match = re.match(r"obs_([^_]+(?:_[^_]+)?(?:-[^_]+)?)_exec_", dir_name)
     if match:
         return match.group(1)
     return dir_name
+
+
+def extract_user_model_id_from_dir(dir_name: str) -> str:
+    """Extract the user model ID from a top-level traces directory name.
+
+    Example: paper_benchmark_full_user_gpt-5-mini_mt_10_umi_1_omi_5_emi_10 -> gpt-5-mini
+
+    Args:
+        dir_name: The top-level traces directory name.
+
+    Returns:
+        The extracted user model ID.
+    """
+    match = re.search(r"_user_([^_]+(?:-[^_]+)*)_mt_", dir_name)
+    if match:
+        return match.group(1)
+    return "unknown"
 
 
 def trace_uses_messages_app(trace_path: Path) -> bool:
