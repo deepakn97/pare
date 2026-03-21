@@ -619,3 +619,78 @@ def _save_detailed_results(
 
     sample_stats.write_csv(output_path)
     logger.info(f"Saved detailed results to {output_path}")
+
+
+@app.command()
+def evaluate(
+    user_models: Annotated[
+        str,
+        typer.Option("--user-models", help="Comma-separated user model aliases to evaluate"),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Output path for evaluation results parquet"),
+    ],
+    target_models: Annotated[
+        str | None,
+        typer.Option("--target-models", help="Comma-separated proactive model IDs to filter samples"),
+    ] = None,
+    runs: Annotated[
+        int,
+        typer.Option("--runs", "-r", help="Number of runs per (sample, user_model) pair"),
+    ] = 4,
+    smoke_test: Annotated[
+        bool,
+        typer.Option("--smoke-test", help="Only process 10 samples for quick validation"),
+    ] = False,
+) -> None:
+    """Evaluate user models on sampled decision points via single-shot queries.
+
+    Loads llm_input from traces for each sampled decision point, fires it at each
+    candidate user model, and records accept/reject decisions. Outputs a unified
+    evaluation dataframe.
+    """
+    from pas.annotation.evaluator import evaluate_samples, print_evaluation_summary
+    from pas.annotation.sampler import load_existing_samples
+    from pas.cli.utils import MODELS_MAP
+
+    # Load samples
+    samples_df = load_existing_samples()
+    if samples_df is None:
+        typer.echo("Error: No samples found. Run 'pas annotation sample' first.", err=True)
+        raise typer.Exit(code=1)
+
+    # Parse arguments
+    user_model_list = [m.strip() for m in user_models.split(",") if m.strip()]
+    target_model_list = [m.strip() for m in target_models.split(",") if m.strip()] if target_models else None
+
+    # Validate user models exist in MODELS_MAP
+    for model in user_model_list:
+        if model not in MODELS_MAP:
+            typer.echo(f"Warning: {model} not found in MODELS_MAP, will use as raw model name with openai provider")
+
+    typer.echo(f"Evaluating {len(user_model_list)} user models on {len(samples_df)} samples")
+    typer.echo(f"User models: {user_model_list}")
+    if target_model_list:
+        typer.echo(f"Filtering to proactive models: {target_model_list}")
+    typer.echo(f"Runs per sample: {runs}")
+    if smoke_test:
+        typer.echo("Smoke test mode: using only 10 samples")
+
+    # Run evaluation
+    eval_df = evaluate_samples(
+        samples_df=samples_df,
+        user_models=user_model_list,
+        models_map=MODELS_MAP,
+        runs=runs,
+        target_models=target_model_list,
+        smoke_test=smoke_test,
+    )
+
+    # Save results
+    output.parent.mkdir(parents=True, exist_ok=True)
+    eval_df.write_parquet(output)
+    typer.echo(f"\nResults saved to {output}")
+
+    # Print summary
+    print_evaluation_summary(eval_df, original_samples_df=samples_df)
