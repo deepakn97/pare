@@ -37,36 +37,10 @@ def _format_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024):.2f} MB"
 
 
-@app.command()
-def sample(
-    traces_dir: Annotated[
-        Path,
-        typer.Option("--traces-dir", "-t", help="Path to the traces directory"),
-    ],
-    sample_size: Annotated[
-        int,
-        typer.Option("--sample-size", "-n", help="Number of samples to add"),
-    ],
-    seed: Annotated[
-        int | None,
-        typer.Option("--seed", "-s", help="Random seed for reproducibility"),
-    ] = None,
-) -> None:
-    """Sample decision points from traces for annotation.
+def _display_existing_samples() -> None:
+    """Display info about existing samples."""
+    from pas.annotation.sampler import load_existing_samples
 
-    Creates a balanced dataset of accept/reject decisions, prioritizing
-    unique scenarios. Appends to existing samples if present.
-    """
-    from pas.annotation.sampler import load_existing_samples, sample_new_datapoints, save_samples
-
-    # Resolve paths
-    traces_dir = traces_dir.resolve()
-
-    if not traces_dir.exists():
-        typer.echo(f"Error: Traces directory not found: {traces_dir}", err=True)
-        raise typer.Exit(code=1)
-
-    # Show existing samples info
     existing_df = load_existing_samples()
     if existing_df is not None:
         existing_count = len(existing_df)
@@ -76,12 +50,76 @@ def sample(
     else:
         typer.echo("No existing samples found. Creating new sample set.")
 
-    typer.echo(f"Sampling {sample_size} new datapoints from {traces_dir}...")
+
+def _parse_per_model_arg(per_model: str) -> dict[str, int]:
+    """Parse --per-model argument into a dict of model:count pairs."""
+    result: dict[str, int] = {}
+    for pair in per_model.split(","):
+        parts = pair.strip().split(":")
+        if len(parts) != 2:
+            raise typer.BadParameter(f"Invalid --per-model format: '{pair}'. Expected 'model:count'.")
+        result[parts[0].strip()] = int(parts[1].strip())
+    return result
+
+
+@app.command()
+def sample(
+    traces_dir: Annotated[
+        Path,
+        typer.Option("--traces-dir", "-t", help="Path to the traces directory"),
+    ],
+    sample_size: Annotated[
+        int | None,
+        typer.Option("--sample-size", "-n", help="Number of samples to add (optional if --per-model is used)"),
+    ] = None,
+    seed: Annotated[
+        int | None,
+        typer.Option("--seed", "-s", help="Random seed for reproducibility"),
+    ] = None,
+    target_models: Annotated[
+        str | None,
+        typer.Option("--target-models", help="Comma-separated proactive model names to filter traces"),
+    ] = None,
+    per_model: Annotated[
+        str | None,
+        typer.Option(
+            "--per-model", help="Comma-separated model:count pairs (e.g., 'claude-4.5-sonnet:50,qwen-3-4b-it:50')"
+        ),
+    ] = None,
+) -> None:
+    """Sample decision points from traces for annotation.
+
+    Creates a balanced dataset of accept/reject decisions, prioritizing
+    unique scenarios. Appends to existing samples if present.
+    """
+    from pas.annotation.sampler import sample_new_datapoints, save_samples
+
+    # Parse per-model specification
+    per_model_count: dict[str, int] | None = _parse_per_model_arg(per_model) if per_model else None
+
+    if sample_size is None and per_model_count is None:
+        typer.echo("Error: Either --sample-size or --per-model must be provided.", err=True)
+        raise typer.Exit(code=1)
+
+    # Resolve paths
+    traces_dir = traces_dir.resolve()
+
+    if not traces_dir.exists():
+        typer.echo(f"Error: Traces directory not found: {traces_dir}", err=True)
+        raise typer.Exit(code=1)
+
+    _display_existing_samples()
+
+    effective_size = sum(per_model_count.values()) if per_model_count else sample_size
+    typer.echo(f"Sampling {effective_size} new datapoints from {traces_dir}...")
+    if per_model_count:
+        for model, count in per_model_count.items():
+            typer.echo(f"  {model}: {count}")
     if seed is not None:
         typer.echo(f"Using random seed: {seed}")
 
     try:
-        samples = sample_new_datapoints(traces_dir, sample_size, seed)
+        samples = sample_new_datapoints(traces_dir, sample_size, seed, per_model_count=per_model_count)
     except FileNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1) from None

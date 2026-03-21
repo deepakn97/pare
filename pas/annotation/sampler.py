@@ -58,17 +58,25 @@ def discover_trace_directories(traces_dir: Path) -> list[Path]:
 def extract_all_decision_points(
     traces_dir: Path,
     exclude_messages_app: bool = True,
+    target_models: list[str] | None = None,
 ) -> list[DecisionPoint]:
     """Extract all decision points from all no-noise traces.
 
     Args:
         traces_dir: The root traces directory.
         exclude_messages_app: If True, skip traces that use the Messages app.
+        target_models: If provided, only include traces from these proactive models.
 
     Returns:
         List of all DecisionPoint objects.
     """
     trace_dirs = discover_trace_directories(traces_dir)
+
+    # Filter by target proactive models if specified
+    if target_models:
+        target_set = set(target_models)
+        trace_dirs = [d for d in trace_dirs if extract_model_id_from_dir(d.name) in target_set]
+        logger.info(f"Filtered to {len(trace_dirs)} trace directories for models: {target_models}")
 
     all_decision_points = []
     messages_excluded = 0
@@ -203,15 +211,19 @@ def balanced_sample(  # noqa: C901
 
 def sample_new_datapoints(
     traces_dir: Path,
-    sample_size: int,
+    sample_size: int | None = None,
     seed: int | None = None,
+    per_model_count: dict[str, int] | None = None,
 ) -> list[DecisionPoint]:
     """Sample new datapoints, avoiding duplicates with existing samples.
 
     Args:
         traces_dir: Path to the traces directory.
-        sample_size: Number of new samples to add.
+        sample_size: Number of new samples to add (used when per_model_count is None).
         seed: Random seed for reproducibility.
+        per_model_count: If provided, sample this many decision points per proactive model.
+            Keys are proactive model IDs, values are sample counts.
+            When provided, sample_size is ignored.
 
     Returns:
         List of newly selected DecisionPoint objects.
@@ -227,7 +239,29 @@ def sample_new_datapoints(
         existing_scenarios = set(existing_df["scenario_id"].to_list())
         logger.info(f"Found {len(existing_ids)} existing samples from {len(existing_scenarios)} scenarios")
 
-    # Extract all decision points
+    if per_model_count:
+        # Sample per proactive model independently
+        all_selected: list[DecisionPoint] = []
+        for model_id, count in per_model_count.items():
+            model_candidates = extract_all_decision_points(traces_dir, target_models=[model_id])
+            new_candidates = [c for c in model_candidates if c.sample_id not in existing_ids]
+            logger.info(f"Model {model_id}: {len(new_candidates)} new candidates available, sampling {count}")
+
+            if not new_candidates:
+                logger.warning(f"No new candidates available for model {model_id}")
+                continue
+
+            selected = balanced_sample(new_candidates, count, existing_scenarios, seed)
+            all_selected.extend(selected)
+            # Update existing scenarios to avoid duplicates across models
+            existing_scenarios.update(s.scenario_id for s in selected)
+
+        return all_selected
+
+    # Global sampling (original behavior)
+    if sample_size is None:
+        raise ValueError("Either sample_size or per_model_count must be provided")
+
     all_candidates = extract_all_decision_points(traces_dir)
 
     # Filter out already-sampled decision points
