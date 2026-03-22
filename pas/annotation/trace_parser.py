@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import re
-from pathlib import Path  # noqa: TC003
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from pas.annotation.models import ActionWithObservation, DecisionPoint, Turn
 from pas.annotation.observation_formatter import ObservationFormatter, format_notification

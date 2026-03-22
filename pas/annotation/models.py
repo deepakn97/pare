@@ -6,8 +6,10 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path  # noqa: TC003
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 from uuid import uuid4
 
 from pydantic import BaseModel

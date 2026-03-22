@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path  # noqa: TC003
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def ensure_extension(path: Path, ext: str) -> Path:
