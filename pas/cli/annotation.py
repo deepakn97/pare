@@ -11,13 +11,7 @@ if TYPE_CHECKING:
 
 import typer
 
-from pas.annotation.config import (
-    get_annotations_dir,
-    get_annotations_file,
-    get_samples_file,
-    reset_annotations_dir,
-    set_annotations_dir,
-)
+from pas.annotation.config import ensure_extension
 
 logger = logging.getLogger(__name__)
 
@@ -37,20 +31,6 @@ def _format_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024):.2f} MB"
 
 
-def _display_existing_samples() -> None:
-    """Display info about existing samples."""
-    from pas.annotation.sampler import load_existing_samples
-
-    existing_df = load_existing_samples()
-    if existing_df is not None:
-        existing_count = len(existing_df)
-        existing_accepts = len(existing_df.filter(__import__("polars").col("user_agent_decision")))
-        existing_rejects = existing_count - existing_accepts
-        typer.echo(f"Existing samples: {existing_count} ({existing_accepts} accepts, {existing_rejects} rejects)")
-    else:
-        typer.echo("No existing samples found. Creating new sample set.")
-
-
 def _parse_per_model_arg(per_model: str) -> dict[str, int]:
     """Parse --per-model argument into a dict of model:count pairs."""
     result: dict[str, int] = {}
@@ -67,6 +47,10 @@ def sample(
     traces_dir: Annotated[
         Path,
         typer.Option("--traces-dir", "-t", help="Path to the traces directory"),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Output path for samples (extension auto-corrected to .parquet)"),
     ],
     sample_size: Annotated[
         int | None,
@@ -90,9 +74,9 @@ def sample(
     """Sample decision points from traces for annotation.
 
     Creates a balanced dataset of accept/reject decisions, prioritizing
-    unique scenarios. Appends to existing samples if present.
+    unique scenarios. Appends to existing samples if output file already exists.
     """
-    from pas.annotation.sampler import sample_new_datapoints, save_samples
+    from pas.annotation.sampler import load_existing_samples, sample_new_datapoints, save_samples
 
     # Parse per-model specification
     per_model_count: dict[str, int] | None = _parse_per_model_arg(per_model) if per_model else None
@@ -103,23 +87,27 @@ def sample(
 
     # Resolve paths
     traces_dir = traces_dir.resolve()
+    output_file = ensure_extension(output.resolve(), ".parquet")
 
     if not traces_dir.exists():
         typer.echo(f"Error: Traces directory not found: {traces_dir}", err=True)
         raise typer.Exit(code=1)
 
-    _display_existing_samples()
+    # Show existing samples info
+    existing_df = load_existing_samples(output_file)
+    if existing_df is not None:
+        typer.echo(f"Existing samples in {output_file}: {len(existing_df)}")
+    else:
+        typer.echo(f"No existing samples at {output_file}. Creating new sample set.")
 
     effective_size = sum(per_model_count.values()) if per_model_count else sample_size
     typer.echo(f"Sampling {effective_size} new datapoints from {traces_dir}...")
     if per_model_count:
         for model, count in per_model_count.items():
             typer.echo(f"  {model}: {count}")
-    if seed is not None:
-        typer.echo(f"Using random seed: {seed}")
 
     try:
-        samples = sample_new_datapoints(traces_dir, sample_size, seed, per_model_count=per_model_count)
+        samples = sample_new_datapoints(traces_dir, output_file, sample_size, seed, per_model_count=per_model_count)
     except FileNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1) from None
@@ -136,7 +124,7 @@ def sample(
         raise typer.Exit(code=1)
 
     # Save samples
-    samples_file = save_samples(samples)
+    save_samples(samples, output_file)
 
     # Report statistics
     accepts = len([s for s in samples if s.user_agent_decision])
@@ -148,11 +136,19 @@ def sample(
     typer.echo(f"  Accepts: {accepts}")
     typer.echo(f"  Rejects: {rejects}")
     typer.echo(f"  Unique scenarios: {unique_scenarios}")
-    typer.echo(f"\nSamples saved to: {samples_file}")
+    typer.echo(f"\nSamples saved to: {output_file}")
 
 
 @app.command()
 def launch(
+    samples: Annotated[
+        Path,
+        typer.Option("--samples", help="Path to the samples parquet file"),
+    ],
+    annotations: Annotated[
+        Path,
+        typer.Option("--annotations", help="Path to the annotations CSV file (created if not exists)"),
+    ],
     annotators_per_sample: Annotated[
         int,
         typer.Option("--annotators-per-sample", "-k", help="Number of annotations required per sample"),
@@ -169,8 +165,8 @@ def launch(
     """
     from pas.annotation.server import run_server
 
-    data_dir = get_annotations_dir()
-    samples_file = get_samples_file()
+    samples_file = ensure_extension(samples.resolve(), ".parquet")
+    annotations_file = ensure_extension(annotations.resolve(), ".csv")
 
     if not samples_file.exists():
         typer.echo(f"Error: No samples found at {samples_file}", err=True)
@@ -179,8 +175,8 @@ def launch(
 
     typer.echo("PAS Annotation Server")
     typer.echo("=" * 40)
-    typer.echo(f"Data directory: {data_dir}")
-    typer.echo(f"Samples file: {samples_file}")
+    typer.echo(f"Samples: {samples_file}")
+    typer.echo(f"Annotations: {annotations_file}")
     typer.echo(f"Annotators per sample: {annotators_per_sample}")
     typer.echo(f"Server URL: http://localhost:{port}")
     typer.echo("")
@@ -191,7 +187,7 @@ def launch(
     typer.echo("=" * 40)
 
     try:
-        run_server(data_dir, port, annotators_per_sample)
+        run_server(samples_file, annotations_file, port, annotators_per_sample)
     except FileNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1) from None
@@ -200,216 +196,45 @@ def launch(
 
 
 @app.command()
-def status() -> None:
-    """Show annotation progress and statistics."""
-    import polars as pl
+def status(
+    port: Annotated[
+        int,
+        typer.Option("--port", "-p", help="Port of the running annotation server"),
+    ] = 8000,
+) -> None:
+    """Show annotation progress from a running annotation server."""
+    import json
+    import urllib.request
 
-    data_dir = get_annotations_dir()
-    samples_file = get_samples_file()
-    annotations_file = get_annotations_file()
+    url = f"http://localhost:{port}/api/stats"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
+            stats = json.loads(response.read().decode())
+    except Exception:
+        typer.echo(f"Error: Could not connect to annotation server at localhost:{port}", err=True)
+        typer.echo("Make sure the server is running with 'pas annotation launch'.")
+        raise typer.Exit(code=1) from None
 
     typer.echo("PAS Annotation Status")
     typer.echo("=" * 40)
-    typer.echo(f"Data directory: {data_dir}")
-
-    if not samples_file.exists():
-        typer.echo("\nNo samples found. Run 'pas annotation sample' first.")
-        return
-
-    # Load samples
-    samples_df = pl.read_parquet(samples_file)
-    total_samples = len(samples_df)
-
-    # Calculate balance
-    accepts = len(samples_df.filter(pl.col("user_agent_decision")))
-    rejects = total_samples - accepts
-    accept_pct = (accepts / total_samples * 100) if total_samples > 0 else 0
-    reject_pct = (rejects / total_samples * 100) if total_samples > 0 else 0
-
-    typer.echo("\nSamples:")
-    typer.echo(f"  Total: {total_samples}")
-    typer.echo(f"  User agent accepts: {accepts} ({accept_pct:.1f}%)")
-    typer.echo(f"  User agent rejects: {rejects} ({reject_pct:.1f}%)")
-
-    # Load annotations if they exist
-    if annotations_file.exists():
-        try:
-            annotations_df = pl.read_csv(annotations_file)
-            total_annotations = len(annotations_df)
-
-            if total_annotations > 0:
-                # Count unique annotators
-                unique_annotators = annotations_df["annotator_id"].n_unique()
-
-                # Count annotations per sample
-                sample_counts = annotations_df.group_by("sample_id").len()
-
-                # Note: We don't have annotators_per_sample stored, so we estimate
-                max_count = sample_counts["len"].max()
-                complete = len(sample_counts.filter(pl.col("len") >= max_count)) if max_count else 0
-                in_progress = len(sample_counts) - complete
-                not_started = total_samples - len(sample_counts)
-
-                typer.echo("\nAnnotations:")
-                typer.echo(f"  Total: {total_annotations}")
-                typer.echo(f"  Unique annotators: {unique_annotators}")
-
-                typer.echo("\nProgress:")
-                typer.echo(f"  Samples with annotations: {len(sample_counts)}")
-                typer.echo(f"  Samples not started: {not_started}")
-
-                # Human decision statistics
-                human_accepts = len(annotations_df.filter(pl.col("human_decision")))
-                human_rejects = total_annotations - human_accepts
-                human_accept_pct = (human_accepts / total_annotations * 100) if total_annotations > 0 else 0
-
-                typer.echo("\nHuman Decisions:")
-                typer.echo(f"  Accepts: {human_accepts} ({human_accept_pct:.1f}%)")
-                typer.echo(f"  Rejects: {human_rejects} ({100 - human_accept_pct:.1f}%)")
-
-                # Agreement with user agent
-                agreements = len(annotations_df.filter(pl.col("human_decision") == pl.col("user_agent_decision")))
-                agreement_pct = (agreements / total_annotations * 100) if total_annotations > 0 else 0
-                typer.echo(f"\nAgreement with user agent: {agreements}/{total_annotations} ({agreement_pct:.1f}%)")
-
-            else:
-                typer.echo("\nAnnotations: 0")
-        except Exception as e:
-            typer.echo(f"\nError reading annotations: {e}")
-    else:
-        typer.echo("\nAnnotations: 0 (file not created yet)")
-
-
-@app.command("set-dir")
-def set_dir(
-    folder_path: Annotated[
-        Path,
-        typer.Argument(help="Path to the annotations directory"),
-    ],
-    create: Annotated[
-        bool,
-        typer.Option("--create", "-c", help="Create the directory if it doesn't exist"),
-    ] = False,
-) -> None:
-    """Set the annotations directory path (persistent).
-
-    This setting is saved to ~/.config/pas/config.json and persists across sessions.
-    The PAS_ANNOTATIONS_DIR environment variable takes precedence over this setting.
-    """
-    import os
-
-    try:
-        set_annotations_dir(folder_path, create)
-        typer.echo(f"Annotations directory set to: {folder_path.resolve()}")
-
-        # Warn if environment variable is set
-        if os.environ.get("PAS_ANNOTATIONS_DIR"):
-            typer.echo(
-                "\nNote: PAS_ANNOTATIONS_DIR environment variable is set and will take precedence "
-                "over this config file setting."
-            )
-    except FileNotFoundError as e:
-        typer.echo(f"Error: {e}", err=True)
-        typer.echo("Use --create to create the directory automatically.")
-        raise typer.Exit(code=1) from None
-    except NotADirectoryError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(code=1) from None
-
-
-@app.command("reset-dir")
-def reset_dir() -> None:
-    """Reset annotations directory to default location.
-
-    Removes the annotations_dir setting from the config file.
-    """
-    default_dir = reset_annotations_dir()
-    typer.echo(f"Annotations directory reset to default: {default_dir}")
-
-
-@app.command()
-def invalidate(  # noqa: C901
-    confirm: Annotated[
-        bool,
-        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
-    ] = False,
-    samples_too: Annotated[
-        bool,
-        typer.Option("--samples", help="Also delete samples (requires re-sampling)"),
-    ] = False,
-) -> None:
-    """Delete all annotations (and optionally samples).
-
-    This is a destructive operation. All collected annotations will be
-    permanently deleted.
-    """
-    annotations_file = get_annotations_file()
-    samples_file = get_samples_file()
-
-    if not annotations_file.exists() and not (samples_too and samples_file.exists()):
-        typer.echo("Nothing to delete. No annotations or samples found.")
-        return
-
-    # Show what will be deleted
-    typer.secho("\nWARNING: This action is irreversible!", fg=typer.colors.RED, bold=True)
-    typer.echo("")
-
-    if annotations_file.exists():
-        import polars as pl
-
-        try:
-            annotations_df = pl.read_csv(annotations_file)
-            n_annotations = len(annotations_df)
-            n_annotators = annotations_df["annotator_id"].n_unique() if n_annotations > 0 else 0
-            typer.secho(f"  Annotations to delete: {n_annotations}", fg=typer.colors.YELLOW)
-            typer.secho(f"  From {n_annotators} unique annotators", fg=typer.colors.YELLOW)
-        except Exception:
-            typer.secho(f"  Annotations file: {annotations_file}", fg=typer.colors.YELLOW)
-    else:
-        typer.echo("  No annotations file found.")
-
-    if samples_too and samples_file.exists():
-        import polars as pl
-
-        try:
-            samples_df = pl.read_parquet(samples_file)
-            typer.secho(f"  Samples to delete: {len(samples_df)}", fg=typer.colors.YELLOW)
-        except Exception:
-            typer.secho(f"  Samples file: {samples_file}", fg=typer.colors.YELLOW)
-
-    typer.echo("")
-
-    if not confirm:
-        typer.secho(
-            "Are you sure you want to delete all annotations" + (" and samples" if samples_too else "") + "?",
-            fg=typer.colors.RED,
-        )
-        if not typer.confirm("Type 'y' to confirm"):
-            typer.echo("Aborted.")
-            raise typer.Exit(code=0)
-
-    # Delete files
-    deleted_annotations = False
-    deleted_samples = False
-
-    if annotations_file.exists():
-        annotations_file.unlink()
-        deleted_annotations = True
-        typer.secho("Deleted annotations file.", fg=typer.colors.GREEN)
-
-    if samples_too and samples_file.exists():
-        samples_file.unlink()
-        deleted_samples = True
-        typer.secho("Deleted samples file.", fg=typer.colors.GREEN)
-
-    if deleted_annotations or deleted_samples:
-        typer.echo("\nDone. You may need to run 'pas annotation sample' to create new samples.")
-    else:
-        typer.echo("Nothing was deleted.")
+    typer.echo(f"Total samples: {stats.get('total_samples', 'N/A')}")
+    typer.echo(f"Complete: {stats.get('complete', 'N/A')}")
+    typer.echo(f"In progress: {stats.get('in_progress', 'N/A')}")
+    typer.echo(f"Not started: {stats.get('not_started', 'N/A')}")
+    typer.echo(f"Total annotations: {stats.get('total_annotations', 'N/A')}")
+    typer.echo(f"Unique annotators: {stats.get('unique_annotators', 'N/A')}")
 
 
 @app.command()
 def process(  # noqa: C901
+    samples: Annotated[
+        Path,
+        typer.Option("--samples", help="Path to the samples parquet file"),
+    ],
+    annotations: Annotated[
+        Path,
+        typer.Option("--annotations", help="Path to the annotations CSV file"),
+    ],
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Output CSV file for detailed results"),
@@ -443,15 +268,15 @@ def process(  # noqa: C901
 
     from pas.annotation.metrics import compute_agreement_metrics, compute_per_model_agreement_metrics
 
-    samples_file = get_samples_file()
-    annotations_file = get_annotations_file()
+    samples_file = ensure_extension(samples.resolve(), ".parquet")
+    annotations_file = ensure_extension(annotations.resolve(), ".csv")
 
     if not samples_file.exists():
-        typer.echo("Error: No samples found. Run 'pas annotation sample' first.", err=True)
+        typer.echo(f"Error: No samples found at {samples_file}", err=True)
         raise typer.Exit(code=1)
 
     if not annotations_file.exists():
-        typer.echo("Error: No annotations found. Run 'pas annotation launch' to collect annotations.", err=True)
+        typer.echo(f"Error: No annotations found at {annotations_file}", err=True)
         raise typer.Exit(code=1)
 
     # Load data
@@ -649,13 +474,19 @@ def _save_detailed_results(
 
 @app.command()
 def evaluate(
+    samples: Annotated[
+        Path,
+        typer.Option("--samples", help="Path to the samples parquet file"),
+    ],
     user_models: Annotated[
         str,
         typer.Option("--user-models", help="Comma-separated user model aliases to evaluate"),
     ],
     output: Annotated[
         Path,
-        typer.Option("--output", "-o", help="Output path for evaluation results parquet"),
+        typer.Option(
+            "--output", "-o", help="Output path for evaluation results (extension auto-corrected to .parquet)"
+        ),
     ],
     target_models: Annotated[
         str | None,
@@ -676,15 +507,18 @@ def evaluate(
     candidate user model, and records accept/reject decisions. Outputs a unified
     evaluation dataframe.
     """
+    import polars as pl
+
     from pas.annotation.evaluator import evaluate_samples, print_evaluation_summary
-    from pas.annotation.sampler import load_existing_samples
     from pas.cli.utils import MODELS_MAP
 
     # Load samples
-    samples_df = load_existing_samples()
-    if samples_df is None:
-        typer.echo("Error: No samples found. Run 'pas annotation sample' first.", err=True)
+    samples_file = ensure_extension(samples.resolve(), ".parquet")
+    if not samples_file.exists():
+        typer.echo(f"Error: No samples found at {samples_file}", err=True)
         raise typer.Exit(code=1)
+
+    samples_df = pl.read_parquet(samples_file)
 
     # Parse arguments
     user_model_list = [m.strip() for m in user_models.split(",") if m.strip()]
@@ -714,9 +548,10 @@ def evaluate(
     )
 
     # Save results
-    output.parent.mkdir(parents=True, exist_ok=True)
-    eval_df.write_parquet(output)
-    typer.echo(f"\nResults saved to {output}")
+    output_file = ensure_extension(output.resolve(), ".parquet")
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    eval_df.write_parquet(output_file)
+    typer.echo(f"\nResults saved to {output_file}")
 
     # Print summary
     print_evaluation_summary(eval_df, original_samples_df=samples_df)

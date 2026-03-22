@@ -228,3 +228,6 @@ docs/_plans/paper
 personal_notes/
 docs/github_issues/
 bedrock_models.json
+
+# Annotation data
+data/annotations/

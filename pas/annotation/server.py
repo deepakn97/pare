@@ -30,18 +30,19 @@ class AnnotationRequest(BaseModel):
 class AnnotationServer:
     """Server for managing annotation state and serving samples."""
 
-    def __init__(self, data_dir: Path, annotators_per_sample: int = 2) -> None:
+    def __init__(self, samples_file: Path, annotations_file: Path, annotators_per_sample: int = 2) -> None:
         """Initialize the annotation server.
 
         Args:
-            data_dir: Directory containing samples.parquet and annotations.csv.
+            samples_file: Path to the samples parquet file.
+            annotations_file: Path to the annotations CSV file (created if not exists).
             annotators_per_sample: Number of annotations required per sample.
         """
-        self.data_dir = data_dir
+        self.samples_file = samples_file
+        self.annotations_file = annotations_file
         self.annotators_per_sample = annotators_per_sample
 
         # Load samples
-        samples_file = data_dir / "samples.parquet"
         if not samples_file.exists():
             raise FileNotFoundError(f"Samples file not found: {samples_file}. Run 'pas annotation sample' first.")
 
@@ -55,7 +56,7 @@ class AnnotationServer:
             self._samples[sample.sample_id] = sample
 
         # Initialize annotations file
-        self.annotations_file = data_dir / "annotations.csv"
+        self.annotations_file.parent.mkdir(parents=True, exist_ok=True)
         if not self.annotations_file.exists():
             with open(self.annotations_file, "w") as f:
                 f.write(Annotation.csv_header())
@@ -230,11 +231,12 @@ class AnnotationServer:
         }
 
 
-def create_app(data_dir: Path, annotators_per_sample: int = 2) -> FastAPI:  # noqa: C901
+def create_app(samples_file: Path, annotations_file: Path, annotators_per_sample: int = 2) -> FastAPI:  # noqa: C901
     """Create the FastAPI application.
 
     Args:
-        data_dir: Directory containing samples and annotations.
+        samples_file: Path to the samples parquet file.
+        annotations_file: Path to the annotations CSV file.
         annotators_per_sample: Number of annotations required per sample.
 
     Returns:
@@ -243,7 +245,7 @@ def create_app(data_dir: Path, annotators_per_sample: int = 2) -> FastAPI:  # no
     app = FastAPI(title="PAS Annotation Interface")
 
     # Initialize server
-    server = AnnotationServer(data_dir, annotators_per_sample)
+    server = AnnotationServer(samples_file, annotations_file, annotators_per_sample)
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> FileResponse:
@@ -330,19 +332,20 @@ def create_app(data_dir: Path, annotators_per_sample: int = 2) -> FastAPI:  # no
     return app
 
 
-def run_server(data_dir: Path, port: int = 8000, annotators_per_sample: int = 2) -> None:
+def run_server(samples_file: Path, annotations_file: Path, port: int = 8000, annotators_per_sample: int = 2) -> None:
     """Run the annotation server.
 
     Args:
-        data_dir: Directory containing samples and annotations.
+        samples_file: Path to the samples parquet file.
+        annotations_file: Path to the annotations CSV file.
         port: Port to run the server on.
         annotators_per_sample: Number of annotations required per sample.
     """
     import uvicorn
 
-    app = create_app(data_dir, annotators_per_sample)
+    app = create_app(samples_file, annotations_file, annotators_per_sample)
     logger.info(f"Starting annotation server on http://localhost:{port}")
-    logger.info(f"Annotators per sample: {annotators_per_sample}")
-    logger.info(f"Data directory: {data_dir}")
+    logger.info(f"Samples: {samples_file}")
+    logger.info(f"Annotations: {annotations_file}")
 
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")  # noqa: S104

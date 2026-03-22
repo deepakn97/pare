@@ -8,7 +8,6 @@ from pathlib import Path  # noqa: TC003
 
 import polars as pl
 
-from pas.annotation.config import ensure_annotations_dir, get_samples_file
 from pas.annotation.models import DecisionPoint  # noqa: TC001
 from pas.annotation.trace_parser import (
     extract_model_id_from_dir,
@@ -108,13 +107,15 @@ def extract_all_decision_points(
     return all_decision_points
 
 
-def load_existing_samples() -> pl.DataFrame | None:
-    """Load existing samples from the samples file.
+def load_existing_samples(samples_file: Path) -> pl.DataFrame | None:
+    """Load existing samples from a parquet file.
+
+    Args:
+        samples_file: Path to the samples parquet file.
 
     Returns:
-        DataFrame of existing samples, or None if no samples exist.
+        DataFrame of existing samples, or None if file doesn't exist.
     """
-    samples_file = get_samples_file()
     if not samples_file.exists():
         return None
 
@@ -211,6 +212,7 @@ def balanced_sample(  # noqa: C901
 
 def sample_new_datapoints(
     traces_dir: Path,
+    samples_file: Path,
     sample_size: int | None = None,
     seed: int | None = None,
     per_model_count: dict[str, int] | None = None,
@@ -219,6 +221,7 @@ def sample_new_datapoints(
 
     Args:
         traces_dir: Path to the traces directory.
+        samples_file: Path to the existing samples parquet file (for dedup).
         sample_size: Number of new samples to add (used when per_model_count is None).
         seed: Random seed for reproducibility.
         per_model_count: If provided, sample this many decision points per proactive model.
@@ -229,7 +232,7 @@ def sample_new_datapoints(
         List of newly selected DecisionPoint objects.
     """
     # Load existing samples
-    existing_df = load_existing_samples()
+    existing_df = load_existing_samples(samples_file)
 
     existing_ids: set[str] = set()
     existing_scenarios: set[str] = set()
@@ -280,48 +283,49 @@ def sample_new_datapoints(
     return selected
 
 
-def save_samples(samples: list[DecisionPoint]) -> Path:
-    """Save samples to the parquet file (append mode).
+def save_samples(samples: list[DecisionPoint], output_file: Path) -> Path:
+    """Save samples to a parquet file (append if exists, create if not).
 
     Args:
         samples: List of DecisionPoint objects to save.
+        output_file: Path to the output parquet file.
 
     Returns:
         Path to the samples file.
     """
     if not samples:
         logger.warning("No samples to save")
-        return get_samples_file()
+        return output_file
 
-    ensure_annotations_dir()
-    samples_file = get_samples_file()
+    output_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Convert to DataFrame
     new_df = pl.DataFrame([s.to_sample_dict() for s in samples])
 
     # Append to existing or create new
-    if samples_file.exists():
-        existing_df = pl.read_parquet(samples_file)
+    if output_file.exists():
+        existing_df = pl.read_parquet(output_file)
         combined_df = pl.concat([existing_df, new_df])
-        combined_df.write_parquet(samples_file)
-        logger.info(f"Appended {len(samples)} samples to {samples_file} (total: {len(combined_df)})")
+        combined_df.write_parquet(output_file)
+        logger.info(f"Appended {len(samples)} samples to {output_file} (total: {len(combined_df)})")
     else:
-        new_df.write_parquet(samples_file)
-        logger.info(f"Created {samples_file} with {len(samples)} samples")
+        new_df.write_parquet(output_file)
+        logger.info(f"Created {output_file} with {len(samples)} samples")
 
-    return samples_file
+    return output_file
 
 
-def get_sampling_stats(traces_dir: Path) -> dict[str, int]:
+def get_sampling_stats(traces_dir: Path, samples_file: Path) -> dict[str, int]:
     """Get statistics about available samples.
 
     Args:
         traces_dir: Path to the traces directory.
+        samples_file: Path to the existing samples parquet file.
 
     Returns:
         Dictionary with statistics.
     """
-    existing_df = load_existing_samples()
+    existing_df = load_existing_samples(samples_file)
 
     # Count existing
     existing_count = len(existing_df) if existing_df is not None else 0
