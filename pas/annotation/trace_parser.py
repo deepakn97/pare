@@ -328,23 +328,6 @@ def extract_model_id_from_dir(dir_name: str) -> str:
     return dir_name
 
 
-def extract_user_model_id_from_dir(dir_name: str) -> str:
-    """Extract the user model ID from a top-level traces directory name.
-
-    Example: paper_benchmark_full_user_gpt-5-mini_mt_10_umi_1_omi_5_emi_10 -> gpt-5-mini
-
-    Args:
-        dir_name: The top-level traces directory name.
-
-    Returns:
-        The extracted user model ID.
-    """
-    match = re.search(r"_user_([^_]+(?:-[^_]+)*)_mt_", dir_name)
-    if match:
-        return match.group(1)
-    return "unknown"
-
-
 def trace_uses_messages_app(trace_path: Path) -> bool:
     """Check if a trace uses the Messages app.
 

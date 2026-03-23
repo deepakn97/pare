@@ -31,6 +31,36 @@ def _format_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024):.2f} MB"
 
 
+def _validate_sample_args(
+    sample_size: int | None,
+    per_model: str | None,
+    target_models: str | None,
+) -> tuple[dict[str, int] | None, list[str] | None]:
+    """Validate and parse sample command arguments.
+
+    Returns:
+        Tuple of (per_model_count, target_model_list).
+    """
+    per_model_count: dict[str, int] | None = _parse_per_model_arg(per_model) if per_model else None
+    target_model_list: list[str] | None = (
+        [m.strip() for m in target_models.split(",") if m.strip()] if target_models else None
+    )
+
+    if sample_size is not None and per_model_count is not None:
+        typer.echo("Error: --sample-size and --per-model are mutually exclusive.", err=True)
+        raise typer.Exit(code=1)
+
+    if per_model_count is not None and target_model_list is not None:
+        typer.echo("Error: --per-model and --target-models are mutually exclusive.", err=True)
+        raise typer.Exit(code=1)
+
+    if sample_size is None and per_model_count is None:
+        typer.echo("Error: Either --sample-size or --per-model must be provided.", err=True)
+        raise typer.Exit(code=1)
+
+    return per_model_count, target_model_list
+
+
 def _parse_per_model_arg(per_model: str) -> dict[str, int]:
     """Parse --per-model argument into a dict of model:count pairs."""
     result: dict[str, int] = {}
@@ -62,7 +92,9 @@ def sample(
     ] = None,
     target_models: Annotated[
         str | None,
-        typer.Option("--target-models", help="Comma-separated proactive model names to filter traces"),
+        typer.Option(
+            "--target-models", help="Comma-separated proactive models; used with --sample-size to distribute equally"
+        ),
     ] = None,
     per_model: Annotated[
         str | None,
@@ -70,6 +102,10 @@ def sample(
             "--per-model", help="Comma-separated model:count pairs (e.g., 'claude-4.5-sonnet:50,qwen-3-4b-it:50')"
         ),
     ] = None,
+    user_model: Annotated[
+        str,
+        typer.Option("--user-model", "-um", help="User model that generated the traces"),
+    ] = "gpt-5-mini",
 ) -> None:
     """Sample decision points from traces for annotation.
 
@@ -78,12 +114,7 @@ def sample(
     """
     from pas.annotation.sampler import load_existing_samples, sample_new_datapoints, save_samples
 
-    # Parse per-model specification
-    per_model_count: dict[str, int] | None = _parse_per_model_arg(per_model) if per_model else None
-
-    if sample_size is None and per_model_count is None:
-        typer.echo("Error: Either --sample-size or --per-model must be provided.", err=True)
-        raise typer.Exit(code=1)
+    per_model_count, target_model_list = _validate_sample_args(sample_size, per_model, target_models)
 
     # Resolve paths
     traces_dir = traces_dir.resolve()
@@ -105,9 +136,19 @@ def sample(
     if per_model_count:
         for model, count in per_model_count.items():
             typer.echo(f"  {model}: {count}")
+    if target_model_list:
+        typer.echo(f"Target models: {target_model_list} (distributing {sample_size} equally)")
 
     try:
-        samples = sample_new_datapoints(traces_dir, output_file, sample_size, seed, per_model_count=per_model_count)
+        samples = sample_new_datapoints(
+            traces_dir,
+            output_file,
+            user_model,
+            sample_size,
+            seed,
+            per_model_count=per_model_count,
+            target_models=target_model_list,
+        )
     except FileNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1) from None
@@ -204,15 +245,25 @@ def status(
 ) -> None:
     """Show annotation progress from a running annotation server."""
     import json
+    import urllib.error
     import urllib.request
 
     url = f"http://localhost:{port}/api/stats"
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
             stats = json.loads(response.read().decode())
-    except Exception:
-        typer.echo(f"Error: Could not connect to annotation server at localhost:{port}", err=True)
-        typer.echo("Make sure the server is running with 'pas annotation launch'.")
+    except urllib.error.URLError as e:
+        if "Connection refused" in str(e):
+            typer.echo(f"Error: No server running on port {port}", err=True)
+            typer.echo(f"Start the server with: pas annotation launch -p {port}")
+        else:
+            typer.echo(f"Error: Could not connect to server: {e}", err=True)
+        raise typer.Exit(code=1) from None
+    except TimeoutError:
+        typer.echo(f"Error: Server at localhost:{port} is not responding (timeout)", err=True)
+        raise typer.Exit(code=1) from None
+    except json.JSONDecodeError as e:
+        typer.echo(f"Error: Server returned invalid response: {e}", err=True)
         raise typer.Exit(code=1) from None
 
     typer.echo("PAS Annotation Status")

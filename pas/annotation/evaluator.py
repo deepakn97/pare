@@ -120,6 +120,7 @@ def evaluate_single_decision(
         Tuple of (decision: True=accept/False=reject/None=unparseable, valid_response: bool).
     """
     llm_output = None
+    last_error: Exception | None = None
     for attempt in range(MAX_RETRIES):
         try:
             response = engine.chat_completion(messages, stop_sequences=STOP_SEQUENCES)
@@ -130,10 +131,17 @@ def evaluate_single_decision(
 
             logger.debug(f"Attempt {attempt + 1}: output missing Action:/Thought: tokens, retrying")
         except Exception as e:
+            last_error = e
             logger.warning(f"Attempt {attempt + 1}: LLM call failed: {e}")
             llm_output = None
 
     if not llm_output or ACTION_TOKEN not in llm_output:
+        if last_error:
+            logger.warning(f"LLM evaluation failed after {MAX_RETRIES} attempts.")
+        elif llm_output:
+            logger.warning(f"LLM output missing Action: token after {MAX_RETRIES} attempts")
+        else:
+            logger.warning(f"LLM produced no output after {MAX_RETRIES} attempts")
         return None, False
 
     # Parse the action
@@ -146,10 +154,10 @@ def evaluate_single_decision(
         elif "reject_proposal" in tool_name:
             return False, True
         else:
-            logger.debug(f"Unexpected tool call: {tool_name}")
+            logger.warning(f"Unexpected tool call: {tool_name}")
             return None, False
     except (JsonParsingAgentError, Exception) as e:
-        logger.debug(f"Failed to parse action: {e}")
+        logger.warning(f"Failed to parse action: {e}")
         return None, False
 
 
@@ -289,7 +297,8 @@ def print_evaluation_summary(eval_df: pl.DataFrame, original_samples_df: pl.Data
 
     print("\n=== Evaluation Summary ===")
     print(f"Total evaluations: {len(eval_df)}")
-    print(f"Valid responses: {len(valid_df)} ({len(valid_df) / len(eval_df) * 100:.1f}%)")
+    valid_pct = (len(valid_df) / len(eval_df) * 100) if len(eval_df) > 0 else 0.0
+    print(f"Valid responses: {len(valid_df)} ({valid_pct:.1f}%)")
 
     print("\n--- Acceptance Rate by User Model ---")
     for row in summary.iter_rows(named=True):
