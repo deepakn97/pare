@@ -2,27 +2,42 @@
 
 from __future__ import annotations
 
-import ast
+import inspect
 import json
 import logging
-import re
+import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from dotenv import load_dotenv
+
+from pas.benchmark.scenario_loader import (
+    Split,
+    get_splits_dir,
+    load_scenario_ids_from_file,
+    load_scenarios_by_split,
+    load_scenarios_from_registry,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from pas.scenarios import PASScenario
 
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="scenarios",
-    help="List available benchmark scenarios and run the multi-step scenario generator",
+    help="List registered PAS scenarios and run the multi-step scenario generator",
     no_args_is_help=True,
 )
 
 
-_DEFAULT_BENCHMARK_DIR = Path(__file__).resolve().parents[1] / "scenarios" / "benchmark"
+_SCENARIOS_BASE_DIR = Path(__file__).resolve().parents[1] / "scenarios"
+_DEFAULT_BENCHMARK_DIR = _SCENARIOS_BASE_DIR / "benchmark"
 _SCENARIO_METADATA_PATH = Path(__file__).resolve().parents[1] / "scenarios" / "scenario_metadata.json"
 
 
@@ -55,15 +70,6 @@ def _load_scenario_metadata(path: Path) -> dict[str, dict[str, Any]]:
     return mapping
 
 
-def _decorator_name(expr: ast.expr) -> str | None:
-    """Return decorator function name for `@name(...)` or `@mod.name(...)`."""
-    if isinstance(expr, ast.Name):
-        return expr.id
-    if isinstance(expr, ast.Attribute):
-        return expr.attr
-    return None
-
-
 @dataclass(frozen=True)
 class BenchmarkScenarioListing:
     """Lightweight representation of a benchmark scenario for CLI listing/output."""
@@ -75,120 +81,155 @@ class BenchmarkScenarioListing:
     description: str | None
 
 
-_APP_TOKEN_RE = re.compile(r"\b(Stateful[A-Za-z0-9_]+App|PASAgentUserInterface|HomeScreenSystemApp)\b")
+def _reset_pas_registry_discovery_state() -> None:
+    from pas.scenarios import registry
+
+    if hasattr(registry, "_scenarios_discovered"):
+        registry._scenarios_discovered = False
+    scenarios = getattr(registry, "_scenarios", None)
+    if isinstance(scenarios, dict):
+        scenarios.clear()
 
 
-def _extract_scenarios_from_file(  # noqa: C901
-    py_file: Path, metadata: dict[str, dict[str, Any]]
-) -> list[BenchmarkScenarioListing]:
-    source = py_file.read_text(encoding="utf-8")
+def _resolve_registry_dir_name(scenarios_dir: Path) -> tuple[Path, str]:
+    resolved_dir = scenarios_dir.resolve()
+    if not resolved_dir.exists():
+        raise typer.BadParameter(f"Scenario directory does not exist: {resolved_dir}")
+    if not resolved_dir.is_dir():
+        raise typer.BadParameter(f"Scenario directory is not a directory: {resolved_dir}")
+
     try:
-        tree = ast.parse(source, filename=str(py_file))
-    except SyntaxError as exc:
-        logger.warning("Skipping %s due to syntax error: %s", py_file, exc)
+        relative_dir = resolved_dir.relative_to(_SCENARIOS_BASE_DIR.resolve())
+    except ValueError as exc:
+        raise typer.BadParameter(f"Scenario directory must live under {_SCENARIOS_BASE_DIR}") from exc
+
+    return resolved_dir, relative_dir.as_posix()
+
+
+@contextmanager
+def _temporary_scenarios_dir(scenarios_dir: Path) -> Iterator[tuple[Path, str]]:
+    _, scenarios_dir_name = _resolve_registry_dir_name(scenarios_dir)
+    previous_dirs = os.environ.get("PAS_SCENARIOS_DIR")
+
+    try:
+        os.environ["PAS_SCENARIOS_DIR"] = scenarios_dir_name
+        _reset_pas_registry_discovery_state()
+        yield _resolve_registry_dir_name(scenarios_dir)
+    finally:
+        if previous_dirs is None:
+            os.environ.pop("PAS_SCENARIOS_DIR", None)
+        else:
+            os.environ["PAS_SCENARIOS_DIR"] = previous_dirs
+        _reset_pas_registry_discovery_state()
+
+
+def _scenario_file_belongs_to_dir(file_path: Path, scenarios_dir: Path) -> bool:
+    try:
+        file_path.resolve().relative_to(scenarios_dir.resolve())
+    except ValueError:
+        return False
+    else:
+        return True
+
+
+def _load_registered_scenario_ids(scenarios_dir: Path) -> list[str]:
+    from pas.scenarios import registry
+
+    with _temporary_scenarios_dir(scenarios_dir):
+        return sorted(registry.get_all_scenarios().keys())
+
+
+def _load_apps_for_listing(scenario_id: str, scenario: PASScenario, metadata: dict[str, dict[str, Any]]) -> list[str]:
+    meta = metadata.get(scenario_id, {})
+    apps_from_meta = meta.get("apps") if isinstance(meta, dict) else None
+    if isinstance(apps_from_meta, list) and all(isinstance(app, str) for app in apps_from_meta):
+        return list(apps_from_meta)
+
+    try:
+        scenario.init_and_populate_apps(sandbox_dir=Path("sandbox"))
+    except Exception as exc:
+        logger.warning("Failed to initialize scenario %s for app listing: %s", scenario_id, exc)
         return []
 
-    results: list[BenchmarkScenarioListing] = []
-    for node in tree.body:
-        if not isinstance(node, ast.ClassDef):
+    apps = getattr(scenario, "apps", None)
+    if not isinstance(apps, list):
+        return []
+
+    app_names = [app.__class__.__name__ for app in apps]
+    return sorted(dict.fromkeys(app_names))
+
+
+def _load_registered_scenario_listings(scenarios_dir: Path) -> list[BenchmarkScenarioListing]:
+    resolved_dir, _ = _resolve_registry_dir_name(scenarios_dir)
+    metadata = _load_scenario_metadata(_SCENARIO_METADATA_PATH)
+    scenario_ids = _load_registered_scenario_ids(resolved_dir)
+
+    with _temporary_scenarios_dir(resolved_dir):
+        scenarios = list(load_scenarios_from_registry(scenario_ids=scenario_ids))
+
+    listings: list[BenchmarkScenarioListing] = []
+    for scenario in scenarios:
+        scenario_id = getattr(scenario, "scenario_id", None)
+        if not isinstance(scenario_id, str) or not scenario_id:
+            logger.warning("Skipping scenario instance without scenario_id: %r", scenario)
             continue
-        scenario_id: str | None = None
-        for decorator in node.decorator_list:
-            if not isinstance(decorator, ast.Call):
-                continue
-            name = _decorator_name(decorator.func)
-            if name != "register_scenario":
-                continue
-            if not decorator.args:
-                continue
-            first = decorator.args[0]
-            if isinstance(first, ast.Constant) and isinstance(first.value, str):
-                scenario_id = first.value
-                break
-        if not scenario_id:
+
+        scenario_class = scenario.__class__
+        try:
+            file_path = Path(inspect.getfile(scenario_class)).resolve()
+        except TypeError:
+            logger.warning("Skipping scenario %s because its source file could not be determined", scenario_id)
+            continue
+
+        if not _scenario_file_belongs_to_dir(file_path, resolved_dir):
             continue
 
         meta = metadata.get(scenario_id, {})
-        apps_from_meta = meta.get("apps") if isinstance(meta, dict) else None
-        if isinstance(apps_from_meta, list) and all(isinstance(a, str) for a in apps_from_meta):
-            apps = list(apps_from_meta)
-        else:
-            apps = sorted(set(_APP_TOKEN_RE.findall(source)))
-
-        doc = ast.get_docstring(node)
         description = None
         if isinstance(meta, dict) and isinstance(meta.get("description"), str):
             description = meta["description"].strip() or None
-        elif isinstance(doc, str):
-            description = doc.strip() or None
+        else:
+            class_doc = inspect.getdoc(scenario_class)
+            if isinstance(class_doc, str):
+                description = class_doc.strip() or None
 
-        results.append(
+        listings.append(
             BenchmarkScenarioListing(
                 scenario_id=scenario_id,
-                class_name=node.name or None,
-                file_path=py_file,
-                apps=apps,
+                class_name=getattr(scenario_class, "__name__", None),
+                file_path=file_path,
+                apps=_load_apps_for_listing(scenario_id, scenario, metadata),
                 description=description,
             )
         )
-    return results
 
-
-def _load_benchmark_scenarios(benchmark_dir: Path) -> list[BenchmarkScenarioListing]:
-    metadata = _load_scenario_metadata(_SCENARIO_METADATA_PATH)
-    if not benchmark_dir.exists():
-        raise typer.BadParameter(f"Benchmark directory does not exist: {benchmark_dir}")
-
-    listings: list[BenchmarkScenarioListing] = []
-    for py_file in sorted(benchmark_dir.glob("*.py")):
-        if py_file.name.startswith("_"):
-            continue
-        listings.extend(_extract_scenarios_from_file(py_file, metadata))
     return listings
 
 
-@app.command("list")
-def list_scenarios(  # noqa: C901
-    benchmark_dir: Annotated[
-        Path,
-        typer.Option("--benchmark-dir", help="Directory containing benchmark scenario .py files"),
-    ] = _DEFAULT_BENCHMARK_DIR,
-    apps: Annotated[
-        list[str] | None,
-        typer.Option("--apps", "-a", help="Filter by required apps (repeat or comma-separate)"),
-    ] = None,
-    id_contains: Annotated[
-        str | None,
-        typer.Option("--id-contains", help="Only include scenario_ids containing this substring"),
-    ] = None,
-    limit: Annotated[
-        int | None,
-        typer.Option("--limit", help="Optional limit on number of results shown"),
-    ] = None,
-    as_json: Annotated[
-        bool,
-        typer.Option("--json", help="Output as JSON"),
-    ] = False,
-) -> None:
-    """List all scenarios under `pas/scenarios/benchmark` with optional filters."""
-    listings = _load_benchmark_scenarios(benchmark_dir)
+def _scenario_to_listing(scenario: PASScenario, metadata: dict[str, dict[str, Any]]) -> BenchmarkScenarioListing:
+    scenario_id = str(getattr(scenario, "scenario_id", "")).strip()
+    scenario_class = scenario.__class__
+    file_path = Path(inspect.getfile(scenario_class)).resolve()
+    meta = metadata.get(scenario_id, {})
 
-    required_apps = set(_expand_csv_list(apps))
-    if id_contains:
-        needle = id_contains.lower()
-        listings = [s for s in listings if needle in s.scenario_id.lower()]
+    description = None
+    if isinstance(meta, dict) and isinstance(meta.get("description"), str):
+        description = meta["description"].strip() or None
+    else:
+        class_doc = inspect.getdoc(scenario_class)
+        if isinstance(class_doc, str):
+            description = class_doc.strip() or None
 
-    if required_apps:
-        filtered: list[BenchmarkScenarioListing] = []
-        for item in listings:
-            item_apps = set(item.apps)
-            if required_apps.issubset(item_apps):
-                filtered.append(item)
-        listings = filtered
+    return BenchmarkScenarioListing(
+        scenario_id=scenario_id,
+        class_name=getattr(scenario_class, "__name__", None),
+        file_path=file_path,
+        apps=_load_apps_for_listing(scenario_id, scenario, metadata),
+        description=description,
+    )
 
-    if limit is not None:
-        listings = listings[: max(0, limit)]
 
+def _emit_listings(listings: list[BenchmarkScenarioListing], *, as_json: bool) -> None:
     if as_json:
         payload = [
             {
@@ -220,6 +261,149 @@ def list_scenarios(  # noqa: C901
             if first_line:
                 typer.echo(f"  Description: {first_line}")
         typer.echo("")
+
+
+@app.command("list")
+def list_scenarios(
+    benchmark_dir: Annotated[
+        Path,
+        typer.Option("--benchmark-dir", help="Scenario directory to load via PAS registry"),
+    ] = _DEFAULT_BENCHMARK_DIR,
+    apps: Annotated[
+        list[str] | None,
+        typer.Option("--apps", "-a", help="Filter by required apps (repeat or comma-separate)"),
+    ] = None,
+    id_contains: Annotated[
+        str | None,
+        typer.Option("--id-contains", help="Only include scenario_ids containing this substring"),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Optional limit on number of results shown"),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """List registered PAS scenarios from the selected `pas/scenarios/*` directory."""
+    listings = _load_registered_scenario_listings(benchmark_dir)
+
+    required_apps = set(_expand_csv_list(apps))
+    if id_contains:
+        needle = id_contains.lower()
+        listings = [s for s in listings if needle in s.scenario_id.lower()]
+
+    if required_apps:
+        filtered: list[BenchmarkScenarioListing] = []
+        for item in listings:
+            item_apps = set(item.apps)
+            if required_apps.issubset(item_apps):
+                filtered.append(item)
+        listings = filtered
+
+    if limit is not None:
+        listings = listings[: max(0, limit)]
+
+    _emit_listings(listings, as_json=as_json)
+
+
+@app.command("split")
+def list_split_scenarios(
+    split: Annotated[
+        Split,
+        typer.Option("--split", help="Benchmark split to list"),
+    ] = Split.FULL,
+    benchmark_dir: Annotated[
+        Path,
+        typer.Option("--benchmark-dir", help="Scenario directory to load via PAS registry"),
+    ] = _DEFAULT_BENCHMARK_DIR,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Optional limit on number of results shown"),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """List scenarios referenced by a benchmark split file."""
+    metadata = _load_scenario_metadata(_SCENARIO_METADATA_PATH)
+    with _temporary_scenarios_dir(benchmark_dir):
+        scenarios = list(load_scenarios_by_split(split=split, limit=limit))
+    listings = [_scenario_to_listing(scenario, metadata) for scenario in scenarios]
+    _emit_listings(listings, as_json=as_json)
+
+
+@app.command("check-ids-file")
+def check_ids_file(
+    file_path: Annotated[
+        Path,
+        typer.Argument(help="Path to a file containing one scenario ID per line"),
+    ],
+    benchmark_dir: Annotated[
+        Path,
+        typer.Option("--benchmark-dir", help="Scenario directory to validate against via PAS registry"),
+    ] = _DEFAULT_BENCHMARK_DIR,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Validate that scenario IDs from a file exist in the selected PAS scenario directory."""
+    scenario_ids = load_scenario_ids_from_file(file_path)
+    registered_ids = set(_load_registered_scenario_ids(benchmark_dir))
+    present = [scenario_id for scenario_id in scenario_ids if scenario_id in registered_ids]
+    missing = [scenario_id for scenario_id in scenario_ids if scenario_id not in registered_ids]
+
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "file": str(file_path),
+                    "benchmark_dir": str(benchmark_dir),
+                    "total_ids": len(scenario_ids),
+                    "present_ids": present,
+                    "missing_ids": missing,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        if missing:
+            raise typer.Exit(code=1)
+        return
+
+    typer.echo(f"Checked {len(scenario_ids)} scenario IDs from {file_path}")
+    typer.echo(f"Scenario directory: {benchmark_dir}")
+    typer.echo(f"Present: {len(present)}")
+    typer.echo(f"Missing: {len(missing)}")
+    if missing:
+        typer.echo("Missing IDs:")
+        for scenario_id in missing:
+            typer.echo(f"- {scenario_id}")
+        raise typer.Exit(code=1)
+
+
+@app.command("splits")
+def show_splits_info(
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Show the benchmark splits directory and available split files."""
+    splits_dir = get_splits_dir()
+    available = sorted(path.stem for path in splits_dir.glob("*.txt")) if splits_dir.exists() else []
+
+    if as_json:
+        typer.echo(
+            json.dumps({"splits_dir": str(splits_dir), "available_splits": available}, indent=2, ensure_ascii=False)
+        )
+        return
+
+    typer.echo(f"Splits directory: {splits_dir}")
+    typer.echo(f"Available splits: {', '.join(available) if available else '(none found)'}")
 
 
 @app.command()

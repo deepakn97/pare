@@ -89,13 +89,13 @@ class ScenarioGeneratingAgentOrchestrator:
         self.output_dir = Path(output_dir) if output_dir is not None else self.trajectory_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Directory that holds the canonical seed scenario plus the single
-        # editable working copy used by all Claude-backed steps.
+        # Directory that holds the single editable working copy plus the final
+        # exported scenarios produced by the multi-step generator.
         #
         # IMPORTANT: this directory must live directly under `pas/scenarios/`
-        # so that `PAS_SCENARIOS_DIR=<dir_name>` can discover and import the
-        # working file as `pas.scenarios.<dir_name>.<module>`.
-        self.seed_scenarios_dir = self.repo_root / "scenarios" / "default_generation_output"
+        # so that `PAS_SCENARIOS_DIR=generator` can discover and import the
+        # working file as `pas.scenarios.generator.<module>`.
+        self.seed_scenarios_dir = generator_dir
         self.seed_scenarios_dir.mkdir(parents=True, exist_ok=True)
 
         # Use the editable_seed_scenario-based working file so Claude Agent can
@@ -986,7 +986,7 @@ class ScenarioGeneratingAgentOrchestrator:
         1. Reads `editable_seed_scenario.py` and extracts the PASScenario class
            name (e.g., `MyScenarioName`).
         2. Copies the final scenario into
-           `pas/scenarios/default_generation_output/MyScenarioName.py`.
+           `pas/scenarios/generator/MyScenarioName.py`.
         3. Resets `editable_seed_scenario.py` back to the original seed template
            so the next multi-step run starts from a clean, canonical file.
         """
@@ -1128,7 +1128,7 @@ class ScenarioGeneratingAgentOrchestrator:
         # this environment variable when `registry.get_scenario(...)` is first
         # called inside `run_demo`.
         scenarios_dir_name = artifact_path.parent.name
-        existing_dirs = os.getenv("PAS_SCENARIOS_DIR", "user_scenarios")
+        existing_dirs = os.getenv("PAS_SCENARIOS_DIR", "benchmark")
         dirs = [d.strip() for d in existing_dirs.split(",") if d.strip()]
         if scenarios_dir_name not in dirs:
             dirs.append(scenarios_dir_name)
