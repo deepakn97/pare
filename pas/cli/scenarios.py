@@ -50,6 +50,14 @@ def _expand_csv_list(values: list[str] | None) -> list[str]:
     return expanded
 
 
+def _configured_scenarios_dir_inputs(scenarios_dirs: list[str] | None = None) -> list[str]:
+    configured = _expand_csv_list(scenarios_dirs)
+    if not configured:
+        env_value = os.getenv("PAS_SCENARIOS_DIR", "benchmark")
+        configured = [part.strip() for part in env_value.split(",") if part.strip()]
+    return list(dict.fromkeys(configured or ["benchmark"]))
+
+
 def _load_scenario_metadata(path: Path) -> dict[str, dict[str, Any]]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -91,8 +99,10 @@ def _reset_pas_registry_discovery_state() -> None:
         scenarios.clear()
 
 
-def _resolve_registry_dir_name(scenarios_dir: Path) -> tuple[Path, str]:
-    resolved_dir = scenarios_dir.resolve()
+def _resolve_registry_dir_name(scenarios_dir: str | Path) -> tuple[Path, str]:
+    raw_dir = Path(scenarios_dir)
+    candidate_dir = raw_dir if raw_dir.is_absolute() else _SCENARIOS_BASE_DIR / raw_dir
+    resolved_dir = candidate_dir.resolve()
     if not resolved_dir.exists():
         raise typer.BadParameter(f"Scenario directory does not exist: {resolved_dir}")
     if not resolved_dir.is_dir():
@@ -107,14 +117,18 @@ def _resolve_registry_dir_name(scenarios_dir: Path) -> tuple[Path, str]:
 
 
 @contextmanager
-def _temporary_scenarios_dir(scenarios_dir: Path) -> Iterator[tuple[Path, str]]:
-    _, scenarios_dir_name = _resolve_registry_dir_name(scenarios_dir)
+def _temporary_scenarios_dirs(scenarios_dirs: list[str] | None = None) -> Iterator[list[Path]]:
+    resolved_dirs_with_names = [
+        _resolve_registry_dir_name(dir_input) for dir_input in _configured_scenarios_dir_inputs(scenarios_dirs)
+    ]
+    resolved_dirs = [path for path, _ in resolved_dirs_with_names]
+    scenarios_dir_names = [dir_name for _, dir_name in resolved_dirs_with_names]
     previous_dirs = os.environ.get("PAS_SCENARIOS_DIR")
 
     try:
-        os.environ["PAS_SCENARIOS_DIR"] = scenarios_dir_name
+        os.environ["PAS_SCENARIOS_DIR"] = ",".join(scenarios_dir_names)
         _reset_pas_registry_discovery_state()
-        yield _resolve_registry_dir_name(scenarios_dir)
+        yield resolved_dirs
     finally:
         if previous_dirs is None:
             os.environ.pop("PAS_SCENARIOS_DIR", None)
@@ -123,19 +137,22 @@ def _temporary_scenarios_dir(scenarios_dir: Path) -> Iterator[tuple[Path, str]]:
         _reset_pas_registry_discovery_state()
 
 
-def _scenario_file_belongs_to_dir(file_path: Path, scenarios_dir: Path) -> bool:
-    try:
-        file_path.resolve().relative_to(scenarios_dir.resolve())
-    except ValueError:
-        return False
-    else:
-        return True
+def _scenario_file_belongs_to_dirs(file_path: Path, scenarios_dirs: list[Path]) -> bool:
+    resolved_file = file_path.resolve()
+    for scenarios_dir in scenarios_dirs:
+        try:
+            resolved_file.relative_to(scenarios_dir.resolve())
+        except ValueError:
+            continue
+        else:
+            return True
+    return False
 
 
-def _load_registered_scenario_ids(scenarios_dir: Path) -> list[str]:
+def _load_registered_scenario_ids(scenarios_dirs: list[str] | None = None) -> list[str]:
     from pas.scenarios import registry
 
-    with _temporary_scenarios_dir(scenarios_dir):
+    with _temporary_scenarios_dirs(scenarios_dirs):
         return sorted(registry.get_all_scenarios().keys())
 
 
@@ -159,12 +176,12 @@ def _load_apps_for_listing(scenario_id: str, scenario: PASScenario, metadata: di
     return sorted(dict.fromkeys(app_names))
 
 
-def _load_registered_scenario_listings(scenarios_dir: Path) -> list[BenchmarkScenarioListing]:
-    resolved_dir, _ = _resolve_registry_dir_name(scenarios_dir)
-    metadata = _load_scenario_metadata(_SCENARIO_METADATA_PATH)
-    scenario_ids = _load_registered_scenario_ids(resolved_dir)
+def _load_registered_scenario_listings(scenarios_dirs: list[str] | None = None) -> list[BenchmarkScenarioListing]:
+    from pas.scenarios import registry
 
-    with _temporary_scenarios_dir(resolved_dir):
+    metadata = _load_scenario_metadata(_SCENARIO_METADATA_PATH)
+    with _temporary_scenarios_dirs(scenarios_dirs) as resolved_dirs:
+        scenario_ids = sorted(registry.get_all_scenarios().keys())
         scenarios = list(load_scenarios_from_registry(scenario_ids=scenario_ids))
 
     listings: list[BenchmarkScenarioListing] = []
@@ -181,7 +198,7 @@ def _load_registered_scenario_listings(scenarios_dir: Path) -> list[BenchmarkSce
             logger.warning("Skipping scenario %s because its source file could not be determined", scenario_id)
             continue
 
-        if not _scenario_file_belongs_to_dir(file_path, resolved_dir):
+        if not _scenario_file_belongs_to_dirs(file_path, resolved_dirs):
             continue
 
         meta = metadata.get(scenario_id, {})
@@ -204,6 +221,57 @@ def _load_registered_scenario_listings(scenarios_dir: Path) -> list[BenchmarkSce
         )
 
     return listings
+
+
+@app.callback(invoke_without_command=True)
+def scenarios_root(
+    ctx: typer.Context,
+    list_only: Annotated[
+        bool,
+        typer.Option("--list", help="Alias for `pas scenarios list`"),
+    ] = False,
+    scenarios_dirs: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--scenarios-dir",
+            "--benchmark-dir",
+            help=(
+                "Scenario directories under pas/scenarios/ (repeat or comma-separate). "
+                "Defaults to PAS_SCENARIOS_DIR or benchmark."
+            ),
+        ),
+    ] = None,
+    apps: Annotated[
+        list[str] | None,
+        typer.Option("--apps", "-a", help="Filter by required apps (repeat or comma-separate)"),
+    ] = None,
+    id_contains: Annotated[
+        str | None,
+        typer.Option("--id-contains", help="Only include scenario_ids containing this substring"),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Optional limit on number of results shown"),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Handle root-level shortcuts such as `pas scenarios --list`."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if list_only:
+        ctx.invoke(
+            list_scenarios,
+            scenarios_dirs=scenarios_dirs,
+            apps=apps,
+            id_contains=id_contains,
+            limit=limit,
+            as_json=as_json,
+        )
+        return
+    typer.echo(ctx.get_help())
 
 
 def _scenario_to_listing(scenario: PASScenario, metadata: dict[str, dict[str, Any]]) -> BenchmarkScenarioListing:
@@ -265,10 +333,17 @@ def _emit_listings(listings: list[BenchmarkScenarioListing], *, as_json: bool) -
 
 @app.command("list")
 def list_scenarios(
-    benchmark_dir: Annotated[
-        Path,
-        typer.Option("--benchmark-dir", help="Scenario directory to load via PAS registry"),
-    ] = _DEFAULT_BENCHMARK_DIR,
+    scenarios_dirs: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--scenarios-dir",
+            "--benchmark-dir",
+            help=(
+                "Scenario directories under pas/scenarios/ (repeat or comma-separate). "
+                "Defaults to PAS_SCENARIOS_DIR or benchmark."
+            ),
+        ),
+    ] = None,
     apps: Annotated[
         list[str] | None,
         typer.Option("--apps", "-a", help="Filter by required apps (repeat or comma-separate)"),
@@ -286,8 +361,8 @@ def list_scenarios(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """List registered PAS scenarios from the selected `pas/scenarios/*` directory."""
-    listings = _load_registered_scenario_listings(benchmark_dir)
+    """List registered PAS scenarios from configured scenario directories."""
+    listings = _load_registered_scenario_listings(scenarios_dirs)
 
     required_apps = set(_expand_csv_list(apps))
     if id_contains:
@@ -314,10 +389,17 @@ def list_split_scenarios(
         Split,
         typer.Option("--split", help="Benchmark split to list"),
     ] = Split.FULL,
-    benchmark_dir: Annotated[
-        Path,
-        typer.Option("--benchmark-dir", help="Scenario directory to load via PAS registry"),
-    ] = _DEFAULT_BENCHMARK_DIR,
+    scenarios_dirs: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--scenarios-dir",
+            "--benchmark-dir",
+            help=(
+                "Scenario directories under pas/scenarios/ (repeat or comma-separate). "
+                "Defaults to PAS_SCENARIOS_DIR or benchmark."
+            ),
+        ),
+    ] = None,
     limit: Annotated[
         int | None,
         typer.Option("--limit", help="Optional limit on number of results shown"),
@@ -329,7 +411,7 @@ def list_split_scenarios(
 ) -> None:
     """List scenarios referenced by a benchmark split file."""
     metadata = _load_scenario_metadata(_SCENARIO_METADATA_PATH)
-    with _temporary_scenarios_dir(benchmark_dir):
+    with _temporary_scenarios_dirs(scenarios_dirs):
         scenarios = list(load_scenarios_by_split(split=split, limit=limit))
     listings = [_scenario_to_listing(scenario, metadata) for scenario in scenarios]
     _emit_listings(listings, as_json=as_json)
@@ -341,18 +423,26 @@ def check_ids_file(
         Path,
         typer.Argument(help="Path to a file containing one scenario ID per line"),
     ],
-    benchmark_dir: Annotated[
-        Path,
-        typer.Option("--benchmark-dir", help="Scenario directory to validate against via PAS registry"),
-    ] = _DEFAULT_BENCHMARK_DIR,
+    scenarios_dirs: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--scenarios-dir",
+            "--benchmark-dir",
+            help=(
+                "Scenario directories under pas/scenarios/ (repeat or comma-separate). "
+                "Defaults to PAS_SCENARIOS_DIR or benchmark."
+            ),
+        ),
+    ] = None,
     as_json: Annotated[
         bool,
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Validate that scenario IDs from a file exist in the selected PAS scenario directory."""
+    """Validate that scenario IDs from a file exist in the configured PAS scenario directories."""
     scenario_ids = load_scenario_ids_from_file(file_path)
-    registered_ids = set(_load_registered_scenario_ids(benchmark_dir))
+    configured_dirs = _configured_scenarios_dir_inputs(scenarios_dirs)
+    registered_ids = set(_load_registered_scenario_ids(scenarios_dirs))
     present = [scenario_id for scenario_id in scenario_ids if scenario_id in registered_ids]
     missing = [scenario_id for scenario_id in scenario_ids if scenario_id not in registered_ids]
 
@@ -361,7 +451,7 @@ def check_ids_file(
             json.dumps(
                 {
                     "file": str(file_path),
-                    "benchmark_dir": str(benchmark_dir),
+                    "scenarios_dirs": configured_dirs,
                     "total_ids": len(scenario_ids),
                     "present_ids": present,
                     "missing_ids": missing,
@@ -375,7 +465,7 @@ def check_ids_file(
         return
 
     typer.echo(f"Checked {len(scenario_ids)} scenario IDs from {file_path}")
-    typer.echo(f"Scenario directory: {benchmark_dir}")
+    typer.echo(f"Scenario directories: {', '.join(configured_dirs)}")
     typer.echo(f"Present: {len(present)}")
     typer.echo(f"Missing: {len(missing)}")
     if missing:
