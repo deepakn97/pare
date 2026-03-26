@@ -293,6 +293,12 @@ def maybe_load_cached_result(
             logger.debug(f"Cache invalidated for {scenario.scenario_id} due to config/scenario changes")
             return None
 
+        if cached_result.exception_type is not None:
+            logger.info(
+                f"Ignoring cached result with exception for {scenario.scenario_id}: {cached_result.exception_type}"
+            )
+            return None
+
         logger.info(f"Loading cached result for scenario {scenario.scenario_id}")
         return cached_result.to_scenario_result()
 
