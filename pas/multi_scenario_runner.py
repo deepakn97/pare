@@ -8,6 +8,7 @@ import itertools
 import logging
 import multiprocessing
 import os
+import shutil
 import signal
 import sys
 import tempfile
@@ -172,12 +173,41 @@ def maybe_run_scenario(
 
         cached_result = maybe_load_cached_result(config, scenario)
         if cached_result is not None:
-            run_number = getattr(scenario, "run_number", None)
-            log_msg = f"Found cached result, skipping scenario {scenario.scenario_id}"
-            if run_number is not None:
-                log_msg += f", run: {run_number}"
-            logger.warning(log_msg)
-            return cached_result
+            # Cached result found
+            if config.export and config.output_dir:
+                # Check if cached export exists
+                run_number = getattr(scenario, "run_number", None)
+                suffix = f"_run_{run_number}" if run_number is not None else ""
+                expected_path = Path(config.output_dir) / f"{scenario.scenario_id}{suffix}.json"
+
+                if not expected_path.exists():
+                    # Trace doesn't exist in the output dir, check export path in cache
+                    cached_export = cached_result.export_path
+                    if cached_export and Path(cached_export).exists():
+                        # Copy from cached trace to expected output directory
+                        Path(expected_path).parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(cached_export, expected_path)
+                        logger.warning(f"Copied trace from {cached_export} to {expected_path}")
+                        return cached_result
+                    else:
+                        # Trace not found anywhere, run scenario again to regenerate trace
+                        log_msg = f"Cache hit but trace missing, running scenario {scenario.scenario_id}"
+                        if run_number is not None:
+                            log_msg += f", run: {run_number}"
+                        logger.warning(log_msg)
+                else:
+                    log_msg = f"Found cached result and trace, skipping scenario {scenario.scenario_id}"
+                    if run_number is not None:
+                        log_msg += f", run: {run_number}"
+                    logger.warning(log_msg)
+                    return cached_result
+            else:
+                run_number = getattr(scenario, "run_number", None)
+                log_msg = f"Found cached result and export disabled, skipping scenario {scenario.scenario_id}"
+                if run_number is not None:
+                    log_msg += f", run: {run_number}"
+                logger.warning(log_msg)
+                return cached_result
 
     # Run the scenario
     result = runner.run(config, scenario)
