@@ -231,3 +231,6 @@ bedrock_models.json
 
 # Annotation data
 data/annotations/
+
+# Git worktrees
+.worktrees/
