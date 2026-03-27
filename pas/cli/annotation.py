@@ -546,21 +546,31 @@ def evaluate(
     runs: Annotated[
         int,
         typer.Option("--runs", "-r", help="Number of runs per (sample, user_model) pair"),
-    ] = 4,
+    ] = 3,
     smoke_test: Annotated[
         bool,
         typer.Option("--smoke-test", help="Only process 10 samples for quick validation"),
     ] = False,
+    max_workers: Annotated[
+        int | None,
+        typer.Option(
+            "--max-workers", help="Number of parallel worker threads (default: min(len(user_models), cpu_count))"
+        ),
+    ] = None,
 ) -> None:
     """Evaluate user models on sampled decision points via single-shot queries.
 
-    Loads llm_input from traces for each sampled decision point, fires it at each
-    candidate user model, and records accept/reject decisions. Outputs a unified
-    evaluation dataframe.
+    Loads llm_input from samples parquet, fires it at each candidate user model,
+    and records ternary decisions (accept/reject/gather_context). Outputs both
+    raw evaluation results and aggregated soft labels.
     """
     import polars as pl
 
-    from pas.annotation.evaluator import evaluate_samples, print_evaluation_summary
+    from pas.annotation.evaluator import (
+        aggregate_evaluations,
+        evaluate_samples_ternary,
+        print_evaluation_summary_ternary,
+    )
     from pas.cli.utils import MODELS_MAP
 
     # Load samples
@@ -585,24 +595,33 @@ def evaluate(
     if target_model_list:
         typer.echo(f"Filtering to proactive models: {target_model_list}")
     typer.echo(f"Runs per sample: {runs}")
+    if max_workers:
+        typer.echo(f"Max workers: {max_workers}")
     if smoke_test:
         typer.echo("Smoke test mode: using only 10 samples")
 
     # Run evaluation
-    eval_df = evaluate_samples(
+    eval_df = evaluate_samples_ternary(
         samples_df=samples_df,
         user_models=user_model_list,
         models_map=MODELS_MAP,
         runs=runs,
         target_models=target_model_list,
         smoke_test=smoke_test,
+        max_workers=max_workers,
     )
 
-    # Save results
+    # Save raw results
     output_file = ensure_extension(output.resolve(), ".parquet")
     output_file.parent.mkdir(parents=True, exist_ok=True)
     eval_df.write_parquet(output_file)
-    typer.echo(f"\nResults saved to {output_file}")
+    typer.echo(f"\nRaw results saved to {output_file}")
+
+    # Aggregate and save soft labels
+    aggregated_df = aggregate_evaluations(eval_df)
+    aggregated_file = output_file.with_name(output_file.stem + "_aggregated.parquet")
+    aggregated_df.write_parquet(aggregated_file)
+    typer.echo(f"Aggregated results saved to {aggregated_file}")
 
     # Print summary
-    print_evaluation_summary(eval_df, original_samples_df=samples_df)
+    print_evaluation_summary_ternary(eval_df, original_samples_df=samples_df)
