@@ -18,6 +18,7 @@ from pas.annotation.trace_parser import (
     parse_trace,
     trace_uses_messages_app,
 )
+from pas.trajectory.models import DecisionPoint as TernaryDecisionPoint  # noqa: TC001
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,69 @@ def balanced_sample(  # noqa: C901
     accepts_count = len([s for s in selected if s.user_agent_decision])
     rejects_count = len(selected) - accepts_count
     logger.info(f"Selected {len(selected)} samples: {accepts_count} accepts, {rejects_count} rejects")
+
+    return selected
+
+
+def balanced_sample_ternary(
+    candidates: list[TernaryDecisionPoint],
+    sample_size: int,
+    seed: int | None = None,
+) -> list[TernaryDecisionPoint]:
+    """Sample decision points with balanced accept/reject/gather_context distribution.
+
+    Algorithm: Three-way balanced sampling. Cycle through pools (accept, reject, gather_context)
+    drawing one sample per cycle. If a pool is exhausted, skip to next. Stop when target count
+    reached or all pools empty.
+
+    Args:
+        candidates: List of candidate decision points.
+        sample_size: Number of samples to select.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        List of selected TernaryDecisionPoint objects.
+    """
+    if seed is not None:
+        random.seed(seed)
+
+    # Separate by decision type
+    accepts = [c for c in candidates if c.user_agent_decision == "accept"]
+    rejects = [c for c in candidates if c.user_agent_decision == "reject"]
+    gather_contexts = [c for c in candidates if c.user_agent_decision == "gather_context"]
+
+    # Shuffle all pools
+    random.shuffle(accepts)
+    random.shuffle(rejects)
+    random.shuffle(gather_contexts)
+
+    selected: list[TernaryDecisionPoint] = []
+    pools = [accepts, rejects, gather_contexts]
+
+    # Cycle through pools until we reach sample_size or all pools are empty
+    while len(selected) < sample_size:
+        any_picked = False
+
+        for pool in pools:
+            if len(selected) >= sample_size:
+                break
+            if pool:
+                selected.append(pool.pop(0))
+                any_picked = True
+
+        # If no pool had any items, break
+        if not any_picked:
+            logger.warning(f"Ran out of candidates after selecting {len(selected)} samples")
+            break
+
+    # Log balance statistics
+    accepts_count = len([s for s in selected if s.user_agent_decision == "accept"])
+    rejects_count = len([s for s in selected if s.user_agent_decision == "reject"])
+    gather_context_count = len([s for s in selected if s.user_agent_decision == "gather_context"])
+    logger.info(
+        f"Selected {len(selected)} samples: {accepts_count} accepts, {rejects_count} rejects, "
+        f"{gather_context_count} gather_context"
+    )
 
     return selected
 
