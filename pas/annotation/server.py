@@ -24,7 +24,7 @@ class AnnotationRequest(BaseModel):
     """Request body for submitting an annotation."""
 
     sample_id: str
-    decision: bool
+    decision: bool | str
 
 
 class AnnotationServer:
@@ -132,7 +132,7 @@ class AnnotationServer:
         self,
         sample_id: str,
         annotator_id: str,
-        human_decision: bool,
+        human_decision: bool | str,
     ) -> bool:
         """Record an annotation.
 
@@ -160,7 +160,7 @@ class AnnotationServer:
             annotation = Annotation.create(
                 sample_id=sample_id,
                 annotator_id=annotator_id,
-                human_decision=human_decision,
+                human_decision=str(human_decision),
             )
 
             # Append to file
