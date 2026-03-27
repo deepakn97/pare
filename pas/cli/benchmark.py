@@ -637,3 +637,60 @@ def sweep(
     typer.echo(f"\nBenchmark complete: {len(configs)} configs")
     for config_result in json_report.get("per_config_results", []):
         typer.echo(f"  {config_result['proactive_model']}: {config_result['success_rate']:.1f}% success")
+
+
+@app.command()
+def report(
+    results_dir: Annotated[
+        Path,
+        typer.Option("--results-dir", "-d", help="Path to results directory containing *_result.json files"),
+    ],
+    split: Annotated[
+        str,
+        typer.Option("--split", "-s", help="Dataset split name for report header"),
+    ] = "full",
+) -> None:
+    """Generate combined report from existing per-model result files.
+
+    Reads all *_result.json files from the given directory, combines them
+    into a single DataFrame, and generates combined JSON and text reports.
+    """
+    import polars as pl
+
+    from pas.scenarios.validation_result import PAS_RESULT_SCHEMA
+
+    results_dir = results_dir.resolve()
+    if not results_dir.exists():
+        typer.echo(f"Error: Results directory not found: {results_dir}", err=True)
+        raise typer.Exit(code=1)
+
+    # Find all individual result files (exclude combined_result.json)
+    result_files = sorted(results_dir.glob("*_result.json"))
+    result_files = [f for f in result_files if f.name != "combined_result.json"]
+
+    if not result_files:
+        typer.echo(f"Error: No result files found in {results_dir}", err=True)
+        raise typer.Exit(code=1)
+
+    # Load and combine
+    dataframes = []
+    for f in result_files:
+        with open(f) as fh:
+            data = json.load(fh)
+        df = pl.DataFrame(data, schema=PAS_RESULT_SCHEMA)
+        dataframes.append(df)
+        typer.echo(f"  Loaded {f.name}: {len(df)} rows")
+
+    combined_df = pl.concat(dataframes, how="vertical")
+    typer.echo(f"\nCombined: {len(combined_df)} total rows from {len(result_files)} files")
+
+    # Generate reports
+    json_report = generate_json_stats_report(combined_df, split)
+    text_report = generate_validation_report(combined_df, split)
+
+    # Save
+    save_json_result(results_dir / "combined_result.json", json_report)
+    save_text_report(results_dir / "combined_report.txt", text_report)
+
+    typer.echo(f"\nSaved combined_result.json and combined_report.txt to {results_dir}")
+    typer.echo(f"\n{text_report}")
