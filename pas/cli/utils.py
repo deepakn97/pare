@@ -31,19 +31,11 @@ MODELS_MAP = {
     "gpt-5": {"model_name": "gpt-5", "provider": "openai"},
     "gpt-oss-20b": {"model_name": "accounts/fireworks/models/gpt-oss-20b", "provider": "fireworks_ai"},
     "gpt-oss-120b": {"model_name": "accounts/fireworks/models/gpt-oss-120b", "provider": "fireworks_ai"},
+    # ANTHROPIC Models
+    "claude-4.5-sonnet": {"model_name": "claude-sonnet-4-5-20250929", "provider": "anthropic"},
+    "claude-4.5-haiku": {"model_name": "claude-haiku-4-5-20251001", "provider": "anthropic"},
+    "claude-4.5-opus": {"model_name": "claude-opus-4-5-20251101", "provider": "anthropic"},
     # BEDROCK Models
-    "claude-4.5-sonnet": {
-        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        "provider": "bedrock",
-    },
-    "claude-4.5-haiku": {
-        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "provider": "bedrock",
-    },
-    "claude-4.5-opus": {
-        "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/us.anthropic.claude-opus-4-5-20251101-v1:0",
-        "provider": "bedrock",
-    },
     "llama-4-scout": {
         "model_name": "arn:aws:bedrock:us-east-1:288380904485:inference-profile/us.meta.llama4-scout-17b-instruct-v1:0",
         "provider": "bedrock",
@@ -70,10 +62,13 @@ MODELS_MAP = {
         "provider": "fireworks_ai",
     },
     "qwen-3-4b-it": {
-        "model_name": "accounts/eric-lab/deployments/zwbkwsbz",
+        "model_name": "accounts/eric-lab/deployments/dsvhze7q",
         "provider": "fireworks_ai",
     },
     "ministral-3-3b-it": {"model_name": "accounts/eric-lab/deployments/ncvfom3m", "provider": "fireworks_ai"},
+    # GEMINI Models
+    "gemini-3-pro": {"model_name": "gemini/gemini-3-pro-preview", "provider": "gemini"},
+    "gemini-3-flash": {"model_name": "gemini/gemini-3-flash-preview", "provider": "gemini"},
 }
 
 

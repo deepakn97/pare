@@ -22,6 +22,8 @@ import matplotlib.pyplot as plt
 # Model display names
 MODEL_DISPLAY_NAMES = {
     "claude-4.5-sonnet": "Claude 4.5 Sonnet",
+    "gpt-5": "GPT-5",
+    "gemini-3-pro": "Gemini 3 Pro",
     "qwen-3-4b-it": "Qwen3-4B",
     "gemma-3-4b-it": "Gemma3-4B",
     "llama-3.2-3b-it": "Llama3.2-3B",
@@ -30,6 +32,8 @@ MODEL_DISPLAY_NAMES = {
 # Markers for different models
 MODEL_MARKERS = {
     "claude-4.5-sonnet": "o",
+    "gpt-5": "P",
+    "gemini-3-pro": "X",
     "qwen-3-4b-it": "s",
     "gemma-3-4b-it": "^",
     "llama-3.2-3b-it": "D",
@@ -38,6 +42,8 @@ MODEL_MARKERS = {
 # Colors for different models (colorblind-friendly)
 MODEL_COLORS = {
     "claude-4.5-sonnet": "#0072B2",  # blue
+    "gpt-5": "#D55E00",  # vermillion
+    "gemini-3-pro": "#56B4E9",  # sky blue
     "qwen-3-4b-it": "#E69F00",  # orange
     "gemma-3-4b-it": "#009E73",  # green
     "llama-3.2-3b-it": "#CC79A7",  # pink
