@@ -21,6 +21,11 @@ from pas.trajectory.models import DecisionPoint
 
 logger = logging.getLogger(__name__)
 
+# Search window sizes for finding llm_input logs near events
+# These values balance between finding nearby logs and avoiding full trace scans
+FORWARD_SEARCH_WINDOW = 50  # Max logs to search forward from proposal point
+BACKWARD_SEARCH_WINDOW = 30  # Max logs to search backward from decision point
+
 
 def extract_decision_points(
     trace_path: Path,
@@ -41,7 +46,18 @@ def extract_decision_points(
         data = json.load(f)
 
     logs = data.get("world_logs", [])
-    logs = [json.loads(log_entry) if isinstance(log_entry, str) else log_entry for log_entry in logs]
+    # Parse string-encoded log entries, skip malformed ones
+    parsed_logs = []
+    for log_entry in logs:
+        if isinstance(log_entry, str):
+            try:
+                parsed_logs.append(json.loads(log_entry))
+            except json.JSONDecodeError:
+                logger.warning(f"Malformed log entry in {trace_path}, skipping: {log_entry[:100]}")
+                continue
+        else:
+            parsed_logs.append(log_entry)
+    logs = parsed_logs
 
     # Check for RateLimitError
     raw_text = json.dumps(data)
@@ -250,12 +266,16 @@ def _find_llm_input_after(
     logs: list[dict[str, Any]], start_idx: int, user_id: str
 ) -> tuple[int, list[dict[str, Any]]] | None:
     """Find the user agent's llm_input after a given index."""
-    for i in range(start_idx + 1, min(start_idx + 50, len(logs))):
+    for i in range(start_idx + 1, min(start_idx + FORWARD_SEARCH_WINDOW, len(logs))):
         log = logs[i]
         if log.get("log_type") == "llm_input" and log.get("agent_id") == user_id:
             content = log.get("content")
             if isinstance(content, str):
-                messages: list[dict[str, Any]] = json.loads(content)
+                try:
+                    messages: list[dict[str, Any]] = json.loads(content)
+                except json.JSONDecodeError:
+                    logger.warning(f"Malformed llm_input content at index {i}, skipping")
+                    continue
             else:
                 messages = content if isinstance(content, list) else []
             return i, messages
@@ -266,12 +286,16 @@ def _find_llm_input_before(
     logs: list[dict[str, Any]], end_idx: int, user_id: str
 ) -> tuple[int, list[dict[str, Any]]] | None:
     """Find the user agent's llm_input before a given index (searching backward)."""
-    for i in range(end_idx - 1, max(end_idx - 30, 0), -1):
+    for i in range(end_idx - 1, max(end_idx - BACKWARD_SEARCH_WINDOW, 0), -1):
         log = logs[i]
         if log.get("log_type") == "llm_input" and log.get("agent_id") == user_id:
             content = log.get("content")
             if isinstance(content, str):
-                messages: list[dict[str, Any]] = json.loads(content)
+                try:
+                    messages: list[dict[str, Any]] = json.loads(content)
+                except json.JSONDecodeError:
+                    logger.warning(f"Malformed llm_input content at index {i}, skipping")
+                    continue
             else:
                 messages = content if isinstance(content, list) else []
             return i, messages
