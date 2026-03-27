@@ -317,7 +317,12 @@ def process(  # noqa: C901
     """
     import polars as pl
 
-    from pas.annotation.metrics import compute_agreement_metrics, compute_per_model_agreement_metrics
+    from pas.annotation.metrics import (
+        compute_agreement_metrics,
+        compute_agreement_metrics_ternary,
+        compute_per_model_agreement_metrics,
+        compute_per_model_agreement_metrics_ternary,
+    )
 
     samples_file = ensure_extension(samples.resolve(), ".parquet")
     annotations_file = ensure_extension(annotations.resolve(), ".csv")
@@ -341,6 +346,9 @@ def process(  # noqa: C901
     typer.echo("Processing Annotations")
     typer.echo("=" * 60)
 
+    # Detect schema: ternary if user_agent_decision is string type
+    is_ternary = samples_df["user_agent_decision"].dtype == pl.String
+
     # Compute metrics
     # Per-model metrics from evaluation dataframe
     if evaluations_file is not None:
@@ -349,7 +357,13 @@ def process(  # noqa: C901
             raise typer.Exit(code=1)
 
         evaluations_df = pl.read_parquet(evaluations_file)
-        per_model_metrics = compute_per_model_agreement_metrics(evaluations_df, annotations_df, n_annotators)
+
+        if is_ternary:
+            per_model_metrics = compute_per_model_agreement_metrics_ternary(
+                evaluations_df, annotations_df, n_annotators
+            )
+        else:
+            per_model_metrics = compute_per_model_agreement_metrics(evaluations_df, annotations_df, n_annotators)
 
         typer.echo("\n=== Per-Model Agreement Metrics ===")
         for model_id, model_metrics in per_model_metrics.items():
@@ -358,10 +372,14 @@ def process(  # noqa: C901
             mv = model_metrics.get("majority_vote_metrics", {})
             typer.echo(f"  Accuracy: {mv.get('accuracy', 'N/A')}")
             typer.echo(f"  Cohen's Kappa: {mv.get('cohens_kappa', 'N/A')}")
-            typer.echo(f"  F1: {mv.get('f1', 'N/A')}")
+            if "f1" in mv:
+                typer.echo(f"  F1: {mv.get('f1', 'N/A')}")
         return
 
-    metrics = compute_agreement_metrics(samples_df, annotations_df, n_annotators)
+    if is_ternary:
+        metrics = compute_agreement_metrics_ternary(samples_df, annotations_df, n_annotators)
+    else:
+        metrics = compute_agreement_metrics(samples_df, annotations_df, n_annotators)
 
     # Display basic counts
     typer.echo(f"\nSamples analyzed: {metrics['n_samples']}")
@@ -388,25 +406,26 @@ def process(  # noqa: C901
     mv = metrics["majority_vote_metrics"]
     if mv["accuracy"] is not None:
         typer.echo(f"Accuracy:       {mv['accuracy']:.1%}")
-    if mv["precision"] is not None:
+    if mv.get("precision") is not None:
         typer.echo(f"Precision:      {mv['precision']:.1%}")
-    if mv["recall"] is not None:
+    if mv.get("recall") is not None:
         typer.echo(f"Recall:         {mv['recall']:.1%}")
-    if mv["f1"] is not None:
+    if mv.get("f1") is not None:
         typer.echo(f"F1 Score:       {mv['f1']:.3f}")
     if mv["cohens_kappa"] is not None:
         typer.echo(f"Cohen's Kappa:  {mv['cohens_kappa']:.3f} ({_interpret_kappa(mv['cohens_kappa'])})")
 
-    # Soft Label Alignment
-    typer.echo("\n" + "-" * 60)
-    typer.echo("SOFT LABEL ALIGNMENT")
-    typer.echo("-" * 60)
+    # Soft Label Alignment (binary only)
+    if not is_ternary and "soft_label_metrics" in metrics:
+        typer.echo("\n" + "-" * 60)
+        typer.echo("SOFT LABEL ALIGNMENT")
+        typer.echo("-" * 60)
 
-    sl = metrics["soft_label_metrics"]
-    if sl["cross_entropy"] is not None:
-        typer.echo(f"Cross-Entropy:  {sl['cross_entropy']:.3f}")
-    if sl["mae"] is not None:
-        typer.echo(f"MAE:            {sl['mae']:.3f}")
+        sl = metrics["soft_label_metrics"]
+        if sl["cross_entropy"] is not None:
+            typer.echo(f"Cross-Entropy:  {sl['cross_entropy']:.3f}")
+        if sl["mae"] is not None:
+            typer.echo(f"MAE:            {sl['mae']:.3f}")
 
     # Average Pairwise Model-Human Kappa
     typer.echo("\n" + "-" * 60)
@@ -433,36 +452,64 @@ def process(  # noqa: C901
             f"Fleiss' Kappa:        {metrics['fleiss_kappa_with_model']:.3f} ({_interpret_kappa(metrics['fleiss_kappa_with_model'])})"
         )
 
-    # Stratified Analysis
-    typer.echo("\n" + "-" * 60)
-    typer.echo("STRATIFIED ANALYSIS (by Human Consensus)")
-    typer.echo("-" * 60)
+    # Stratified Analysis (binary only)
+    if not is_ternary and "stratified_analysis" in metrics:
+        typer.echo("\n" + "-" * 60)
+        typer.echo("STRATIFIED ANALYSIS (by Human Consensus)")
+        typer.echo("-" * 60)
 
-    strat = metrics["stratified_analysis"]
-    if strat:
-        typer.echo(f"  {'Consensus Level':<16} {'Samples':>8} {'Accuracy':>10} {'Model Accept':>13}")
-        for level in ["unanimous", "high_agreement", "low_agreement"]:
-            if level in strat:
-                s = strat[level]
-                acc_str = f"{s['accuracy']:.1%}" if s["accuracy"] is not None else "N/A"
-                mar_str = f"{s['model_accept_rate']:.1%}" if s["model_accept_rate"] is not None else "N/A"
-                typer.echo(f"  {level:<16} {s['n_samples']:>8} {acc_str:>10} {mar_str:>13}")
+        strat = metrics["stratified_analysis"]
+        if strat:
+            typer.echo(f"  {'Consensus Level':<16} {'Samples':>8} {'Accuracy':>10} {'Model Accept':>13}")
+            for level in ["unanimous", "high_agreement", "low_agreement"]:
+                if level in strat:
+                    s = strat[level]
+                    acc_str = f"{s['accuracy']:.1%}" if s["accuracy"] is not None else "N/A"
+                    mar_str = f"{s['model_accept_rate']:.1%}" if s["model_accept_rate"] is not None else "N/A"
+                    typer.echo(f"  {level:<16} {s['n_samples']:>8} {acc_str:>10} {mar_str:>13}")
 
     # Decision Distribution
     typer.echo("\n" + "-" * 60)
     typer.echo("DECISION DISTRIBUTION")
     typer.echo("-" * 60)
 
-    typer.echo(f"Human accept rate:  {metrics['human_accept_rate']:.1%}")
-    typer.echo(f"Model accept rate:  {metrics['agent_accept_rate']:.1%}")
+    if is_ternary and "category_rates" in metrics:
+        cat_rates = metrics["category_rates"]
+        if "human" in cat_rates:
+            typer.echo("Human rates:")
+            typer.echo(f"  Accept:         {cat_rates['human']['accept']:.1%}")
+            typer.echo(f"  Reject:         {cat_rates['human']['reject']:.1%}")
+            typer.echo(f"  Gather Context: {cat_rates['human']['gather_context']:.1%}")
+        if "model" in cat_rates:
+            typer.echo("\nModel rates:")
+            typer.echo(f"  Accept:         {cat_rates['model']['accept']:.1%}")
+            typer.echo(f"  Reject:         {cat_rates['model']['reject']:.1%}")
+            typer.echo(f"  Gather Context: {cat_rates['model']['gather_context']:.1%}")
+    else:
+        typer.echo(f"Human accept rate:  {metrics.get('human_accept_rate', 0):.1%}")
+        typer.echo(f"Model accept rate:  {metrics.get('agent_accept_rate', 0):.1%}")
 
     # Per-annotator breakdown
     if metrics["per_annotator_stats"]:
         typer.echo("\nPer-annotator statistics:")
-        typer.echo(f"  {'Annotator':<12} {'Count':>6} {'Accept%':>8} {'Kappa w/Model':>14}")
-        for annotator_id, stats in sorted(metrics["per_annotator_stats"].items(), key=lambda x: -x[1]["count"]):
-            kappa_str = f"{stats['kappa_with_model']:.3f}" if stats["kappa_with_model"] is not None else "N/A"
-            typer.echo(f"  {annotator_id[:10]:<12} {stats['count']:>6} {stats['accept_rate']:>7.1%} {kappa_str:>14}")
+        if is_ternary:
+            typer.echo(
+                f"  {'Annotator':<12} {'Count':>6} {'Accept%':>8} {'Reject%':>8} {'Gather%':>8} {'Kappa w/Model':>14}"
+            )
+            for annotator_id, stats in sorted(metrics["per_annotator_stats"].items(), key=lambda x: -x[1]["count"]):
+                kappa_str = f"{stats['kappa_with_model']:.3f}" if stats["kappa_with_model"] is not None else "N/A"
+                typer.echo(
+                    f"  {annotator_id[:10]:<12} {stats['count']:>6} "
+                    f"{stats['accept_rate']:>7.1%} {stats['reject_rate']:>7.1%} "
+                    f"{stats['gather_context_rate']:>7.1%} {kappa_str:>14}"
+                )
+        else:
+            typer.echo(f"  {'Annotator':<12} {'Count':>6} {'Accept%':>8} {'Kappa w/Model':>14}")
+            for annotator_id, stats in sorted(metrics["per_annotator_stats"].items(), key=lambda x: -x[1]["count"]):
+                kappa_str = f"{stats['kappa_with_model']:.3f}" if stats["kappa_with_model"] is not None else "N/A"
+                typer.echo(
+                    f"  {annotator_id[:10]:<12} {stats['count']:>6} {stats['accept_rate']:>7.1%} {kappa_str:>14}"
+                )
 
     # Save detailed results if output specified
     if output:
