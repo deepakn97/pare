@@ -125,25 +125,34 @@ class Sample(BaseModel):
     proactive_model_id: str
     user_model_id: str
     trace_file: str
-    user_agent_decision: bool
+    user_agent_decision: str
     agent_proposal: str
     meta_task_description: str
-    decision_timestamp: float
-    context_json: str
+    llm_input: str
+    final_decision: bool
+    gather_context_delta: str | None = None
 
     def get_turns(self) -> list[Turn]:
-        """Parse and return the turns from context_json."""
-        context = json.loads(self.context_json)
-        return [Turn.from_dict(t) for t in context.get("turns", [])]
+        """Parse and return the turns from context_json.
+
+        Note: This method is kept for backward compatibility but is not used
+        by the new ternary decision pipeline.
+        """
+        raise NotImplementedError("get_turns() is not supported in the ternary decision pipeline")
 
     def to_api_response(self, progress_completed: int, progress_total: int) -> dict[str, Any]:
-        """Convert to API response format."""
-        turns = self.get_turns()
+        """Convert to API response format.
+
+        Note: This is a basic pass-through for new fields. UI update is deferred.
+        """
         return {
             "sample_id": self.sample_id,
             "scenario_context": self.meta_task_description if self.meta_task_description else None,
-            "turns": [t.to_dict() for t in turns],
             "agent_proposal": self.agent_proposal,
+            "user_agent_decision": self.user_agent_decision,
+            "final_decision": self.final_decision,
+            "llm_input": self.llm_input,
+            "gather_context_delta": self.gather_context_delta,
             "progress": {
                 "completed": progress_completed,
                 "total": progress_total,
@@ -157,17 +166,18 @@ class Annotation(BaseModel):
     annotation_id: str
     sample_id: str
     annotator_id: str
-    human_decision: bool
+    human_decision: str
+    gather_context_rationale: str | None = None
     timestamp: str
 
     @classmethod
-    def create(cls, sample_id: str, annotator_id: str, human_decision: bool) -> Annotation:
+    def create(cls, sample_id: str, annotator_id: str, human_decision: str) -> Annotation:
         """Create a new annotation record.
 
         Args:
             sample_id: The sample being annotated.
             annotator_id: The annotator's anonymous ID.
-            human_decision: The human's accept/reject decision.
+            human_decision: The human's accept/reject/gather_context decision.
 
         Returns:
             A new Annotation instance.
@@ -177,14 +187,16 @@ class Annotation(BaseModel):
             sample_id=sample_id,
             annotator_id=annotator_id,
             human_decision=human_decision,
+            gather_context_rationale=None,
             timestamp=datetime.now().isoformat(),
         )
 
     def to_csv_row(self) -> str:
         """Convert to CSV row string."""
-        return f"{self.annotation_id},{self.sample_id},{self.annotator_id},{self.human_decision},{self.timestamp}\n"
+        rationale = self.gather_context_rationale if self.gather_context_rationale else ""
+        return f"{self.annotation_id},{self.sample_id},{self.annotator_id},{self.human_decision},{rationale},{self.timestamp}\n"
 
     @classmethod
     def csv_header(cls) -> str:
         """Get CSV header row."""
-        return "annotation_id,sample_id,annotator_id,human_decision,timestamp\n"
+        return "annotation_id,sample_id,annotator_id,human_decision,gather_context_rationale,timestamp\n"
