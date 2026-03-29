@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -17,7 +19,11 @@ from pydantic import BaseModel
 
 @dataclass
 class ActionWithObservation:
-    """A single user action with its formatted observation."""
+    """A single user action with its formatted observation.
+
+    .. deprecated::
+        Part of old binary pipeline. Will be removed after UI update.
+    """
 
     action: str  # e.g., "Messages__open_conversation(conversation_id='fc78...')"
     observation: str  # Formatted, human-readable observation
@@ -27,7 +33,11 @@ class ActionWithObservation:
 
 @dataclass
 class Turn:
-    """A single turn of user interaction."""
+    """A single turn of user interaction.
+
+    .. deprecated::
+        Part of old binary pipeline. Will be removed after UI update.
+    """
 
     turn_number: int
     notifications: list[str] = field(default_factory=list)
@@ -63,6 +73,10 @@ class Turn:
 @dataclass
 class DecisionPoint:
     """A single decision point extracted from a trace.
+
+    .. deprecated::
+        Superseded by ``pas.trajectory.models.DecisionPoint`` which supports
+        ternary decisions. Will be removed after UI update.
 
     Represents a moment when the user agent made an accept/reject decision
     on a proactive agent's proposal.
@@ -125,7 +139,7 @@ class Sample(BaseModel):
     proactive_model_id: str
     user_model_id: str
     trace_file: str
-    user_agent_decision: str
+    user_agent_decision: Literal["accept", "reject", "gather_context"]
     agent_proposal: str
     meta_task_description: str
     llm_input: str
@@ -144,6 +158,13 @@ class Sample(BaseModel):
         """Convert to API response format.
 
         Note: This is a basic pass-through for new fields. UI update is deferred.
+
+        Args:
+            progress_completed: Number of completed annotations.
+            progress_total: Total number of annotations.
+
+        Returns:
+            Dictionary in API response format with sample data and progress.
         """
         return {
             "sample_id": self.sample_id,
@@ -166,12 +187,17 @@ class Annotation(BaseModel):
     annotation_id: str
     sample_id: str
     annotator_id: str
-    human_decision: str
+    human_decision: Literal["accept", "reject", "gather_context"]
     gather_context_rationale: str | None = None
     timestamp: str
 
     @classmethod
-    def create(cls, sample_id: str, annotator_id: str, human_decision: str) -> Annotation:
+    def create(
+        cls,
+        sample_id: str,
+        annotator_id: str,
+        human_decision: Literal["accept", "reject", "gather_context"],
+    ) -> Annotation:
         """Create a new annotation record.
 
         Args:
@@ -193,8 +219,17 @@ class Annotation(BaseModel):
 
     def to_csv_row(self) -> str:
         """Convert to CSV row string."""
-        rationale = self.gather_context_rationale if self.gather_context_rationale else ""
-        return f"{self.annotation_id},{self.sample_id},{self.annotator_id},{self.human_decision},{rationale},{self.timestamp}\n"
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            self.annotation_id,
+            self.sample_id,
+            self.annotator_id,
+            self.human_decision,
+            self.gather_context_rationale or "",
+            self.timestamp,
+        ])
+        return output.getvalue()
 
     @classmethod
     def csv_header(cls) -> str:

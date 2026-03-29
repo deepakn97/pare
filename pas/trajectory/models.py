@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,7 +25,7 @@ class DecisionPoint:
     proactive_model_id: str
     user_model_id: str
     trace_file: Path
-    user_agent_decision: str  # "accept", "reject", "gather_context"
+    user_agent_decision: Literal["accept", "reject", "gather_context"]
     llm_input: list[dict[str, Any]]  # Raw message array with timestamp annotations
     agent_proposal: str
     final_decision: bool  # True=accept, False=reject (always set)

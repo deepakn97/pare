@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -103,7 +103,14 @@ def extract_decision_points(
 
 
 def _identify_agents(logs: list[dict[str, Any]]) -> dict[str, str]:
-    """Identify agent IDs by system prompt content."""
+    """Identify agent IDs by system prompt content.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+
+    Returns:
+        Dictionary mapping agent roles (user/observe/execute) to agent IDs.
+    """
     agents: dict[str, str] = {}
     for log in logs:
         if log.get("log_type") != "system_prompt":
@@ -122,7 +129,15 @@ def _identify_agents(logs: list[dict[str, Any]]) -> dict[str, str]:
 
 
 def _find_execute_cutoff(logs: list[dict[str, Any]], execute_id: str | None) -> float:
-    """Find the timestamp of the execute agent's first tool call."""
+    """Find the timestamp of the execute agent's first tool call.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        execute_id: Agent ID of the execute agent, or None if not found.
+
+    Returns:
+        Timestamp of the first execute agent tool call, or float('inf') if none found.
+    """
     if not execute_id:
         return float("inf")
     for log in logs:
@@ -132,7 +147,14 @@ def _find_execute_cutoff(logs: list[dict[str, Any]], execute_id: str | None) -> 
 
 
 def _extract_meta_task_description(logs: list[dict[str, Any]]) -> str:
-    """Extract meta_task_description from user agent system prompt."""
+    """Extract meta_task_description from user agent system prompt.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+
+    Returns:
+        The meta_task_description text, or empty string if not found.
+    """
     for log in logs[:50]:
         if log.get("log_type") != "system_prompt":
             continue
@@ -147,7 +169,130 @@ def _extract_meta_task_description(logs: list[dict[str, Any]]) -> str:
     return ""
 
 
-def _extract_pairs(  # noqa: C901
+def _collect_proposals(
+    logs: list[dict[str, Any]],
+    observe_id: str,
+    execute_cutoff: float,
+) -> list[dict[str, Any]]:
+    """Collect observe agent proposals from logs before the execute cutoff.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        observe_id: Agent ID of the observe agent.
+        execute_cutoff: Timestamp to truncate trace at.
+
+    Returns:
+        List of dicts with 'index' and 'log' keys for each proposal.
+    """
+    proposals: list[dict[str, Any]] = []
+    for i, log in enumerate(logs):
+        if log.get("timestamp", 0) >= execute_cutoff:
+            break
+        if (
+            log.get("log_type") == "tool_call"
+            and log.get("agent_id") == observe_id
+            and "send_message_to_user" in log.get("tool_name", "")
+        ):
+            proposals.append({"index": i, "log": log})
+    return proposals
+
+
+def _find_matching_decision(
+    logs: list[dict[str, Any]],
+    prop_idx: int,
+    user_id: str,
+    execute_cutoff: float,
+) -> tuple[int, str] | None:
+    """Find the next accept/reject decision from the user after a proposal.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        prop_idx: Index of the proposal in the logs.
+        user_id: Agent ID of the user agent.
+        execute_cutoff: Timestamp to truncate trace at.
+
+    Returns:
+        Tuple of (decision_index, tool_name), or None if no decision found.
+    """
+    for j in range(prop_idx + 1, len(logs)):
+        if logs[j].get("timestamp", 0) >= execute_cutoff:
+            break
+        log_entry = logs[j]
+        if log_entry.get("log_type") == "tool_call" and log_entry.get("agent_id") == user_id:
+            tn = log_entry.get("tool_name", "")
+            if "accept_proposal" in tn or "reject_proposal" in tn:
+                return j, tn
+    return None
+
+
+def _classify_decision(
+    logs: list[dict[str, Any]],
+    prop_idx: int,
+    decision_idx: int,
+    decision_tool: str,
+    user_id: str,
+) -> tuple[Literal["accept", "reject", "gather_context"], bool]:
+    """Classify a decision as accept, reject, or gather_context.
+
+    Checks for intermediate user tool calls between proposal and decision.
+    If any exist, the decision is gather_context. Otherwise, it's the
+    direct accept/reject from the decision tool name.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        prop_idx: Index of the proposal in the logs.
+        decision_idx: Index of the accept/reject decision in the logs.
+        decision_tool: Tool name of the decision (accept_proposal or reject_proposal).
+        user_id: Agent ID of the user agent.
+
+    Returns:
+        Tuple of (decision_type, final_decision). final_decision is True for accept, False for reject.
+    """
+    has_intermediate = False
+    for k in range(prop_idx + 1, decision_idx):
+        log_entry = logs[k]
+        if log_entry.get("log_type") == "tool_call" and log_entry.get("agent_id") == user_id:
+            has_intermediate = True
+            break
+
+    final_decision = "accept_proposal" in decision_tool
+
+    if has_intermediate:
+        return "gather_context", final_decision
+    elif final_decision:
+        return "accept", final_decision
+    else:
+        return "reject", final_decision
+
+
+def _compute_gather_delta(
+    logs: list[dict[str, Any]],
+    decision_idx: int,
+    proposal_messages: list[dict[str, Any]],
+    user_id: str,
+) -> list[dict[str, Any]] | None:
+    """Compute the gather_context_delta for a gather_context decision.
+
+    The delta is the messages between the proposal llm_input and the decision
+    llm_input — i.e., the additional context the user gathered before deciding.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        decision_idx: Index of the accept/reject decision in the logs.
+        proposal_messages: The llm_input messages at the proposal point.
+        user_id: Agent ID of the user agent.
+
+    Returns:
+        List of additional messages, or None if the decision llm_input could not be found.
+    """
+    decision_llm = _find_llm_input_before(logs, decision_idx, user_id)
+    if decision_llm is None:
+        return None
+    _, decision_messages = decision_llm
+    return decision_messages[len(proposal_messages) :]
+
+
+def _extract_pairs(
     logs: list[dict[str, Any]],
     user_id: str,
     observe_id: str,
@@ -163,87 +308,55 @@ def _extract_pairs(  # noqa: C901
 
     Single forward scan: for each proposal, find the next accept/reject.
     Classify based on whether there are intermediate user tool calls.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        user_id: Agent ID of the user agent.
+        observe_id: Agent ID of the observe agent.
+        execute_cutoff: Timestamp to truncate trace at (first execute tool call).
+        scenario_id: Scenario identifier.
+        run_number: Run number for this scenario execution.
+        proactive_model_id: Proactive model identifier.
+        user_model_id: User model identifier.
+        trace_path: Path to the trace file.
+        meta_task_description: Meta task description from scenario.
+
+    Returns:
+        List of DecisionPoint objects, one per valid proposal-decision pair.
     """
     decision_points: list[DecisionPoint] = []
-    proposal_index = 0
+    proposals = _collect_proposals(logs, observe_id, execute_cutoff)
 
-    # Collect all proposals and decisions in the truncated trace
-    proposals: list[dict[str, Any]] = []
-    for i, log in enumerate(logs):
-        if log.get("timestamp", 0) >= execute_cutoff:
-            break
-        if (
-            log.get("log_type") == "tool_call"
-            and log.get("agent_id") == observe_id
-            and "send_message_to_user" in log.get("tool_name", "")
-        ):
-            proposals.append({"index": i, "log": log})
-
-    for prop in proposals:
+    for proposal_index, prop in enumerate(proposals):
         prop_idx = prop["index"]
-        prop_log = prop["log"]
-        proposal_content = prop_log.get("tool_arguments", {}).get("content", "")
+        proposal_content = prop["log"].get("tool_arguments", {}).get("content", "")
 
-        # Find next accept/reject from user after this proposal
-        decision_idx = None
-        decision_tool = None
-        for j in range(prop_idx + 1, len(logs)):
-            if logs[j].get("timestamp", 0) >= execute_cutoff:
-                break
-            log_entry = logs[j]
-            if log_entry.get("log_type") == "tool_call" and log_entry.get("agent_id") == user_id:
-                tn = log_entry.get("tool_name", "")
-                if "accept_proposal" in tn or "reject_proposal" in tn:
-                    decision_idx = j
-                    decision_tool = tn
-                    break
-
-        if decision_idx is None:
+        # Find matching accept/reject decision
+        match = _find_matching_decision(logs, prop_idx, user_id, execute_cutoff)
+        if match is None:
             logger.debug(f"No accept/reject found for proposal at index {prop_idx} in {trace_path}")
             continue
+        decision_idx, decision_tool = match
 
-        # Check for intermediate user tool calls (gather_context)
-        intermediate_tools: list[str] = []
-        for k in range(prop_idx + 1, decision_idx):
-            log_entry = logs[k]
-            if log_entry.get("log_type") == "tool_call" and log_entry.get("agent_id") == user_id:
-                intermediate_tools.append(log_entry.get("tool_name", ""))
+        # Classify the decision
+        user_agent_decision, final_decision = _classify_decision(logs, prop_idx, decision_idx, decision_tool, user_id)
 
-        # Classify
-        if intermediate_tools:
-            user_agent_decision = "gather_context"
-        elif decision_tool and "accept_proposal" in decision_tool:
-            user_agent_decision = "accept"
-        else:
-            user_agent_decision = "reject"
-
-        final_decision = decision_tool is not None and "accept_proposal" in decision_tool
-
-        # Extract llm_input right after proposal
+        # Extract and annotate llm_input
         llm_input = _find_llm_input_after(logs, prop_idx, user_id)
         if llm_input is None:
             logger.warning(f"No llm_input found after proposal at index {prop_idx} in {trace_path}")
             continue
-
         llm_input_idx, messages = llm_input
-
-        # Annotate messages with timestamps and types
         annotated = _annotate_messages(messages, logs, llm_input_idx, user_id)
 
-        # For gather_context, compute delta
+        # Compute gather_context_delta if needed
         gather_context_delta = None
         if user_agent_decision == "gather_context":
-            # Find llm_input at decision point
-            decision_llm = _find_llm_input_before(logs, decision_idx, user_id)
-            if decision_llm is not None:
-                _, decision_messages = decision_llm
-                gather_context_delta = decision_messages[len(messages) :]
-
-        sample_id = DecisionPoint.generate_sample_id(scenario_id, run_number, proposal_index)
+            gather_context_delta = _compute_gather_delta(logs, decision_idx, messages, user_id)
 
         decision_points.append(
             DecisionPoint(
-                sample_id=sample_id,
+                sample_id=DecisionPoint.generate_sample_id(scenario_id, run_number, proposal_index),
                 scenario_id=scenario_id,
                 run_number=run_number,
                 proactive_model_id=proactive_model_id,
@@ -257,7 +370,6 @@ def _extract_pairs(  # noqa: C901
                 gather_context_delta=gather_context_delta,
             )
         )
-        proposal_index += 1
 
     return decision_points
 
@@ -265,7 +377,16 @@ def _extract_pairs(  # noqa: C901
 def _find_llm_input_after(
     logs: list[dict[str, Any]], start_idx: int, user_id: str
 ) -> tuple[int, list[dict[str, Any]]] | None:
-    """Find the user agent's llm_input after a given index."""
+    """Find the user agent's llm_input after a given index.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        start_idx: Index to start searching from.
+        user_id: Agent ID of the user agent.
+
+    Returns:
+        Tuple of (log index, message array) if found, None otherwise.
+    """
     for i in range(start_idx + 1, min(start_idx + FORWARD_SEARCH_WINDOW, len(logs))):
         log = logs[i]
         if log.get("log_type") == "llm_input" and log.get("agent_id") == user_id:
@@ -285,7 +406,16 @@ def _find_llm_input_after(
 def _find_llm_input_before(
     logs: list[dict[str, Any]], end_idx: int, user_id: str
 ) -> tuple[int, list[dict[str, Any]]] | None:
-    """Find the user agent's llm_input before a given index (searching backward)."""
+    """Find the user agent's llm_input before a given index (searching backward).
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        end_idx: Index to start searching backward from.
+        user_id: Agent ID of the user agent.
+
+    Returns:
+        Tuple of (log index, message array) if found, None otherwise.
+    """
     for i in range(end_idx - 1, max(end_idx - BACKWARD_SEARCH_WINDOW, 0), -1):
         log = logs[i]
         if log.get("log_type") == "llm_input" and log.get("agent_id") == user_id:
@@ -315,6 +445,15 @@ def _annotate_messages(
     - tool-response (tool_observation): inherits from preceding assistant
     - [TASK]: prefix (proposal): from task world_log
     - Others: no timestamp
+
+    Args:
+        messages: List of message dicts from llm_input.
+        logs: List of parsed log entries from the trace file.
+        llm_input_idx: Index of the llm_input log entry.
+        user_id: Agent ID of the user agent.
+
+    Returns:
+        List of message dicts with added timestamp and msg_type fields.
     """
     # Collect timestamps from world_logs
     llm_output_timestamps, task_timestamps = _collect_timestamps(logs, llm_input_idx, user_id)
@@ -354,7 +493,16 @@ def _annotate_messages(
 def _collect_timestamps(
     logs: list[dict[str, Any]], llm_input_idx: int, user_id: str
 ) -> tuple[list[float], list[float]]:
-    """Collect llm_output and task timestamps from world logs."""
+    """Collect llm_output and task timestamps from world logs.
+
+    Args:
+        logs: List of parsed log entries from the trace file.
+        llm_input_idx: Index of the llm_input log entry.
+        user_id: Agent ID of the user agent.
+
+    Returns:
+        Tuple of (llm_output_timestamps, task_timestamps) lists.
+    """
     llm_output_timestamps: list[float] = []
     task_timestamps: list[float] = []
 
@@ -375,7 +523,15 @@ def _collect_timestamps(
 
 
 def _classify_user_message(role: str, content: str) -> str:
-    """Classify message type based on role and content."""
+    """Classify message type based on role and content.
+
+    Args:
+        role: Message role (user/assistant/system/tool-response).
+        content: Message content text.
+
+    Returns:
+        Message type string (environment_notification/available_tools/current_app_state/system_prompt/unknown).
+    """
     if role == "user" and content.startswith("Environment notifications"):
         return "environment_notification"
     if role == "user" and content.startswith("Available Actions"):

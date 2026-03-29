@@ -22,6 +22,11 @@ import polars as pl
 
 logger = logging.getLogger(__name__)
 
+# Small constant to prevent log(0) in cross-entropy and KL divergence computations.
+# Chosen to be smaller than any realistic probability while avoiding floating point
+# underflow (machine epsilon for float64 is ~2.2e-16).
+LOG_EPSILON = 1e-15
+
 
 def compute_per_model_agreement_metrics(
     evaluations_df: pl.DataFrame,
@@ -29,6 +34,9 @@ def compute_per_model_agreement_metrics(
     n_annotators: int = 2,
 ) -> dict[str, dict[str, Any]]:
     """Compute agreement metrics per user model from the evaluation dataframe.
+
+    .. deprecated::
+        Use ``compute_per_model_agreement_metrics_ternary`` for ternary decisions. Will be removed after UI update.
 
     For each user_model_id in the evaluations, aggregates runs via majority vote
     and computes agreement metrics against human annotations.
@@ -71,6 +79,9 @@ def compute_agreement_metrics(
     n_annotators: int = 2,
 ) -> dict[str, Any]:
     """Compute comprehensive agreement metrics.
+
+    .. deprecated::
+        Use ``compute_agreement_metrics_ternary`` for ternary decisions. Will be removed after UI update.
 
     Args:
         samples_df: DataFrame with sample data including user_agent_decision.
@@ -284,7 +295,7 @@ def _compute_soft_label_metrics(df: pl.DataFrame) -> dict[str, float | None]:
 
     # Cross-entropy: -sum(y * log(p) + (1-y) * log(1-p))
     # where y is soft label (proportion) and p is prediction
-    eps = 1e-15
+    eps = LOG_EPSILON
     ce_losses = []
     for soft, pred in zip(soft_labels, agent_preds, strict=False):
         pred_clipped = max(eps, min(1 - eps, pred))
@@ -635,7 +646,7 @@ def _cohens_kappa(y1: list[bool], y2: list[bool]) -> float | None:
     return kappa
 
 
-def _cohens_kappa_multiclass(y1: list[str], y2: list[str]) -> float | None:
+def cohens_kappa_multiclass(y1: list[str], y2: list[str]) -> float | None:
     """Compute Cohen's Kappa between two raters for multiclass labels.
 
     Args:
@@ -733,7 +744,7 @@ def compute_kl_divergence(model_probs: list[float], human_probs: list[float]) ->
     Returns:
         KL divergence value (non-negative, 0 means identical distributions).
     """
-    eps = 1e-15
+    eps = LOG_EPSILON
     kl = 0.0
     for p_human, p_model in zip(human_probs, model_probs, strict=False):
         if p_human > 0:
@@ -816,7 +827,7 @@ def compute_per_model_agreement_metrics_ternary(
         majority_votes = vote_counts.with_columns([
             pl.struct(["sample_id", "accept_count", "reject_count", "gather_context_count"])
             .map_elements(
-                lambda row: _argmax_with_tiebreak(
+                lambda row: argmax_with_tiebreak(
                     [row["accept_count"], row["reject_count"], row["gather_context_count"]],
                     ["accept", "reject", "gather_context"],
                     row["sample_id"],
@@ -835,7 +846,7 @@ def compute_per_model_agreement_metrics_ternary(
     return results
 
 
-def _argmax_with_tiebreak(counts: list[int], labels: list[str], seed_str: str) -> str:
+def argmax_with_tiebreak(counts: list[int], labels: list[str], seed_str: str) -> str:
     """Argmax with deterministic tie-breaking using hash of seed string.
 
     Args:
@@ -903,13 +914,13 @@ def compute_agreement_metrics_ternary(
         return _empty_metrics_ternary()
 
     # Human-human agreement (baseline)
-    fleiss_kappa_humans = _compute_fleiss_kappa_multiclass(filtered, include_model=False)
+    fleiss_kappa_humans = compute_fleiss_kappa_multiclass(filtered, include_model=False)
 
     # Model alignment metrics
     majority_vote_metrics = _compute_majority_vote_metrics_ternary(filtered)
     avg_pairwise_kappa = _compute_avg_pairwise_model_human_kappa_ternary(filtered)
-    krippendorff_alpha = _compute_krippendorff_alpha_multiclass(filtered, include_model=True)
-    fleiss_kappa_with_model = _compute_fleiss_kappa_multiclass(filtered, include_model=True)
+    krippendorff_alpha = compute_krippendorff_alpha_multiclass(filtered, include_model=True)
+    fleiss_kappa_with_model = compute_fleiss_kappa_multiclass(filtered, include_model=True)
 
     # Distribution stats (per-category rates)
     category_rates = _compute_category_rates_ternary(filtered, samples_df, complete_samples)
@@ -962,6 +973,12 @@ def _compute_majority_vote_metrics_ternary(df: pl.DataFrame) -> dict[str, float 
     """Compute metrics comparing model predictions to human majority vote for ternary decisions.
 
     Metrics: accuracy, Cohen's kappa.
+
+    Args:
+        df: DataFrame with sample_id, human_decision, user_agent_decision columns.
+
+    Returns:
+        Dictionary with accuracy and cohens_kappa keys.
     """
     if len(df) == 0:
         return {"accuracy": None, "cohens_kappa": None}
@@ -977,7 +994,7 @@ def _compute_majority_vote_metrics_ternary(df: pl.DataFrame) -> dict[str, float 
     sample_votes = sample_votes.with_columns([
         pl.struct(["sample_id", "accept_count", "reject_count", "gather_context_count"])
         .map_elements(
-            lambda row: _argmax_with_tiebreak(
+            lambda row: argmax_with_tiebreak(
                 [row["accept_count"], row["reject_count"], row["gather_context_count"]],
                 ["accept", "reject", "gather_context"],
                 row["sample_id"],
@@ -997,7 +1014,7 @@ def _compute_majority_vote_metrics_ternary(df: pl.DataFrame) -> dict[str, float 
     accuracy = sum(1 for t, p in zip(y_true, y_pred, strict=False) if t == p) / len(y_true)
 
     # Cohen's kappa for multiclass
-    kappa = _cohens_kappa_multiclass(y_true, y_pred)
+    kappa = cohens_kappa_multiclass(y_true, y_pred)
 
     return {
         "accuracy": accuracy,
@@ -1009,6 +1026,12 @@ def _compute_avg_pairwise_model_human_kappa_ternary(df: pl.DataFrame) -> dict[st
     """Compute Cohen's kappa between model and each human annotator for ternary decisions.
 
     Returns mean and standard deviation across all human annotators.
+
+    Args:
+        df: DataFrame with annotator_id, human_decision, user_agent_decision columns.
+
+    Returns:
+        Dictionary with mean and std keys for kappa values.
     """
     if len(df) == 0:
         return {"mean": None, "std": None}
@@ -1020,7 +1043,7 @@ def _compute_avg_pairwise_model_human_kappa_ternary(df: pl.DataFrame) -> dict[st
         annotator_df = df.filter(pl.col("annotator_id") == annotator_id)
         human = annotator_df["human_decision"].to_list()
         agent = annotator_df["user_agent_decision"].to_list()
-        kappa = _cohens_kappa_multiclass(human, agent)
+        kappa = cohens_kappa_multiclass(human, agent)
         if kappa is not None:
             kappas.append(kappa)
 
@@ -1034,7 +1057,7 @@ def _compute_avg_pairwise_model_human_kappa_ternary(df: pl.DataFrame) -> dict[st
     return {"mean": mean_kappa, "std": std_kappa}
 
 
-def _compute_fleiss_kappa_multiclass(df: pl.DataFrame, *, include_model: bool = False) -> float | None:  # noqa: C901
+def compute_fleiss_kappa_multiclass(df: pl.DataFrame, *, include_model: bool = False) -> float | None:  # noqa: C901
     """Compute Fleiss' Kappa for multiple raters with arbitrary categories.
 
     Args:
@@ -1112,7 +1135,7 @@ def _compute_fleiss_kappa_multiclass(df: pl.DataFrame, *, include_model: bool = 
     return kappa
 
 
-def _compute_krippendorff_alpha_multiclass(df: pl.DataFrame, *, include_model: bool = True) -> float | None:  # noqa: C901
+def compute_krippendorff_alpha_multiclass(df: pl.DataFrame, *, include_model: bool = True) -> float | None:  # noqa: C901
     """Compute Krippendorff's Alpha for nominal data with arbitrary categories.
 
     Args:
@@ -1208,6 +1231,11 @@ def _compute_category_rates_ternary(
 ) -> dict[str, dict[str, float]]:
     """Compute per-category rates for human and model.
 
+    Args:
+        df: DataFrame with human_decision, user_agent_decision columns.
+        samples_df: DataFrame with sample data including user_agent_decision.
+        complete_samples: List of sample_ids with complete annotations.
+
     Returns:
         Dictionary with 'human' and 'model' keys, each containing accept/reject/gather_context rates.
     """
@@ -1248,7 +1276,14 @@ def _compute_category_rates_ternary(
 
 
 def _compute_per_annotator_stats_ternary(df: pl.DataFrame) -> dict[str, dict[str, Any]]:
-    """Compute statistics for each annotator (ternary decisions)."""
+    """Compute statistics for each annotator (ternary decisions).
+
+    Args:
+        df: DataFrame with annotator_id, human_decision, user_agent_decision columns.
+
+    Returns:
+        Dictionary mapping annotator_id to stats dict with count, rates, and kappa.
+    """
     if len(df) == 0:
         return {}
 
@@ -1271,7 +1306,7 @@ def _compute_per_annotator_stats_ternary(df: pl.DataFrame) -> dict[str, dict[str
         # Cohen's kappa with model
         human = annotator_df["human_decision"].to_list()
         agent = annotator_df["user_agent_decision"].to_list()
-        kappa_with_model = _cohens_kappa_multiclass(human, agent)
+        kappa_with_model = cohens_kappa_multiclass(human, agent)
 
         stats[annotator_id] = {
             "count": count,

@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Annotated, Any
 if TYPE_CHECKING:
     import polars as pl
 
+    from pas.trajectory.models import DecisionPoint as TernaryDecisionPoint
+
 import typer
 
 from pas.annotation.config import ensure_extension
@@ -72,6 +74,34 @@ def _parse_per_model_arg(per_model: str) -> dict[str, int]:
     return result
 
 
+def _print_sample_stats(samples: list[TernaryDecisionPoint], output_file: Path) -> None:
+    """Print sampling statistics to console.
+
+    Args:
+        samples: List of TernaryDecisionPoint objects.
+        output_file: Path where samples were saved.
+    """
+    from collections import Counter
+
+    accepts = len([s for s in samples if s.user_agent_decision == "accept"])
+    rejects = len([s for s in samples if s.user_agent_decision == "reject"])
+    gather_context = len([s for s in samples if s.user_agent_decision == "gather_context"])
+    unique_scenarios = len({s.scenario_id for s in samples})
+    model_counts = Counter(s.proactive_model_id for s in samples)
+
+    typer.echo("\nSampling complete!")
+    typer.echo(f"  New samples added: {len(samples)}")
+    typer.echo(f"  Accepts: {accepts}")
+    typer.echo(f"  Rejects: {rejects}")
+    typer.echo(f"  Gather context: {gather_context}")
+    if len(model_counts) > 1:
+        typer.echo("  Per model:")
+        for model_id, count in sorted(model_counts.items()):
+            typer.echo(f"    {model_id}: {count}")
+    typer.echo(f"  Unique scenarios: {unique_scenarios}")
+    typer.echo(f"\nSamples saved to: {output_file}")
+
+
 @app.command()
 def sample(
     traces_dir: Annotated[
@@ -107,12 +137,13 @@ def sample(
         typer.Option("--user-model", "-um", help="User model that generated the traces"),
     ] = "gpt-5-mini",
 ) -> None:
-    """Sample decision points from traces for annotation.
+    """Sample ternary decision points from traces for annotation.
 
-    Creates a balanced dataset of accept/reject decisions, prioritizing
-    unique scenarios. Appends to existing samples if output file already exists.
+    Creates a balanced dataset of accept/reject/gather_context decisions
+    using three-way balanced sampling. Writes parquet with ternary schema.
+    Appends to existing samples if output file already exists.
     """
-    from pas.annotation.sampler import load_existing_samples, sample_new_datapoints, save_samples
+    from pas.annotation.sampler import sample_new_datapoints_ternary
 
     per_model_count, target_model_list = _validate_sample_args(sample_size, per_model, target_models)
 
@@ -125,8 +156,10 @@ def sample(
         raise typer.Exit(code=1)
 
     # Show existing samples info
-    existing_df = load_existing_samples(output_file)
-    if existing_df is not None:
+    if output_file.exists():
+        import polars as pl
+
+        existing_df = pl.read_parquet(output_file)
         typer.echo(f"Existing samples in {output_file}: {len(existing_df)}")
     else:
         typer.echo(f"No existing samples at {output_file}. Creating new sample set.")
@@ -140,13 +173,12 @@ def sample(
         typer.echo(f"Target models: {target_model_list} (distributing {sample_size} equally)")
 
     try:
-        samples = sample_new_datapoints(
-            traces_dir,
-            output_file,
-            user_model,
-            sample_size,
-            seed,
-            per_model_count=per_model_count,
+        samples = sample_new_datapoints_ternary(
+            traces_dir=traces_dir,
+            samples_file=output_file,
+            user_model_id=user_model,
+            sample_size=effective_size,  # type: ignore[arg-type]
+            seed=seed,
             target_models=target_model_list,
         )
     except FileNotFoundError as e:
@@ -164,20 +196,7 @@ def sample(
         typer.echo("No new samples could be created. All candidates may already be sampled.", err=True)
         raise typer.Exit(code=1)
 
-    # Save samples
-    save_samples(samples, output_file)
-
-    # Report statistics
-    accepts = len([s for s in samples if s.user_agent_decision])
-    rejects = len(samples) - accepts
-    unique_scenarios = len({s.scenario_id for s in samples})
-
-    typer.echo("\nSampling complete!")
-    typer.echo(f"  New samples added: {len(samples)}")
-    typer.echo(f"  Accepts: {accepts}")
-    typer.echo(f"  Rejects: {rejects}")
-    typer.echo(f"  Unique scenarios: {unique_scenarios}")
-    typer.echo(f"\nSamples saved to: {output_file}")
+    _print_sample_stats(samples, output_file)
 
 
 @app.command()

@@ -157,10 +157,12 @@ class AnnotationServer:
                 raise ValueError(f"User {annotator_id} already annotated sample {sample_id}")
 
             # Create annotation
+            # TODO(ternary): Server still uses binary bool decisions from old UI.
+            # Will be updated to pass Literal values when UI supports ternary decisions.
             annotation = Annotation.create(
                 sample_id=sample_id,
                 annotator_id=annotator_id,
-                human_decision=str(human_decision),
+                human_decision=str(human_decision),  # type: ignore[arg-type]
             )
 
             # Append to file

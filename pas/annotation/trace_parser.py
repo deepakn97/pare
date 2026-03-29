@@ -1,4 +1,10 @@
-"""Trace parser for extracting decision points from PAS traces."""
+"""Trace parser for extracting decision points from PAS traces.
+
+.. deprecated::
+    This module is superseded by ``pas.trajectory.trace_parser`` which supports
+    ternary decisions (accept/reject/gather_context). Use ``extract_decision_points``
+    from ``pas.trajectory`` instead. This module will be removed after the UI update.
+"""
 
 from __future__ import annotations
 

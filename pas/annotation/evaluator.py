@@ -12,7 +12,7 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import polars as pl
 from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
@@ -21,6 +21,7 @@ from are.simulation.agents.default_agent.tools.json_action_executor import (
 )
 from are.simulation.agents.llm.llm_engine_builder import LLMEngineBuilder
 from are.simulation.exceptions import JsonParsingAgentError
+from tqdm import tqdm
 
 if TYPE_CHECKING:
     from are.simulation.agents.llm.llm_engine import LLMEngine
@@ -31,6 +32,12 @@ ACTION_TOKEN = "Action:"  # noqa: S105
 THOUGHT_TOKEN = "Thought:"  # noqa: S105
 STOP_SEQUENCES = ["<end_action>", "Observation:"]
 MAX_RETRIES = 10
+
+
+# ===== DEPRECATED BINARY PIPELINE FUNCTIONS =====
+# The functions below are superseded by the ternary pipeline functions
+# (evaluate_single_decision_ternary, evaluate_samples_ternary, etc.)
+# They will be removed after the UI update.
 
 
 def _parse_trace_logs(trace_file: Path) -> list[dict[str, Any]]:
@@ -66,6 +73,9 @@ def extract_llm_input_from_trace(
     decision_timestamp: float,
 ) -> list[dict[str, Any]] | None:
     """Extract the llm_input message array preceding a decision point from a trace.
+
+    .. deprecated::
+        Ternary pipeline reads llm_input from parquet directly. Will be removed after UI update.
 
     Finds the llm_input log entry for the user agent immediately before
     the accept/reject decision at the given timestamp.
@@ -111,6 +121,9 @@ def evaluate_single_decision(
     engine: LLMEngine,
 ) -> tuple[bool | None, bool]:
     """Fire a single-shot query and parse the accept/reject decision.
+
+    .. deprecated::
+        Use ``evaluate_single_decision_ternary`` for ternary classification. Will be removed after UI update.
 
     Uses the same retry logic as BaseAgent: retries up to MAX_RETRIES times
     if the output doesn't contain Action:/Thought: tokens.
@@ -173,6 +186,9 @@ def evaluate_samples(
     smoke_test: bool = False,
 ) -> pl.DataFrame:
     """Evaluate multiple user models on sampled decision points.
+
+    .. deprecated::
+        Use ``evaluate_samples_ternary`` for ternary evaluation with ThreadPoolExecutor. Will be removed after UI update.
 
     Args:
         samples_df: DataFrame from samples.parquet with decision point context.
@@ -282,6 +298,9 @@ def _make_result(
 def print_evaluation_summary(eval_df: pl.DataFrame, original_samples_df: pl.DataFrame | None = None) -> None:
     """Print a summary of evaluation results.
 
+    .. deprecated::
+        Use ``print_evaluation_summary_ternary`` for ternary output. Will be removed after UI update.
+
     Args:
         eval_df: Evaluation results DataFrame.
         original_samples_df: Original samples DataFrame for sanity check comparison.
@@ -376,7 +395,7 @@ def print_evaluation_summary(eval_df: pl.DataFrame, original_samples_df: pl.Data
 def evaluate_single_decision_ternary(
     messages: list[dict[str, Any]],
     engine: LLMEngine,
-) -> tuple[str | None, bool]:
+) -> tuple[Literal["accept", "reject", "gather_context"] | None, bool]:
     """Fire a single-shot query and parse the ternary decision.
 
     Classifies decision based on first tool call only:
@@ -437,7 +456,7 @@ def evaluate_single_decision_ternary(
         return None, False
 
 
-def evaluate_samples_ternary(  # noqa: C901
+def evaluate_samples_ternary(
     samples_df: pl.DataFrame,
     user_models: list[str],
     models_map: dict[str, dict[str, str]],
@@ -521,25 +540,26 @@ def evaluate_samples_ternary(  # noqa: C901
 
     # Submit jobs to ThreadPoolExecutor
     results: list[dict[str, Any]] = []
-    completed = 0
     total = len(jobs)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_job = {executor.submit(_evaluate_job_ternary, job): job for job in jobs}
 
-        for future in as_completed(future_to_job):
-            result = future.result()
-            results.append(result)
-            completed += 1
-            if completed % 50 == 0:
-                logger.info(f"Progress: {completed}/{total} evaluations complete")
+        for future in tqdm(as_completed(future_to_job), total=total, desc="Evaluating"):
+            results.append(future.result())
 
-    logger.info(f"Completed {completed} evaluations")
     return pl.DataFrame(results)
 
 
 def _evaluate_job_ternary(job: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate a single job (sample x model x run)."""
+    """Evaluate a single job (sample x model x run).
+
+    Args:
+        job: Job dictionary with sample_id, scenario_id, proactive_model_id, user_model_id, run, messages, engine.
+
+    Returns:
+        Result dictionary with sample_id, scenario_id, proactive_model_id, user_model_id, user_agent_decision, run, valid_response.
+    """
     decision, valid = evaluate_single_decision_ternary(job["messages"], job["engine"])
     return {
         "sample_id": job["sample_id"],
@@ -560,12 +580,33 @@ def aggregate_evaluations(eval_df: pl.DataFrame) -> pl.DataFrame:
     - Soft labels: accept_prob, reject_prob, gather_context_prob
     - Hard label: argmax of counts (tie-break with hash of sample_id)
 
+    Pairs with fewer valid responses than total runs are logged as warnings.
+    Pairs with zero valid responses are excluded from the output entirely
+    (also logged as warnings).
+
     Args:
         eval_df: Raw evaluation DataFrame with one row per run.
 
     Returns:
         Aggregated DataFrame with one row per (sample_id, user_model_id).
     """
+    # Check for pairs with fewer valid responses than requested runs
+    total_runs_per_pair = eval_df.group_by(["sample_id", "user_model_id"]).agg(
+        pl.col("valid_response").sum().alias("valid_count"),
+        pl.col("valid_response").count().alias("total_count"),
+    )
+    incomplete = total_runs_per_pair.filter(pl.col("valid_count") < pl.col("total_count"))
+    for row in incomplete.iter_rows(named=True):
+        logger.warning(
+            f"Sample {row['sample_id']} x {row['user_model_id']}: "
+            f"only {row['valid_count']}/{row['total_count']} valid responses"
+        )
+    dropped = total_runs_per_pair.filter(pl.col("valid_count") == 0)
+    for row in dropped.iter_rows(named=True):
+        logger.warning(
+            f"Sample {row['sample_id']} x {row['user_model_id']}: all responses invalid, pair excluded from aggregation"
+        )
+
     # Filter to valid responses only
     valid_df = eval_df.filter(pl.col("valid_response"))
 
@@ -574,14 +615,14 @@ def aggregate_evaluations(eval_df: pl.DataFrame) -> pl.DataFrame:
         (pl.col("user_agent_decision") == "accept").sum().alias("accept_count"),
         (pl.col("user_agent_decision") == "reject").sum().alias("reject_count"),
         (pl.col("user_agent_decision") == "gather_context").sum().alias("gather_context_count"),
-        pl.col("valid_response").sum().alias("total_runs"),
+        pl.col("valid_response").sum().alias("valid_runs"),
     ])
 
     # Compute soft labels (probabilities)
     aggregated = aggregated.with_columns([
-        (pl.col("accept_count") / pl.col("total_runs")).alias("accept_prob"),
-        (pl.col("reject_count") / pl.col("total_runs")).alias("reject_prob"),
-        (pl.col("gather_context_count") / pl.col("total_runs")).alias("gather_context_prob"),
+        (pl.col("accept_count") / pl.col("valid_runs")).alias("accept_prob"),
+        (pl.col("reject_count") / pl.col("valid_runs")).alias("reject_prob"),
+        (pl.col("gather_context_count") / pl.col("valid_runs")).alias("gather_context_prob"),
     ])
 
     # Compute hard label (argmax with deterministic tie-breaking)
@@ -617,6 +658,9 @@ def print_evaluation_summary_ternary(eval_df: pl.DataFrame, original_samples_df:
     Args:
         eval_df: Evaluation results DataFrame (raw, one row per run).
         original_samples_df: Original samples DataFrame for sanity check comparison.
+
+    Returns:
+        None. Prints summary to stdout.
     """
     # Per-model decision rates
     valid_df = eval_df.filter(pl.col("valid_response"))
