@@ -5,6 +5,7 @@ from __future__ import annotations
 import concurrent.futures
 import contextlib
 import errno
+import gc
 import itertools
 import logging
 import multiprocessing
@@ -15,7 +16,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Never
 
 from are.simulation.utils.streaming_utils import stream_pool
 from tqdm import tqdm
@@ -295,13 +296,112 @@ class MultiScenarioRunner:
             raise ValueError("No scenarios provided to run.")
         return self.run_with_scenarios(config, itertools.zip_longest(scenarios, [], fillvalue=None))
 
+    def _run_phase(
+        self,
+        scenarios: CountableIterator[PASScenario] | list[PASScenario],
+        config: MultiScenarioRunnerConfig,
+        max_workers: int,
+        multi_result: PASMultiScenarioValidationResult,
+        progress_bar: tqdm[Never],
+        retry_attempts: dict[str, int],
+    ) -> list[PASScenario]:
+        """Run a single phase of scenario execution, collecting retryable failures.
+
+        Processes all scenarios via stream_pool. Scenarios that fail with retryable
+        OS errors (EMFILE, ENFILE, ENOMEM) and have retry budget remaining are
+        collected into a retry queue instead of being finalized.
+
+        Args:
+            scenarios: Iterator or list of scenarios to run in this phase.
+            config: The multi-scenario runner config.
+            max_workers: Number of parallel workers for this phase.
+            multi_result: The accumulator for finalized results.
+            progress_bar: Shared progress bar (updated only on finalized results).
+            retry_attempts: Dict tracking retry count per scenario key.
+
+        Returns:
+            List of scenarios to retry in the next phase.
+        """
+        retry_queue: list[PASScenario] = []
+
+        with stream_pool(
+            iter(scenarios) if isinstance(scenarios, list) else scenarios,
+            process_scenario,
+            max_workers=max_workers,
+            timeout_seconds=config.timeout_seconds,
+            executor_type=config.executor_type,
+            config=config,
+            user_agent_config_builder=self.user_agent_config_builder,
+            user_agent_builder=self.user_agent_builder,
+            proactive_agent_config_builder=self.proactive_agent_config_builder,
+            proactive_agent_builder=self.proactive_agent_builder,
+        ) as stream:
+            for scenario, result, error in stream:
+                if self._interrupted:
+                    logger.info("Execution interrupted, stopping...")
+                    break
+
+                scenario_id = scenario.scenario_id if hasattr(scenario, "scenario_id") else str(scenario)
+                run_number = getattr(scenario, "run_number", None)
+
+                # Handle errors from stream_pool (exceptions thrown by worker)
+                if error:
+                    if isinstance(error, (TimeoutError, concurrent.futures.TimeoutError)):
+                        logger.error(f"Scenario {scenario_id} timed out after {config.timeout_seconds} seconds")
+                        result = PASScenarioValidationResult(
+                            success=False,
+                            exception=ScenarioTimeoutError(
+                                f"Scenario {scenario_id} timed out after {config.timeout_seconds} seconds"
+                            ),
+                            duration=float(config.timeout_seconds) if config.timeout_seconds else 0.0,
+                        )
+                    else:
+                        logger.error(f"Scenario {scenario_id} failed with exception: {error}")
+                        result = PASScenarioValidationResult(
+                            success=False,
+                            exception=error,
+                            duration=None,
+                        )
+
+                if result is None:
+                    result = PASScenarioValidationResult(
+                        success=False,
+                        exception=Exception(f"Unknown error for scenario {scenario_id}"),
+                        duration=None,
+                    )
+
+                # Check if this is a retryable error with budget remaining
+                key = f"{scenario_id}_run_{run_number}" if run_number is not None else scenario_id
+                attempts = retry_attempts.get(key, 0)
+                if _is_retryable_error(error, result) and attempts < MAX_RETRIES:
+                    retry_attempts[key] = attempts + 1
+                    retry_queue.append(scenario)
+                    logger.warning(
+                        f"Scenario {scenario_id} hit retryable error, queued for retry "
+                        f"(attempt {attempts + 1}/{MAX_RETRIES})"
+                    )
+                    continue
+
+                # Final result -- add to multi_result and update progress
+                multi_result.add_result(result, scenario_id, run_number)
+                progress_bar.update(1)
+                success_rate = multi_result.success_rate_updated()
+                progress_bar.set_postfix({"Success": f"{success_rate:.1f}%"})
+
+        return retry_queue
+
     def run_with_scenarios(  # noqa: C901
         self,
         config: MultiScenarioRunnerConfig,
         scenarios: CountableIterator[PASScenario],
         progress_description: str | None = None,
     ) -> PASMultiScenarioValidationResult:
-        """Run multiple scenarios provided as an iterator with the given configuration.
+        """Run multiple scenarios with retry for transient OS errors.
+
+        Executes scenarios in up to 3 phases:
+        - Phase 1: Run all scenarios with full worker count.
+        - Phase 2: Retry scenarios that failed with retryable OS errors, using half the workers.
+        - Phase 3: Final retry attempt for any remaining retryable failures.
 
         Args:
             config: The configuration for running scenarios.
@@ -320,7 +420,6 @@ class MultiScenarioRunner:
             config.output_dir = os.path.abspath(config.output_dir)
         os.makedirs(config.output_dir, exist_ok=True)
 
-        processed_scenarios = 0
         start_time = time.time()
 
         # Determine max workers
@@ -340,90 +439,79 @@ class MultiScenarioRunner:
             f"execute={config.execute_model_alias} | "
             f"max_turns={config.max_turns}"
         )
+        if config.tool_augmentation_config:
+            tfp = config.tool_augmentation_config.tool_failure_probability
+            config_info += f" | tfp={tfp}"
+        if config.env_events_config:
+            epm = config.env_events_config.num_env_events_per_minute
+            config_info += f" | epm={epm}"
         if config.experiment_name:
             config_info = f"[{config.experiment_name}] {config_info}"
         tqdm.write(config_info)
 
+        # Get total count for progress bar
+        total = None
+        with contextlib.suppress(TypeError, AttributeError):
+            total = len(scenarios)
+
+        # Create progress bar once, reuse across all phases
+        desc = progress_description or "Running scenarios"
+        progress_bar = tqdm(
+            total=total,
+            desc=desc,
+            position=0,
+            leave=True,
+            mininterval=0.1,
+            maxinterval=1.0,
+            smoothing=0.3,
+            dynamic_ncols=True,
+            file=sys.stdout,
+        )
+        progress_bar.set_postfix({"Success": "0.0%"})
+
+        retry_attempts: dict[str, int] = {}
+
         try:
-            with stream_pool(
+            # Phase 1: Run all scenarios with full worker count
+            retry_queue = self._run_phase(
                 scenarios,
-                process_scenario,
-                max_workers=max_workers,
-                timeout_seconds=config.timeout_seconds,
-                executor_type=config.executor_type,
-                config=config,
-                user_agent_config_builder=self.user_agent_config_builder,
-                user_agent_builder=self.user_agent_builder,
-                proactive_agent_config_builder=self.proactive_agent_config_builder,
-                proactive_agent_builder=self.proactive_agent_builder,
-            ) as stream:
-                # Get total count if available
-                total = None
-                with contextlib.suppress(TypeError, AttributeError):
-                    total = len(scenarios)
+                config,
+                max_workers,
+                multi_result,
+                progress_bar,
+                retry_attempts,
+            )
 
-                desc = progress_description or "Running scenarios"
-                progress_bar = tqdm(
-                    stream,
-                    desc=desc,
-                    position=0,  # Top position for overall progress
-                    leave=True,
-                    total=total,
-                    mininterval=0.1,
-                    maxinterval=1.0,
-                    smoothing=0.3,
-                    dynamic_ncols=True,
-                    file=sys.stdout,
+            # Phase 2 and 3: Retry with reduced workers
+            retry_workers = max(1, max_workers // 2)
+            for phase in range(2, 4):
+                if not retry_queue or self._interrupted:
+                    break
+
+                gc.collect()
+                tqdm.write(
+                    f"Retrying {len(retry_queue)} scenarios with transient errors "
+                    f"(attempt {phase}/3, {retry_workers} workers)"
                 )
-                progress_bar.set_postfix({"Success": "0.0%"})
+                progress_bar.set_description(f"Retrying scenarios (attempt {phase}/3)")
 
-                for scenario, result, error in progress_bar:
-                    if self._interrupted:
-                        logger.info("Execution interrupted, stopping...")
-                        break
-
-                    # Extract scenario_id and run_number
-                    scenario_id = scenario.scenario_id if hasattr(scenario, "scenario_id") else str(scenario)
-                    run_number = getattr(scenario, "run_number", None)
-
-                    # Handle errors
-                    if error:
-                        if isinstance(error, (TimeoutError, concurrent.futures.TimeoutError)):
-                            logger.error(f"Scenario {scenario_id} timed out after {config.timeout_seconds} seconds")
-                            result = PASScenarioValidationResult(
-                                success=False,
-                                exception=ScenarioTimeoutError(
-                                    f"Scenario {scenario_id} timed out after {config.timeout_seconds} seconds"
-                                ),
-                                duration=float(config.timeout_seconds) if config.timeout_seconds else 0.0,
-                            )
-                        else:
-                            logger.error(f"Scenario {scenario_id} failed with exception: {error}")
-                            result = PASScenarioValidationResult(
-                                success=False,
-                                exception=error,
-                                duration=None,
-                            )
-
-                    if result is None:
-                        result = PASScenarioValidationResult(
-                            success=False,
-                            exception=Exception(f"Unknown error for scenario {scenario_id}"),
-                            duration=None,
-                        )
-
-                    processed_scenarios += 1
-                    multi_result.add_result(result, scenario_id, run_number)
-
-                    success_rate = multi_result.success_rate_updated()
-                    progress_bar.set_postfix({"Success": f"{success_rate:.1f}%"})
+                retry_queue = self._run_phase(
+                    retry_queue,
+                    config,
+                    retry_workers,
+                    multi_result,
+                    progress_bar,
+                    retry_attempts,
+                )
 
         except KeyboardInterrupt:
             logger.info("Received interrupt signal, stopping scenario execution...")
             self._interrupted = True
             raise
+        finally:
+            progress_bar.close()
 
-        if processed_scenarios == 0:
+        if len(multi_result.scenario_results) == 0:
             raise RuntimeError("No scenarios processed")
 
         multi_result.duration = time.time() - start_time
