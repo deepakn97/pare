@@ -23,7 +23,7 @@ from pas.benchmark.scenario_loader import (
     load_scenarios_by_split,
     load_scenarios_from_registry,
 )
-from pas.cli.utils import MODELS_MAP
+from pas.cli.utils import MODELS_MAP, LLMProbeError, probe_llm_endpoint
 from pas.logging_config import configure_logging, suppress_noisy_are_loggers, suppress_noisy_loggers
 from pas.multi_scenario_runner import MultiScenarioRunner
 from pas.scenarios.config import MultiScenarioRunnerConfig
@@ -426,14 +426,21 @@ def run_single_config(
 def _print_sweep_summary(
     configs: list[MultiScenarioRunnerConfig],
     all_results: dict[tuple[str, str, float, int], PASMultiScenarioValidationResult],
+    skipped_configs: list[tuple[str, str]] | None = None,
 ) -> None:
     """Print per-config summary with success/failure/exception counts.
 
     Args:
         configs: List of configs that were run.
         all_results: Mapping of config key to validation results.
+        skipped_configs: List of (config_descriptor, error_message) for configs
+            that were skipped due to LLM probe failures.
     """
-    typer.echo(f"\nBenchmark complete: {len(configs)} configs")
+    skipped = skipped_configs or []
+    ran_count = len(all_results)
+    skipped_count = len(skipped)
+    typer.echo(f"\nBenchmark complete: {len(configs)} configs ({ran_count} ran, {skipped_count} skipped)")
+
     for config_key, config_result_obj in all_results.items():
         _user_model, proactive_model, tfp, enmi = config_key
         result_df = config_result_obj.to_polars()
@@ -468,6 +475,9 @@ def _print_sweep_summary(
                 if len(msg) > 100:
                     msg = msg[:100] + "..."
                 typer.echo(f"    [{row['exception_type']}] x{row['count']}: {msg}")
+
+    for descriptor, error_msg in skipped:
+        typer.echo(f"  Skipped: {descriptor} -- {error_msg}")
 
 
 @app.command()
@@ -660,8 +670,24 @@ def sweep(
 
     # Run each config and collect results
     all_results: dict[tuple[str, str, float, int], PASMultiScenarioValidationResult] = {}
+    skipped_configs: list[tuple[str, str]] = []  # (config_descriptor, error_message)
     for i, config in enumerate(configs, 1):
         logger.info(f"Running config {i}/{len(configs)}")
+        config_descriptor = build_config_descriptor(config)
+
+        # Probe all unique LLM endpoints before running scenarios
+        try:
+            probed: set[tuple[str, str | None]] = set()
+            for engine in (config.user_engine_config, config.observe_engine_config, config.execute_engine_config):
+                engine_key = (engine.model_name, engine.provider)
+                if engine_key not in probed:
+                    probe_llm_endpoint(engine)
+                    probed.add(engine_key)
+        except LLMProbeError as e:
+            logger.warning(f"Skipping config {i}/{len(configs)} ({config_descriptor}): {e}")
+            skipped_configs.append((config_descriptor, str(e)))
+            continue
+
         _, result = run_single_config(
             config=config,
             scenario_iterator_factory=scenario_factory,
@@ -683,7 +709,7 @@ def sweep(
     save_text_report(results_dir / base_dir_name / "combined_report.txt", text_report)
 
     # Print summary
-    _print_sweep_summary(configs, all_results)
+    _print_sweep_summary(configs, all_results, skipped_configs)
 
 
 @app.command()

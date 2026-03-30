@@ -1,16 +1,33 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import litellm
 from are.simulation.agents.are_simulation_agent_config import (
     LLMEngineConfig,
 )
 from are.simulation.scenario_runner import ScenarioRunnerConfig
 from are.simulation.scenarios.utils.scenario_expander import EnvEventsConfig
 from are.simulation.types import ToolAugmentationConfig
+from litellm.exceptions import (
+    APIConnectionError as LiteLLMAPIConnectionError,
+)
+from litellm.exceptions import (
+    InternalServerError as LiteLLMInternalServerError,
+)
+from litellm.exceptions import (
+    RateLimitError as LiteLLMRateLimitError,
+)
+from litellm.exceptions import (
+    ServiceUnavailableError as LiteLLMServiceUnavailableError,
+)
+from litellm.exceptions import (
+    Timeout as LiteLLMTimeout,
+)
 from pytz import timezone
 
 from pas.logging_config import configure_logging, suppress_noisy_are_loggers, suppress_noisy_loggers
@@ -23,6 +40,79 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+class LLMProbeError(Exception):
+    """Raised when an LLM endpoint probe fails with a non-retryable error or times out."""
+
+
+# Transient errors that indicate the endpoint may become available.
+_RETRYABLE_PROBE_ERRORS = (
+    LiteLLMServiceUnavailableError,
+    LiteLLMAPIConnectionError,
+    LiteLLMRateLimitError,
+    LiteLLMInternalServerError,
+    LiteLLMTimeout,
+)
+
+
+def probe_llm_endpoint(
+    engine_config: LLMEngineConfig,
+    *,
+    timeout_seconds: int = 600,
+    poll_interval: int = 30,
+) -> None:
+    """Probe an LLM endpoint to verify it is ready to serve requests.
+
+    Sends a minimal completion request. Retries on transient errors (503, connection,
+    rate-limit) with a fixed poll interval until the endpoint responds or the timeout
+    is exceeded.
+
+    Args:
+        engine_config: The LLM engine configuration to probe.
+        timeout_seconds: Maximum seconds to wait for the endpoint to become ready.
+        poll_interval: Seconds between retry attempts.
+
+    Raises:
+        LLMProbeError: If the endpoint fails with a non-retryable error (e.g. auth)
+            or does not become ready within the timeout.
+    """
+    model_name = engine_config.model_name
+    provider = engine_config.provider
+
+    logger.info(f"Probing LLM endpoint: {model_name} (provider: {provider})")
+    start_time = time.monotonic()
+
+    while True:
+        try:
+            litellm.completion(
+                model=model_name,
+                custom_llm_provider=provider if provider != "local" else None,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+                num_retries=0,
+            )
+        except _RETRYABLE_PROBE_ERRORS as e:
+            elapsed = time.monotonic() - start_time
+            if elapsed + poll_interval > timeout_seconds:
+                raise LLMProbeError(
+                    f"LLM endpoint {model_name} not ready after {timeout_seconds}s. Last error: {type(e).__name__}: {e}"
+                ) from e
+            logger.warning(
+                f"LLM endpoint {model_name} returned {type(e).__name__}, "
+                f"retrying in {poll_interval}s ({elapsed:.0f}s elapsed)"
+            )
+            time.sleep(poll_interval)
+
+        except Exception as e:
+            raise LLMProbeError(
+                f"LLM endpoint {model_name} failed with non-retryable error: {type(e).__name__}: {e}"
+            ) from e
+        else:
+            elapsed = time.monotonic() - start_time
+            logger.info(f"LLM endpoint ready: {model_name} ({elapsed:.1f}s)")
+            return
+
 
 MODELS_MAP = {
     "gpt-4o-mini": {"model_name": "gpt-4o-mini", "provider": "openai"},
