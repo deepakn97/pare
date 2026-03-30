@@ -396,26 +396,31 @@ class TwoAgentScenarioRunner:
         # NOTE: ALWAYS EXPORT FOR NOW.
 
         # CLAUDE CODE: we need to implement the _export_pas_trace method to export everything.
-        has_hf_metadata = getattr(scenario, "hf_metadata", None) is not None
-        export_path = None
-        if user_agent is not None and proactive_agent is not None:
-            export_path = self._export_pas_trace(
-                env,
-                scenario,
-                user_agent.model,
-                user_agent.agent_framework,
-                proactive_agent.observe_model,
-                proactive_agent.execute_model,
-                proactive_agent.agent_framework,
-                validation_result,
-                run_duration,
-                output_dir=config.output_dir,
-                export_apps=not has_hf_metadata,
-                trace_dump_format=config.trace_dump_format,
-                runner_config=config,
-            )
-        validation_result.export_path = export_path
-        env.stop()
+        try:
+            has_hf_metadata = getattr(scenario, "hf_metadata", None) is not None
+            export_path = None
+            if user_agent is not None and proactive_agent is not None:
+                export_path = self._export_pas_trace(
+                    env,
+                    scenario,
+                    user_agent.model,
+                    user_agent.agent_framework,
+                    proactive_agent.observe_model,
+                    proactive_agent.execute_model,
+                    proactive_agent.agent_framework,
+                    validation_result,
+                    run_duration,
+                    output_dir=config.output_dir,
+                    export_apps=not has_hf_metadata,
+                    trace_dump_format=config.trace_dump_format,
+                    runner_config=config,
+                )
+            validation_result.export_path = export_path
+        except Exception:
+            logger.exception("Failed to export trace, returning result without export path")
+        finally:
+            env.stop()
+
         return validation_result
 
     def run(
