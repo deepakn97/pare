@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
+import polars as pl
 import typer
 
 from pas.benchmark.report_stats import (
@@ -26,6 +27,7 @@ from pas.cli.utils import MODELS_MAP
 from pas.logging_config import configure_logging, suppress_noisy_are_loggers, suppress_noisy_loggers
 from pas.multi_scenario_runner import MultiScenarioRunner
 from pas.scenarios.config import MultiScenarioRunnerConfig
+from pas.scenarios.validation_result import PAS_RESULT_SCHEMA
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -421,6 +423,53 @@ def run_single_config(
     return config_descriptor, result
 
 
+def _print_sweep_summary(
+    configs: list[MultiScenarioRunnerConfig],
+    all_results: dict[tuple[str, str, float, int], PASMultiScenarioValidationResult],
+) -> None:
+    """Print per-config summary with success/failure/exception counts.
+
+    Args:
+        configs: List of configs that were run.
+        all_results: Mapping of config key to validation results.
+    """
+    typer.echo(f"\nBenchmark complete: {len(configs)} configs")
+    for config_key, config_result_obj in all_results.items():
+        _user_model, proactive_model, tfp, enmi = config_key
+        result_df = config_result_obj.to_polars()
+        total = len(result_df)
+        success = result_df.filter(result_df["status"] == "success").height
+        failed = result_df.filter(result_df["status"] == "failed").height
+        exception_df = result_df.filter(result_df["has_exception"] == True)  # noqa: E712
+        exceptions = exception_df.height
+
+        noise_info = ""
+        if tfp > 0:
+            noise_info += f" tfp={tfp}"
+        if enmi > 0:
+            noise_info += f" epm={enmi}"
+
+        typer.echo(
+            f"  {proactive_model}{noise_info}: "
+            f"{total} total | {success} success | {failed} failed | {exceptions} exceptions"
+        )
+
+        if exceptions > 0:
+            exc_groups = (
+                exception_df.group_by("exception_type")
+                .agg(
+                    pl.col("exception_message").first().alias("sample_message"),
+                    pl.len().alias("count"),
+                )
+                .sort("count", descending=True)
+            )
+            for row in exc_groups.iter_rows(named=True):
+                msg = row["sample_message"] or "no message"
+                if len(msg) > 100:
+                    msg = msg[:100] + "..."
+                typer.echo(f"    [{row['exception_type']}] x{row['count']}: {msg}")
+
+
 @app.command()
 def sweep(
     # Scenario selection (mutually exclusive)
@@ -634,9 +683,7 @@ def sweep(
     save_text_report(results_dir / base_dir_name / "combined_report.txt", text_report)
 
     # Print summary
-    typer.echo(f"\nBenchmark complete: {len(configs)} configs")
-    for config_result in json_report.get("per_config_results", []):
-        typer.echo(f"  {config_result['proactive_model']}: {config_result['success_rate']:.1f}% success")
+    _print_sweep_summary(configs, all_results)
 
 
 @app.command()
@@ -655,10 +702,6 @@ def report(
     Reads all *_result.json files from the given directory, combines them
     into a single DataFrame, and generates combined JSON and text reports.
     """
-    import polars as pl
-
-    from pas.scenarios.validation_result import PAS_RESULT_SCHEMA
-
     results_dir = results_dir.resolve()
     if not results_dir.exists():
         typer.echo(f"Error: Results directory not found: {results_dir}", err=True)
