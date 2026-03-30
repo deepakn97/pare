@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import contextlib
+import errno
 import itertools
 import logging
 import multiprocessing
@@ -37,6 +38,29 @@ class ScenarioTimeoutError(Exception):
     """Scenario exectution timed out."""
 
     pass
+
+
+RETRYABLE_ERRNOS = {errno.EMFILE, errno.ENFILE, errno.ENOMEM}
+MAX_RETRIES = 2
+
+
+def _is_retryable_error(
+    error: Exception | None,
+    result: PASScenarioValidationResult | None,
+) -> bool:
+    """Check if a failure is caused by a transient OS resource error.
+
+    Args:
+        error: Exception from stream_pool error path (thrown by worker).
+        result: Validation result that may contain a wrapped exception.
+
+    Returns:
+        True if the error is a retryable OS resource error.
+    """
+    exc = error or (result.exception if result else None)
+    if exc is None:
+        return False
+    return isinstance(exc, OSError) and getattr(exc, "errno", None) in RETRYABLE_ERRNOS
 
 
 def _create_scenario_runner_config(
