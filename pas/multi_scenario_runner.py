@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import concurrent.futures
 import contextlib
-import errno
 import gc
 import itertools
 import logging
@@ -21,6 +20,7 @@ from typing import TYPE_CHECKING, Never
 from are.simulation.utils.streaming_utils import stream_pool
 from tqdm import tqdm
 
+from pas.constants import RETRYABLE_ERRNOS
 from pas.scenario_runner import TwoAgentScenarioRunner
 from pas.scenarios.config import MultiScenarioRunnerConfig, ScenarioRunnerConfig
 from pas.scenarios.validation_result import PASMultiScenarioValidationResult, PASScenarioValidationResult
@@ -41,7 +41,6 @@ class ScenarioTimeoutError(Exception):
     pass
 
 
-RETRYABLE_ERRNOS = {errno.EMFILE, errno.ENFILE, errno.ENOMEM}
 MAX_RETRIES = 2
 
 

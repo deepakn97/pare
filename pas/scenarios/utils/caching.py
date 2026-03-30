@@ -5,7 +5,6 @@ The changes are minimal and primarily involve updating imports and type hints to
 
 from __future__ import annotations
 
-import errno
 import json
 import logging
 import os
@@ -17,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 import xxhash
 from dotenv import load_dotenv
 
+from pas.constants import RETRYABLE_ERRNOS
 from pas.scenarios.validation_result import PASScenarioValidationResult
 
 if TYPE_CHECKING:
@@ -309,7 +309,6 @@ def maybe_load_cached_result(
         return None
 
 
-_RETRYABLE_ERRNOS = {errno.EMFILE, errno.ENFILE, errno.ENOMEM}
 _CACHE_WRITE_MAX_ATTEMPTS = 3
 
 
@@ -334,7 +333,7 @@ def write_cached_result(
             break
 
         except OSError as e:
-            if e.errno in _RETRYABLE_ERRNOS and attempt < _CACHE_WRITE_MAX_ATTEMPTS - 1:
+            if e.errno in RETRYABLE_ERRNOS and attempt < _CACHE_WRITE_MAX_ATTEMPTS - 1:
                 wait_time = 2 * (attempt + 1)
                 logger.warning(
                     f"Cache write failed for {scenario.scenario_id} ({e}), "
