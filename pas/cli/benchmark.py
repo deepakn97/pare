@@ -423,6 +423,54 @@ def run_single_config(
     return config_descriptor, result
 
 
+def _print_config_result(
+    config_key: tuple[str, str, float, int],
+    config_result_obj: PASMultiScenarioValidationResult,
+    *,
+    prefix: str = "  ",
+) -> None:
+    """Print summary stats for a single config result.
+
+    Args:
+        config_key: Tuple of (user_model, proactive_model, tfp, enmi).
+        config_result_obj: Validation results for this config.
+        prefix: String prefix for each output line.
+    """
+    _user_model, proactive_model, tfp, enmi = config_key
+    result_df = config_result_obj.to_polars()
+    total = len(result_df)
+    success = result_df.filter(result_df["status"] == "success").height
+    failed = result_df.filter(result_df["status"] == "failed").height
+    exception_df = result_df.filter(result_df["has_exception"] == True)  # noqa: E712
+    exceptions = exception_df.height
+
+    noise_info = ""
+    if tfp > 0:
+        noise_info += f" tfp={tfp}"
+    if enmi > 0:
+        noise_info += f" epm={enmi}"
+
+    typer.echo(
+        f"{prefix}{proactive_model}{noise_info}: "
+        f"{total} total | {success} success | {failed} failed | {exceptions} exceptions"
+    )
+
+    if exceptions > 0:
+        exc_groups = (
+            exception_df.group_by("exception_type")
+            .agg(
+                pl.col("exception_message").first().alias("sample_message"),
+                pl.len().alias("count"),
+            )
+            .sort("count", descending=True)
+        )
+        for row in exc_groups.iter_rows(named=True):
+            msg = row["sample_message"] or "no message"
+            if len(msg) > 100:
+                msg = msg[:100] + "..."
+            typer.echo(f"{prefix}  [{row['exception_type']}] x{row['count']}: {msg}")
+
+
 def _print_sweep_summary(
     configs: list[MultiScenarioRunnerConfig],
     all_results: dict[tuple[str, str, float, int], PASMultiScenarioValidationResult],
@@ -442,39 +490,7 @@ def _print_sweep_summary(
     typer.echo(f"\nBenchmark complete: {len(configs)} configs ({ran_count} ran, {skipped_count} skipped)")
 
     for config_key, config_result_obj in all_results.items():
-        _user_model, proactive_model, tfp, enmi = config_key
-        result_df = config_result_obj.to_polars()
-        total = len(result_df)
-        success = result_df.filter(result_df["status"] == "success").height
-        failed = result_df.filter(result_df["status"] == "failed").height
-        exception_df = result_df.filter(result_df["has_exception"] == True)  # noqa: E712
-        exceptions = exception_df.height
-
-        noise_info = ""
-        if tfp > 0:
-            noise_info += f" tfp={tfp}"
-        if enmi > 0:
-            noise_info += f" epm={enmi}"
-
-        typer.echo(
-            f"  {proactive_model}{noise_info}: "
-            f"{total} total | {success} success | {failed} failed | {exceptions} exceptions"
-        )
-
-        if exceptions > 0:
-            exc_groups = (
-                exception_df.group_by("exception_type")
-                .agg(
-                    pl.col("exception_message").first().alias("sample_message"),
-                    pl.len().alias("count"),
-                )
-                .sort("count", descending=True)
-            )
-            for row in exc_groups.iter_rows(named=True):
-                msg = row["sample_message"] or "no message"
-                if len(msg) > 100:
-                    msg = msg[:100] + "..."
-                typer.echo(f"    [{row['exception_type']}] x{row['count']}: {msg}")
+        _print_config_result(config_key, config_result_obj)
 
     for descriptor, error_msg in skipped:
         typer.echo(f"  Skipped: {descriptor} -- {error_msg}")
@@ -697,7 +713,10 @@ def sweep(
             results_dir=results_dir,
             output_dir=output_dir,
         )
-        all_results[build_result_key(config)] = result
+        config_key = build_result_key(config)
+        all_results[config_key] = result
+        typer.echo(f"\nConfig {i}/{len(configs)} complete:")
+        _print_config_result(config_key, result)
 
     # Combine results and generate reports
     combined_df = combine_results_to_dataframe(all_results)
