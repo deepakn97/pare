@@ -88,8 +88,7 @@ def probe_llm_endpoint(
             litellm.completion(
                 model=model_name,
                 custom_llm_provider=provider if provider != "local" else None,
-                messages=[{"role": "user", "content": "hi"}],
-                max_tokens=1,
+                messages=[{"role": "user", "content": "Reply with only the word ok"}],
                 num_retries=0,
             )
         except _RETRYABLE_PROBE_ERRORS as e:
@@ -144,11 +143,11 @@ MODELS_MAP = {
     "minimax-2.5": {"model_name": "accounts/fireworks/models/minimax-m2p5", "provider": "fireworks_ai"},
     # These models do not support serverless so we use a autoscaled deployment.
     "llama-3.2-3b-it": {
-        "model_name": "accounts/eric-lab/deployments/srcfs0r1",
+        "model_name": "accounts/eric-lab/deployments/n6f1bvuo",
         "provider": "fireworks_ai",
     },
     "gemma-3-4b-it": {
-        "model_name": "accounts/eric-lab/deployments/jwokodcv",
+        "model_name": "accounts/eric-lab/deployments/y65wjbfd",
         "provider": "fireworks_ai",
     },
     "qwen-3-4b-it": {
