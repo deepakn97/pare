@@ -1,9 +1,8 @@
 """Observation formatter for converting raw tool observations to human-readable text.
 
-.. deprecated::
-    This module is part of the old binary annotation pipeline and will be removed
-    after the UI update. The ternary pipeline uses raw ``llm_input`` messages instead
-    of formatted observations.
+Used by ``Sample.to_api_response()`` to format tool observations and notifications
+for human annotators. A redesign using proper typed object parsing is tracked as a
+separate feature (see observation-formatter-redesign feature doc).
 
 This module provides formatters for all return types used in PAS apps.
 """

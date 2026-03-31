@@ -3,18 +3,12 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import io
 import json
 import re
-from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
 from uuid import uuid4
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 from pydantic import BaseModel
 
@@ -49,119 +43,6 @@ class SampleResponse(BaseModel):
     tutorial: bool = False
 
 
-@dataclass
-class ActionWithObservation:
-    """A single user action with its formatted observation.
-
-    .. deprecated::
-        Part of old binary pipeline. Will be removed after UI update.
-    """
-
-    action: str  # e.g., "Messages__open_conversation(conversation_id='fc78...')"
-    observation: str  # Formatted, human-readable observation
-    raw_observation: Any = None  # Original observation data (for debugging)
-    timestamp: float | None = None  # Unix timestamp of the action
-
-
-@dataclass
-class Turn:
-    """A single turn of user interaction.
-
-    .. deprecated::
-        Part of old binary pipeline. Will be removed after UI update.
-    """
-
-    turn_number: int
-    notifications: list[str] = field(default_factory=list)
-    actions: list[ActionWithObservation] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return {
-            "turn_number": self.turn_number,
-            "notifications": self.notifications,
-            "actions": [
-                {"action": a.action, "observation": a.observation, "timestamp": a.timestamp} for a in self.actions
-            ],
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Turn:
-        """Create from dictionary."""
-        return cls(
-            turn_number=data["turn_number"],
-            notifications=data.get("notifications", []),
-            actions=[
-                ActionWithObservation(
-                    action=a["action"],
-                    observation=a["observation"],
-                    timestamp=a.get("timestamp"),
-                )
-                for a in data.get("actions", [])
-            ],
-        )
-
-
-@dataclass
-class DecisionPoint:
-    """A single decision point extracted from a trace.
-
-    .. deprecated::
-        Superseded by ``pas.trajectory.models.DecisionPoint`` which supports
-        ternary decisions. Will be removed after UI update.
-
-    Represents a moment when the user agent made an accept/reject decision
-    on a proactive agent's proposal.
-    """
-
-    sample_id: str  # {scenario_id}_run_{run_number}_{content_hash}
-    scenario_id: str
-    run_number: int
-    proactive_model_id: str
-    user_model_id: str
-    trace_file: Path
-    meta_task_description: str  # From scenario metadata (may be empty)
-    turns: list[Turn]  # All turns before this decision
-    agent_proposal: str  # The proposal text
-    user_agent_decision: bool  # True=accept, False=reject
-    decision_timestamp: float  # Timestamp of the decision event
-
-    @staticmethod
-    def generate_sample_id(scenario_id: str, run_number: int, proposal: str, decision_timestamp: float) -> str:
-        """Generate a unique sample ID.
-
-        Args:
-            scenario_id: The scenario identifier.
-            run_number: The run number.
-            proposal: The agent's proposal text.
-            decision_timestamp: Timestamp of the decision.
-
-        Returns:
-            A unique sample ID string.
-        """
-        content = f"{scenario_id}_{run_number}_{proposal}_{decision_timestamp}"
-        content_hash = hashlib.sha256(content.encode()).hexdigest()[:8]
-        return f"{scenario_id}_run_{run_number}_{content_hash}"
-
-    def to_sample_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for parquet storage."""
-        return {
-            "sample_id": self.sample_id,
-            "scenario_id": self.scenario_id,
-            "run_number": self.run_number,
-            "proactive_model_id": self.proactive_model_id,
-            "user_model_id": self.user_model_id,
-            "trace_file": str(self.trace_file),
-            "user_agent_decision": self.user_agent_decision,
-            "agent_proposal": self.agent_proposal,
-            "meta_task_description": self.meta_task_description,
-            "decision_timestamp": self.decision_timestamp,
-            "context_json": json.dumps({
-                "turns": [t.to_dict() for t in self.turns],
-            }),
-        }
-
-
 class Sample(BaseModel):
     """A sample for annotation (loaded from parquet)."""
 
@@ -180,14 +61,6 @@ class Sample(BaseModel):
     tutorial: bool = False
     correct_decision: TernaryDecision | None = None
     explanation: str | None = None
-
-    def get_turns(self) -> list[Turn]:
-        """Parse and return the turns from context_json.
-
-        Note: This method is kept for backward compatibility but is not used
-        by the new ternary decision pipeline.
-        """
-        raise NotImplementedError("get_turns() is not supported in the ternary decision pipeline")
 
     # Message types to strip from UI rendering
     _STRIPPED_MSG_TYPES: frozenset[str] = frozenset({
