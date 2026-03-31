@@ -12,7 +12,8 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
-from pas.annotation.models import Annotation, Sample
+from pas.annotation.models import Annotation, Sample, SampleResponse
+from pas.trajectory.models import TernaryDecision  # noqa: TC001 - Pydantic needs runtime access
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,8 @@ class AnnotationRequest(BaseModel):
     """Request body for submitting an annotation."""
 
     sample_id: str
-    decision: bool | str
+    decision: TernaryDecision
+    gather_context_rationale: str | None = None
 
 
 class AnnotationServer:
@@ -132,14 +134,16 @@ class AnnotationServer:
         self,
         sample_id: str,
         annotator_id: str,
-        human_decision: bool | str,
+        human_decision: TernaryDecision,
+        gather_context_rationale: str | None = None,
     ) -> bool:
         """Record an annotation.
 
         Args:
             sample_id: The sample being annotated.
             annotator_id: The annotator's anonymous ID.
-            human_decision: The human's accept/reject decision.
+            human_decision: The human's accept/reject/gather_context decision.
+            gather_context_rationale: Free-text rationale when decision is gather_context.
 
         Returns:
             True if recorded successfully.
@@ -152,17 +156,14 @@ class AnnotationServer:
             raise ValueError(f"Sample not found: {sample_id}")
 
         with self._lock:
-            # Check if user already annotated this sample
             if annotator_id in self._user_annotations and sample_id in self._user_annotations[annotator_id]:
                 raise ValueError(f"User {annotator_id} already annotated sample {sample_id}")
 
-            # Create annotation
-            # TODO(ternary): Server still uses binary bool decisions from old UI.
-            # Will be updated to pass Literal values when UI supports ternary decisions.
             annotation = Annotation.create(
                 sample_id=sample_id,
                 annotator_id=annotator_id,
-                human_decision=str(human_decision),  # type: ignore[arg-type]
+                human_decision=human_decision,
+                gather_context_rationale=gather_context_rationale,
             )
 
             # Append to file
@@ -255,7 +256,9 @@ def create_app(samples_file: Path, annotations_file: Path, annotators_per_sample
         return FileResponse(TEMPLATES_DIR / "index.html")
 
     @app.get("/api/sample")
-    async def get_sample(x_annotator_id: str = Header(None, alias="X-Annotator-ID")) -> dict[str, Any]:
+    async def get_sample(
+        x_annotator_id: str = Header(None, alias="X-Annotator-ID"),
+    ) -> SampleResponse | dict[str, Any]:
         """Get the next sample for annotation."""
         if not x_annotator_id:
             raise HTTPException(status_code=400, detail="X-Annotator-ID header required")
@@ -286,6 +289,7 @@ def create_app(samples_file: Path, annotations_file: Path, annotators_per_sample
                 sample_id=request.sample_id,
                 annotator_id=x_annotator_id,
                 human_decision=request.decision,
+                gather_context_rationale=request.gather_context_rationale,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
@@ -304,7 +308,7 @@ def create_app(samples_file: Path, annotations_file: Path, annotators_per_sample
 
         return {
             "success": True,
-            "next_sample": next_sample.to_api_response(progress["completed"], progress["total"]),
+            "next_sample": next_sample.to_api_response(progress["completed"], progress["total"]).model_dump(),
         }
 
     @app.get("/api/progress")

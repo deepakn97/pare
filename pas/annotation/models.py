@@ -317,6 +317,7 @@ class Annotation(BaseModel):
         sample_id: str,
         annotator_id: str,
         human_decision: TernaryDecision,
+        gather_context_rationale: str | None = None,
     ) -> Annotation:
         """Create a new annotation record.
 
@@ -324,6 +325,7 @@ class Annotation(BaseModel):
             sample_id: The sample being annotated.
             annotator_id: The annotator's anonymous ID.
             human_decision: The human's accept/reject/gather_context decision.
+            gather_context_rationale: Free-text rationale when decision is gather_context.
 
         Returns:
             A new Annotation instance.
@@ -333,7 +335,7 @@ class Annotation(BaseModel):
             sample_id=sample_id,
             annotator_id=annotator_id,
             human_decision=human_decision,
-            gather_context_rationale=None,
+            gather_context_rationale=gather_context_rationale,
             timestamp=datetime.now().isoformat(),
         )
 
