@@ -22,7 +22,6 @@
             max-width: 100%;
             overflow-wrap: break-word;
         }
-        /* Chat bubble styles */
         .user-bubble {
             background-color: #dbeafe;
             border-radius: 1rem 1rem 1rem 0.25rem;
@@ -45,7 +44,10 @@
     <div class="max-w-3xl mx-auto px-4 py-8">
         <!-- Header -->
         <div class="bg-white rounded-lg shadow-sm p-4 mb-6 flex justify-between items-center">
-            <h1 class="text-xl font-semibold text-gray-800">PAS Annotation Study</h1>
+            <div class="flex items-center gap-2">
+                <h1 class="text-xl font-semibold text-gray-800">PAS Annotation Study</h1>
+                <span id="tutorial-badge" class="hidden bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-semibold">TUTORIAL</span>
+            </div>
             <div id="progress-display" class="text-sm text-gray-600">
                 Progress: <span id="progress-completed">0</span>/<span id="progress-total">0</span>
             </div>
@@ -75,21 +77,113 @@
                 <p class="text-gray-600">Loading...</p>
             </div>
 
+            <!-- Instructions state (hidden initially) -->
+            <div id="instructions-state" class="hidden">
+                <div class="bg-white rounded-lg shadow-sm p-7 mb-5">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-2">Welcome to the PAS Annotation Study</h2>
+                    <p class="text-gray-500 text-sm">Please read the instructions carefully before proceeding.</p>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3">Your Task</h3>
+                    <p class="text-sm text-gray-700 leading-relaxed mb-3">
+                        You will be shown a series of interactions between a <strong>user</strong> and their <strong>AI assistant</strong> on a mobile phone. The user performs actions (opening apps, reading messages, etc.) and at some point the assistant makes a <strong>proposal</strong> to help the user.
+                    </p>
+                    <p class="text-sm text-gray-700 leading-relaxed">
+                        Your job is to decide: <strong>if you were the user, what would you do with this proposal?</strong>
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">Your Three Options</h3>
+
+                    <div class="flex gap-3 mb-4 p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
+                        <span class="bg-green-500 text-white px-3 py-1 rounded text-xs font-bold h-fit">ACCEPT</span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700">The proposal is helpful and appropriate</p>
+                            <p class="text-xs text-gray-500 mt-1">The assistant correctly understood what the user needs and the proposed action makes sense given the context.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 mb-4 p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
+                        <span class="bg-red-500 text-white px-3 py-1 rounded text-xs font-bold h-fit">REJECT</span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700">The proposal is wrong, unhelpful, or inappropriate</p>
+                            <p class="text-xs text-gray-500 mt-1">The assistant misunderstood the situation, the proposed action is incorrect, or the timing is bad.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                        <span class="bg-blue-500 text-white px-3 py-1 rounded text-[10px] font-bold h-fit whitespace-nowrap">I NEED MORE INFO</span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700">You can't decide without additional information</p>
+                            <p class="text-xs text-gray-500 mt-1">The proposal might be good, but you'd need to check something first. You'll be asked to briefly describe what info you'd need.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">Reading the Interface</h3>
+                    <div class="flex flex-wrap gap-4">
+                        <div class="flex-1 min-w-[180px] p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">U</span>
+                                <span class="text-xs font-semibold text-gray-700">User Actions</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Blue bubbles on the left show what the user did, with the result shown below.</p>
+                        </div>
+                        <div class="flex-1 min-w-[180px] p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">A</span>
+                                <span class="text-xs font-semibold text-gray-700">Assistant Proposal</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Amber bubble on the right marked "NEW" is what you're deciding on.</p>
+                        </div>
+                        <div class="flex-1 min-w-[180px] p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-green-500 text-sm">&#128276;</span>
+                                <span class="text-xs font-semibold text-gray-700">Notifications</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Green centered bubbles show system notifications that appeared during the interaction.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-amber-50 border border-amber-300 rounded-lg p-5 mb-6">
+                    <p class="text-sm font-semibold text-amber-800 mb-1">Important</p>
+                    <p class="text-xs text-amber-700 leading-relaxed">
+                        Events are shown in <strong>chronological order</strong> -- read them top to bottom like a timeline. Put yourself in the user's shoes and decide based on all the context you see.
+                    </p>
+                </div>
+
+                <div class="text-center">
+                    <button id="start-tutorial-btn"
+                            class="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-colors">
+                        I Understand, Show Me Examples
+                    </button>
+                    <p class="text-xs text-gray-400 mt-2">You'll complete practice examples before starting</p>
+                </div>
+            </div>
+
             <!-- Sample state (hidden initially) -->
             <div id="sample-state" class="hidden">
+                <!-- Tutorial practice banner (shown only during tutorial) -->
+                <div id="tutorial-banner" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                    <strong>Practice mode</strong> -- annotate this example like a real sample. You'll see feedback after submitting.
+                </div>
+
                 <!-- Scenario Context -->
                 <div id="context-section" class="bg-white rounded-lg shadow-sm p-4 mb-4 hidden">
                     <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Scenario Context</h2>
                     <p id="context-text" class="text-gray-700"></p>
                 </div>
 
-                <!-- Chat Container (chronological messages rendered here) -->
+                <!-- Chat Container -->
                 <div id="chat-container" class="bg-white rounded-lg shadow-sm p-4 mb-4 space-y-4">
                 </div>
 
                 <!-- Decision Panel -->
                 <div id="decision-panel" class="bg-white rounded-lg shadow-sm p-6 text-center">
-                    <!-- Three buttons state -->
                     <div id="decision-buttons">
                         <p class="text-gray-700 mb-4">What would you do with this proposal?</p>
                         <div class="flex justify-center gap-3 flex-wrap">
@@ -108,7 +202,6 @@
                         </div>
                     </div>
 
-                    <!-- Rationale input state (hidden initially) -->
                     <div id="rationale-input" class="hidden">
                         <p class="text-gray-800 font-semibold mb-1">What information would you need before deciding?</p>
                         <p class="text-gray-500 text-sm mb-3">Briefly describe what you'd want to check or verify.</p>
@@ -128,6 +221,35 @@
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Tutorial feedback state (hidden initially) -->
+            <div id="tutorial-feedback-state" class="hidden">
+                <div id="tutorial-feedback-banner" class="rounded-xl p-6 text-center mb-5">
+                </div>
+                <div id="tutorial-feedback-explanation" class="bg-white rounded-lg shadow-sm p-5 mb-5">
+                </div>
+                <div class="text-center">
+                    <button id="tutorial-next-btn"
+                            class="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-colors">
+                        Next Example
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tutorial summary state (hidden initially) -->
+            <div id="tutorial-summary-state" class="hidden">
+                <div class="bg-white rounded-xl shadow-sm p-8 text-center mb-5">
+                    <p class="text-sm text-gray-500 mb-1">Tutorial Complete</p>
+                    <p id="tutorial-score" class="text-5xl font-extrabold text-gray-800 mb-1"></p>
+                    <p id="tutorial-percentage" class="text-base text-gray-500"></p>
+                </div>
+                <div class="text-center">
+                    <button id="begin-annotation-btn"
+                            class="px-10 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg shadow-md text-lg transition-colors">
+                        Begin Annotation
+                    </button>
                 </div>
             </div>
 
@@ -179,13 +301,26 @@
 
         const annotatorId = getAnnotatorId();
         let currentSampleId = null;
+        let isTutorialMode = false;
 
         function showState(stateName) {
-            document.getElementById('loading-state').classList.add('hidden');
-            document.getElementById('sample-state').classList.add('hidden');
-            document.getElementById('completion-state').classList.add('hidden');
-            document.getElementById('error-state').classList.add('hidden');
-            document.getElementById(stateName + '-state').classList.remove('hidden');
+            const states = ['loading', 'instructions', 'sample', 'tutorial-feedback', 'tutorial-summary', 'completion', 'error'];
+            states.forEach(s => {
+                const el = document.getElementById(s + '-state');
+                if (el) el.classList.add('hidden');
+            });
+            const target = document.getElementById(stateName + '-state');
+            if (target) target.classList.remove('hidden');
+
+            // Show/hide tutorial badge
+            const badge = document.getElementById('tutorial-badge');
+            if (stateName === 'sample' && isTutorialMode) {
+                badge.classList.remove('hidden');
+            } else if (stateName === 'tutorial-feedback') {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
         }
 
         function updateProgress(completed, total) {
@@ -287,15 +422,13 @@
                 const msg = messages[i];
 
                 if (msg.msg_type === 'user_action') {
-                    // Check if next message is a paired tool_observation
                     let observation = null;
                     if (i + 1 < messages.length && messages[i + 1].msg_type === 'tool_observation') {
                         observation = messages[i + 1].content;
-                        i++; // Skip the observation in the next iteration
+                        i++;
                     }
                     container.appendChild(renderUserAction(msg.content, msg.timestamp, observation));
                 } else if (msg.msg_type === 'tool_observation') {
-                    // Standalone observation (not paired) -- render as observation without action text
                     container.appendChild(renderUserAction('(observation)', msg.timestamp, msg.content));
                 } else if (msg.msg_type === 'proposal') {
                     container.appendChild(renderProposal(msg.content, msg.timestamp));
@@ -312,7 +445,16 @@
 
         function renderSample(data) {
             currentSampleId = data.sample_id;
+            isTutorialMode = data.tutorial || false;
             updateProgress(data.progress_completed, data.progress_total);
+
+            // Show/hide tutorial banner
+            const tutorialBanner = document.getElementById('tutorial-banner');
+            if (isTutorialMode) {
+                tutorialBanner.classList.remove('hidden');
+            } else {
+                tutorialBanner.classList.add('hidden');
+            }
 
             // Scenario context
             const contextSection = document.getElementById('context-section');
@@ -335,6 +477,56 @@
             showState('sample');
         }
 
+        // --- Tutorial feedback and summary ---
+
+        function showTutorialFeedback(feedback) {
+            const banner = document.getElementById('tutorial-feedback-banner');
+            const explanation = document.getElementById('tutorial-feedback-explanation');
+
+            if (feedback.correct === null || feedback.correct === undefined) {
+                // Ambiguous example (gather context)
+                banner.className = 'rounded-xl p-6 text-center mb-5 bg-blue-50 border-2 border-blue-400';
+                banner.innerHTML = `
+                    <p class="text-lg font-bold text-blue-800 mb-1">Here's how to think about this:</p>
+                `;
+            } else if (feedback.correct) {
+                banner.className = 'rounded-xl p-6 text-center mb-5 bg-green-50 border-2 border-green-500';
+                banner.innerHTML = `
+                    <p class="text-2xl mb-2">&#10003;</p>
+                    <p class="text-lg font-bold text-green-800">Correct!</p>
+                `;
+            } else {
+                const correctLabel = escapeHtml((feedback.correct_decision || '').replace('_', ' ').toUpperCase());
+                banner.className = 'rounded-xl p-6 text-center mb-5 bg-red-50 border-2 border-red-500';
+                banner.innerHTML = `
+                    <p class="text-2xl mb-2">&#10007;</p>
+                    <p class="text-lg font-bold text-red-800 mb-1">Incorrect</p>
+                    <p class="text-sm text-gray-600">Correct answer: <strong class="text-green-600">${correctLabel}</strong></p>
+                `;
+            }
+
+            const headingDecision = escapeHtml((feedback.correct_decision || '').replace('_', ' '));
+            const heading = feedback.correct === null ? 'Reasoning:' :
+                           (feedback.correct ? 'Why this is correct:' :
+                           `Why ${headingDecision} is correct:`);
+            explanation.innerHTML = `
+                <p class="text-sm font-semibold text-gray-700 mb-2">${heading}</p>
+                <p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(feedback.explanation)}</p>
+            `;
+
+            showState('tutorial-feedback');
+        }
+
+        function showTutorialSummary(summary) {
+            document.getElementById('tutorial-score').textContent = `${summary.correct}/${summary.scored_total}`;
+            const pct = summary.scored_total > 0 ? Math.round(summary.correct / summary.scored_total * 100) : 0;
+            document.getElementById('tutorial-percentage').textContent = `${pct}% correct on scored examples`;
+            localStorage.setItem('pas_tutorial_completed', 'true');
+            showState('tutorial-summary');
+        }
+
+        // --- Loading and submission ---
+
         async function loadNextSample() {
             showState('loading');
 
@@ -351,7 +543,7 @@
 
                 const data = await response.json();
 
-                if (data.sample_id === null) {
+                if (data.sample_id === null || data.sample_id === undefined) {
                     document.getElementById('completion-message').textContent = data.message || 'You have completed all available samples.';
                     if (data.progress) {
                         updateProgress(data.progress.completed, data.progress.total);
@@ -362,6 +554,43 @@
                 }
             } catch (error) {
                 console.error('Error loading sample:', error);
+                document.getElementById('error-message').textContent = error.message;
+                showState('error');
+            }
+        }
+
+        async function checkTutorialStatus() {
+            showState('loading');
+
+            try {
+                const response = await fetch('/api/sample', {
+                    headers: { 'X-Annotator-ID': annotatorId }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.sample_id === null || data.sample_id === undefined) {
+                    // No samples at all
+                    document.getElementById('completion-message').textContent = data.message || 'No samples available.';
+                    showState('completion');
+                } else if (data.tutorial) {
+                    // Tutorial sample -- show instructions first (if not seen before)
+                    if (localStorage.getItem('pas_tutorial_completed') === 'true') {
+                        // Already completed tutorial in previous session, but server says otherwise
+                        // Server is authority -- clear localStorage and re-do tutorial
+                        localStorage.removeItem('pas_tutorial_completed');
+                    }
+                    showState('instructions');
+                } else {
+                    // Real sample -- tutorial already completed
+                    renderSample(data);
+                }
+            } catch (error) {
+                console.error('Error checking tutorial status:', error);
                 document.getElementById('error-message').textContent = error.message;
                 showState('error');
             }
@@ -403,7 +632,26 @@
 
                 const data = await response.json();
 
-                if (data.next_sample) {
+                // Handle tutorial feedback
+                if (data.tutorial_feedback) {
+                    showTutorialFeedback(data.tutorial_feedback);
+
+                    // Check if tutorial is complete
+                    if (data.tutorial_complete) {
+                        // Store summary for after feedback is dismissed
+                        document.getElementById('tutorial-next-btn').onclick = function() {
+                            showTutorialSummary(data.tutorial_summary);
+                        };
+                        document.getElementById('tutorial-next-btn').textContent = 'View Results';
+                    } else if (data.next_sample) {
+                        // More tutorial samples -- "Next" loads the next one
+                        document.getElementById('tutorial-next-btn').onclick = function() {
+                            renderSample(data.next_sample);
+                        };
+                        document.getElementById('tutorial-next-btn').textContent = 'Next Example';
+                    }
+                } else if (data.next_sample) {
+                    // Real annotation -- render next sample
                     renderSample(data.next_sample);
                 } else {
                     document.getElementById('completion-message').textContent = data.message || 'You have completed all available samples.';
@@ -421,11 +669,13 @@
             setButtonsDisabled(false);
         }
 
-        // Button listeners -- Accept and Reject submit immediately
+        // --- Button listeners ---
+
+        // Accept and Reject submit immediately
         document.getElementById('accept-btn').addEventListener('click', () => submitAnnotation('accept'));
         document.getElementById('reject-btn').addEventListener('click', () => submitAnnotation('reject'));
 
-        // Gather context flow -- show rationale input
+        // Gather context flow
         document.getElementById('gather-btn').addEventListener('click', () => {
             document.getElementById('decision-buttons').classList.add('hidden');
             document.getElementById('rationale-input').classList.remove('hidden');
@@ -438,7 +688,6 @@
             document.getElementById('rationale-text').value = '';
         });
 
-        // Enable/disable submit based on rationale text
         document.getElementById('rationale-text').addEventListener('input', (e) => {
             document.getElementById('submit-rationale-btn').disabled = e.target.value.trim().length === 0;
         });
@@ -450,8 +699,14 @@
             }
         });
 
-        // Start loading
-        loadNextSample();
+        // Tutorial: "I Understand" -> load first tutorial sample
+        document.getElementById('start-tutorial-btn').addEventListener('click', loadNextSample);
+
+        // Tutorial: "Begin Annotation" -> load first real sample
+        document.getElementById('begin-annotation-btn').addEventListener('click', loadNextSample);
+
+        // Start with tutorial check
+        checkTutorialStatus();
     </script>
 </body>
 </html>
