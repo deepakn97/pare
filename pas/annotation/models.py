@@ -46,6 +46,7 @@ class SampleResponse(BaseModel):
     messages: list[UIMessage]
     progress_completed: int
     progress_total: int
+    tutorial: bool = False
 
 
 @dataclass
@@ -176,6 +177,9 @@ class Sample(BaseModel):
     llm_input: str
     final_decision: bool
     gather_context_delta: str | None = None
+    tutorial: bool = False
+    correct_decision: TernaryDecision | None = None
+    explanation: str | None = None
 
     def get_turns(self) -> list[Turn]:
         """Parse and return the turns from context_json.
@@ -298,6 +302,7 @@ class Sample(BaseModel):
             messages=messages,
             progress_completed=progress_completed,
             progress_total=progress_total,
+            tutorial=self.tutorial,
         )
 
 
