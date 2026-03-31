@@ -102,8 +102,47 @@ def _print_sample_stats(samples: list[TernaryDecisionPoint], output_file: Path) 
     typer.echo(f"\nSamples saved to: {output_file}")
 
 
+def _copy_tutorial_examples(tutorial_path: Path, output_file: Path) -> None:
+    """Copy tutorial examples into the output parquet file.
+
+    If the output file already exists, removes any existing tutorial rows
+    before appending to avoid duplication.
+
+    Args:
+        tutorial_path: Path to the tutorial_samples.parquet file.
+        output_file: Path to the output samples.parquet file.
+    """
+    import polars as pl
+
+    tutorial_df = pl.read_parquet(tutorial_path)
+    if len(tutorial_df) == 0:
+        typer.echo("Tutorial file is empty, skipping tutorial examples.")
+        return
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    if output_file.exists():
+        existing_df = pl.read_parquet(output_file)
+
+        # Check for incompatible old schema
+        if "tutorial" not in existing_df.columns:
+            typer.echo(
+                f"Error: Existing parquet {output_file} is missing the 'tutorial' column. "
+                "Delete it and re-sample with the ternary pipeline.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        existing_non_tutorial = existing_df.filter(pl.col("tutorial") == False)  # noqa: E712
+        combined = pl.concat([existing_non_tutorial, tutorial_df])
+        combined.write_parquet(output_file)
+        typer.echo(f"Added {len(tutorial_df)} tutorial examples to {output_file}")
+    else:
+        tutorial_df.write_parquet(output_file)
+        typer.echo(f"Created {output_file} with {len(tutorial_df)} tutorial examples")
+
+
 @app.command()
-def sample(
+def sample(  # noqa: C901
     traces_dir: Annotated[
         Path,
         typer.Option("--traces-dir", "-t", help="Path to the traces directory"),
@@ -136,6 +175,10 @@ def sample(
         str,
         typer.Option("--user-model", "-um", help="User model that generated the traces"),
     ] = "gpt-5-mini",
+    add_tutorial_examples: Annotated[
+        Path | None,
+        typer.Option("--add-tutorial-examples", help="Path to tutorial_samples.parquet to copy into output"),
+    ] = None,
 ) -> None:
     """Sample ternary decision points from traces for annotation.
 
@@ -154,6 +197,14 @@ def sample(
     if not traces_dir.exists():
         typer.echo(f"Error: Traces directory not found: {traces_dir}", err=True)
         raise typer.Exit(code=1)
+
+    # Copy tutorial examples if requested
+    if add_tutorial_examples:
+        tutorial_path = add_tutorial_examples.resolve()
+        if not tutorial_path.exists():
+            typer.echo(f"Error: Tutorial file not found: {tutorial_path}", err=True)
+            raise typer.Exit(code=1)
+        _copy_tutorial_examples(tutorial_path, output_file)
 
     # Show existing samples info
     if output_file.exists():

@@ -523,6 +523,13 @@ def save_samples_ternary(samples: list[TernaryDecisionPoint], output_file: Path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     new_df = pl.DataFrame([s.to_sample_dict() for s in samples])
 
+    # Add tutorial columns with defaults (real samples are never tutorials)
+    new_df = new_df.with_columns(
+        pl.lit(False).alias("tutorial"),
+        pl.lit(None).cast(pl.Utf8).alias("correct_decision"),
+        pl.lit(None).cast(pl.Utf8).alias("explanation"),
+    )
+
     if output_file.exists():
         existing_df = pl.read_parquet(output_file)
 
@@ -534,7 +541,10 @@ def save_samples_ternary(samples: list[TernaryDecisionPoint], output_file: Path)
             )
             sys.exit(1)
 
-        combined_df = pl.concat([existing_df, new_df])
+        # Align column order and use diagonal concat to handle type mismatches
+        # (e.g., Null vs String when all values in a column are null)
+        new_df = new_df.select(existing_df.columns)
+        combined_df = pl.concat([existing_df, new_df], how="diagonal_relaxed")
         combined_df.write_parquet(output_file)
         logger.info(f"Appended {len(samples)} samples to {output_file} (total: {len(combined_df)})")
     else:

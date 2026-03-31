@@ -147,7 +147,7 @@ class TestSampleCommand:
         assert "not found" in result.output.lower()
 
     def test_parquet_schema_matches_spec(self, tmp_path: Path) -> None:
-        """Verify parquet columns match spec Section 1 (DecisionPoint -> Sample fields)."""
+        """Verify parquet columns match spec including tutorial fields."""
         traces_dir = _setup_traces(tmp_path)
         output = tmp_path / "samples.parquet"
 
@@ -175,5 +175,118 @@ class TestSampleCommand:
             "final_decision",
             "meta_task_description",
             "gather_context_delta",
+            "tutorial",
+            "correct_decision",
+            "explanation",
         }
         assert set(df.columns) == expected_columns
+        # Real samples should have tutorial=False
+        assert df["tutorial"].to_list() == [False] * len(df)
+
+
+class TestAddTutorialExamples:
+    """Tests for --add-tutorial-examples flag."""
+
+    def test_adds_tutorial_rows_to_output(self, tmp_path: Path) -> None:
+        """Tutorial examples are copied into samples.parquet with tutorial=True."""
+        import json
+
+        traces_dir = _setup_traces(tmp_path)
+        output = tmp_path / "samples.parquet"
+
+        # Create a tutorial parquet with one example
+        tutorial_llm_input = [
+            {"role": "assistant", "content": "test", "timestamp": 101.0, "msg_type": "user_action"},
+            {"role": "user", "content": "[TASK]: test proposal", "timestamp": 103.0, "msg_type": "proposal"},
+        ]
+        tutorial_df = pl.DataFrame({
+            "sample_id": ["tutorial_001"],
+            "scenario_id": ["tutorial_scenario"],
+            "run_number": [1],
+            "proactive_model_id": ["gpt-4o"],
+            "user_model_id": ["gpt-4o"],
+            "trace_file": ["traces/tutorial.json"],
+            "user_agent_decision": ["accept"],
+            "agent_proposal": ["test proposal"],
+            "meta_task_description": ["Tutorial scenario"],
+            "llm_input": [json.dumps(tutorial_llm_input)],
+            "final_decision": [True],
+            "gather_context_delta": [None],
+            "tutorial": [True],
+            "correct_decision": ["accept"],
+            "explanation": ["This is the correct answer."],
+        })
+        tutorial_file = tmp_path / "tutorial_samples.parquet"
+        tutorial_df.write_parquet(tutorial_file)
+
+        result = runner.invoke(app, [
+            "annotation", "sample",
+            "--traces-dir", str(traces_dir),
+            "--output", str(output),
+            "--sample-size", "2",
+            "--user-model", "gpt-5-mini",
+            "--seed", "42",
+            "--add-tutorial-examples", str(tutorial_file),
+        ])
+        assert result.exit_code == 0, result.output
+
+        df = pl.read_parquet(output)
+        tutorial_rows = df.filter(pl.col("tutorial") == True)  # noqa: E712
+        real_rows = df.filter(pl.col("tutorial") == False)  # noqa: E712
+        assert len(tutorial_rows) == 1
+        assert len(real_rows) >= 1
+        assert tutorial_rows["sample_id"][0] == "tutorial_001"
+        assert tutorial_rows["correct_decision"][0] == "accept"
+
+    def test_tutorial_not_duplicated_on_rerun(self, tmp_path: Path) -> None:
+        """Running with --add-tutorial-examples twice does not duplicate tutorial rows."""
+        import json
+
+        traces_dir = _setup_traces(tmp_path)
+        output = tmp_path / "samples.parquet"
+
+        tutorial_df = pl.DataFrame({
+            "sample_id": ["tutorial_001"],
+            "scenario_id": ["tutorial_scenario"],
+            "run_number": [1],
+            "proactive_model_id": ["gpt-4o"],
+            "user_model_id": ["gpt-4o"],
+            "trace_file": ["traces/tutorial.json"],
+            "user_agent_decision": ["accept"],
+            "agent_proposal": ["test"],
+            "meta_task_description": ["Tutorial"],
+            "llm_input": [json.dumps([])],
+            "final_decision": [True],
+            "gather_context_delta": [None],
+            "tutorial": [True],
+            "correct_decision": ["accept"],
+            "explanation": ["Correct."],
+        })
+        tutorial_file = tmp_path / "tutorial_samples.parquet"
+        tutorial_df.write_parquet(tutorial_file)
+
+        # First run
+        runner.invoke(app, [
+            "annotation", "sample",
+            "--traces-dir", str(traces_dir),
+            "--output", str(output),
+            "--sample-size", "2",
+            "--user-model", "gpt-5-mini",
+            "--seed", "42",
+            "--add-tutorial-examples", str(tutorial_file),
+        ])
+
+        # Second run
+        runner.invoke(app, [
+            "annotation", "sample",
+            "--traces-dir", str(traces_dir),
+            "--output", str(output),
+            "--sample-size", "2",
+            "--user-model", "gpt-5-mini",
+            "--seed", "99",
+            "--add-tutorial-examples", str(tutorial_file),
+        ])
+
+        df = pl.read_parquet(output)
+        tutorial_rows = df.filter(pl.col("tutorial") == True)  # noqa: E712
+        assert len(tutorial_rows) == 1  # Not duplicated
