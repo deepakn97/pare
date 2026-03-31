@@ -8,13 +8,15 @@ import io
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pathlib import Path
 from uuid import uuid4
 
 from pydantic import BaseModel
+
+from pas.trajectory.models import TernaryDecision  # noqa: TC001 - Pydantic needs runtime access
 
 
 @dataclass
@@ -139,7 +141,7 @@ class Sample(BaseModel):
     proactive_model_id: str
     user_model_id: str
     trace_file: str
-    user_agent_decision: Literal["accept", "reject", "gather_context"]
+    user_agent_decision: TernaryDecision
     agent_proposal: str
     meta_task_description: str
     llm_input: str
@@ -187,7 +189,7 @@ class Annotation(BaseModel):
     annotation_id: str
     sample_id: str
     annotator_id: str
-    human_decision: Literal["accept", "reject", "gather_context"]
+    human_decision: TernaryDecision
     gather_context_rationale: str | None = None
     timestamp: str
 
@@ -196,7 +198,7 @@ class Annotation(BaseModel):
         cls,
         sample_id: str,
         annotator_id: str,
-        human_decision: Literal["accept", "reject", "gather_context"],
+        human_decision: TernaryDecision,
     ) -> Annotation:
         """Create a new annotation record.
 

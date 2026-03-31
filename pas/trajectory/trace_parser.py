@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-from pas.trajectory.models import DecisionPoint
+from pas.trajectory.models import DecisionPoint, TernaryDecision
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +231,7 @@ def _classify_decision(
     decision_idx: int,
     decision_tool: str,
     user_id: str,
-) -> tuple[Literal["accept", "reject", "gather_context"], bool]:
+) -> tuple[TernaryDecision, bool]:
     """Classify a decision as accept, reject, or gather_context.
 
     Checks for intermediate user tool calls between proposal and decision.

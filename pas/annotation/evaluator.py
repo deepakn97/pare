@@ -12,7 +12,7 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
@@ -25,6 +25,8 @@ from tqdm import tqdm
 
 if TYPE_CHECKING:
     from are.simulation.agents.llm.llm_engine import LLMEngine
+
+    from pas.trajectory.models import TernaryDecision
 
 logger = logging.getLogger(__name__)
 
@@ -395,7 +397,7 @@ def print_evaluation_summary(eval_df: pl.DataFrame, original_samples_df: pl.Data
 def evaluate_single_decision_ternary(
     messages: list[dict[str, Any]],
     engine: LLMEngine,
-) -> tuple[Literal["accept", "reject", "gather_context"] | None, bool]:
+) -> tuple[TernaryDecision | None, bool]:
     """Fire a single-shot query and parse the ternary decision.
 
     Classifies decision based on first tool call only:
