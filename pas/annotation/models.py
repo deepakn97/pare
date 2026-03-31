@@ -103,6 +103,44 @@ class Sample(BaseModel):
         return match.group(1).strip() if match else content
 
     @staticmethod
+    def _extract_proposal_message(content: str) -> str:
+        """Extract the proposal message from [TASK] formatted content.
+
+        Strips the ``[TASK]:``, ``Received at:``, ``Sender:``, ``Message:``,
+        and ``Already read:`` framing added by Meta-ARE.
+
+        Args:
+            content: Raw proposal content with [TASK] framing.
+
+        Returns:
+            Clean proposal message text.
+        """
+        match = re.search(r"Message:\s*(.+?)(?:\nAlready read:|$)", content, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        # Fallback: strip [TASK]: prefix at minimum
+        if content.startswith("[TASK]:"):
+            return content[len("[TASK]:") :].strip()
+        return content
+
+    @staticmethod
+    def _filter_none_notifications(content: str) -> str:
+        """Remove notification lines that contain only 'None' content.
+
+        Filters out lines like ``[2025-11-18 09:00:01] None`` that represent
+        environment ticks with no actual notification.
+
+        Args:
+            content: Notification content with potentially multiple lines.
+
+        Returns:
+            Filtered content with None-only lines removed. Empty string if all lines were None.
+        """
+        lines = content.strip().split("\n")
+        filtered = [line for line in lines if not re.match(r"^\[[\d\-: ]+\]\s*None\s*$", line.strip())]
+        return "\n".join(filtered)
+
+    @staticmethod
     def _extract_tool_name(user_action_content: str) -> str:
         """Extract tool name from a user_action message content.
 
@@ -153,9 +191,16 @@ class Sample(BaseModel):
                 raw_obs = self._extract_observation_content(content)
                 content = ObservationFormatter.format(last_tool_name, raw_obs)
 
-            # Format notifications to strip hex IDs
+            # Format proposals to strip [TASK] framing
+            if msg_type_str == "proposal":
+                content = self._extract_proposal_message(content)
+
+            # Format notifications to strip hex IDs and filter None entries
             if msg_type_str == "environment_notification":
                 raw_notif = self._extract_notification_content(content)
+                raw_notif = self._filter_none_notifications(raw_notif)
+                if not raw_notif.strip():
+                    continue  # Skip entirely empty notification blocks
                 content = format_notification(raw_notif)
 
             timestamp_val = msg.get("timestamp")
