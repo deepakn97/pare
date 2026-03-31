@@ -83,7 +83,7 @@ class AnnotationServer:
         # Tutorial completion tracking
         # Maps annotator_id -> {sample_id: decision} for tutorial samples
         self._tutorial_annotations: dict[str, dict[str, str]] = {}
-        self._tutorial_annotations_file = self.annotations_file.parent / "tutorial_annotations.csv"
+        self._tutorial_annotations_file = self.annotations_file.parent / f"{self.annotations_file.stem}_tutorial.csv"
         if not self._tutorial_annotations_file.exists():
             with open(self._tutorial_annotations_file, "w") as f:
                 f.write(Annotation.csv_header())

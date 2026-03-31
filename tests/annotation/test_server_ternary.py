@@ -209,7 +209,7 @@ class TestTutorialFlow:
     def test_tutorial_writes_to_tutorial_csv(
         self, tutorial_client: TestClient, tutorial_server_paths: tuple[Path, Path],
     ) -> None:
-        """Tutorial submissions go to tutorial_annotations.csv, not annotations.csv."""
+        """Tutorial submissions go to {stem}_tutorial.csv, not annotations.csv."""
         _, annotations_file = tutorial_server_paths
         sample = tutorial_client.get("/api/sample", headers={"X-Annotator-ID": "new"}).json()
         tutorial_client.post(
@@ -218,7 +218,7 @@ class TestTutorialFlow:
             headers={"X-Annotator-ID": "new"},
         )
         assert len(annotations_file.read_text().strip().split("\n")) == 1  # header only
-        tutorial_csv = annotations_file.parent / "tutorial_annotations.csv"
+        tutorial_csv = annotations_file.parent / f"{annotations_file.stem}_tutorial.csv"
         assert tutorial_csv.exists()
         assert len(tutorial_csv.read_text().strip().split("\n")) == 2  # header + 1
 
