@@ -83,41 +83,50 @@
                     <p id="context-text" class="text-gray-700"></p>
                 </div>
 
-                <!-- Chat Container -->
+                <!-- Chat Container (chronological messages rendered here) -->
                 <div id="chat-container" class="bg-white rounded-lg shadow-sm p-4 mb-4 space-y-4">
-                    <!-- Chat messages will be rendered here -->
                 </div>
 
-                <!-- Agent Proposal (final message) -->
-                <div class="mb-6">
-                    <div class="flex justify-end items-start gap-2">
-                        <div class="max-w-[85%]">
-                            <div class="flex items-center justify-end gap-2 mb-1">
-                                <span class="text-xs text-gray-500 uppercase font-semibold">Assistant's Proposal</span>
-                                <span class="bg-amber-500 text-white text-xs px-2 py-0.5 rounded">NEW</span>
-                            </div>
-                            <div class="agent-bubble p-4 shadow-sm">
-                                <pre id="proposal-text" class="text-gray-800 text-sm"></pre>
-                            </div>
-                        </div>
-                        <div class="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 font-bold text-sm">
-                            A
+                <!-- Decision Panel -->
+                <div id="decision-panel" class="bg-white rounded-lg shadow-sm p-6 text-center">
+                    <!-- Three buttons state -->
+                    <div id="decision-buttons">
+                        <p class="text-gray-700 mb-4">What would you do with this proposal?</p>
+                        <div class="flex justify-center gap-3 flex-wrap">
+                            <button id="accept-btn"
+                                    class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                                ACCEPT
+                            </button>
+                            <button id="reject-btn"
+                                    class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                                REJECT
+                            </button>
+                            <button id="gather-btn"
+                                    class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap">
+                                I NEED MORE INFO
+                            </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- Decision Buttons -->
-                <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-                    <p class="text-gray-700 mb-4">Would you accept this proposal from your assistant?</p>
-                    <div class="flex justify-center gap-4">
-                        <button id="accept-btn"
-                                class="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
-                            ACCEPT
-                        </button>
-                        <button id="reject-btn"
-                                class="px-8 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
-                            REJECT
-                        </button>
+                    <!-- Rationale input state (hidden initially) -->
+                    <div id="rationale-input" class="hidden">
+                        <p class="text-gray-800 font-semibold mb-1">What information would you need before deciding?</p>
+                        <p class="text-gray-500 text-sm mb-3">Briefly describe what you'd want to check or verify.</p>
+                        <textarea id="rationale-text"
+                                  class="w-full border-2 border-blue-300 rounded-lg p-3 text-sm focus:border-blue-500 focus:outline-none resize-y"
+                                  rows="3"
+                                  placeholder="e.g., I'd want to check if Bob is available at 3pm first..."></textarea>
+                        <div class="flex justify-end gap-3 mt-3">
+                            <button id="cancel-rationale-btn"
+                                    class="px-6 py-2 border border-gray-300 text-gray-600 font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+                                CANCEL
+                            </button>
+                            <button id="submit-rationale-btn"
+                                    class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled>
+                                SUBMIT
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -215,58 +224,95 @@
             return wrapper;
         }
 
-        // Render a user action (left side)
-        function renderUserAction(action) {
+        // Render a user action with optional paired observation
+        function renderUserAction(content, timestamp, observation) {
             const wrapper = document.createElement('div');
             wrapper.className = 'flex items-start gap-2';
-            const timestamp = action.timestamp ? formatTimestamp(action.timestamp) : '';
+            const ts = timestamp ? formatTimestamp(timestamp) : '';
+            let obsHtml = '';
+            if (observation) {
+                obsHtml = `
+                    <div class="observation-text mt-1 ml-2 p-2 rounded text-xs">
+                        <pre class="text-gray-600">${escapeHtml(observation)}</pre>
+                    </div>`;
+            }
             wrapper.innerHTML = `
                 <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">
                     U
                 </div>
                 <div class="max-w-[80%]">
-                    ${timestamp ? `<div class="text-xs text-gray-400 mb-1">${timestamp}</div>` : ''}
+                    ${ts ? `<div class="text-xs text-gray-400 mb-1">${ts}</div>` : ''}
                     <div class="user-bubble p-3 shadow-sm">
-                        <div class="action-code text-blue-800">${escapeHtml(action.action)}</div>
+                        <div class="action-code text-blue-800">${escapeHtml(content)}</div>
                     </div>
-                    <div class="observation-text mt-1 ml-2 p-2 rounded text-xs">
-                        <pre class="text-gray-600">${escapeHtml(action.observation)}</pre>
-                    </div>
+                    ${obsHtml}
                 </div>
             `;
             return wrapper;
         }
 
-        // Render turns into the chat container
-        function renderTurns(turns) {
-            const chatContainer = document.getElementById('chat-container');
-            chatContainer.innerHTML = '';
+        // Render agent proposal (right side)
+        function renderProposal(content, timestamp) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex justify-end items-start gap-2';
+            const ts = timestamp ? formatTimestamp(timestamp) : '';
+            wrapper.innerHTML = `
+                <div class="max-w-[85%]">
+                    <div class="flex items-center justify-end gap-2 mb-1">
+                        ${ts ? `<span class="text-xs text-gray-400">${ts}</span>` : ''}
+                        <span class="text-xs text-gray-500 uppercase font-semibold">Proposal</span>
+                        <span class="bg-amber-500 text-white text-xs px-2 py-0.5 rounded font-semibold">NEW</span>
+                    </div>
+                    <div class="agent-bubble p-4 shadow-sm">
+                        <pre class="text-gray-800 text-sm">${escapeHtml(content)}</pre>
+                    </div>
+                </div>
+                <div class="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 font-bold text-sm">
+                    A
+                </div>
+            `;
+            return wrapper;
+        }
 
-            if (!turns || turns.length === 0) {
-                chatContainer.innerHTML = '<p class="text-gray-400 text-center italic">No previous actions</p>';
+        // Render messages chronologically into a target container
+        function renderMessagesInto(messages, container) {
+            container.innerHTML = '';
+
+            if (!messages || messages.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center italic">No previous actions</p>';
                 return;
             }
 
-            turns.forEach(turn => {
-                // Render notifications first (centered)
-                if (turn.notifications && turn.notifications.length > 0) {
-                    turn.notifications.forEach(notif => {
-                        chatContainer.appendChild(renderNotification(notif));
-                    });
-                }
+            for (let i = 0; i < messages.length; i++) {
+                const msg = messages[i];
 
-                // Render user actions (left side)
-                if (turn.actions && turn.actions.length > 0) {
-                    turn.actions.forEach(action => {
-                        chatContainer.appendChild(renderUserAction(action));
-                    });
+                if (msg.msg_type === 'user_action') {
+                    // Check if next message is a paired tool_observation
+                    let observation = null;
+                    if (i + 1 < messages.length && messages[i + 1].msg_type === 'tool_observation') {
+                        observation = messages[i + 1].content;
+                        i++; // Skip the observation in the next iteration
+                    }
+                    container.appendChild(renderUserAction(msg.content, msg.timestamp, observation));
+                } else if (msg.msg_type === 'tool_observation') {
+                    // Standalone observation (not paired) -- render as observation without action text
+                    container.appendChild(renderUserAction('(observation)', msg.timestamp, msg.content));
+                } else if (msg.msg_type === 'proposal') {
+                    container.appendChild(renderProposal(msg.content, msg.timestamp));
+                } else if (msg.msg_type === 'environment_notification') {
+                    container.appendChild(renderNotification(msg.content));
                 }
-            });
+            }
+        }
+
+        // Render messages into the main chat container
+        function renderMessages(messages) {
+            renderMessagesInto(messages, document.getElementById('chat-container'));
         }
 
         function renderSample(data) {
             currentSampleId = data.sample_id;
-            updateProgress(data.progress.completed, data.progress.total);
+            updateProgress(data.progress_completed, data.progress_total);
 
             // Scenario context
             const contextSection = document.getElementById('context-section');
@@ -278,11 +324,13 @@
                 contextSection.classList.add('hidden');
             }
 
-            // Render turns
-            renderTurns(data.turns);
+            // Render chronological messages
+            renderMessages(data.messages);
 
-            // Agent proposal
-            document.getElementById('proposal-text').textContent = data.agent_proposal;
+            // Reset decision panel to buttons state
+            document.getElementById('decision-buttons').classList.remove('hidden');
+            document.getElementById('rationale-input').classList.add('hidden');
+            document.getElementById('rationale-text').value = '';
 
             showState('sample');
         }
@@ -305,7 +353,9 @@
 
                 if (data.sample_id === null) {
                     document.getElementById('completion-message').textContent = data.message || 'You have completed all available samples.';
-                    updateProgress(data.progress.completed, data.progress.total);
+                    if (data.progress) {
+                        updateProgress(data.progress.completed, data.progress.total);
+                    }
                     showState('completion');
                 } else {
                     renderSample(data);
@@ -317,9 +367,24 @@
             }
         }
 
-        async function submitAnnotation(decision) {
-            document.getElementById('accept-btn').disabled = true;
-            document.getElementById('reject-btn').disabled = true;
+        function setButtonsDisabled(disabled) {
+            document.getElementById('accept-btn').disabled = disabled;
+            document.getElementById('reject-btn').disabled = disabled;
+            document.getElementById('gather-btn').disabled = disabled;
+            document.getElementById('submit-rationale-btn').disabled = disabled;
+            document.getElementById('cancel-rationale-btn').disabled = disabled;
+        }
+
+        async function submitAnnotation(decision, rationale) {
+            setButtonsDisabled(true);
+
+            const body = {
+                sample_id: currentSampleId,
+                decision: decision
+            };
+            if (rationale) {
+                body.gather_context_rationale = rationale;
+            }
 
             try {
                 const response = await fetch('/api/annotate', {
@@ -328,10 +393,7 @@
                         'Content-Type': 'application/json',
                         'X-Annotator-ID': annotatorId
                     },
-                    body: JSON.stringify({
-                        sample_id: currentSampleId,
-                        decision: decision
-                    })
+                    body: JSON.stringify(body)
                 });
 
                 if (!response.ok) {
@@ -345,7 +407,9 @@
                     renderSample(data.next_sample);
                 } else {
                     document.getElementById('completion-message').textContent = data.message || 'You have completed all available samples.';
-                    updateProgress(data.progress.completed, data.progress.total);
+                    if (data.progress) {
+                        updateProgress(data.progress.completed, data.progress.total);
+                    }
                     showState('completion');
                 }
             } catch (error) {
@@ -354,13 +418,39 @@
                 showState('error');
             }
 
-            document.getElementById('accept-btn').disabled = false;
-            document.getElementById('reject-btn').disabled = false;
+            setButtonsDisabled(false);
         }
 
-        document.getElementById('accept-btn').addEventListener('click', () => submitAnnotation(true));
-        document.getElementById('reject-btn').addEventListener('click', () => submitAnnotation(false));
+        // Button listeners -- Accept and Reject submit immediately
+        document.getElementById('accept-btn').addEventListener('click', () => submitAnnotation('accept'));
+        document.getElementById('reject-btn').addEventListener('click', () => submitAnnotation('reject'));
 
+        // Gather context flow -- show rationale input
+        document.getElementById('gather-btn').addEventListener('click', () => {
+            document.getElementById('decision-buttons').classList.add('hidden');
+            document.getElementById('rationale-input').classList.remove('hidden');
+            document.getElementById('rationale-text').focus();
+        });
+
+        document.getElementById('cancel-rationale-btn').addEventListener('click', () => {
+            document.getElementById('rationale-input').classList.add('hidden');
+            document.getElementById('decision-buttons').classList.remove('hidden');
+            document.getElementById('rationale-text').value = '';
+        });
+
+        // Enable/disable submit based on rationale text
+        document.getElementById('rationale-text').addEventListener('input', (e) => {
+            document.getElementById('submit-rationale-btn').disabled = e.target.value.trim().length === 0;
+        });
+
+        document.getElementById('submit-rationale-btn').addEventListener('click', () => {
+            const rationale = document.getElementById('rationale-text').value.trim();
+            if (rationale) {
+                submitAnnotation('gather_context', rationale);
+            }
+        });
+
+        // Start loading
         loadNextSample();
     </script>
 </body>
