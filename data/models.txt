@@ -1,8 +1,0 @@
-gpt-5
-gpt-5-mini
-claude-4.5-sonnet
-claude-4.5-haiku
-llama-4-scout
-llama-4-maverick
-llama-3.2-3B
-qwen-3-4b-it

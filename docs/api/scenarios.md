@@ -2,22 +2,22 @@
 
 ## Package Exports
 
-::: pas.scenarios
+::: pare.scenarios
 
 ## Base Scenario and Validation Types
 
-::: pas.scenarios.scenario
+::: pare.scenarios.scenario
 
-::: pas.scenarios.validation_result
+::: pare.scenarios.validation_result
 
 ## Registration and Discovery
 
-::: pas.scenarios.registration
+::: pare.scenarios.registration
 
-::: pas.scenarios.utils.registry
+::: pare.scenarios.utils.registry
 
 ## Runner Config and Expansion Helpers
 
-::: pas.scenarios.config
+::: pare.scenarios.config
 
-::: pas.scenarios.utils.scenario_expander
+::: pare.scenarios.utils.scenario_expander

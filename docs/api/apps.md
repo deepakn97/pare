@@ -2,72 +2,72 @@
 
 ## Package Exports
 
-::: pas.apps
+::: pare.apps
 
 ## Core Framework
 
-::: pas.apps.core
+::: pare.apps.core
 
-::: pas.apps.tool_decorators
+::: pare.apps.tool_decorators
 
 ## System and Agent UI Apps
 
-::: pas.apps.system
+::: pare.apps.system
 
-::: pas.apps.proactive_aui
+::: pare.apps.proactive_aui
 
 ## Contacts App
 
-::: pas.apps.contacts.app
+::: pare.apps.contacts.app
 
-::: pas.apps.contacts.states
+::: pare.apps.contacts.states
 
 ## Messaging App
 
-::: pas.apps.messaging.app
+::: pare.apps.messaging.app
 
-::: pas.apps.messaging.states
+::: pare.apps.messaging.states
 
 ## Email App
 
-::: pas.apps.email.app
+::: pare.apps.email.app
 
-::: pas.apps.email.states
+::: pare.apps.email.states
 
 ## Calendar App
 
-::: pas.apps.calendar.app
+::: pare.apps.calendar.app
 
-::: pas.apps.calendar.states
+::: pare.apps.calendar.states
 
 ## Cab App
 
-::: pas.apps.cab.app
+::: pare.apps.cab.app
 
-::: pas.apps.cab.states
+::: pare.apps.cab.states
 
 ## Apartment App
 
-::: pas.apps.apartment.app
+::: pare.apps.apartment.app
 
-::: pas.apps.apartment.states
+::: pare.apps.apartment.states
 
 ## Reminder App
 
-::: pas.apps.reminder.app
+::: pare.apps.reminder.app
 
-::: pas.apps.reminder.states
+::: pare.apps.reminder.states
 
 ## Shopping App
 
-::: pas.apps.shopping.app
+::: pare.apps.shopping.app
 
-::: pas.apps.shopping.states
+::: pare.apps.shopping.states
 
 ## Notes App
 
-::: pas.apps.note.app
+::: pare.apps.note.app
 
-::: pas.apps.note.states
+::: pare.apps.note.states
 
-::: pas.apps.note.types
+::: pare.apps.note.types

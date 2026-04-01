@@ -22,6 +22,7 @@ from pas.scenarios.validation_result import PASScenarioValidationResult
 
 if TYPE_CHECKING:
     from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
+    from are.simulation.types import CompletedEvent
 
     from pas.agents.pas_agent_config import ProactiveObserveExecuteAgentConfig, UserDefaultAgentConfig
     from pas.agents.proactive.agent import ProactiveAgent
@@ -31,6 +32,34 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+def _count_observe_mode_acceptances(completed_events: list[CompletedEvent]) -> int:
+    """Count accept_proposal calls that follow observe-mode proposals only.
+
+    Walks completed events chronologically. Tracks the proactive_mode of the most recent
+    send_message_to_user call. Only counts accept_proposal when the preceding proposal
+    was made in observe mode (not execute mode).
+
+    Args:
+        completed_events: Chronologically ordered list of completed events from env.event_log.
+
+    Returns:
+        Number of acceptances that correspond to observe-mode proposals.
+    """
+    last_proposal_mode: str | None = None
+    count = 0
+    for event in completed_events:
+        func_name = event.function_name()
+        app_class = event.app_class_name()
+        if app_class != "PASAgentUserInterface":
+            continue
+        if func_name == "send_message_to_user":
+            last_proposal_mode = event.metadata.proactive_mode
+        elif func_name == "accept_proposal" and last_proposal_mode == "observe":
+            count += 1
+            last_proposal_mode = None  # consume the proposal
+    return count
 
 
 class TwoAgentScenarioRunner:
@@ -272,7 +301,7 @@ class TwoAgentScenarioRunner:
 
         # Extract metrics from agents
         proposal_count = proactive_agent.get_proposal_count()
-        acceptance_count = user_agent.get_acceptance_count()
+        acceptance_count = _count_observe_mode_acceptances(env.event_log.list_view())
         read_only_actions = proactive_agent.get_read_only_actions() + user_agent.get_read_only_actions()
         write_actions = proactive_agent.get_write_actions() + user_agent.get_write_actions()
 
@@ -367,26 +396,31 @@ class TwoAgentScenarioRunner:
         # NOTE: ALWAYS EXPORT FOR NOW.
 
         # CLAUDE CODE: we need to implement the _export_pas_trace method to export everything.
-        has_hf_metadata = getattr(scenario, "hf_metadata", None) is not None
-        export_path = None
-        if user_agent is not None and proactive_agent is not None:
-            export_path = self._export_pas_trace(
-                env,
-                scenario,
-                user_agent.model,
-                user_agent.agent_framework,
-                proactive_agent.observe_model,
-                proactive_agent.execute_model,
-                proactive_agent.agent_framework,
-                validation_result,
-                run_duration,
-                output_dir=config.output_dir,
-                export_apps=not has_hf_metadata,
-                trace_dump_format=config.trace_dump_format,
-                runner_config=config,
-            )
-        validation_result.export_path = export_path
-        env.stop()
+        try:
+            has_hf_metadata = getattr(scenario, "hf_metadata", None) is not None
+            export_path = None
+            if user_agent is not None and proactive_agent is not None:
+                export_path = self._export_pas_trace(
+                    env,
+                    scenario,
+                    user_agent.model,
+                    user_agent.agent_framework,
+                    proactive_agent.observe_model,
+                    proactive_agent.execute_model,
+                    proactive_agent.agent_framework,
+                    validation_result,
+                    run_duration,
+                    output_dir=config.output_dir,
+                    export_apps=not has_hf_metadata,
+                    trace_dump_format=config.trace_dump_format,
+                    runner_config=config,
+                )
+            validation_result.export_path = export_path
+        except Exception:
+            logger.exception("Failed to export trace, returning result without export path")
+        finally:
+            env.stop()
+
         return validation_result
 
     def run(

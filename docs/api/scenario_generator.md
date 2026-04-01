@@ -2,24 +2,24 @@
 
 ## Generator Entry and Prompt Context Utilities
 
-::: pas.scenarios.generator.scenario_generator
+::: pare.scenarios.generator.scenario_generator
 
 ## Orchestrator
 
-::: pas.scenarios.generator.agent.scenario_generating_agent_orchestrator
+::: pare.scenarios.generator.agent.scenario_generating_agent_orchestrator
 
 ## Step Agents
 
-::: pas.scenarios.generator.agent.step_agents
+::: pare.scenarios.generator.agent.step_agents
 
 ## Uniqueness and Summarization Agents
 
-::: pas.scenarios.generator.agent.scenario_uniqueness_agent
+::: pare.scenarios.generator.agent.scenario_uniqueness_agent
 
-::: pas.scenarios.generator.agent.summary_generating_agent
+::: pare.scenarios.generator.agent.summary_generating_agent
 
 ## Generator Utilities
 
-::: pas.scenarios.generator.utils.apps_init_instructions
+::: pare.scenarios.generator.utils.apps_init_instructions
 
-::: pas.scenarios.generator.utils.deduplicate_scenarios
+::: pare.scenarios.generator.utils.deduplicate_scenarios

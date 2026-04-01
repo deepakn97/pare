@@ -2,24 +2,24 @@
 
 ## Package Exports
 
-::: pas.annotation
+::: pare.annotation
 
 ## Data Models and Parsing
 
-::: pas.annotation.models
+::: pare.annotation.models
 
-::: pas.annotation.trace_parser
+::: pare.trajectory.trace_parser
 
-::: pas.annotation.observation_formatter
+::: pare.annotation.observation_formatter
 
 ## Sampling and Server
 
-::: pas.annotation.sampler
+::: pare.annotation.sampler
 
-::: pas.annotation.server
+::: pare.annotation.server
 
 ## Metrics and Configuration
 
-::: pas.annotation.metrics
+::: pare.annotation.metrics
 
-::: pas.annotation.config
+::: pare.annotation.config

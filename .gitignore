@@ -206,6 +206,7 @@ cython_debug/
 .serena
 AGENTS.md
 CLAUDE.md
+pas/**/CLAUDE.md
 
 # Marimo
 marimo/_static/
@@ -227,3 +228,9 @@ docs/_plans/paper
 personal_notes/
 docs/github_issues/
 bedrock_models.json
+
+# Annotation data
+data/annotations/
+
+# Git worktrees
+.worktrees/

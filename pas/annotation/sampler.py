@@ -4,312 +4,310 @@ from __future__ import annotations
 
 import logging
 import random
-from pathlib import Path  # noqa: TC003
+import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import polars as pl
 
-from pas.annotation.config import ensure_annotations_dir, get_samples_file
-from pas.annotation.models import DecisionPoint  # noqa: TC001
-from pas.annotation.trace_parser import (
-    extract_model_id_from_dir,
-    is_excluded_model,
-    is_no_noise_trace,
-    parse_trace,
-    trace_uses_messages_app,
-)
+from pas.trajectory.models import DecisionPoint as TernaryDecisionPoint  # noqa: TC001
+from pas.trajectory.trace_parser import extract_decision_points as extract_ternary_decision_points
 
 logger = logging.getLogger(__name__)
 
 
-def discover_trace_directories(traces_dir: Path) -> list[Path]:
-    """Discover all no-noise trace directories, excluding low-quality models.
+def extract_model_id_from_dir(dir_name: str) -> str:
+    """Extract the proactive model ID from a trace subdirectory name.
+
+    Example: obs_gpt-5_exec_gpt-5_enmi_0_es_42_tfp_0.0 -> gpt-5
 
     Args:
-        traces_dir: The root traces directory.
+        dir_name: The subdirectory name.
 
     Returns:
-        List of paths to valid no-noise trace directories.
+        The extracted proactive model ID.
     """
-    if not traces_dir.exists():
-        raise FileNotFoundError(f"Traces directory not found: {traces_dir}")
-
-    valid_dirs = []
-    excluded_count = 0
-    for subdir in traces_dir.iterdir():
-        if subdir.is_dir() and is_no_noise_trace(subdir.name):
-            # Skip excluded models (e.g., ministral)
-            if is_excluded_model(subdir.name):
-                excluded_count += 1
-                logger.debug(f"Excluding {subdir.name} (excluded model)")
-                continue
-            valid_dirs.append(subdir)
-
-    if excluded_count > 0:
-        logger.info(f"Excluded {excluded_count} trace directories from low-quality models")
-
-    if not valid_dirs:
-        raise ValueError(f"No valid no-noise trace directories found in {traces_dir}")
-
-    logger.info(f"Found {len(valid_dirs)} valid no-noise trace directories")
-    return valid_dirs
+    match = re.match(r"obs_([^_]+(?:_[^_]+)?(?:-[^_]+)?)_exec_", dir_name)
+    if match:
+        return match.group(1)
+    return dir_name
 
 
-def extract_all_decision_points(
-    traces_dir: Path,
-    exclude_messages_app: bool = True,
-) -> list[DecisionPoint]:
-    """Extract all decision points from all no-noise traces.
+def is_no_noise_trace(dir_name: str) -> bool:
+    """Check if a trace directory is a no-noise trace.
+
+    No-noise traces have enmi_0 (environment noise = 0).
 
     Args:
-        traces_dir: The root traces directory.
-        exclude_messages_app: If True, skip traces that use the Messages app.
+        dir_name: The directory name.
 
     Returns:
-        List of all DecisionPoint objects.
+        True if this is a no-noise trace.
     """
-    trace_dirs = discover_trace_directories(traces_dir)
-
-    all_decision_points = []
-    messages_excluded = 0
-
-    for trace_dir in trace_dirs:
-        model_id = extract_model_id_from_dir(trace_dir.name)
-        logger.info(f"Processing {trace_dir.name} (model: {model_id})")
-
-        trace_files = list(trace_dir.glob("*.json"))
-        for trace_file in trace_files:
-            # Skip traces that use Messages app if requested
-            if exclude_messages_app and trace_uses_messages_app(trace_file):
-                messages_excluded += 1
-                logger.debug(f"Excluding {trace_file.name} (uses Messages app)")
-                continue
-
-            try:
-                decision_points = parse_trace(trace_file, model_id)
-                all_decision_points.extend(decision_points)
-            except Exception as e:
-                logger.warning(f"Failed to parse {trace_file}: {e}")
-
-    if messages_excluded > 0:
-        logger.info(f"Excluded {messages_excluded} traces that use Messages app")
-
-    logger.info(f"Extracted {len(all_decision_points)} decision points total")
-    return all_decision_points
+    return "enmi_0" in dir_name
 
 
-def load_existing_samples() -> pl.DataFrame | None:
-    """Load existing samples from the samples file.
-
-    Returns:
-        DataFrame of existing samples, or None if no samples exist.
-    """
-    samples_file = get_samples_file()
-    if not samples_file.exists():
-        return None
-
-    return pl.read_parquet(samples_file)
-
-
-def balanced_sample(  # noqa: C901
-    candidates: list[DecisionPoint],
+def _draw_one_cycle(
+    model_ids: list[str],
+    decision_types: list[str],
+    model_pools: dict[str, dict[str, list[TernaryDecisionPoint]]],
+    selected: list[TernaryDecisionPoint],
     sample_size: int,
-    existing_scenarios: set[str],
-    seed: int | None = None,
-) -> list[DecisionPoint]:
-    """Sample decision points with balanced accept/reject and unique scenario priority.
+) -> bool:
+    """Draw one sample per decision type per model in a single cycle.
 
-    Algorithm:
-    1. Separate candidates into accept and reject pools
-    2. Alternate between pools, prioritizing unique scenarios
-    3. Only reuse scenarios when all unique ones are exhausted
+    Args:
+        model_ids: Sorted list of proactive model IDs.
+        decision_types: List of decision type strings.
+        model_pools: Nested dict of model -> decision_type -> candidate list.
+        selected: Accumulator list to append drawn samples to (mutated in place).
+        sample_size: Maximum number of samples to select.
+
+    Returns:
+        True if any sample was drawn in this cycle, False if all pools exhausted.
+    """
+    any_picked = False
+    for model_id in model_ids:
+        for dt in decision_types:
+            if len(selected) >= sample_size:
+                return any_picked
+            pool = model_pools[model_id][dt]
+            if pool:
+                selected.append(pool.pop(0))
+                any_picked = True
+    return any_picked
+
+
+def balanced_sample_ternary(
+    candidates: list[TernaryDecisionPoint],
+    sample_size: int,
+    seed: int | None = None,
+) -> list[TernaryDecisionPoint]:
+    """Sample decision points balanced by both decision type and proactive model.
+
+    Algorithm: For each proactive model, create three pools (accept, reject, gather_context).
+    Cycle through models, and within each model cycle through decision type pools, drawing
+    one sample per pool per cycle. If a pool is exhausted, skip it. Stop when target count
+    reached or all pools across all models are empty.
 
     Args:
         candidates: List of candidate decision points.
         sample_size: Number of samples to select.
-        existing_scenarios: Set of scenario IDs already used (from previous sampling).
         seed: Random seed for reproducibility.
 
     Returns:
-        List of selected DecisionPoint objects.
+        List of selected TernaryDecisionPoint objects.
     """
     if seed is not None:
         random.seed(seed)
 
-    # Separate by accept/reject
-    accepts = [c for c in candidates if c.user_agent_decision]
-    rejects = [c for c in candidates if not c.user_agent_decision]
+    decision_types = ["accept", "reject", "gather_context"]
 
-    # Shuffle both pools
-    random.shuffle(accepts)
-    random.shuffle(rejects)
+    # Group by model, then by decision type
+    model_ids = sorted({c.proactive_model_id for c in candidates})
+    model_pools: dict[str, dict[str, list[TernaryDecisionPoint]]] = {}
+    for model_id in model_ids:
+        model_pools[model_id] = {}
+        for dt in decision_types:
+            pool = [c for c in candidates if c.proactive_model_id == model_id and c.user_agent_decision == dt]
+            random.shuffle(pool)
+            model_pools[model_id][dt] = pool
 
-    selected: list[DecisionPoint] = []
-    scenarios_used = set(existing_scenarios)
+    selected: list[TernaryDecisionPoint] = []
 
-    def pick_from_pool(pool: list[DecisionPoint]) -> DecisionPoint | None:
-        """Pick a candidate, prioritizing unused scenarios."""
-        if not pool:
-            return None
-
-        # Try to find a candidate from an unused scenario
-        for i, candidate in enumerate(pool):
-            if candidate.scenario_id not in scenarios_used:
-                return pool.pop(i)
-
-        # Fall back to any candidate (scenario reuse)
-        return pool.pop(0)
-
-    # Alternate between accept and reject
-    target_accepts = 0
-    target_rejects = 0
-
+    # Cycle: for each model, draw one from each decision type pool
     while len(selected) < sample_size:
-        # Determine which pool to pick from (balance accept/reject)
-        accepts_selected = len([s for s in selected if s.user_agent_decision])
-        rejects_selected = len(selected) - accepts_selected
-
-        # Try to balance
-        if accepts_selected <= rejects_selected:
-            # Try to pick an accept
-            pick = pick_from_pool(accepts)
-            if not pick:
-                # Accept pool empty, try reject
-                pick = pick_from_pool(rejects)
-        else:
-            # Try to pick a reject
-            pick = pick_from_pool(rejects)
-            if not pick:
-                # Reject pool empty, try accept
-                pick = pick_from_pool(accepts)
-
-        if not pick:
-            # Both pools empty
+        any_picked = _draw_one_cycle(model_ids, decision_types, model_pools, selected, sample_size)
+        if not any_picked:
             logger.warning(f"Ran out of candidates after selecting {len(selected)} samples")
             break
 
-        selected.append(pick)
-        scenarios_used.add(pick.scenario_id)
-
     # Log balance statistics
-    accepts_count = len([s for s in selected if s.user_agent_decision])
-    rejects_count = len(selected) - accepts_count
-    logger.info(f"Selected {len(selected)} samples: {accepts_count} accepts, {rejects_count} rejects")
+    accepts_count = len([s for s in selected if s.user_agent_decision == "accept"])
+    rejects_count = len([s for s in selected if s.user_agent_decision == "reject"])
+    gather_context_count = len([s for s in selected if s.user_agent_decision == "gather_context"])
+    model_counts = {m: len([s for s in selected if s.proactive_model_id == m]) for m in model_ids}
+    logger.info(
+        f"Selected {len(selected)} samples: {accepts_count} accepts, {rejects_count} rejects, "
+        f"{gather_context_count} gather_context. Per model: {model_counts}"
+    )
 
     return selected
 
 
-def sample_new_datapoints(
-    traces_dir: Path,
-    sample_size: int,
-    seed: int | None = None,
-) -> list[DecisionPoint]:
-    """Sample new datapoints, avoiding duplicates with existing samples.
+def _distribute_equally(total: int, models: list[str]) -> dict[str, int]:
+    """Distribute a total sample count equally across models.
+
+    Remainder is distributed across the first N models.
 
     Args:
-        traces_dir: Path to the traces directory.
-        sample_size: Number of new samples to add.
-        seed: Random seed for reproducibility.
+        total: Total number of samples to distribute.
+        models: List of model IDs.
 
     Returns:
-        List of newly selected DecisionPoint objects.
+        Dict mapping model ID to sample count.
     """
-    # Load existing samples
-    existing_df = load_existing_samples()
+    if not models:
+        raise ValueError("Cannot distribute samples across empty model list")
+    per_model = total // len(models)
+    remainder = total % len(models)
+    result = dict.fromkeys(models, per_model)
+    for i, model in enumerate(models):
+        if i < remainder:
+            result[model] += 1
+    logger.info(f"Distributing {total} samples equally across {len(models)} models")
+    return result
 
-    existing_ids: set[str] = set()
-    existing_scenarios: set[str] = set()
 
-    if existing_df is not None:
-        existing_ids = set(existing_df["sample_id"].to_list())
-        existing_scenarios = set(existing_df["scenario_id"].to_list())
-        logger.info(f"Found {len(existing_ids)} existing samples from {len(existing_scenarios)} scenarios")
+def extract_all_decision_points_ternary(
+    traces_dir: Path,
+    user_model_id: str,
+    target_models: list[str] | None = None,
+) -> list[TernaryDecisionPoint]:
+    """Extract ternary decision points from all trace files in a directory.
 
-    # Extract all decision points
-    all_candidates = extract_all_decision_points(traces_dir)
+    Walks the traces directory, identifies model subdirectories, and extracts
+    decision points from each no-noise trace file using the ternary parser.
 
-    # Filter out already-sampled decision points
-    new_candidates = [c for c in all_candidates if c.sample_id not in existing_ids]
-    logger.info(
-        f"Found {len(new_candidates)} new candidates (filtered {len(all_candidates) - len(new_candidates)} existing)"
+    Args:
+        traces_dir: Root directory containing model subdirectories with traces.
+        user_model_id: The user model that generated these traces.
+        target_models: If provided, only extract from these proactive model IDs.
+
+    Returns:
+        List of TernaryDecisionPoint objects from all matching traces.
+    """
+    all_dps: list[TernaryDecisionPoint] = []
+
+    for model_dir in sorted(traces_dir.iterdir()):
+        if not model_dir.is_dir() or not is_no_noise_trace(model_dir.name):
+            continue
+
+        model_id = extract_model_id_from_dir(model_dir.name)
+        if not model_id:
+            continue
+
+        if target_models and model_id not in target_models:
+            continue
+
+        trace_files = sorted(model_dir.glob("*.json"))
+
+        for trace_file in trace_files:
+            dps = extract_ternary_decision_points(trace_file, model_id, user_model_id)
+            all_dps.extend(dps)
+
+        logger.info(f"Extracted {len(all_dps)} decision points from {model_id} ({len(trace_files)} traces)")
+
+    logger.info(f"Total: {len(all_dps)} ternary decision points from {traces_dir}")
+    return all_dps
+
+
+def save_samples_ternary(samples: list[TernaryDecisionPoint], output_file: Path) -> Path:
+    """Save ternary samples to parquet, checking schema compatibility.
+
+    If the output file already exists, validates that it uses the ternary schema
+    (user_agent_decision as String, not Boolean). Raises SystemExit if an
+    incompatible binary-schema parquet is found.
+
+    Args:
+        samples: List of TernaryDecisionPoint objects to save.
+        output_file: Path to the output parquet file.
+
+    Returns:
+        Path to the samples file.
+    """
+    import sys
+
+    if not samples:
+        logger.warning("No samples to save")
+        return output_file
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    new_df = pl.DataFrame([s.to_sample_dict() for s in samples])
+
+    # Add tutorial columns with defaults (real samples are never tutorials)
+    new_df = new_df.with_columns(
+        pl.lit(False).alias("tutorial"),
+        pl.lit(None).cast(pl.Utf8).alias("correct_decision"),
+        pl.lit(None).cast(pl.Utf8).alias("explanation"),
     )
+
+    if output_file.exists():
+        existing_df = pl.read_parquet(output_file)
+
+        # Check schema compatibility
+        if "user_agent_decision" in existing_df.columns and existing_df["user_agent_decision"].dtype == pl.Boolean:
+            logger.error(
+                f"Existing parquet {output_file} uses binary schema (user_agent_decision: bool). "
+                "Delete it and re-sample with the ternary pipeline."
+            )
+            sys.exit(1)
+
+        # Align column order and use diagonal concat to handle type mismatches
+        # (e.g., Null vs String when all values in a column are null)
+        new_df = new_df.select(existing_df.columns)
+        combined_df = pl.concat([existing_df, new_df], how="diagonal_relaxed")
+        combined_df.write_parquet(output_file)
+        logger.info(f"Appended {len(samples)} samples to {output_file} (total: {len(combined_df)})")
+    else:
+        new_df.write_parquet(output_file)
+        logger.info(f"Created {output_file} with {len(samples)} samples")
+
+    return output_file
+
+
+def sample_new_datapoints_ternary(
+    traces_dir: Path,
+    samples_file: Path,
+    user_model_id: str,
+    sample_size: int,
+    seed: int | None = None,
+    target_models: list[str] | None = None,
+) -> list[TernaryDecisionPoint]:
+    """Extract, sample, and save ternary decision points.
+
+    End-to-end function: extracts all ternary decision points from traces,
+    deduplicates against existing samples, applies three-way balanced sampling,
+    and saves the result to parquet.
+
+    Args:
+        traces_dir: Root directory containing model subdirectories with traces.
+        samples_file: Path to the output parquet file (for dedup and save).
+        user_model_id: The user model that generated these traces.
+        sample_size: Number of new samples to select.
+        seed: Random seed for reproducibility.
+        target_models: If provided, only extract from these proactive model IDs.
+
+    Returns:
+        List of newly selected TernaryDecisionPoint objects.
+    """
+    # Extract all decision points
+    all_dps = extract_all_decision_points_ternary(traces_dir, user_model_id, target_models)
+
+    if not all_dps:
+        logger.warning("No decision points found in traces")
+        return []
+
+    # Deduplicate against existing samples
+    existing_ids: set[str] = set()
+    if samples_file.exists():
+        existing_df = pl.read_parquet(samples_file)
+        existing_ids = set(existing_df["sample_id"].to_list())
+        logger.info(f"Found {len(existing_ids)} existing samples for deduplication")
+
+    new_candidates = [dp for dp in all_dps if dp.sample_id not in existing_ids]
+    logger.info(f"Found {len(new_candidates)} new candidates (filtered {len(all_dps) - len(new_candidates)} existing)")
 
     if not new_candidates:
         logger.warning("No new candidates available for sampling")
         return []
 
-    # Apply balanced sampling
-    selected = balanced_sample(new_candidates, sample_size, existing_scenarios, seed)
+    # Three-way balanced sampling
+    selected = balanced_sample_ternary(new_candidates, sample_size, seed)
+
+    # Save to parquet
+    save_samples_ternary(selected, samples_file)
 
     return selected
-
-
-def save_samples(samples: list[DecisionPoint]) -> Path:
-    """Save samples to the parquet file (append mode).
-
-    Args:
-        samples: List of DecisionPoint objects to save.
-
-    Returns:
-        Path to the samples file.
-    """
-    if not samples:
-        logger.warning("No samples to save")
-        return get_samples_file()
-
-    ensure_annotations_dir()
-    samples_file = get_samples_file()
-
-    # Convert to DataFrame
-    new_df = pl.DataFrame([s.to_sample_dict() for s in samples])
-
-    # Append to existing or create new
-    if samples_file.exists():
-        existing_df = pl.read_parquet(samples_file)
-        combined_df = pl.concat([existing_df, new_df])
-        combined_df.write_parquet(samples_file)
-        logger.info(f"Appended {len(samples)} samples to {samples_file} (total: {len(combined_df)})")
-    else:
-        new_df.write_parquet(samples_file)
-        logger.info(f"Created {samples_file} with {len(samples)} samples")
-
-    return samples_file
-
-
-def get_sampling_stats(traces_dir: Path) -> dict[str, int]:
-    """Get statistics about available samples.
-
-    Args:
-        traces_dir: Path to the traces directory.
-
-    Returns:
-        Dictionary with statistics.
-    """
-    existing_df = load_existing_samples()
-
-    # Count existing
-    existing_count = len(existing_df) if existing_df is not None else 0
-    existing_scenarios = len(existing_df["scenario_id"].unique()) if existing_df is not None else 0
-    existing_accepts = len(existing_df.filter(pl.col("user_agent_decision"))) if existing_df is not None else 0
-    existing_rejects = existing_count - existing_accepts
-
-    # Count available candidates
-    try:
-        all_candidates = extract_all_decision_points(traces_dir)
-        existing_ids = set(existing_df["sample_id"].to_list()) if existing_df is not None else set()
-        new_candidates = [c for c in all_candidates if c.sample_id not in existing_ids]
-
-        available_accepts = len([c for c in new_candidates if c.user_agent_decision])
-        available_rejects = len(new_candidates) - available_accepts
-    except Exception as e:
-        logger.warning(f"Could not count available candidates: {e}")
-        available_accepts = -1
-        available_rejects = -1
-
-    return {
-        "existing_samples": existing_count,
-        "existing_scenarios": existing_scenarios,
-        "existing_accepts": existing_accepts,
-        "existing_rejects": existing_rejects,
-        "available_accepts": available_accepts,
-        "available_rejects": available_rejects,
-    }

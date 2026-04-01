@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "meta-agents-research-environments",
-    "litellm>=1.0.0",
+    "litellm>=1.0.0,<=1.71.1",
     "python-dotenv>=1.0.0",
     "jinja2>=3.1.6",
     "numpy>=2.2.6",
@@ -226,7 +226,7 @@ ignore = ["*"]
 proactive-agent-sandbox = "pas.scenarios.registration:register_pas_scenarios"
 
 [tool.uv.sources]
-meta-agents-research-environments = { path = "../meta-are", editable = true }
+meta-agents-research-environments = { git = "https://github.com/deepakn97/meta-are.git", branch = "main" }
 
 [[tool.mypy.overrides]]
 module = "dotenv"

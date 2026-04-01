@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
+import polars as pl
 import typer
 
 from pas.benchmark.report_stats import (
@@ -22,10 +23,11 @@ from pas.benchmark.scenario_loader import (
     load_scenarios_by_split,
     load_scenarios_from_registry,
 )
-from pas.cli.utils import MODELS_MAP
+from pas.cli.utils import MODELS_MAP, LLMProbeError, probe_llm_endpoint
 from pas.logging_config import configure_logging, suppress_noisy_are_loggers, suppress_noisy_loggers
 from pas.multi_scenario_runner import MultiScenarioRunner
 from pas.scenarios.config import MultiScenarioRunnerConfig
+from pas.scenarios.validation_result import PAS_RESULT_SCHEMA
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -188,7 +190,7 @@ def generate_config_sweep(
 
     model_pairs = list(zip(observe_models, execute_models, strict=True))
 
-    # Validate noise params are mutually exclusive
+    # Noise params are treated independently - tfp and epm each produce separate configs, never combined together.
     if tool_failure_probs and env_events_per_min:
         logger.info(
             "Both tool failure probability and env events per min provided; they will be treated as separate configurations in the sweep."
@@ -204,14 +206,14 @@ def generate_config_sweep(
             # tfp=0 is equivalent to no tool augmentation - use None for cache compatibility
             tool_aug = ToolAugmentationConfig(tool_failure_probability=tfp) if tfp > 0 else None
             noise_configs.append((tool_aug, None))
-    elif env_events_per_min:
+    if env_events_per_min:
         for epm in env_events_per_min:
             # epm=0 is equivalent to no env events - use None for cache compatibility
             env_events = (
                 EnvEventsConfig(num_env_events_per_minute=epm, env_events_seed=env_events_seed) if epm > 0 else None
             )
             noise_configs.append((None, env_events))
-    else:
+    if not noise_configs:
         # No noise - single config with no augmentation
         noise_configs.append((None, None))
 
@@ -421,6 +423,79 @@ def run_single_config(
     return config_descriptor, result
 
 
+def _print_config_result(
+    config_key: tuple[str, str, float, int],
+    config_result_obj: PASMultiScenarioValidationResult,
+    *,
+    prefix: str = "  ",
+) -> None:
+    """Print summary stats for a single config result.
+
+    Args:
+        config_key: Tuple of (user_model, proactive_model, tfp, enmi).
+        config_result_obj: Validation results for this config.
+        prefix: String prefix for each output line.
+    """
+    _user_model, proactive_model, tfp, enmi = config_key
+    result_df = config_result_obj.to_polars()
+    total = len(result_df)
+    success = result_df.filter(result_df["status"] == "success").height
+    failed = result_df.filter(result_df["status"] == "failed").height
+    exception_df = result_df.filter(result_df["has_exception"] == True)  # noqa: E712
+    exceptions = exception_df.height
+
+    noise_info = ""
+    if tfp > 0:
+        noise_info += f" tfp={tfp}"
+    if enmi > 0:
+        noise_info += f" epm={enmi}"
+
+    typer.echo(
+        f"{prefix}{proactive_model}{noise_info}: "
+        f"{total} total | {success} success | {failed} failed | {exceptions} exceptions"
+    )
+
+    if exceptions > 0:
+        exc_groups = (
+            exception_df.group_by("exception_type")
+            .agg(
+                pl.col("exception_message").first().alias("sample_message"),
+                pl.len().alias("count"),
+            )
+            .sort("count", descending=True)
+        )
+        for row in exc_groups.iter_rows(named=True):
+            msg = row["sample_message"] or "no message"
+            if len(msg) > 100:
+                msg = msg[:100] + "..."
+            typer.echo(f"{prefix}  [{row['exception_type']}] x{row['count']}: {msg}")
+
+
+def _print_sweep_summary(
+    configs: list[MultiScenarioRunnerConfig],
+    all_results: dict[tuple[str, str, float, int], PASMultiScenarioValidationResult],
+    skipped_configs: list[tuple[str, str]] | None = None,
+) -> None:
+    """Print per-config summary with success/failure/exception counts.
+
+    Args:
+        configs: List of configs that were run.
+        all_results: Mapping of config key to validation results.
+        skipped_configs: List of (config_descriptor, error_message) for configs
+            that were skipped due to LLM probe failures.
+    """
+    skipped = skipped_configs or []
+    ran_count = len(all_results)
+    skipped_count = len(skipped)
+    typer.echo(f"\nBenchmark complete: {len(configs)} configs ({ran_count} ran, {skipped_count} skipped)")
+
+    for config_key, config_result_obj in all_results.items():
+        _print_config_result(config_key, config_result_obj)
+
+    for descriptor, error_msg in skipped:
+        typer.echo(f"  Skipped: {descriptor} -- {error_msg}")
+
+
 @app.command()
 def sweep(
     # Scenario selection (mutually exclusive)
@@ -611,8 +686,24 @@ def sweep(
 
     # Run each config and collect results
     all_results: dict[tuple[str, str, float, int], PASMultiScenarioValidationResult] = {}
+    skipped_configs: list[tuple[str, str]] = []  # (config_descriptor, error_message)
     for i, config in enumerate(configs, 1):
         logger.info(f"Running config {i}/{len(configs)}")
+        config_descriptor = build_config_descriptor(config)
+
+        # Probe all unique LLM endpoints before running scenarios
+        try:
+            probed: set[tuple[str, str | None]] = set()
+            for engine in (config.user_engine_config, config.observe_engine_config, config.execute_engine_config):
+                engine_key = (engine.model_name, engine.provider)
+                if engine_key not in probed:
+                    probe_llm_endpoint(engine)
+                    probed.add(engine_key)
+        except LLMProbeError as e:
+            logger.warning(f"Skipping config {i}/{len(configs)} ({config_descriptor}): {e}")
+            skipped_configs.append((config_descriptor, str(e)))
+            continue
+
         _, result = run_single_config(
             config=config,
             scenario_iterator_factory=scenario_factory,
@@ -622,7 +713,10 @@ def sweep(
             results_dir=results_dir,
             output_dir=output_dir,
         )
-        all_results[build_result_key(config)] = result
+        config_key = build_result_key(config)
+        all_results[config_key] = result
+        typer.echo(f"\nConfig {i}/{len(configs)} complete:")
+        _print_config_result(config_key, result)
 
     # Combine results and generate reports
     combined_df = combine_results_to_dataframe(all_results)
@@ -634,6 +728,57 @@ def sweep(
     save_text_report(results_dir / base_dir_name / "combined_report.txt", text_report)
 
     # Print summary
-    typer.echo(f"\nBenchmark complete: {len(configs)} configs")
-    for config_result in json_report.get("per_config_results", []):
-        typer.echo(f"  {config_result['proactive_model']}: {config_result['success_rate']:.1f}% success")
+    _print_sweep_summary(configs, all_results, skipped_configs)
+
+
+@app.command()
+def report(
+    results_dir: Annotated[
+        Path,
+        typer.Option("--results-dir", "-d", help="Path to results directory containing *_result.json files"),
+    ],
+    split: Annotated[
+        str,
+        typer.Option("--split", "-s", help="Dataset split name for report header"),
+    ] = "full",
+) -> None:
+    """Generate combined report from existing per-model result files.
+
+    Reads all *_result.json files from the given directory, combines them
+    into a single DataFrame, and generates combined JSON and text reports.
+    """
+    results_dir = results_dir.resolve()
+    if not results_dir.exists():
+        typer.echo(f"Error: Results directory not found: {results_dir}", err=True)
+        raise typer.Exit(code=1)
+
+    # Find all individual result files (exclude combined_result.json)
+    result_files = sorted(results_dir.glob("*_result.json"))
+    result_files = [f for f in result_files if f.name != "combined_result.json"]
+
+    if not result_files:
+        typer.echo(f"Error: No result files found in {results_dir}", err=True)
+        raise typer.Exit(code=1)
+
+    # Load and combine
+    dataframes = []
+    for f in result_files:
+        with open(f) as fh:
+            data = json.load(fh)
+        df = pl.DataFrame(data, schema=PAS_RESULT_SCHEMA)
+        dataframes.append(df)
+        typer.echo(f"  Loaded {f.name}: {len(df)} rows")
+
+    combined_df = pl.concat(dataframes, how="vertical")
+    typer.echo(f"\nCombined: {len(combined_df)} total rows from {len(result_files)} files")
+
+    # Generate reports
+    json_report = generate_json_stats_report(combined_df, split)
+    text_report = generate_validation_report(combined_df, split)
+
+    # Save
+    save_json_result(results_dir / "combined_result.json", json_report)
+    save_text_report(results_dir / "combined_report.txt", text_report)
+
+    typer.echo(f"\nSaved combined_result.json and combined_report.txt to {results_dir}")
+    typer.echo(f"\n{text_report}")

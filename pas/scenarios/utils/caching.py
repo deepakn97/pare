@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -15,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 import xxhash
 from dotenv import load_dotenv
 
+from pas.constants import RETRYABLE_ERRNOS
 from pas.scenarios.validation_result import PASScenarioValidationResult
 
 if TYPE_CHECKING:
@@ -192,10 +194,10 @@ def _generate_config_hash(runner_config: ScenarioRunnerConfig) -> str:
         "oracle": runner_config.oracle,
         "max_turns": runner_config.max_turns,
         "simulated_generation_time_mode": runner_config.simulated_generation_time_mode,
-        "tool_augmentation": runner_config.tool_augmentation_config.model_dump()
+        "tool_augmentation": asdict(runner_config.tool_augmentation_config)
         if runner_config.tool_augmentation_config
         else None,
-        "env_events_config": runner_config.env_events_config.model_dump() if runner_config.env_events_config else None,
+        "env_events_config": asdict(runner_config.env_events_config) if runner_config.env_events_config else None,
     }
     config_json = json.dumps(config_dict, sort_keys=True)
     return xxhash.xxh64(config_json.encode()).hexdigest()[:16]
@@ -293,6 +295,12 @@ def maybe_load_cached_result(
             logger.debug(f"Cache invalidated for {scenario.scenario_id} due to config/scenario changes")
             return None
 
+        if cached_result.exception_type is not None:
+            logger.info(
+                f"Ignoring cached result with exception for {scenario.scenario_id}: {cached_result.exception_type}"
+            )
+            return None
+
         logger.info(f"Loading cached result for scenario {scenario.scenario_id}")
         return cached_result.to_scenario_result()
 
@@ -301,24 +309,44 @@ def maybe_load_cached_result(
         return None
 
 
+_CACHE_WRITE_MAX_ATTEMPTS = 3
+
+
 def write_cached_result(
     runner_config: ScenarioRunnerConfig,
     scenario: PASScenario,
     result: PASScenarioValidationResult,
 ) -> None:
-    """Write a scenario result to cache."""
-    try:
-        cached_result = CachedScenarioResult.from_scenario_result(result, scenario, runner_config)
+    """Write a scenario result to cache.
 
-        cache_file = _get_cache_file_path(cached_result.cache_key)
+    Retries up to 3 times on transient OS resource errors (e.g., too many open files).
+    """
+    for attempt in range(_CACHE_WRITE_MAX_ATTEMPTS):
+        try:
+            cached_result = CachedScenarioResult.from_scenario_result(result, scenario, runner_config)
+            cache_file = _get_cache_file_path(cached_result.cache_key)
 
-        with open(cache_file, "w") as f:
-            f.write(cached_result.to_json())
+            with open(cache_file, "w") as f:
+                f.write(cached_result.to_json())
 
-        logger.debug(f"Cached result for scenario {scenario.scenario_id}")
+            logger.debug(f"Cached result for scenario {scenario.scenario_id}")
+            break
 
-    except Exception as e:
-        logger.warning(f"Failed to cache result for {scenario.scenario_id}: {e}")
+        except OSError as e:
+            if e.errno in RETRYABLE_ERRNOS and attempt < _CACHE_WRITE_MAX_ATTEMPTS - 1:
+                wait_time = 2 * (attempt + 1)
+                logger.warning(
+                    f"Cache write failed for {scenario.scenario_id} ({e}), "
+                    f"retrying in {wait_time}s (attempt {attempt + 1}/{_CACHE_WRITE_MAX_ATTEMPTS})"
+                )
+                time.sleep(wait_time)
+                continue
+            logger.warning(f"Failed to cache result for {scenario.scenario_id}: {e}")
+            break
+
+        except Exception as e:
+            logger.warning(f"Failed to cache result for {scenario.scenario_id}: {e}")
+            break
 
 
 def clear_cache() -> None:
