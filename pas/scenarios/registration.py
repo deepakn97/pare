@@ -25,11 +25,11 @@ def register_pas_scenarios(registry: ScenarioRegistry) -> None:
 
     This function is called by Meta-ARE's scenario registry when it discovers
     the PAS scenarios entry point. It imports all scenario modules from the
-    configured scenarios directory (or user_scenarios by default).
+    configured scenarios directory (or benchmark by default).
 
     The scenarios directory can be configured via PAS_SCENARIOS_DIR environment variable:
-    - Relative path (e.g., "user_scenarios", "generated_scenarios/3apps_group")
-    - Multiple directories separated by commas (e.g., "user_scenarios,generated_scenarios/3apps_group")
+    - Relative path (e.g., "benchmark", "generator")
+    - Multiple directories separated by commas (e.g., "benchmark,generator")
 
     Args:
         registry: The ScenarioRegistry instance to register with.

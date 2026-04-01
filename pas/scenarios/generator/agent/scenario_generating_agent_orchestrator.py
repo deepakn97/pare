@@ -14,11 +14,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from pas.scenario_generator.prompt.scenario_generating_agent_prompts import (
+from pas.scenarios.generator.prompt import scenario_generating_agent_prompts as prompt_module
+from pas.scenarios.generator.prompt.scenario_generating_agent_prompts import (
     configure_dynamic_context,
-)
-from pas.scenario_generator.prompt.scenario_generating_agent_prompts import (
-    prompts as prompt_module,
 )
 from scripts.run_scenarios import run_scenarios
 
@@ -63,12 +61,21 @@ class ScenarioGeneratingAgentOrchestrator:
         # Backwards compatibility: boolean resume_from_step2 maps to "step2" unless
         # an explicit resume_from_step value is provided.
         self.resume_from_step = resume_from_step or ("step2" if resume_from_step2 else None)
-        base_dir = Path(__file__).resolve().parents[2]
-        self.repo_root = base_dir.parent
+        # This file lives under `pas/scenarios/generator/agent/...`.
+        # - generator_dir: pas/scenarios/generator
+        # - scenarios_dir: pas/scenarios
+        # - pas_dir:       pas
+        generator_dir = Path(__file__).resolve().parents[1]
+        scenarios_dir = generator_dir.parent
+        pas_dir = scenarios_dir.parent
+
+        # Keep repo_root aligned to the `pas/` package directory (so relative paths
+        # like repo_root/"scenarios"/... resolve under `pas/scenarios/`).
+        self.repo_root = pas_dir
 
         # Directory that tracks the per-step trajectory for this run, e.g.,
         # pas/scenario_generator/step_trajectory/trajectory_YYYYMMDDTHHMMSS.
-        trajectory_root = base_dir / "step_trajectory"
+        trajectory_root = generator_dir / "step_trajectory"
         if trajectory_dir is not None:
             self.trajectory_dir = Path(trajectory_dir)
         else:
@@ -82,11 +89,13 @@ class ScenarioGeneratingAgentOrchestrator:
         self.output_dir = Path(output_dir) if output_dir is not None else self.trajectory_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Directory that holds the canonical seed scenario plus the single
-        # editable working copy used by all Claude-backed steps.
-        # This path is aligned with the PAS package layout:
-        # pas/scenarios/generated_scenarios_w_claude_agent
-        self.seed_scenarios_dir = self.repo_root / "scenarios" / "generated_scenarios_w_claude_agent"
+        # Directory that holds the single editable working copy plus the final
+        # exported scenarios produced by the multi-step generator.
+        #
+        # IMPORTANT: this directory must live directly under `pas/scenarios/`
+        # so that `PAS_SCENARIOS_DIR=generator` can discover and import the
+        # working file as `pas.scenarios.generator.<module>`.
+        self.seed_scenarios_dir = generator_dir
         self.seed_scenarios_dir.mkdir(parents=True, exist_ok=True)
 
         # Use the editable_seed_scenario-based working file so Claude Agent can
@@ -160,7 +169,7 @@ class ScenarioGeneratingAgentOrchestrator:
         # from the PAS scenarios package so we can safely strip any
         # natural-language preamble/epilogue that Claude might emit around the
         # template body.
-        self.seed_template_path = self.seed_scenarios_dir / "original_seed_scenario.py"
+        self.seed_template_path = generator_dir / "utils" / "original_seed_scenario.py"
         self.seed_template_text = self._safe_read_text(self.seed_template_path)
 
         if self.debug_prompts:
@@ -977,7 +986,7 @@ class ScenarioGeneratingAgentOrchestrator:
         1. Reads `editable_seed_scenario.py` and extracts the PASScenario class
            name (e.g., `MyScenarioName`).
         2. Copies the final scenario into
-           `pas/scenarios/generated_scenarios_w_claude_agent/MyScenarioName.py`.
+           `pas/scenarios/generator/MyScenarioName.py`.
         3. Resets `editable_seed_scenario.py` back to the original seed template
            so the next multi-step run starts from a clean, canonical file.
         """
@@ -1012,7 +1021,7 @@ class ScenarioGeneratingAgentOrchestrator:
                     break
                 i += 1
 
-        # Safety guard: never export into `generated_scenarios_w_claude_agent/`
+        # Safety guard: never export into the default generation output directory
         # unless the most recent run check reached validation and succeeded.
         if (
             self._last_check_result is None
@@ -1119,7 +1128,7 @@ class ScenarioGeneratingAgentOrchestrator:
         # this environment variable when `registry.get_scenario(...)` is first
         # called inside `run_demo`.
         scenarios_dir_name = artifact_path.parent.name
-        existing_dirs = os.getenv("PAS_SCENARIOS_DIR", "user_scenarios")
+        existing_dirs = os.getenv("PAS_SCENARIOS_DIR", "benchmark")
         dirs = [d.strip() for d in existing_dirs.split(",") if d.strip()]
         if scenarios_dir_name not in dirs:
             dirs.append(scenarios_dir_name)

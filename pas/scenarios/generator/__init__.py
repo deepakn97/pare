@@ -32,11 +32,12 @@ def register_custom_scenarios(registry: ScenarioRegistry) -> None:  # noqa: C901
     custom_scenario_modules = [
         # Keep this list restricted to modules that exist in-tree. Importing the
         # module triggers any @register_scenario decorators at import time.
-        "pas.scenario_generator.scenario_with_all_pas_apps",
+        "pas.scenarios.generator.utils.apps_init_instructions",
     ]
 
     # Auto-discover generated scenario files by file path; import by spec (no package required)
-    base_dir = Path(__file__).resolve().parents[1] / "scenarios" / "generated_scenarios"
+    # NOTE: this module lives under `pas/scenarios/generator/`, so we need `parents[2]` to get back to `pas/`.
+    base_dir = Path(__file__).resolve().parents[2] / "scenarios" / "generated_scenarios"
     discovered_files: list[Path] = []
     excluded_filenames = {"meeting_invite_coordination.py", "project_feedback_share.py", "weekend_grocery_pickup.py"}
     if base_dir.exists():

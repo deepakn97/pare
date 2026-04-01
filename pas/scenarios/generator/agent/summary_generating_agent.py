@@ -3,10 +3,12 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from are.simulation.agents.llm.llm_engine import LLMEngine
+if TYPE_CHECKING:
+    from are.simulation.agents.llm.llm_engine import LLMEngine
 
-from pas.scenario_generator.prompt.summary_generator_prompts import (
+from pas.scenarios.generator.prompt.summary_generator_prompts import (
     DEFAULT_SUMMARY_GENERATOR_SYSTEM_PROMPT,
     SUMMARY_TASK_TEMPLATE,
 )

@@ -5,7 +5,7 @@ from collections.abc import Callable  # noqa: TC003
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from pas.scenario_generator.prompt.scenario_generating_agent_prompts import (
+from pas.scenarios.generator.prompt.scenario_generating_agent_prompts import (
     APPS_AND_DATA_USER_PROMPT,
     EVENTS_FLOW_USER_PROMPT,
     SCENARIO_DESCRIPTION_USER_PROMPT,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from pas.scenario_generator.prompt.scenario_generating_agent_prompts.prompts import (
+from pas.scenarios.generator.prompt.scenario_generating_agent_prompts import (
     SCENARIO_UNIQUENESS_SYSTEM_PROMPT,
     SCENARIO_UNIQUENESS_USER_PROMPT,
 )

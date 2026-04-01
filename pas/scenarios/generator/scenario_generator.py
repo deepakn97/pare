@@ -16,14 +16,14 @@ from dotenv import load_dotenv
 
 from pas.apps.core import AppState
 from pas.apps.notification_templates import NOTIFICATION_TEMPLATES
-from pas.scenario_generator.agent.scenario_generating_agent import (
+from pas.scenarios.generator.agent.scenario_generating_agent_orchestrator import (
     ScenarioGeneratingAgentOrchestrator,
 )
-from pas.scenario_generator.prompt.scenario_generating_agent_prompts.prompts import (
+from pas.scenarios.generator.prompt.scenario_generating_agent_prompts import (
     APP_IMPORT_INSTRUCTIONS,
     build_app_initialization_block,
 )
-from pas.scenario_generator.scenario_with_all_pas_apps import ScenarioWithAllPASApps
+from pas.scenarios.generator.utils.apps_init_instructions import ScenarioWithAllPASApps
 
 SYSTEM_APPS = {"PASAgentUserInterface", "HomeScreenSystemApp"}
 _STATE_USER_TOOL_CACHE: dict[type, list[tuple[str, str, Any]]] = {}
@@ -686,9 +686,9 @@ def main() -> None:
         default=None,
         help=(
             "Optional path to a step trajectory directory "
-            "(e.g., pas/scenario_generator/step_trajectory/trajectory_YYYYMMDDTHHMMSS). "
+            "(e.g., pas/scenarios/generator/step_trajectory/trajectory_YYYYMMDDTHHMMSS). "
             "If not provided, a new directory will be created under "
-            "pas/scenario_generator/step_trajectory for this run."
+            "pas/scenarios/generator/step_trajectory for this run."
         ),
     )
     parser.add_argument(

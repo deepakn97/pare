@@ -6,7 +6,9 @@ from pathlib import Path
 
 PROMPTS_DIR = Path(__file__).resolve().parent
 SCENARIO_GENERATOR_DIR = PROMPTS_DIR.parent
-PAS_DIR = SCENARIO_GENERATOR_DIR.parent
+# This file lives under `pas/scenarios/generator/prompt/`.
+# We want the top-level `pas/` package directory for filesystem hints in prompts.
+PAS_DIR = Path(__file__).resolve().parents[3]
 
 
 def _discover_meta_are_apps_dir() -> Path | None:
@@ -27,7 +29,7 @@ def _discover_meta_are_apps_dir() -> Path | None:
 PAS_APPS_DIR = PAS_DIR / "apps"
 META_ARE_APPS_DIR = _discover_meta_are_apps_dir()
 META_ARE_APPS_DIR_DISPLAY = str(META_ARE_APPS_DIR) if META_ARE_APPS_DIR is not None else "(not found on disk)"
-SCENARIOS_DIR = PAS_DIR / "scenarios" / "user_scenarios"
+SCENARIOS_DIR = PAS_DIR / "scenarios" / "benchmark"
 SCENARIOS_DIR_DISPLAY = str(SCENARIOS_DIR)
 
 PROJECT_CONTEXT_SUMMARY = textwrap.dedent(
@@ -251,7 +253,7 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
     - A concise, ecologically grounded **narrative description** that:
       - Focuses on ONE clear, primary coordination/assistive challenge for the proactive agent (do not try to cover multiple unrelated subplots).
       - Explains the user's context, pain point, and why the proactive assistant should intervene.
-      - Describes what information arrives through PAS apps and when, at a similar level of detail and brevity as the existing user scenarios under `pas/scenarios/user_scenarios/`.
+      - Describes what information arrives through PAS apps and when, at a similar level of detail and brevity as the existing reference scenarios under `pas/scenarios/benchmark/`.
       - Outlines the agent's proactive inference, proposed assistance, and expected user response without unnecessary digressions.
       - Follows the docstring structure of the existing PAS scenarios (e.g. `calendar_conflict_urgent_reschedule.py`, `contact_update_from_new_number.py`):
         * First line: one-sentence summary of what the agent does (e.g. "Agent updates contact information from messages received from unknown number.").
@@ -359,7 +361,7 @@ _SCENARIO_DESCRIPTION_BODY = textwrap.dedent(
       - Valid Python identifier in PascalCase (e.g., `VipCalendarConflict`).
       - Starts with a letter; contains only letters and digits; no underscores or spaces.
     - Complexity and style:
-      - Aim for the same level of complexity and conciseness as the hand-written PAS user scenarios in `pas/scenarios/user_scenarios/` (for example, `calendar_conflict_urgent_reschedule.py`).
+      - Aim for the same level of complexity and conciseness as the hand-written PAS scenarios in `pas/scenarios/benchmark/` (for example, `calendar_conflict_urgent_reschedule.py`).
       - Avoid redundant background details that do not affect the agent's reasoning or the event flow.
       - Keep the description tightly centered on the single main coordination problem and how PAS apps + the agent resolve it.
 
@@ -635,7 +637,7 @@ _EVENTS_FLOW_BODY = textwrap.dedent(
 
     Explicit oracle events for agent behavior (IMPORTANT):
     - For every major agent behavior that you expect Step 4 to validate (for example: sending a proposal to the user, searching the calendar, updating a contact, sending a reply email, adding a reminder), you MUST create a concrete oracle event in `build_events_flow()`.
-      - Follow the patterns used in the hand-written scenarios under `pas/scenarios/user_scenarios/`, such as:
+      - Follow the patterns used in the hand-written scenarios under `pas/scenarios/benchmark/`, such as:
         - `calendar_conflict_urgent_reschedule.py` (explicit `get_calendar_events_from_to`, `edit_calendar_event`, `add_calendar_event`, `reply_to_email` calls, each with `.oracle().depends_on(...)`).
         - `contact_update_from_new_number.py` (explicit `search_contacts`, `edit_contact`, `send_message` calls with `.oracle().depends_on(...)`).
     - Do NOT rely on "implicit" agent behavior that you only describe in comments. If a behavior matters for validation, represent it as an actual oracle event by calling the appropriate PAS app tools, chaining them with `.oracle()` / `.depends_on(...)`, and registering them in `self.events`.
@@ -871,8 +873,8 @@ SCENARIO_DESCRIPTION_USER_PROMPT = textwrap.dedent(
 
     Stylistic reference (docstring pattern ONLY, not scenario content):
     - Use the Read tool to open the following existing user scenarios and observe how their docstrings are structured:
-      - `pas/scenarios/user_scenarios/contact_update_from_new_number.py`
-      - `pas/scenarios/user_scenarios/calendar_conflict_urgent_reschedule.py`
+      - `pas/scenarios/benchmark/contact_update_from_new_number.py`
+      - `pas/scenarios/benchmark/calendar_conflict_urgent_reschedule.py`
     - Follow their docstring pattern (high-level summary line, concrete context + numbered steps, final "This scenario exercises ..." paragraph),
       but you MUST design a completely new scenario with different triggers, goals, and app usage.
 
