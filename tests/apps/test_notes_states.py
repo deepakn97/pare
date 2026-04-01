@@ -12,16 +12,16 @@ from are.simulation.types import (
     EventType,
 )
 
-from pas.apps.note.app import Note, ReturnedNotes, StatefulNotesApp
-from pas.apps.note.states import (
+from pare.apps.note.app import Note, ReturnedNotes, StatefulNotesApp
+from pare.apps.note.states import (
     EditNote,
     FolderList,
     NoteDetail,
     NoteList,
 )
-from pas.apps.proactive_aui import PASAgentUserInterface
-from pas.apps.system import HomeScreenSystemApp
-from pas.environment import StateAwareEnvironmentWrapper
+from pare.apps.proactive_aui import PAREAgentUserInterface
+from pare.apps.system import HomeScreenSystemApp
+from pare.environment import StateAwareEnvironmentWrapper
 
 # =============================================================================
 # State Helpers
@@ -85,7 +85,7 @@ def env_with_note() -> StateAwareEnvironmentWrapper:
     """Create environment with note app registered and opened."""
     env = StateAwareEnvironmentWrapper()
     system_app = HomeScreenSystemApp(name="HomeScreen")
-    aui_app = PASAgentUserInterface()
+    aui_app = PAREAgentUserInterface()
     note_app = StatefulNotesApp(name="note")
     env.register_apps([system_app, aui_app, note_app])
     env._open_app("note")

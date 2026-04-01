@@ -7,10 +7,10 @@ from are.simulation.agents.default_agent.base_agent import BaseAgent, BaseAgentL
 from are.simulation.notification_system import Message
 from are.simulation.scenarios.scenario import Scenario
 
-from pas.agents.user.agent import UserAgent
-from pas.agents.user.steps import pull_notifications_and_tools
-from pas.agents.agent_log import AvailableToolsLog, CurrentAppStateLog, AgentMessageLog
-from pas.notification_system import PASMessageType, PASNotificationSystem
+from pare.agents.user.agent import UserAgent
+from pare.agents.user.steps import pull_notifications_and_tools
+from pare.agents.agent_log import AvailableToolsLog, CurrentAppStateLog, AgentMessageLog
+from pare.notification_system import PAREMessageType, PARENotificationSystem
 from are.simulation.agents.agent_log import TaskLog, ObservationLog
 
 
@@ -46,7 +46,7 @@ def mock_time_manager():
 @pytest.fixture
 def mock_notification_system():
     """Mock notification system."""
-    system = Mock(spec=PASNotificationSystem)
+    system = Mock(spec=PARENotificationSystem)
     system.message_queue = Mock()
     system.message_queue.get_by_timestamp.return_value = []
     system.message_queue.put = Mock()
@@ -72,7 +72,7 @@ def user_agent(mock_llm_engine, mock_base_agent, mock_time_manager):
 
 def test_agent_framework_property(user_agent):
     """Test agent_framework property returns correct name."""
-    assert user_agent.agent_framework == "PASUserAgent"
+    assert user_agent.agent_framework == "PAREUserAgent"
 
 
 def test_model_property(user_agent, mock_llm_engine):
@@ -123,7 +123,7 @@ def test_init_notification_system_with_none(user_agent):
 def test_get_notifications_filters_agent_messages(user_agent, mock_notification_system):
     """Test get_notifications filters AGENT_MESSAGE type correctly."""
     agent_msg = Mock(spec=Message)
-    agent_msg.message_type = PASMessageType.AGENT_MESSAGE
+    agent_msg.message_type = PAREMessageType.AGENT_MESSAGE
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [agent_msg]
     user_agent.react_agent.notification_system = mock_notification_system
@@ -139,7 +139,7 @@ def test_get_notifications_filters_agent_messages(user_agent, mock_notification_
 def test_get_notifications_filters_env_notifications(user_agent, mock_notification_system):
     """Test get_notifications filters ENVIRONMENT_NOTIFICATION type correctly."""
     env_msg = Mock(spec=Message)
-    env_msg.message_type = PASMessageType.ENVIRONMENT_NOTIFICATION_USER
+    env_msg.message_type = PAREMessageType.ENVIRONMENT_NOTIFICATION_USER
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [env_msg]
     user_agent.react_agent.notification_system = mock_notification_system
@@ -155,7 +155,7 @@ def test_get_notifications_filters_env_notifications(user_agent, mock_notificati
 def test_get_notifications_filters_env_stop(user_agent, mock_notification_system):
     """Test get_notifications filters ENVIRONMENT_STOP type correctly."""
     stop_msg = Mock(spec=Message)
-    stop_msg.message_type = PASMessageType.ENVIRONMENT_STOP
+    stop_msg.message_type = PAREMessageType.ENVIRONMENT_STOP
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [stop_msg]
     user_agent.react_agent.notification_system = mock_notification_system
@@ -171,7 +171,7 @@ def test_get_notifications_filters_env_stop(user_agent, mock_notification_system
 def test_get_notifications_puts_env_notifications_back(user_agent, mock_notification_system):
     """Test get_notifications puts env notifications back in queue."""
     env_msg = Mock(spec=Message)
-    env_msg.message_type = PASMessageType.ENVIRONMENT_NOTIFICATION_USER
+    env_msg.message_type = PAREMessageType.ENVIRONMENT_NOTIFICATION_USER
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [env_msg]
     user_agent.react_agent.notification_system = mock_notification_system
@@ -185,10 +185,10 @@ def test_get_notifications_puts_env_notifications_back(user_agent, mock_notifica
 def test_get_notifications_does_not_put_agent_messages_back(user_agent, mock_notification_system):
     """Test get_notifications consumes agent_messages (does not put them back in queue)."""
     agent_msg = Mock(spec=Message)
-    agent_msg.message_type = PASMessageType.AGENT_MESSAGE
+    agent_msg.message_type = PAREMessageType.AGENT_MESSAGE
 
     env_msg = Mock(spec=Message)
-    env_msg.message_type = PASMessageType.ENVIRONMENT_NOTIFICATION_USER
+    env_msg.message_type = PAREMessageType.ENVIRONMENT_NOTIFICATION_USER
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [agent_msg, env_msg]
     user_agent.react_agent.notification_system = mock_notification_system
@@ -211,13 +211,13 @@ def test_get_notifications_raises_without_system(user_agent):
 def test_get_notifications_handles_mixed_messages(user_agent, mock_notification_system):
     """Test get_notifications correctly filters mixed message types."""
     agent_msg = Mock(spec=Message)
-    agent_msg.message_type = PASMessageType.AGENT_MESSAGE
+    agent_msg.message_type = PAREMessageType.AGENT_MESSAGE
 
     env_msg = Mock(spec=Message)
-    env_msg.message_type = PASMessageType.ENVIRONMENT_NOTIFICATION_USER
+    env_msg.message_type = PAREMessageType.ENVIRONMENT_NOTIFICATION_USER
 
     stop_msg = Mock(spec=Message)
-    stop_msg.message_type = PASMessageType.ENVIRONMENT_STOP
+    stop_msg.message_type = PAREMessageType.ENVIRONMENT_STOP
 
     mock_notification_system.message_queue.get_by_timestamp.return_value = [agent_msg, env_msg, stop_msg]
     user_agent.react_agent.notification_system = mock_notification_system
@@ -287,7 +287,7 @@ def test_prepare_user_agent_run_initializes_notification_system(user_agent, mock
     assert user_agent.react_agent.notification_system == mock_notification_system
 
 
-@patch("pas.agents.user.agent.get_notification_system_prompt")
+@patch("pare.agents.user.agent.get_notification_system_prompt")
 def test_prepare_user_agent_run_initializes_system_prompt(mock_get_prompt, user_agent, mock_notification_system):
     """Test prepare_user_agent_run initializes system prompt."""
     mock_get_prompt.return_value = "Notification system description"
@@ -392,7 +392,7 @@ def test_agent_loop_handles_agent_messages(user_agent, mock_notification_system)
     # Create agent message
     msg = Mock(spec=Message)
     msg.message = "Test proposal"
-    msg.message_type = PASMessageType.AGENT_MESSAGE
+    msg.message_type = PAREMessageType.AGENT_MESSAGE
     msg.attachments = []
 
     # Mock get_notifications to return agent message
@@ -419,7 +419,7 @@ def test_agent_loop_handles_env_stop(user_agent, mock_notification_system):
     user_agent.init_tools = Mock()
 
     stop_msg = Mock(spec=Message)
-    stop_msg.message_type = PASMessageType.ENVIRONMENT_STOP
+    stop_msg.message_type = PAREMessageType.ENVIRONMENT_STOP
 
     # Return stop message and empty lists
     mock_notification_system.message_queue.get_by_timestamp.return_value = [stop_msg]
@@ -442,7 +442,7 @@ def test_agent_loop_handles_failed_state(user_agent, mock_notification_system):
 
     msg = Mock(spec=Message)
     msg.message = "Test"
-    msg.message_type = PASMessageType.AGENT_MESSAGE
+    msg.message_type = PAREMessageType.AGENT_MESSAGE
     msg.attachments = []
 
     # Mock get_notifications to provide one message

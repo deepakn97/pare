@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analyze app usage distribution across registered PAS scenarios.
+"""Analyze app usage distribution across registered PARE scenarios.
 
 Creates a pie chart showing which apps are used how many times.
 """
@@ -19,8 +19,8 @@ from dotenv import load_dotenv
 # Load environment variables before importing registry
 load_dotenv()
 
-from pas.benchmark.scenario_loader import Split, get_splits_dir, load_scenario_ids_from_file  # noqa: E402
-from pas.scenarios.utils.registry import registry  # noqa: E402
+from pare.benchmark.scenario_loader import Split, get_splits_dir, load_scenario_ids_from_file  # noqa: E402
+from pare.scenarios.utils.registry import registry  # noqa: E402
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ PALETTES = {
 }
 
 # Apps to exclude (present in all scenarios)
-EXCLUDED_APPS = {"PASAgentUserInterface", "HomeScreenSystem"}
+EXCLUDED_APPS = {"PAREAgentUserInterface", "HomeScreenSystem"}
 
 
 def get_app_usage_from_scenarios(scenario_ids: list[str] | None = None) -> Counter[str]:
@@ -252,7 +252,7 @@ def print_summary(app_counter: Counter[str], split_name: str | None = None) -> N
 
 def main() -> None:
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Analyze app usage distribution across PAS scenarios.")
+    parser = argparse.ArgumentParser(description="Analyze app usage distribution across PARE scenarios.")
     parser.add_argument(
         "-o",
         "--output",

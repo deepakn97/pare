@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Run PAS scenarios across multiple proactive models.
+# Run PARE scenarios across multiple proactive models.
 #
 # Usage:
 #   ./scripts/run_models_sweep.sh --models model1 model2 model3
@@ -96,7 +96,7 @@ while [[ $# -gt 0 ]]; do
         --help|-h)
             echo "Usage: $0 --models <model1 model2 ... | models_file.txt> [OPTIONS]"
             echo ""
-            echo "Run PAS scenarios across multiple proactive models."
+            echo "Run PARE scenarios across multiple proactive models."
             echo ""
             echo "Options:"
             echo "  --models MODELS          Model names or path to file with model names (one per line)"
@@ -147,7 +147,7 @@ if [[ ${#MODELS[@]} -eq 0 ]]; then
 fi
 
 echo "========================================"
-echo "PAS Models Sweep"
+echo "PARE Models Sweep"
 echo "========================================"
 echo "User model: $USER_MODEL"
 echo "Proactive models: ${MODELS[*]}"

@@ -9,8 +9,8 @@ import pytest
 from are.simulation.apps.calendar import DATETIME_FORMAT, CalendarEvent
 from are.simulation.types import Action, CompletedEvent, EventMetadata, EventType
 
-from pas.apps.calendar.app import StatefulCalendarApp
-from pas.apps.calendar.states import AgendaView, EditDraft, EditEvent, EventDetail
+from pare.apps.calendar.app import StatefulCalendarApp
+from pare.apps.calendar.states import AgendaView, EditDraft, EditEvent, EventDetail
 
 
 class SampledCalendarApp(StatefulCalendarApp):

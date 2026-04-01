@@ -1,4 +1,4 @@
-"""Tests for PAS Environmental Events Expander."""
+"""Tests for PARE Environmental Events Expander."""
 
 from __future__ import annotations
 
@@ -7,11 +7,11 @@ from unittest.mock import Mock
 import pytest
 from are.simulation.scenarios.utils.scenario_expander import EnvEventsConfig
 
-from pas.apps.email.app import StatefulEmailApp
-from pas.apps.messaging.app import StatefulMessagingApp
-from pas.scenarios import PASScenario
-from pas.scenarios.utils.scenario_expander import (
-    PASEnvEventsExpander,
+from pare.apps.email.app import StatefulEmailApp
+from pare.apps.messaging.app import StatefulMessagingApp
+from pare.scenarios import PAREScenario
+from pare.scenarios.utils.scenario_expander import (
+    PAREEnvEventsExpander,
     default_weight_per_app_class,
 )
 
@@ -20,21 +20,21 @@ def create_mock_scenario(
     apps: list | None = None,
     duration: int = 300,
 ) -> Mock:
-    """Create a mock scenario with real PAS apps for testing.
+    """Create a mock scenario with real PARE apps for testing.
 
     Args:
         apps: List of app instances. If None, creates default email and messaging apps.
         duration: Scenario duration in seconds.
 
     Returns:
-        Mock scenario with spec=PASScenario.
+        Mock scenario with spec=PAREScenario.
     """
     if apps is None:
         email_app = StatefulEmailApp(name="Emails")
         messaging_app = StatefulMessagingApp(name="Messages")
         apps = [email_app, messaging_app]
 
-    scenario = Mock(spec=PASScenario)
+    scenario = Mock(spec=PAREScenario)
     scenario.apps = apps
     scenario.duration = duration
     scenario.events = [Mock()]  # Start event
@@ -52,7 +52,7 @@ def create_mock_scenario(
 
 
 def create_sample_augmentation_data() -> list[dict]:
-    """Create sample augmentation data matching PAS app structure."""
+    """Create sample augmentation data matching PARE app structure."""
     return [
         {
             "name": "Emails",
@@ -126,7 +126,7 @@ class TestNoiseEventTiming:
             env_events_seed=42,
             weight_per_app_class=default_weight_per_app_class(),
         )
-        expander = PASEnvEventsExpander(env_events_config=config)
+        expander = PAREEnvEventsExpander(env_events_config=config)
 
         initial_event_count = len(scenario.events)
         expander.add_env_events_to_scenario(scenario, augmentation_data)
@@ -141,30 +141,30 @@ class TestResolveAppNames:
     """Tests for _resolve_app_names method."""
 
     @pytest.fixture
-    def expander(self) -> PASEnvEventsExpander:
+    def expander(self) -> PAREEnvEventsExpander:
         """Create expander with default config."""
         config = EnvEventsConfig(
             num_env_events_per_minute=2.0,
             env_events_seed=42,
             weight_per_app_class=default_weight_per_app_class(),
         )
-        return PASEnvEventsExpander(env_events_config=config)
+        return PAREEnvEventsExpander(env_events_config=config)
 
-    def test_resolves_canonical_names(self, expander: PASEnvEventsExpander) -> None:
+    def test_resolves_canonical_names(self, expander: PAREEnvEventsExpander) -> None:
         """Should resolve canonical class names to themselves."""
         result = expander._resolve_app_names(["StatefulEmailApp", "StatefulMessagingApp"])
 
         assert result["StatefulEmailApp"] == "StatefulEmailApp"
         assert result["StatefulMessagingApp"] == "StatefulMessagingApp"
 
-    def test_resolves_aliases(self, expander: PASEnvEventsExpander) -> None:
+    def test_resolves_aliases(self, expander: PAREEnvEventsExpander) -> None:
         """Should resolve aliases to canonical class names."""
         result = expander._resolve_app_names(["Emails", "Messages"])
 
         assert result["Emails"] == "StatefulEmailApp"
         assert result["Messages"] == "StatefulMessagingApp"
 
-    def test_unknown_app_not_included(self, expander: PASEnvEventsExpander) -> None:
+    def test_unknown_app_not_included(self, expander: PAREEnvEventsExpander) -> None:
         """Should not include apps not in APP_ALIAS."""
         result = expander._resolve_app_names(["UnknownApp", "Emails"])
 
@@ -185,7 +185,7 @@ class TestGetNumEnvEventsPerApp:
                 "StatefulMessagingApp": 1.0,
             },
         )
-        expander = PASEnvEventsExpander(env_events_config=config)
+        expander = PAREEnvEventsExpander(env_events_config=config)
 
         # Set up resolved_app_names
         expander.resolved_app_names = {
@@ -206,7 +206,7 @@ class TestGetNumEnvEventsPerApp:
             env_events_seed=42,
             weight_per_app_class=default_weight_per_app_class(),
         )
-        expander = PASEnvEventsExpander(env_events_config=config)
+        expander = PAREEnvEventsExpander(env_events_config=config)
 
         expander.resolved_app_names = {
             "Emails": "StatefulEmailApp",
@@ -237,7 +237,7 @@ class TestAddEnvEventsToScenario:
             env_events_seed=42,
             weight_per_app_class=default_weight_per_app_class(),
         )
-        expander = PASEnvEventsExpander(env_events_config=config)
+        expander = PAREEnvEventsExpander(env_events_config=config)
 
         expander.add_env_events_to_scenario(scenario, augmentation_data)
 
@@ -254,7 +254,7 @@ class TestAddEnvEventsToScenario:
             env_events_seed=42,
             weight_per_app_class=default_weight_per_app_class(),
         )
-        expander = PASEnvEventsExpander(env_events_config=config)
+        expander = PAREEnvEventsExpander(env_events_config=config)
 
         initial_events_count = len(scenario.events)
 
@@ -272,7 +272,7 @@ class TestAddEnvEventsToScenario:
             env_events_seed=42,
             weight_per_app_class=default_weight_per_app_class(),
         )
-        expander = PASEnvEventsExpander(env_events_config=config)
+        expander = PAREEnvEventsExpander(env_events_config=config)
 
         initial_events_count = len(scenario.events)
 
@@ -292,7 +292,7 @@ class TestAddEnvEventsToScenario:
             env_events_seed=42,
             weight_per_app_class=default_weight_per_app_class(),
         )
-        expander = PASEnvEventsExpander(env_events_config=config)
+        expander = PAREEnvEventsExpander(env_events_config=config)
 
         # Augmentation only has email data
         email_only_augmentation = [create_sample_augmentation_data()[0]]
@@ -321,7 +321,7 @@ class TestIntegration:
             env_events_seed=42,
             weight_per_app_class=default_weight_per_app_class(),
         )
-        expander = PASEnvEventsExpander(env_events_config=config)
+        expander = PAREEnvEventsExpander(env_events_config=config)
 
         initial_count = len(scenario.events)
 
@@ -345,8 +345,8 @@ class TestIntegration:
             weight_per_app_class=default_weight_per_app_class(),
         )
 
-        expander1 = PASEnvEventsExpander(env_events_config=config)
-        expander2 = PASEnvEventsExpander(env_events_config=config)
+        expander1 = PAREEnvEventsExpander(env_events_config=config)
+        expander2 = PAREEnvEventsExpander(env_events_config=config)
 
         expander1.add_env_events_to_scenario(scenario1, augmentation_data)
         expander2.add_env_events_to_scenario(scenario2, augmentation_data)
@@ -370,8 +370,8 @@ class TestIntegration:
             weight_per_app_class=default_weight_per_app_class(),
         )
 
-        expander1 = PASEnvEventsExpander(env_events_config=config1)
-        expander2 = PASEnvEventsExpander(env_events_config=config2)
+        expander1 = PAREEnvEventsExpander(env_events_config=config1)
+        expander2 = PAREEnvEventsExpander(env_events_config=config2)
 
         expander1.add_env_events_to_scenario(scenario1, augmentation_data)
         expander2.add_env_events_to_scenario(scenario2, augmentation_data)

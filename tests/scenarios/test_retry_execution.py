@@ -6,17 +6,17 @@ import errno
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
-from pas.multi_scenario_runner import MultiScenarioRunner
-from pas.scenarios.validation_result import PASScenarioValidationResult
+from pare.multi_scenario_runner import MultiScenarioRunner
+from pare.scenarios.validation_result import PAREScenarioValidationResult
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from pas.scenarios.scenario import PASScenario
+    from pare.scenarios.scenario import PAREScenario
 
 
 def _make_scenario(scenario_id: str, run_number: int | None = None) -> MagicMock:
-    """Create a mock PASScenario."""
+    """Create a mock PAREScenario."""
     s = MagicMock()
     s.scenario_id = scenario_id
     s.run_number = run_number
@@ -51,17 +51,17 @@ class TestRetryExecution:
     def test_retryable_error_triggers_phase2(self) -> None:
         """Scenario with EMFILE error in phase 1 should be retried in phase 2."""
         scenario = _make_scenario("test_retry")
-        emfile_result = PASScenarioValidationResult(
+        emfile_result = PAREScenarioValidationResult(
             success=False,
             exception=OSError(errno.EMFILE, "Too many open files"),
         )
-        success_result = PASScenarioValidationResult(success=True)
+        success_result = PAREScenarioValidationResult(success=True)
 
         call_count = 0
         scenarios_per_phase: list[list[MagicMock]] = []
 
         def mock_stream_pool(
-            scenarios: Iterator[PASScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
+            scenarios: Iterator[PAREScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
         ) -> MagicMock:
             nonlocal call_count
             call_count += 1
@@ -79,8 +79,8 @@ class TestRetryExecution:
         runner = MultiScenarioRunner()
 
         with (
-            patch("pas.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool),
-            patch("pas.multi_scenario_runner.gc.collect") as mock_gc,
+            patch("pare.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool),
+            patch("pare.multi_scenario_runner.gc.collect") as mock_gc,
         ):
             config = _make_config()
             scenarios_iter = [scenario]
@@ -99,7 +99,7 @@ class TestRetryExecution:
     def test_non_retryable_error_not_retried(self) -> None:
         """Scenario with TypeError should NOT be retried."""
         scenario = _make_scenario("test_no_retry")
-        type_error_result = PASScenarioValidationResult(
+        type_error_result = PAREScenarioValidationResult(
             success=False,
             exception=TypeError("bad type"),
         )
@@ -107,7 +107,7 @@ class TestRetryExecution:
         call_count = 0
 
         def mock_stream_pool(
-            scenarios: Iterator[PASScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
+            scenarios: Iterator[PAREScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
         ) -> MagicMock:
             nonlocal call_count
             call_count += 1
@@ -119,7 +119,7 @@ class TestRetryExecution:
 
         runner = MultiScenarioRunner()
 
-        with patch("pas.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool):
+        with patch("pare.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool):
             config = _make_config()
             scenarios_iter = [scenario]
             result = runner.run_with_scenarios(config, scenarios_iter)
@@ -130,7 +130,7 @@ class TestRetryExecution:
     def test_retry_budget_exhausted_after_max_retries(self) -> None:
         """Scenario should finalize as failed after exhausting retry budget."""
         scenario = _make_scenario("test_budget")
-        emfile_result = PASScenarioValidationResult(
+        emfile_result = PAREScenarioValidationResult(
             success=False,
             exception=OSError(errno.EMFILE, "Too many open files"),
         )
@@ -139,7 +139,7 @@ class TestRetryExecution:
         scenarios_per_phase: list[list[MagicMock]] = []
 
         def mock_stream_pool(
-            scenarios: Iterator[PASScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
+            scenarios: Iterator[PAREScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
         ) -> MagicMock:
             nonlocal call_count
             call_count += 1
@@ -153,8 +153,8 @@ class TestRetryExecution:
         runner = MultiScenarioRunner()
 
         with (
-            patch("pas.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool),
-            patch("pas.multi_scenario_runner.gc.collect"),
+            patch("pare.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool),
+            patch("pare.multi_scenario_runner.gc.collect"),
         ):
             config = _make_config()
             scenarios_iter = [scenario]
@@ -170,17 +170,17 @@ class TestRetryExecution:
     def test_phase2_uses_half_workers(self) -> None:
         """Phase 2 should use max(1, original_workers // 2)."""
         scenario = _make_scenario("test_workers")
-        emfile_result = PASScenarioValidationResult(
+        emfile_result = PAREScenarioValidationResult(
             success=False,
             exception=OSError(errno.EMFILE, "Too many open files"),
         )
-        success_result = PASScenarioValidationResult(success=True)
+        success_result = PAREScenarioValidationResult(success=True)
 
         call_count = 0
         workers_per_call: list[int] = []
 
         def mock_stream_pool(
-            scenarios: Iterator[PASScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
+            scenarios: Iterator[PAREScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
         ) -> MagicMock:
             nonlocal call_count
             call_count += 1
@@ -198,8 +198,8 @@ class TestRetryExecution:
         runner = MultiScenarioRunner()
 
         with (
-            patch("pas.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool),
-            patch("pas.multi_scenario_runner.gc.collect"),
+            patch("pare.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool),
+            patch("pare.multi_scenario_runner.gc.collect"),
         ):
             config = _make_config(max_concurrent=10)
             scenarios_iter = [scenario]
@@ -213,17 +213,17 @@ class TestRetryExecution:
         run1 = _make_scenario("test_multi_run", run_number=1)
         run2 = _make_scenario("test_multi_run", run_number=2)
 
-        emfile_result = PASScenarioValidationResult(
+        emfile_result = PAREScenarioValidationResult(
             success=False,
             exception=OSError(errno.EMFILE, "Too many open files"),
         )
-        success_result = PASScenarioValidationResult(success=True)
+        success_result = PAREScenarioValidationResult(success=True)
 
         call_count = 0
         scenarios_per_phase: list[list[MagicMock]] = []
 
         def mock_stream_pool(
-            scenarios: Iterator[PASScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
+            scenarios: Iterator[PAREScenario], process_func: Any, max_workers: int, **kwargs: Any  # noqa: ANN401
         ) -> MagicMock:
             nonlocal call_count
             call_count += 1
@@ -251,8 +251,8 @@ class TestRetryExecution:
         runner = MultiScenarioRunner()
 
         with (
-            patch("pas.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool),
-            patch("pas.multi_scenario_runner.gc.collect"),
+            patch("pare.multi_scenario_runner.stream_pool", side_effect=mock_stream_pool),
+            patch("pare.multi_scenario_runner.gc.collect"),
         ):
             config = _make_config()
             scenarios_iter = [run1, run2]

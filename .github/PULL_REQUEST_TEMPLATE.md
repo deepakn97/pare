@@ -31,11 +31,11 @@ Closes #
 
 <!-- Select the component(s) this PR affects -->
 
-- [ ] Core (All files in the root `pas`, e.g. `pas/environment.py`)
-- [ ] Agents (All files in `pas/agents/`)
-- [ ] Scenarios (All files in `pas/scenarios/`)
-- [ ] Scenario Generator (All files in `pas/scenario_generator/`)
-- [ ] Apps (All files in `pas/apps/`)
+- [ ] Core (All files in the root `pare`, e.g. `pare/environment.py`)
+- [ ] Agents (All files in `pare/agents/`)
+- [ ] Scenarios (All files in `pare/scenarios/`)
+- [ ] Scenario Generator (All files in `pare/scenario_generator/`)
+- [ ] Apps (All files in `pare/apps/`)
 - [ ] Documentation (Documentation files e.g., `docs/`, `mkdocs.yml`, `README.md`)
 - [ ] Testing Infrastructure
 - [ ] Other
@@ -85,7 +85,7 @@ Closes #
 ## Code Quality
 
 - [ ] Pre-commit hooks pass (see output below)
-- [ ] No dependency issues (`uv run deptry pas`)
+- [ ] No dependency issues (`uv run deptry pare`)
 - [ ] Code follows project style guidelines (f-strings, Google docstrings, etc.)
 
 **Pre-commit output:**

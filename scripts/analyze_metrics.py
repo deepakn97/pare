@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analyze PAS traces and compute metrics per model and per scenario.
+"""Analyze PARE traces and compute metrics per model and per scenario.
 
 Metrics computed:
 1. Proposal Rate: proposals / total tool calls in observe mode
@@ -426,7 +426,7 @@ def load_scenarios_filter(scenarios_arg: list[str] | None) -> set[str] | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Analyze PAS traces and compute metrics.")
+    parser = argparse.ArgumentParser(description="Analyze PARE traces and compute metrics.")
     parser.add_argument(
         "--traces",
         "-t",

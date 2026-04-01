@@ -206,7 +206,7 @@ cython_debug/
 .serena
 AGENTS.md
 CLAUDE.md
-pas/**/CLAUDE.md
+pare/**/CLAUDE.md
 
 # Marimo
 marimo/_static/

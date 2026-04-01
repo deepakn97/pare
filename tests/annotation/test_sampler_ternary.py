@@ -7,13 +7,13 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from pas.annotation.sampler import (
+from pare.annotation.sampler import (
     balanced_sample_ternary,
     extract_all_decision_points_ternary,
     sample_new_datapoints_ternary,
     save_samples_ternary,
 )
-from pas.trajectory.models import DecisionPoint
+from pare.trajectory.models import DecisionPoint
 
 
 def _make_dp(scenario: str, run: int, decision: str, model: str = "claude") -> DecisionPoint:

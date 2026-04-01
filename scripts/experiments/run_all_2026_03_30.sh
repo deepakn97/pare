@@ -11,7 +11,7 @@ set -e
 
 STARTED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 echo "========================================"
-echo "PAS Experiment Batch - 2026-03-30"
+echo "PARE Experiment Batch - 2026-03-30"
 echo "Started at: $STARTED_AT"
 echo "========================================"
 echo ""
@@ -19,7 +19,7 @@ echo ""
 # --- 1. Full benchmark rerun ---
 echo "[1/8] Full benchmark rerun"
 echo "========================================"
-uv run pas benchmark sweep \
+uv run pare benchmark sweep \
   --split full \
   --observe-model qwen-3-4b-it,gemma-3-4b-it,llama-3.2-3b-it,claude-4.5-sonnet,gpt-5,gemini-3-pro,gemini-3-flash \
   --execute-model qwen-3-4b-it,gemma-3-4b-it,llama-3.2-3b-it,claude-4.5-sonnet,gpt-5,gemini-3-pro,gemini-3-flash \
@@ -32,7 +32,7 @@ echo ""
 # --- 2. Ablation benchmark rerun ---
 echo "[2/8] Ablation benchmark rerun"
 echo "========================================"
-uv run pas benchmark sweep \
+uv run pare benchmark sweep \
   --split ablation \
   --observe-model qwen-3-4b-it,gemma-3-4b-it,llama-3.2-3b-it,claude-4.5-sonnet,gpt-5,gemini-3-pro,gemini-3-flash \
   --execute-model qwen-3-4b-it,gemma-3-4b-it,llama-3.2-3b-it,claude-4.5-sonnet,gpt-5,gemini-3-pro,gemini-3-flash \
@@ -47,7 +47,7 @@ echo ""
 # --- 3. User model study: claude-4.5-sonnet as user ---
 echo "[3/8] User model study: claude-4.5-sonnet as user"
 echo "========================================"
-uv run pas benchmark sweep \
+uv run pare benchmark sweep \
   --split ablation \
   --observe-model claude-4.5-sonnet,gemini-3-flash,qwen-3-4b-it,gpt-5 \
   --execute-model claude-4.5-sonnet,gemini-3-flash,qwen-3-4b-it,gpt-5 \
@@ -60,7 +60,7 @@ echo ""
 # --- 4. User model study: gpt-5-mini as user ---
 echo "[4/8] User model study: gpt-5-mini as user"
 echo "========================================"
-uv run pas benchmark sweep \
+uv run pare benchmark sweep \
   --split ablation \
   --observe-model claude-4.5-sonnet,gemini-3-flash,qwen-3-4b-it,gpt-5 \
   --execute-model claude-4.5-sonnet,gemini-3-flash,qwen-3-4b-it,gpt-5 \
@@ -73,7 +73,7 @@ echo ""
 # --- 5. User model study: qwen-3-4b-it as user ---
 echo "[5/8] User model study: qwen-3-4b-it as user"
 echo "========================================"
-uv run pas benchmark sweep \
+uv run pare benchmark sweep \
   --split ablation \
   --observe-model claude-4.5-sonnet,gemini-3-flash,qwen-3-4b-it,gpt-5 \
   --execute-model claude-4.5-sonnet,gemini-3-flash,qwen-3-4b-it,gpt-5 \
@@ -86,7 +86,7 @@ echo ""
 # --- 6. User model study: gemini-3-flash as user ---
 echo "[6/8] User model study: gemini-3-flash as user"
 echo "========================================"
-uv run pas benchmark sweep \
+uv run pare benchmark sweep \
   --split ablation \
   --observe-model claude-4.5-sonnet,gemini-3-flash,qwen-3-4b-it,gpt-5 \
   --execute-model claude-4.5-sonnet,gemini-3-flash,qwen-3-4b-it,gpt-5 \
@@ -99,7 +99,7 @@ echo ""
 # --- 7. Asymmetric: fix execute to claude-sonnet, vary observe ---
 echo "[7/8] Asymmetric: fix execute, vary observe"
 echo "========================================"
-uv run pas benchmark sweep \
+uv run pare benchmark sweep \
   --split ablation \
   --observe-model gpt-5,claude-4.5-sonnet,gemini-3-pro,qwen-3-4b-it \
   --execute-model claude-4.5-sonnet,claude-4.5-sonnet,claude-4.5-sonnet,claude-4.5-sonnet \
@@ -112,7 +112,7 @@ echo ""
 # --- 8. Asymmetric: fix observe to claude-sonnet, vary execute ---
 echo "[8/8] Asymmetric: fix observe, vary execute"
 echo "========================================"
-uv run pas benchmark sweep \
+uv run pare benchmark sweep \
   --split ablation \
   --observe-model claude-4.5-sonnet,claude-4.5-sonnet,claude-4.5-sonnet,claude-4.5-sonnet \
   --execute-model gpt-5,claude-4.5-sonnet,gemini-3-pro,qwen-3-4b-it \

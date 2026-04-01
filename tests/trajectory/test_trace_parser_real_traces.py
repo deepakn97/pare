@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pas.trajectory.trace_parser import extract_decision_points
+from pare.trajectory.trace_parser import extract_decision_points
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

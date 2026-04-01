@@ -7,16 +7,16 @@ import pytest
 from are.simulation.apps.cab import Ride
 from are.simulation.types import Action, CompletedEvent, EventMetadata, EventType
 
-from pas.apps.cab.app import StatefulCabApp
-from pas.apps.cab.states import (
+from pare.apps.cab.app import StatefulCabApp
+from pare.apps.cab.states import (
     CabHome,
     CabQuotationDetail,
     CabRideDetail,
     CabServiceOptions,
 )
-from pas.apps.proactive_aui import PASAgentUserInterface
-from pas.apps.system import HomeScreenSystemApp
-from pas.environment import StateAwareEnvironmentWrapper
+from pare.apps.proactive_aui import PAREAgentUserInterface
+from pare.apps.system import HomeScreenSystemApp
+from pare.environment import StateAwareEnvironmentWrapper
 
 
 def _home_state(app: StatefulCabApp) -> CabHome:
@@ -48,7 +48,7 @@ def env_with_cab() -> StateAwareEnvironmentWrapper:
     """Create environment with cab app registered and opened."""
     env = StateAwareEnvironmentWrapper()
     system_app = HomeScreenSystemApp(name="HomeScreen")
-    aui_app = PASAgentUserInterface()
+    aui_app = PAREAgentUserInterface()
     cab_app = StatefulCabApp(name="cab")
     env.register_apps([system_app, aui_app, cab_app])
     env._open_app("cab")
@@ -271,7 +271,7 @@ class TestCabEnvironmentIntegration:
     """Integration tests that exercise the full environment flow.
 
     These tests use the environment pattern where:
-    1. Tool calls automatically log events via @pas_event_registered
+    1. Tool calls automatically log events via @pare_event_registered
     2. Events automatically trigger state transitions via StateAwareEnvironmentWrapper.add_to_log
     3. No manual event handling is needed - just call tools and verify state
     """

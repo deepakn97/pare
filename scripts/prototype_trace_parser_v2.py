@@ -8,6 +8,8 @@ Only annotates timestamps on event messages:
 - system prompt, available_tools, current_app_state -> no timestamp needed
 """
 
+from __future__ import annotations
+
 import json
 import sys
 from pathlib import Path
@@ -383,7 +385,7 @@ def run_batch(traces_dir: str, max_traces: int = 50) -> None:
     print(f"BATCH RESULTS ({trace_count} traces processed, {len(ok_results)} valid decision points)")
     print(f"{'=' * 70}")
 
-    print(f"\n--- Overall Decision Distribution ---")
+    print("\n--- Overall Decision Distribution ---")
     for d, count in sorted(decisions.items()):
         pct = f"({count / len(ok_results) * 100:.1f}%)" if ok_results else ""
         print(f"  {d:20s}: {count:4d} {pct}")
@@ -393,7 +395,7 @@ def run_batch(traces_dir: str, max_traces: int = 50) -> None:
     print(f"  {'no_proposal':20s}: {no_proposal:4d}")
     print(f"  {'errors/skipped':20s}: {errors:4d}")
 
-    print(f"\n--- Per Proactive Model ---")
+    print("\n--- Per Proactive Model ---")
     print(f"  {'Model':<60s} {'Acc':>4s} {'Rej':>4s} {'GC':>4s} {'NoPr':>4s} {'Err':>4s} {'Tot':>4s}")
     for model_name, stats in sorted(per_model_stats.items()):
         short_name = model_name.split("_enmi")[0].replace("obs_", "").replace("_exec_", " / ")
@@ -401,7 +403,7 @@ def run_batch(traces_dir: str, max_traces: int = 50) -> None:
             f"  {short_name:<60s} {stats['accept']:4d} {stats['reject']:4d} {stats['gather_context']:4d} {stats['no_proposal']:4d} {stats['error']:4d} {stats['total']:4d}"
         )
 
-    print(f"\n--- Timestamp Annotation Quality ---")
+    print("\n--- Timestamp Annotation Quality ---")
     print(f"  Traces with missing event timestamps: {timestamp_issues}/{len(ok_results)}")
 
     # Message type distribution
@@ -410,12 +412,12 @@ def run_batch(traces_dir: str, max_traces: int = 50) -> None:
         for mt, count in r["msg_type_counts"].items():
             all_msg_types[mt] = all_msg_types.get(mt, 0) + count
 
-    print(f"\n--- Message Type Distribution (across all valid traces) ---")
+    print("\n--- Message Type Distribution (across all valid traces) ---")
     for mt, count in sorted(all_msg_types.items(), key=lambda x: -x[1]):
         print(f"  {mt:25s}: {count:5d}")
 
     if gc_results:
-        print(f"\n--- Gather Context Analysis ---")
+        print("\n--- Gather Context Analysis ---")
         print(f"  Total gather_context decisions: {decisions['gather_context']}")
         print(f"  With eventual accept/reject:    {len(gc_with_final)}")
         print(f"    -> accepted after gathering:  {gc_final_accept}")
@@ -435,7 +437,7 @@ def run_batch(traces_dir: str, max_traces: int = 50) -> None:
             gc_tools[app] = gc_tools.get(app, 0) + 1
 
     if gc_tools:
-        print(f"\n--- Gather Context: First Tool Called (by app) ---")
+        print("\n--- Gather Context: First Tool Called (by app) ---")
         for tool, count in sorted(gc_tools.items(), key=lambda x: -x[1]):
             print(f"  {tool:30s}: {count:3d}")
 

@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 from fastapi.testclient import TestClient
 
-from pas.annotation.server import AnnotationServer, create_app
+from pare.annotation.server import AnnotationServer, create_app
 
 if TYPE_CHECKING:
     from pathlib import Path

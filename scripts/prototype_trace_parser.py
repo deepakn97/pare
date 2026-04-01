@@ -9,6 +9,8 @@ Demonstrates the new parsing logic:
 6. For gather_context, capture the delta (additional context gathered before decision)
 """
 
+from __future__ import annotations
+
 import json
 import sys
 from pathlib import Path
@@ -164,8 +166,6 @@ def annotate_messages_with_timestamps(
 
 def run_batch(traces_dir: str, max_traces: int = 20) -> None:
     """Run the parser on multiple traces and summarize results."""
-    from pathlib import Path
-
     traces_base = Path(traces_dir)
     results = {"accept": 0, "reject": 0, "gather_context": 0, "no_proposal": 0, "errors": 0, "skipped_post_execute": 0}
     total = 0

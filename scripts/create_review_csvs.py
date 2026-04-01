@@ -1,5 +1,7 @@
 """Script to create scenario review CSV files and organize scenarios by reviewer."""
 
+from __future__ import annotations
+
 import csv
 import random
 import shutil
@@ -7,7 +9,7 @@ from pathlib import Path
 
 # Define paths
 BASE_DIR = Path(__file__).parent.parent
-SCENARIOS_DIR = BASE_DIR / "pas" / "scenarios"
+SCENARIOS_DIR = BASE_DIR / "pare" / "scenarios"
 GENERATED_SCENARIOS_DIR = SCENARIOS_DIR / "generated_scenarios_w_claude_agent"
 STAGING_DIR = SCENARIOS_DIR / "staging"
 REVIEWS_DIR = SCENARIOS_DIR / "reviews"
@@ -64,7 +66,7 @@ def setup_reviewer_folder(reviewer: str, scenarios: list[dict[str, str | Path]],
 
     # Create CSV in the same folder
     csv_file = reviewer_dir / "scenario_review.csv"
-    folder_path = f"pas/scenarios/reviews/{reviewer.lower()}"
+    folder_path = f"pare/scenarios/reviews/{reviewer.lower()}"
 
     with open(csv_file, "w", newline="") as f:
         writer = csv.writer(f)

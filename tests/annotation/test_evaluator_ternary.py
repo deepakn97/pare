@@ -13,7 +13,7 @@ import polars as pl
 import pytest
 from are.simulation.agents.llm.litellm.litellm_engine import LiteLLMEngine, LiteLLMModelConfig
 
-from pas.annotation.evaluator import (
+from pare.annotation.evaluator import (
     aggregate_evaluations,
     evaluate_samples_ternary,
     evaluate_single_decision_ternary,
@@ -22,14 +22,14 @@ from pas.annotation.evaluator import (
 ACCEPT_RESPONSE = (
     "Thought: The proposal looks good.\n"
     "Action:\n"
-    '{"action": "PASAgentUserInterface__accept_proposal", '
+    '{"action": "PAREAgentUserInterface__accept_proposal", '
     '"action_input": {"content": "Yes"}}'
 )
 
 REJECT_RESPONSE = (
     "Thought: I do not need this.\n"
     "Action:\n"
-    '{"action": "PASAgentUserInterface__reject_proposal", '
+    '{"action": "PAREAgentUserInterface__reject_proposal", '
     '"action_input": {"content": "No thanks"}}'
 )
 

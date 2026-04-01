@@ -1,4 +1,4 @@
-"""Tests for PAS cache invalidation of results with exceptions.
+"""Tests for PARE cache invalidation of results with exceptions.
 
 Cached results with any exception_type should be treated as cache misses,
 forcing a rerun of the scenario.
@@ -6,7 +6,7 @@ forcing a rerun of the scenario.
 
 from unittest.mock import MagicMock, patch
 
-from pas.scenarios.utils.caching import (
+from pare.scenarios.utils.caching import (
     CachedScenarioResult,
     maybe_load_cached_result,
 )
@@ -71,9 +71,9 @@ class TestCacheExceptionInvalidation:
         cache_file.write_text(cached.to_json())
 
         with (
-            patch("pas.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
-            patch("pas.scenarios.utils.caching._generate_config_hash", return_value="abc123"),
-            patch("pas.scenarios.utils.caching._generate_scenario_hash", return_value="def456"),
+            patch("pare.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
+            patch("pare.scenarios.utils.caching._generate_config_hash", return_value="abc123"),
+            patch("pare.scenarios.utils.caching._generate_scenario_hash", return_value="def456"),
         ):
             result = maybe_load_cached_result(_make_mock_config(), _make_mock_scenario())
 
@@ -86,9 +86,9 @@ class TestCacheExceptionInvalidation:
         cache_file.write_text(cached.to_json())
 
         with (
-            patch("pas.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
-            patch("pas.scenarios.utils.caching._generate_config_hash", return_value="abc123"),
-            patch("pas.scenarios.utils.caching._generate_scenario_hash", return_value="def456"),
+            patch("pare.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
+            patch("pare.scenarios.utils.caching._generate_config_hash", return_value="abc123"),
+            patch("pare.scenarios.utils.caching._generate_scenario_hash", return_value="def456"),
         ):
             result = maybe_load_cached_result(_make_mock_config(), _make_mock_scenario())
 
@@ -106,9 +106,9 @@ class TestCacheExceptionInvalidation:
         cache_file.write_text(cached.to_json())
 
         with (
-            patch("pas.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
-            patch("pas.scenarios.utils.caching._generate_config_hash", return_value="abc123"),
-            patch("pas.scenarios.utils.caching._generate_scenario_hash", return_value="def456"),
+            patch("pare.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
+            patch("pare.scenarios.utils.caching._generate_config_hash", return_value="abc123"),
+            patch("pare.scenarios.utils.caching._generate_scenario_hash", return_value="def456"),
         ):
             result = maybe_load_cached_result(_make_mock_config(), _make_mock_scenario())
 
@@ -121,9 +121,9 @@ class TestCacheExceptionInvalidation:
         cache_file.write_text(cached.to_json())
 
         with (
-            patch("pas.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
-            patch("pas.scenarios.utils.caching._generate_config_hash", return_value="abc123"),
-            patch("pas.scenarios.utils.caching._generate_scenario_hash", return_value="def456"),
+            patch("pare.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
+            patch("pare.scenarios.utils.caching._generate_config_hash", return_value="abc123"),
+            patch("pare.scenarios.utils.caching._generate_scenario_hash", return_value="def456"),
         ):
             result = maybe_load_cached_result(_make_mock_config(), _make_mock_scenario())
 

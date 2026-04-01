@@ -18,16 +18,16 @@ from are.simulation.types import (
     EventType,
 )
 
-from pas.apps.apartment.app import StatefulApartmentApp
-from pas.apps.apartment.states import (
+from pare.apps.apartment.app import StatefulApartmentApp
+from pare.apps.apartment.states import (
     ApartmentDetail,
     ApartmentFavorites,
     ApartmentHome,
     ApartmentSearch,
 )
-from pas.apps.proactive_aui import PASAgentUserInterface
-from pas.apps.system import HomeScreenSystemApp
-from pas.environment import StateAwareEnvironmentWrapper
+from pare.apps.proactive_aui import PAREAgentUserInterface
+from pare.apps.system import HomeScreenSystemApp
+from pare.environment import StateAwareEnvironmentWrapper
 
 # =============================================================================
 # State Helpers
@@ -126,7 +126,7 @@ def env_with_apartment() -> StateAwareEnvironmentWrapper:
     """Create environment with apartment app registered and opened."""
     env = StateAwareEnvironmentWrapper()
     system_app = HomeScreenSystemApp(name="HomeScreen")
-    aui_app = PASAgentUserInterface()
+    aui_app = PAREAgentUserInterface()
     apt_app = StatefulApartmentApp(name="apartment")
 
     # Add test data

@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest a new feature or enhancement for PAS
+description: Suggest a new feature or enhancement for PARE
 title: "[Feature]: "
 labels: ["enhancement", "needs-triage"]
 body:
@@ -57,11 +57,11 @@ body:
     attributes:
       value: |
         **Component Guide:**
-        - **Core**: All Python source files in the root `pas` directory (e.g., `pas/environment.py`, `pas/scenario_runner.py`, `pas/notification_system.py`)
-        - **Agents**: All files in `pas/agents/` (e.g., `pas/agents/user/`, `pas/agents/proactive/`, `pas/agents/agent_log.py`)
-        - **Scenarios**: All files in `pas/scenarios/` (scenario definitions, not runner code)
-        - **Scenario Generator**: All files in `pas/scenario_generator/`
-        - **Apps**: All files in `pas/apps/` (e.g., `pas/apps/contacts/`, `pas/apps/email/`, `pas/apps/calendar/`)
+        - **Core**: All Python source files in the root `pare` directory (e.g., `pare/environment.py`, `pare/scenario_runner.py`, `pare/notification_system.py`)
+        - **Agents**: All files in `pare/agents/` (e.g., `pare/agents/user/`, `pare/agents/proactive/`, `pare/agents/agent_log.py`)
+        - **Scenarios**: All files in `pare/scenarios/` (scenario definitions, not runner code)
+        - **Scenario Generator**: All files in `pare/scenario_generator/`
+        - **Apps**: All files in `pare/apps/` (e.g., `pare/apps/contacts/`, `pare/apps/email/`, `pare/apps/calendar/`)
         - **Documentation**: Documentation files (e.g., `docs/`, `mkdocs.yml`, `README.md`, `CONTRIBUTING.md`)
         - **Testing Infrastructure**: Testing and CI/CD (e.g., `tests/`, `.github/workflows/`, `.pre-commit-config.yaml`)
         - **Other**: Project configuration and other files (e.g., `pyproject.toml`, `Makefile`, `.gitignore`)
@@ -104,7 +104,7 @@ body:
       placeholder: |
         ```python
         # Example of how you'd use the proposed feature
-        from pas import NewFeature
+        from pare import NewFeature
 
         # Your example code here...
         ```
@@ -134,7 +134,7 @@ body:
       options:
         - label: I have searched existing issues and discussions to ensure this is not a duplicate
           required: true
-        - label: I have considered how this feature fits with PAS's research goals
+        - label: I have considered how this feature fits with PARE's research goals
           required: false
         - label: I am willing to contribute to implementing this feature
           required: false

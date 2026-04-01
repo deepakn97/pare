@@ -8,8 +8,8 @@ from are.simulation.agents.default_agent.base_agent import BaseAgent
 from are.simulation.notification_system import BaseNotificationSystem, Message
 from are.simulation.tool_utils import OperationType
 
-from pas.agents.proactive.agent import ProactiveAgent, ProactiveAgentMode
-from pas.notification_system import PASMessageType
+from pare.agents.proactive.agent import ProactiveAgent, ProactiveAgentMode
+from pare.notification_system import PAREMessageType
 
 
 @pytest.fixture
@@ -140,8 +140,8 @@ def _create_mock_app_tool(name: str, operation_type: OperationType) -> Mock:
 def test_init_tools_observe_agent_gets_read_only_and_core_tools(proactive_agent):
     """Test that observe agent receives only read-only tools plus wait and send_message_to_user."""
     # Create mock tools with different operation types
-    wait_tool = _create_mock_app_tool("PASAgentUserInterface__wait", OperationType.READ)
-    send_message_tool = _create_mock_app_tool("PASAgentUserInterface__send_message_to_user", OperationType.WRITE)
+    wait_tool = _create_mock_app_tool("PAREAgentUserInterface__wait", OperationType.READ)
+    send_message_tool = _create_mock_app_tool("PAREAgentUserInterface__send_message_to_user", OperationType.WRITE)
     read_tool_1 = _create_mock_app_tool("Contacts__list_contacts", OperationType.READ)
     read_tool_2 = _create_mock_app_tool("Email__get_emails", OperationType.READ)
     write_tool_1 = _create_mock_app_tool("Contacts__create_contact", OperationType.WRITE)
@@ -159,8 +159,8 @@ def test_init_tools_observe_agent_gets_read_only_and_core_tools(proactive_agent)
     # Verify observe agent tools
     observe_tool_names = set(proactive_agent.observe_agent.tools.keys())
     expected_observe_tools = {
-        "PASAgentUserInterface__wait",
-        "PASAgentUserInterface__send_message_to_user",
+        "PAREAgentUserInterface__wait",
+        "PAREAgentUserInterface__send_message_to_user",
         "Contacts__list_contacts",
         "Email__get_emails",
     }
@@ -174,8 +174,8 @@ def test_init_tools_observe_agent_gets_read_only_and_core_tools(proactive_agent)
 def test_init_tools_execute_agent_gets_all_tools_except_wait(proactive_agent):
     """Test that execute agent receives all tools except wait."""
     # Create mock tools
-    wait_tool = _create_mock_app_tool("PASAgentUserInterface__wait", OperationType.READ)
-    send_message_tool = _create_mock_app_tool("PASAgentUserInterface__send_message_to_user", OperationType.WRITE)
+    wait_tool = _create_mock_app_tool("PAREAgentUserInterface__wait", OperationType.READ)
+    send_message_tool = _create_mock_app_tool("PAREAgentUserInterface__send_message_to_user", OperationType.WRITE)
     read_tool = _create_mock_app_tool("Contacts__list_contacts", OperationType.READ)
     write_tool = _create_mock_app_tool("Email__send_email", OperationType.WRITE)
 
@@ -189,14 +189,14 @@ def test_init_tools_execute_agent_gets_all_tools_except_wait(proactive_agent):
     # Verify execute agent tools - should have all except wait
     execute_tool_names = set(proactive_agent.execute_agent.tools.keys())
     expected_execute_tools = {
-        "PASAgentUserInterface__send_message_to_user",
+        "PAREAgentUserInterface__send_message_to_user",
         "Contacts__list_contacts",
         "Email__send_email",
     }
     assert execute_tool_names == expected_execute_tools, f"Execute agent should have all tools except wait. Got: {execute_tool_names}"
 
     # Verify execute agent does NOT have wait tool
-    assert "PASAgentUserInterface__wait" not in execute_tool_names
+    assert "PAREAgentUserInterface__wait" not in execute_tool_names
 
 
 def test_init_tools_default_operation_type_is_read(proactive_agent):
@@ -213,8 +213,8 @@ def test_init_tools_default_operation_type_is_read(proactive_agent):
     mock_tool_no_type._public_description = "Mock tool without operation type"
 
     # Create core tools
-    wait_tool = _create_mock_app_tool("PASAgentUserInterface__wait", OperationType.READ)
-    send_message_tool = _create_mock_app_tool("PASAgentUserInterface__send_message_to_user", OperationType.WRITE)
+    wait_tool = _create_mock_app_tool("PAREAgentUserInterface__wait", OperationType.READ)
+    send_message_tool = _create_mock_app_tool("PAREAgentUserInterface__send_message_to_user", OperationType.WRITE)
 
     all_tools = [wait_tool, send_message_tool, mock_tool_no_type]
 
@@ -243,7 +243,7 @@ def test_init_tools_raises_if_no_observe_tools(proactive_agent):
 def test_get_turn_ending_tool_send_message_with_dict_arguments(proactive_agent):
     """Test get_turn_ending_tool extracts content from dict tool_arguments for send_message_to_user."""
     tool_log = Mock(spec=ToolCallLog)
-    tool_log.tool_name = "PASAgentUserInterface__send_message_to_user"
+    tool_log.tool_name = "PAREAgentUserInterface__send_message_to_user"
     tool_log.tool_arguments = {"content": "Shall I reply to Alice's email?"}
 
     proactive_agent.observe_agent.get_agent_logs.return_value = [tool_log]
@@ -271,7 +271,7 @@ def test_get_turn_ending_tool_send_message_with_string_arguments(proactive_agent
 def test_get_turn_ending_tool_wait(proactive_agent):
     """Test get_turn_ending_tool returns wait when wait tool is called."""
     tool_log = Mock(spec=ToolCallLog)
-    tool_log.tool_name = "PASAgentUserInterface__wait"
+    tool_log.tool_name = "PAREAgentUserInterface__wait"
     tool_log.tool_arguments = {}
 
     proactive_agent.observe_agent.get_agent_logs.return_value = [tool_log]
@@ -439,7 +439,7 @@ def test_agent_loop_environment_stop_returns_none(proactive_agent, mock_notifica
 
     # Mock ENVIRONMENT_STOP
     stop_msg = Mock(spec=Message)
-    stop_msg.message_type = PASMessageType.ENVIRONMENT_STOP
+    stop_msg.message_type = PAREMessageType.ENVIRONMENT_STOP
     mock_notification_system.message_queue.get_by_timestamp.return_value = [stop_msg]
 
     result = proactive_agent.agent_loop()
@@ -465,7 +465,7 @@ def test_agent_loop_initial_task_injection(proactive_agent, mock_notification_sy
     # Verify message was added to custom_state notifications
     notifications = proactive_agent.observe_agent.custom_state["notifications"]
     assert len(notifications) == 1
-    assert notifications[0].message_type == PASMessageType.USER_MESSAGE
+    assert notifications[0].message_type == PAREMessageType.USER_MESSAGE
     assert notifications[0].message == "Please help with task X"
 
 
@@ -483,7 +483,7 @@ def test_full_accept_flow_observe_to_execute_to_observe(proactive_agent, mock_no
 
     user_msg1 = Mock(spec=Message)
     user_msg1.message = "test"
-    user_msg1.message_type = PASMessageType.USER_MESSAGE
+    user_msg1.message_type = PAREMessageType.USER_MESSAGE
     user_msg1.attachments = []
     mock_notification_system.message_queue.get_by_timestamp.return_value = [user_msg1]
 
@@ -504,7 +504,7 @@ def test_full_accept_flow_observe_to_execute_to_observe(proactive_agent, mock_no
     # Step 3: AWAITING mode with accept
     accept_msg = Mock(spec=Message)
     accept_msg.message = "[ACCEPT] yes, please proceed"
-    accept_msg.message_type = PASMessageType.USER_MESSAGE
+    accept_msg.message_type = PAREMessageType.USER_MESSAGE
     accept_msg.attachments = []
     mock_notification_system.message_queue.get_by_timestamp.return_value = [accept_msg]
 
@@ -528,7 +528,7 @@ def test_reject_flow_observe_to_awaiting_to_observe_skip_execute(proactive_agent
 
     user_msg = Mock(spec=Message)
     user_msg.message = "test"
-    user_msg.message_type = PASMessageType.USER_MESSAGE
+    user_msg.message_type = PAREMessageType.USER_MESSAGE
     user_msg.attachments = []
     mock_notification_system.message_queue.get_by_timestamp.return_value = [user_msg]
 
@@ -539,7 +539,7 @@ def test_reject_flow_observe_to_awaiting_to_observe_skip_execute(proactive_agent
     # Step 2: AWAITING mode with reject
     reject_msg = Mock(spec=Message)
     reject_msg.message = "[REJECT] no, please don't do that"
-    reject_msg.message_type = PASMessageType.USER_MESSAGE
+    reject_msg.message_type = PAREMessageType.USER_MESSAGE
     reject_msg.attachments = []
     mock_notification_system.message_queue.get_by_timestamp.return_value = [reject_msg]
 

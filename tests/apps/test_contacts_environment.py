@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from are.simulation.apps.contacts import Contact
 
-from pas.apps.contacts.app import StatefulContactsApp
-from pas.apps.contacts.states import ContactDetail, ContactEdit, ContactsList
-from pas.apps.proactive_aui import PASAgentUserInterface
-from pas.apps.system import HomeScreenSystemApp
-from pas.environment import StateAwareEnvironmentWrapper
+from pare.apps.contacts.app import StatefulContactsApp
+from pare.apps.contacts.states import ContactDetail, ContactEdit, ContactsList
+from pare.apps.proactive_aui import PAREAgentUserInterface
+from pare.apps.system import HomeScreenSystemApp
+from pare.environment import StateAwareEnvironmentWrapper
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -47,7 +47,7 @@ def env_with_contacts():
     """Provide an environment with a pre-populated contacts app."""
     env = StateAwareEnvironmentWrapper()
     system_app = HomeScreenSystemApp(name="HomeScreen")
-    aui_app = PASAgentUserInterface()
+    aui_app = PAREAgentUserInterface()
 
     contacts_app = StatefulContactsApp(name="Contacts")
     contacts_app.add_contacts([
