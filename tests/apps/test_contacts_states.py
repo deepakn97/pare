@@ -8,8 +8,8 @@ import pytest
 from are.simulation.apps.contacts import Contact
 from are.simulation.types import Action, CompletedEvent, EventMetadata, EventType
 
-from pas.apps.contacts.app import StatefulContactsApp
-from pas.apps.contacts.states import ContactDetail, ContactEdit, ContactsList
+from pare.apps.contacts.app import StatefulContactsApp
+from pare.apps.contacts.states import ContactDetail, ContactEdit, ContactsList
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator

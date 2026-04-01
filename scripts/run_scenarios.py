@@ -1,6 +1,6 @@
-"""Script for running PAS scenarios.
+"""Script for running PARE scenarios.
 
-This script runs one or more scenarios registered in the PAS scenario registry
+This script runs one or more scenarios registered in the PARE scenario registry
 using the TwoAgentScenarioRunner and collects results into a summary.
 
 Usage:
@@ -28,8 +28,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from pas.cli.utils import get_pst_time, run_scenario_by_id, setup_logging
-from pas.scenarios.utils.registry import registry
+from pare.cli.utils import get_pst_time, run_scenario_by_id, setup_logging
+from pare.scenarios.utils.registry import registry
 
 logger = logging.getLogger(__name__)
 
@@ -232,7 +232,7 @@ def print_summary_table(summary: ResultsSummary) -> None:
     print("-" * 80)
 
     for result in summary.results:
-        status = "PASS" if result.success else "FAIL"
+        status = "PARES" if result.success else "FAIL"
         duration = f"{result.duration_seconds:.2f}s"
         rationale = (
             result.rationale[:30] + "..."
@@ -251,7 +251,7 @@ def main(argv: list[str] | None = None) -> None:
         argv: Command-line arguments (None to use sys.argv).
     """
     parser = argparse.ArgumentParser(
-        description="Run PAS scenarios",
+        description="Run PARE scenarios",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -403,7 +403,7 @@ def main(argv: list[str] | None = None) -> None:
     traces_dir.mkdir(parents=True, exist_ok=True)
     print(f"Traces directory: {traces_dir}")
 
-    # logs: logs/<config_suffix>/<model_dir>/<scenario>/pas.log
+    # logs: logs/<config_suffix>/<model_dir>/<scenario>/pare.log
     logs_dir = Path("logs") / config_suffix / f"{args.proactive_model}_{run_timestamp}"
     logs_dir.mkdir(parents=True, exist_ok=True)
     print(f"Logs directory: {logs_dir}")

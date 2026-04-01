@@ -1,0 +1,201 @@
+"""Navigation states for the stateful contacts app."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
+
+from are.simulation.apps.contacts import Contact  # noqa: TC002
+from are.simulation.types import OperationType, disable_events
+
+from pare.apps.core import AppState
+from pare.apps.tool_decorators import pare_event_registered, user_tool
+
+if TYPE_CHECKING:
+    from are.simulation.tool_utils import AppTool
+
+    from pare.apps.contacts.app import StatefulContactsApp
+
+
+CONTACT_TOOL_ARG_DESCRIPTIONS = {
+    "list_contacts": {"offset": "Zero-based pagination offset"},
+    "search_contacts": {"query": "Free-form search query"},
+    "open_contact": {"contact_id": "Contact identifier"},
+    "create_contact": {
+        "first_name": "Given name",
+        "last_name": "Family name",
+        "gender": "Gender label",
+        "age": "Approximate age",
+        "nationality": "Country of origin",
+        "city_living": "Home city",
+        "country": "Home country",
+        "status": "Relationship status",
+        "job": "Occupation",
+        "description": "Short bio",
+        "phone": "Primary phone number",
+        "email": "Primary email address",
+        "address": "Postal address",
+    },
+}
+
+
+class ContactsList(AppState):
+    """Initial navigation state showing the list of contacts."""
+
+    def __init__(self) -> None:
+        """Initialise the list state."""
+        super().__init__()
+
+    def on_enter(self) -> None:
+        """No-op hook for entering the contacts list."""
+
+    def on_exit(self) -> None:
+        """No-op hook for exiting the contacts list."""
+
+    @user_tool()
+    @pare_event_registered()
+    def list_contacts(self, offset: int = 0) -> dict[str, object]:
+        """List contacts using the native paginated API."""
+        app = cast("StatefulContactsApp", self.app)
+        return app.get_contacts(offset=offset)
+
+    @user_tool()
+    @pare_event_registered()
+    def search_contacts(self, query: str) -> list[Contact]:
+        """Search contacts by name, phone or email."""
+        app = cast("StatefulContactsApp", self.app)
+        return app.search_contacts(query=query)
+
+    @user_tool()
+    @pare_event_registered()
+    def open_contact(self, contact_id: str) -> Contact:
+        """Open a contact from the list, queuing a transition to the detail view."""
+        app = cast("StatefulContactsApp", self.app)
+        app.queue_contact_transition("detail", contact_id)
+        return app.get_contact(contact_id=contact_id)
+
+    @user_tool()
+    @pare_event_registered()
+    def view_current_user(self) -> Contact:
+        """View the contact card for the current user persona."""
+        app = cast("StatefulContactsApp", self.app)
+        return app.get_current_user_details()
+
+    def get_available_actions(self) -> list[AppTool]:
+        """Annotate tool argument descriptions for the current state."""
+        actions = super().get_available_actions()
+        for tool in actions:
+            mapping = CONTACT_TOOL_ARG_DESCRIPTIONS.get(tool.function.__name__)
+            if mapping is None:
+                continue
+            for arg in tool.args:
+                description = mapping.get(arg.name)
+                if description is not None:
+                    arg.description = description
+        return actions
+
+    @user_tool()
+    @pare_event_registered(operation_type=OperationType.WRITE)
+    def create_contact(
+        self,
+        first_name: str,
+        last_name: str,
+        gender: str | None = None,
+        age: int | None = None,
+        nationality: str | None = None,
+        city_living: str | None = None,
+        country: str | None = None,
+        status: str | None = None,
+        job: str | None = None,
+        description: str | None = None,
+        phone: str | None = None,
+        email: str | None = None,
+        address: str | None = None,
+    ) -> str:
+        """Create a new contact and return its identifier."""
+        app = cast("StatefulContactsApp", self.app)
+        return app.add_new_contact(
+            first_name=first_name,
+            last_name=last_name,
+            gender=gender,
+            age=age,
+            nationality=nationality,
+            city_living=city_living,
+            country=country,
+            status=status,
+            job=job,
+            description=description,
+            phone=phone,
+            email=email,
+            address=address,
+        )
+
+
+class ContactDetail(AppState):
+    """State for viewing a specific contact's details."""
+
+    def __init__(self, contact_id: str) -> None:
+        """Bind the detail view to the supplied contact identifier."""
+        super().__init__()
+        self.contact_id = contact_id
+
+    def on_enter(self) -> None:
+        """No-op hook for detail entry; data retrieval happens via user tools."""
+
+    def on_exit(self) -> None:
+        """Clear any queued edit intents when leaving detail view."""
+        app = cast("StatefulContactsApp", self.app)
+        app.clear_contact_transition()
+
+    @user_tool()
+    @pare_event_registered()
+    def view_contact(self) -> Contact:
+        """Retrieve the currently opened contact."""
+        app = cast("StatefulContactsApp", self.app)
+        return app.get_contact(contact_id=self.contact_id)
+
+    @user_tool()
+    @pare_event_registered()
+    def start_edit_contact(self) -> Contact:
+        """Queue an edit transition and return the latest contact data."""
+        app = cast("StatefulContactsApp", self.app)
+        app.queue_contact_transition("edit", self.contact_id)
+        return app.get_contact(contact_id=self.contact_id)
+
+    @user_tool()
+    @pare_event_registered(operation_type=OperationType.WRITE)
+    def delete_contact(self) -> str:
+        """Delete the currently opened contact."""
+        app = cast("StatefulContactsApp", self.app)
+        with disable_events():
+            return app.delete_contact(contact_id=self.contact_id)
+
+
+class ContactEdit(AppState):
+    """State representing the contact edit surface."""
+
+    def __init__(self, contact_id: str) -> None:
+        """Initialise the edit state for a particular contact."""
+        super().__init__()
+        self.contact_id = contact_id
+
+    def on_enter(self) -> None:
+        """No special entry behaviour for the edit form."""
+
+    def on_exit(self) -> None:
+        """Clear edit-specific transition intent when leaving the edit view."""
+        app = cast("StatefulContactsApp", self.app)
+        app.clear_contact_transition()
+
+    @user_tool()
+    @pare_event_registered()
+    def view_contact(self) -> Contact:
+        """Read the contact being edited without leaving edit mode."""
+        app = cast("StatefulContactsApp", self.app)
+        return app.get_contact(contact_id=self.contact_id)
+
+    @user_tool()
+    @pare_event_registered(operation_type=OperationType.WRITE)
+    def update_contact(self, updates: dict[str, object]) -> str | None:
+        """Persist updates to the contact and stay in edit mode until a transition occurs."""
+        app = cast("StatefulContactsApp", self.app)
+        return app.edit_contact(contact_id=self.contact_id, updates=updates)

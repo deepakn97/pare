@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 if TYPE_CHECKING:
     from pathlib import Path
 
-from pas.multi_scenario_runner import _is_retryable_error
-from pas.scenarios.validation_result import PASScenarioValidationResult
+from pare.multi_scenario_runner import _is_retryable_error
+from pare.scenarios.validation_result import PAREScenarioValidationResult
 
 
 class TestIsRetryableError:
@@ -47,7 +47,7 @@ class TestIsRetryableError:
 
     def test_retryable_error_in_result_exception(self) -> None:
         """OSError wrapped inside result.exception should be retryable."""
-        result = PASScenarioValidationResult(
+        result = PAREScenarioValidationResult(
             success=False,
             exception=OSError(errno.EMFILE, "Too many open files"),
         )
@@ -55,7 +55,7 @@ class TestIsRetryableError:
 
     def test_non_retryable_error_in_result_exception(self) -> None:
         """Non-retryable exception in result should not be retryable."""
-        result = PASScenarioValidationResult(
+        result = PAREScenarioValidationResult(
             success=False,
             exception=TypeError("bad type"),
         )
@@ -64,7 +64,7 @@ class TestIsRetryableError:
     def test_error_takes_precedence_over_result(self) -> None:
         """When both error and result have exceptions, error is checked."""
         error = OSError(errno.EMFILE, "Too many open files")
-        result = PASScenarioValidationResult(
+        result = PAREScenarioValidationResult(
             success=False,
             exception=TypeError("bad type"),
         )
@@ -76,12 +76,12 @@ class TestCacheWriteRetry:
 
     def test_cache_write_retries_on_emfile(self, tmp_path: Path) -> None:
         """write_cached_result should retry on EMFILE errors."""
-        from pas.scenarios.utils.caching import CachedScenarioResult, write_cached_result
+        from pare.scenarios.utils.caching import CachedScenarioResult, write_cached_result
 
         mock_config = MagicMock()
         mock_scenario = MagicMock()
         mock_scenario.scenario_id = "test_scenario"
-        mock_result = PASScenarioValidationResult(success=True)
+        mock_result = PAREScenarioValidationResult(success=True)
 
         # Create a real CachedScenarioResult to avoid asdict issues with mocks
         fake_cached = CachedScenarioResult(
@@ -115,11 +115,11 @@ class TestCacheWriteRetry:
             return original_open(path, mode, *args, **kwargs)
 
         with (
-            patch("pas.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
-            patch("pas.scenarios.utils.caching.CachedScenarioResult.from_scenario_result", return_value=fake_cached),
-            patch("pas.scenarios.utils.caching._get_cache_file_path", return_value=tmp_path / "test.json"),
+            patch("pare.scenarios.utils.caching._get_cache_dir", return_value=tmp_path),
+            patch("pare.scenarios.utils.caching.CachedScenarioResult.from_scenario_result", return_value=fake_cached),
+            patch("pare.scenarios.utils.caching._get_cache_file_path", return_value=tmp_path / "test.json"),
             patch("builtins.open", side_effect=mock_open_fn),
-            patch("pas.scenarios.utils.caching.time.sleep"),
+            patch("pare.scenarios.utils.caching.time.sleep"),
         ):
             write_cached_result(mock_config, mock_scenario, mock_result)
 

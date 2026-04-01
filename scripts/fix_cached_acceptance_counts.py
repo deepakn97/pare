@@ -5,7 +5,7 @@ The old get_acceptance_count() counted all accept_proposal calls, including resp
 to execute-mode send_message_to_user messages. This script recomputes acceptance_count
 from trace completed_events, only counting acceptances that follow observe-mode proposals.
 
-After running this script, re-run `pas benchmark sweep` with the same config to
+After running this script, re-run `pare benchmark sweep` with the same config to
 regenerate result JSONs and reports from corrected cache entries.
 
 Usage:
@@ -43,7 +43,7 @@ def count_observe_mode_acceptances_from_trace(completed_events: list[dict]) -> i
         action = event.get("action", {})
         func_name = action.get("function", "")
         app_class = action.get("app", "")
-        if "PASAgentUserInterface" not in str(app_class):
+        if "PAREAgentUserInterface" not in str(app_class):
             continue
         metadata = event.get("metadata", {})
         if func_name == "send_message_to_user":
@@ -132,7 +132,7 @@ def main() -> None:
         "--cache-dir",
         type=Path,
         default=None,
-        help="Override cache directory (default: auto-detect from PAS config).",
+        help="Override cache directory (default: auto-detect from PARE config).",
     )
     args = parser.parse_args()
 
@@ -140,12 +140,12 @@ def main() -> None:
         cache_dir = args.cache_dir
     else:
         try:
-            from pas.scenarios.utils.caching import _get_cache_dir
+            from pare.scenarios.utils.caching import _get_cache_dir
 
             cache_dir = _get_cache_dir()
         except ImportError:
-            cache_dir = Path.home() / ".cache" / "pas" / "scenario_results"
-            logger.warning(f"Could not import PAS caching module, using default: {cache_dir}")
+            cache_dir = Path.home() / ".cache" / "pare" / "scenario_results"
+            logger.warning(f"Could not import PARE caching module, using default: {cache_dir}")
 
     if not cache_dir.exists():
         logger.error(f"Cache directory does not exist: {cache_dir}")

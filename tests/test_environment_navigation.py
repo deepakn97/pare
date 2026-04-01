@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 from are.simulation.apps.contacts import Contact
 
-from pas.apps import HomeScreenSystemApp, PASAgentUserInterface, StatefulContactsApp, StatefulEmailApp
-from pas.environment import StateAwareEnvironmentWrapper
+from pare.apps import HomeScreenSystemApp, PAREAgentUserInterface, StatefulContactsApp, StatefulEmailApp
+from pare.environment import StateAwareEnvironmentWrapper
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -22,8 +22,8 @@ def env_with_apps() -> Generator[StateAwareEnvironmentWrapper, None, None]:
     # Register system app (automatically added)
     system_app = HomeScreenSystemApp(name="HomeScreen")
 
-    # Register PASAgentUserInterface app
-    aui_app = PASAgentUserInterface()
+    # Register PAREAgentUserInterface app
+    aui_app = PAREAgentUserInterface()
     # Register contacts app
     contacts_app = StatefulContactsApp(name="Contacts")
     contacts_app.add_contacts([Contact(first_name="Ada", last_name="Lovelace", contact_id="contact-ada", phone="111")])

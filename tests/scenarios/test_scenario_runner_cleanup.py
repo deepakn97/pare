@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from pas.scenario_runner import TwoAgentScenarioRunner
+from pare.scenario_runner import TwoAgentScenarioRunner
 
 
 class TestRunPasScenarioCleanup:
@@ -26,17 +26,17 @@ class TestRunPasScenarioCleanup:
         mock_config.trace_dump_format = "hf"
         mock_config.use_custom_logger = False
 
-        # Make _run_with_two_agents succeed but _export_pas_trace raise
+        # Make _run_with_two_agents succeed but _export_pare_trace raise
         mock_result = MagicMock()
         mock_result.success = True
         mock_result.exception = None
 
         with (
             patch.object(runner, "_run_with_two_agents", return_value=(mock_result, MagicMock(), MagicMock())),
-            patch.object(runner, "_export_pas_trace", side_effect=OSError("Too many open files")),
-            patch("pas.scenario_runner.StateAwareEnvironmentWrapper", return_value=mock_env),
+            patch.object(runner, "_export_pare_trace", side_effect=OSError("Too many open files")),
+            patch("pare.scenario_runner.StateAwareEnvironmentWrapper", return_value=mock_env),
         ):
-            result = runner._run_pas_scenario(mock_config, mock_scenario)
+            result = runner._run_pare_scenario(mock_config, mock_scenario)
 
         mock_env.stop.assert_called_once()
         # The original validation_result should be returned, not destroyed by export error

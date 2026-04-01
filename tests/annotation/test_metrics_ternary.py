@@ -11,7 +11,7 @@ import math
 import polars as pl
 import pytest
 
-from pas.annotation.metrics import (
+from pare.annotation.metrics import (
     argmax_with_tiebreak,
     cohens_kappa_multiclass,
     compute_decision_entropy,

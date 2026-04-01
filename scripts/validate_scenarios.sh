@@ -8,7 +8,7 @@ set -euo pipefail
 # Check if directory argument is provided
 if [ $# -eq 0 ]; then
     echo "Usage: $0 <scenarios_directory>"
-    echo "Example: $0 pas/scenarios/user_scenarios"
+    echo "Example: $0 pare/scenarios/user_scenarios"
     exit 1
 fi
 

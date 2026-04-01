@@ -9,8 +9,8 @@ import pytest
 from are.simulation.apps.email_client import Email, EmailFolderName
 from are.simulation.types import Action, CompletedEvent, EventMetadata, EventType
 
-from pas.apps.email.app import StatefulEmailApp
-from pas.apps.email.states import ComposeEmail, EmailDetail, MailboxView
+from pare.apps.email.app import StatefulEmailApp
+from pare.apps.email.states import ComposeEmail, EmailDetail, MailboxView
 
 if TYPE_CHECKING:
     from collections.abc import Generator

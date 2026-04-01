@@ -3,8 +3,8 @@ from __future__ import annotations
 from are.simulation.apps.app import ToolType
 from are.simulation.tool_utils import ToolAttributeName
 
-from pas.apps.messaging.app import StatefulMessagingApp
-from pas.apps.messaging.states import ConversationList
+from pare.apps.messaging.app import StatefulMessagingApp
+from pare.apps.messaging.states import ConversationList
 
 
 def _func_names(tools):
@@ -16,7 +16,7 @@ def test_user_tools_from_state_are_discovered_and_bound_to_state():
     # Ensure we start at ConversationList
     assert isinstance(app.current_state, ConversationList)
 
-    # Discover USER tools via PAS override
+    # Discover USER tools via PARE override
     user_tools = app.get_tools_with_attribute(
         ToolAttributeName.USER, ToolType.USER
     )

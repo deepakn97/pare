@@ -1,1 +1,1 @@
-"""Tests for PAS scenarios module."""
+"""Tests for PARE scenarios module."""

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a stratified sample of PAS scenarios maintaining app distribution proportionally.
+"""Create a stratified sample of PARE scenarios maintaining app distribution proportionally.
 
 This script uses iterative stratified sampling (from scikit-multilearn) to sample
 scenarios while preserving the proportional representation of all apps.
@@ -22,14 +22,14 @@ from skmultilearn.model_selection import iterative_train_test_split
 # Load environment variables before importing registry
 load_dotenv()
 
-from pas import PROJECT_ROOT  # noqa: E402
-from pas.scenarios.utils.registry import registry  # noqa: E402
+from pare import PROJECT_ROOT  # noqa: E402
+from pare.scenarios.utils.registry import registry  # noqa: E402
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Apps to exclude from app matrix (they appear in all scenarios)
-SYSTEM_APPS = {"HomeScreenSystemApp", "PASAgentUserInterface"}
+SYSTEM_APPS = {"HomeScreenSystemApp", "PAREAgentUserInterface"}
 
 
 def extract_app_name(class_name: str) -> str:
@@ -283,7 +283,7 @@ def write_sample_file(
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Create a stratified sample of PAS scenarios maintaining app distribution."
+        description="Create a stratified sample of PARE scenarios maintaining app distribution."
     )
     parser.add_argument(
         "--sample-size",

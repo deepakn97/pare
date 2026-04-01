@@ -12,15 +12,15 @@ from are.simulation.types import (
     EventType,
 )
 
-from pas.apps.proactive_aui import PASAgentUserInterface
-from pas.apps.reminder.app import StatefulReminderApp
-from pas.apps.reminder.states import (
+from pare.apps.proactive_aui import PAREAgentUserInterface
+from pare.apps.reminder.app import StatefulReminderApp
+from pare.apps.reminder.states import (
     EditReminder,
     ReminderDetail,
     ReminderList,
 )
-from pas.apps.system import HomeScreenSystemApp
-from pas.environment import StateAwareEnvironmentWrapper
+from pare.apps.system import HomeScreenSystemApp
+from pare.environment import StateAwareEnvironmentWrapper
 
 # =============================================================================
 # Helper Functions
@@ -92,7 +92,7 @@ def env_with_reminder() -> StateAwareEnvironmentWrapper:
     """Create environment with reminder app registered and opened."""
     env = StateAwareEnvironmentWrapper()
     system_app = HomeScreenSystemApp(name="HomeScreen")
-    aui_app = PASAgentUserInterface()
+    aui_app = PAREAgentUserInterface()
     reminder_app = StatefulReminderApp(name="reminder")
     env.register_apps([system_app, aui_app, reminder_app])
     env._open_app("reminder")
@@ -349,7 +349,7 @@ class TestReminderEnvironmentIntegration:
     """Integration tests that exercise the full environment flow.
 
     These tests use the environment pattern where:
-    1. Tool calls automatically log events via @pas_event_registered
+    1. Tool calls automatically log events via @pare_event_registered
     2. Events automatically trigger state transitions via StateAwareEnvironmentWrapper.add_to_log
     3. No manual event handling is needed - just call tools and verify state
     """

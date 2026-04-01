@@ -1,4 +1,4 @@
-"""Download augmentation data from Meta-ARE adaptability dataset for PAS noise generation."""
+"""Download augmentation data from Meta-ARE adaptability dataset for PARE noise generation."""
 
 from __future__ import annotations
 

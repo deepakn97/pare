@@ -9,8 +9,8 @@ import polars as pl
 import pytest
 from fastapi.testclient import TestClient
 
-from pas.annotation.models import Sample
-from pas.annotation.server import create_app
+from pare.annotation.models import Sample
+from pare.annotation.server import create_app
 
 if TYPE_CHECKING:
     from pathlib import Path

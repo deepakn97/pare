@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pas.apps.messaging.app import StatefulMessagingApp
-from pas.apps.messaging.states import ConversationList, ConversationOpened
+from pare.apps.messaging.app import StatefulMessagingApp
+from pare.apps.messaging.states import ConversationList, ConversationOpened
 
 if TYPE_CHECKING:
     from collections.abc import Generator

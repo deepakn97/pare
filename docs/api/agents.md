@@ -6,7 +6,7 @@
 
 ## Agent Configuration
 
-::: pare.agents.pas_agent_config
+::: pare.agents.pare_agent_config
 
 ## Agent Config Builder
 

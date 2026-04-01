@@ -14,9 +14,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pas.apps import (
+from pare.apps import (
     HomeScreenSystemApp,
-    PASAgentUserInterface,
+    PAREAgentUserInterface,
     StatefulApartmentApp,
     StatefulCabApp,
     StatefulCalendarApp,
@@ -27,7 +27,7 @@ from pas.apps import (
     StatefulReminderApp,
     StatefulShoppingApp,
 )
-from pas.environment import StateAwareEnvironmentWrapper
+from pare.environment import StateAwareEnvironmentWrapper
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -35,12 +35,12 @@ if TYPE_CHECKING:
 
 @pytest.fixture()
 def env_with_all_apps() -> Generator[StateAwareEnvironmentWrapper, None, None]:
-    """Provide an environment with all PAS apps registered."""
+    """Provide an environment with all PARE apps registered."""
     env = StateAwareEnvironmentWrapper()
 
     apps = [
         HomeScreenSystemApp(name="HomeScreen"),
-        PASAgentUserInterface(),
+        PAREAgentUserInterface(),
         StatefulContactsApp(name="Contacts"),
         StatefulEmailApp(name="Email"),
         StatefulCalendarApp(name="Calendar"),

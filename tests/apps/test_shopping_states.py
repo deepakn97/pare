@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Callable, Any
 import pytest
 from are.simulation.types import Action, CompletedEvent, EventMetadata, EventType
 
-from pas.apps.shopping.app import StatefulShoppingApp
-from pas.apps.shopping.states import (
+from pare.apps.shopping.app import StatefulShoppingApp
+from pare.apps.shopping.states import (
     ShoppingHome,
     ProductDetail,
     VariantDetail,

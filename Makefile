@@ -13,7 +13,7 @@ check: ## Run code quality tools.
 	@echo "🚀 Static type checking: Running mypy"
 	@uv run mypy
 	@echo "🚀 Checking for obsolete dependencies: Running deptry"
-	@uv run deptry pas
+	@uv run deptry pare
 
 .PHONY: test
 test: ## Test the code with pytest
@@ -40,13 +40,13 @@ docs-serve: ## Build and serve the documentation
 
 .PHONY: docs-deploy
 docs-deploy: ## Deploy the documentation to GitHub Pages
-	@echo "🚀 Deploying documentation to GitHub Pages at https://deepakn97.github.io/pas/"
+	@echo "🚀 Deploying documentation to GitHub Pages at https://deepakn97.github.io/pare/"
 	@uv run mkdocs build -s
 	@uv run mkdocs gh-deploy
 
 .PHONY: demo
 demo: ## Run a sample scenario interaction and show log locations
-	@uv run python -m pas.scripts.run_contacts_demo
+	@uv run python -m pare.scripts.run_contacts_demo
 
 .PHONY: help
 help:

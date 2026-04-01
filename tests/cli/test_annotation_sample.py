@@ -12,7 +12,7 @@ from pathlib import Path
 import polars as pl
 from typer.testing import CliRunner
 
-from pas.main import app
+from pare.main import app
 
 FIXTURES_DIR = Path(__file__).parent.parent / "trajectory" / "fixtures"
 
@@ -38,7 +38,7 @@ def _setup_traces(tmp_path: Path) -> Path:
 
 
 class TestSampleCommand:
-    """Integration tests for `pas annotation sample` CLI command."""
+    """Integration tests for `pare annotation sample` CLI command."""
 
     def test_creates_parquet_with_ternary_schema(self, tmp_path: Path) -> None:
         """Output parquet has correct ternary schema columns."""

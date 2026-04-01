@@ -64,7 +64,7 @@ def trace_accept(user_agent_id: str, observe_agent_id: str, execute_agent_id: st
         _make_log("tool_call", user_agent_id, "", timestamp=101.0, tool_name="System__open_app", tool_arguments={"app_name": "Notes"}),
         _make_log("observation", user_agent_id, "Opened Notes App.", timestamp=101.0),
         # Observe agent proposes
-        _make_log("tool_call", observe_agent_id, "", timestamp=102.0, tool_name="PASAgentUserInterface__send_message_to_user", tool_arguments={"content": "I propose to update your note"}),
+        _make_log("tool_call", observe_agent_id, "", timestamp=102.0, tool_name="PAREAgentUserInterface__send_message_to_user", tool_arguments={"content": "I propose to update your note"}),
         _make_log("observation", observe_agent_id, "None", timestamp=102.0),
         # User agent receives proposal and gets new llm_input
         _make_log("task", user_agent_id, "Received at: 2025-01-01\nSender: Agent\nMessage: I propose to update your note", timestamp=103.0),
@@ -82,7 +82,7 @@ def trace_accept(user_agent_id: str, observe_agent_id: str, execute_agent_id: st
         ]), timestamp=103.0),
         _make_log("llm_output", user_agent_id, "Thought: The proposal looks good, I accept", timestamp=104.0),
         # User directly accepts (no intermediate tool calls)
-        _make_log("tool_call", user_agent_id, "", timestamp=104.0, tool_name="PASAgentUserInterface__accept_proposal", tool_arguments={"content": "Yes, update the note"}),
+        _make_log("tool_call", user_agent_id, "", timestamp=104.0, tool_name="PAREAgentUserInterface__accept_proposal", tool_arguments={"content": "Yes, update the note"}),
         _make_log("observation", user_agent_id, "accepted-uuid", timestamp=104.0),
         # Execute agent starts
         _make_log("tool_call", execute_agent_id, "", timestamp=105.0, tool_name="Notes__update_note", tool_arguments={"note_id": "abc"}),
@@ -114,7 +114,7 @@ def trace_reject(user_agent_id: str, observe_agent_id: str, tmp_path: Path) -> P
         _make_log("llm_output", user_agent_id, "Thought: waiting", timestamp=101.0),
         _make_log("tool_call", user_agent_id, "", timestamp=101.0, tool_name="System__open_app", tool_arguments={"app_name": "Calendar"}),
         _make_log("observation", user_agent_id, "Opened Calendar.", timestamp=101.0),
-        _make_log("tool_call", observe_agent_id, "", timestamp=102.0, tool_name="PASAgentUserInterface__send_message_to_user", tool_arguments={"content": "I propose to book a cab"}),
+        _make_log("tool_call", observe_agent_id, "", timestamp=102.0, tool_name="PAREAgentUserInterface__send_message_to_user", tool_arguments={"content": "I propose to book a cab"}),
         _make_log("observation", observe_agent_id, "None", timestamp=102.0),
         # User receives proposal
         _make_log("task", user_agent_id, "Received at: 2025-01-01\nSender: Agent\nMessage: I propose to book a cab", timestamp=103.0),
@@ -130,7 +130,7 @@ def trace_reject(user_agent_id: str, observe_agent_id: str, tmp_path: Path) -> P
         ]), timestamp=103.0),
         _make_log("llm_output", user_agent_id, "Thought: This is wrong, reject", timestamp=104.0),
         # User rejects directly
-        _make_log("tool_call", user_agent_id, "", timestamp=104.0, tool_name="PASAgentUserInterface__reject_proposal", tool_arguments={"content": "No thanks"}),
+        _make_log("tool_call", user_agent_id, "", timestamp=104.0, tool_name="PAREAgentUserInterface__reject_proposal", tool_arguments={"content": "No thanks"}),
         _make_log("observation", user_agent_id, "rejected-uuid", timestamp=104.0),
     ]
     trace_data = {
@@ -162,7 +162,7 @@ def trace_gather_context(user_agent_id: str, observe_agent_id: str, execute_agen
         _make_log("tool_call", user_agent_id, "", timestamp=101.0, tool_name="System__open_app", tool_arguments={"app_name": "Messages"}),
         _make_log("observation", user_agent_id, "Opened Messages.", timestamp=101.0),
         # Observe proposes
-        _make_log("tool_call", observe_agent_id, "", timestamp=102.0, tool_name="PASAgentUserInterface__send_message_to_user", tool_arguments={"content": "I found relevant info in your messages"}),
+        _make_log("tool_call", observe_agent_id, "", timestamp=102.0, tool_name="PAREAgentUserInterface__send_message_to_user", tool_arguments={"content": "I found relevant info in your messages"}),
         _make_log("observation", observe_agent_id, "None", timestamp=102.0),
         # User receives proposal - this is the llm_input we store
         _make_log("task", user_agent_id, "Received at: 2025-01-01\nSender: Agent\nMessage: I found relevant info", timestamp=103.0),
@@ -197,7 +197,7 @@ def trace_gather_context(user_agent_id: str, observe_agent_id: str, execute_agen
         ]), timestamp=105.0),
         _make_log("llm_output", user_agent_id, "Thought: OK now I accept", timestamp=106.0),
         # User accepts after gathering
-        _make_log("tool_call", user_agent_id, "", timestamp=106.0, tool_name="PASAgentUserInterface__accept_proposal", tool_arguments={"content": "Yes"}),
+        _make_log("tool_call", user_agent_id, "", timestamp=106.0, tool_name="PAREAgentUserInterface__accept_proposal", tool_arguments={"content": "Yes"}),
         _make_log("observation", user_agent_id, "accepted-uuid", timestamp=106.0),
         # Execute agent starts
         _make_log("tool_call", execute_agent_id, "", timestamp=107.0, tool_name="Messages__send_message", tool_arguments={}),
@@ -217,7 +217,7 @@ def trace_no_proposal(user_agent_id: str, observe_agent_id: str, tmp_path: Path)
     logs = [
         _make_log("system_prompt", user_agent_id, "You are simulating a real human user", timestamp=100.0),
         _make_log("system_prompt", observe_agent_id, "You are a proactive assistant that monitors", timestamp=100.0),
-        _make_log("tool_call", observe_agent_id, "", timestamp=101.0, tool_name="PASAgentUserInterface__wait", tool_arguments={}),
+        _make_log("tool_call", observe_agent_id, "", timestamp=101.0, tool_name="PAREAgentUserInterface__wait", tool_arguments={}),
         _make_log("observation", observe_agent_id, "Continuing to observe.", timestamp=101.0),
     ]
     trace_data = {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pas.trajectory.models import DecisionPoint
+from pare.trajectory.models import DecisionPoint
 
 
 def test_decision_point_creation_accept() -> None:

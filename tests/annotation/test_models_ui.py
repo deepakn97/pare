@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from pas.annotation.models import MessageType, Sample, SampleResponse, UIMessage
+from pare.annotation.models import MessageType, Sample, SampleResponse, UIMessage
 
 
 class TestUIMessage:

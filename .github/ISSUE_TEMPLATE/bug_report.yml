@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug or unexpected behavior in PAS
+description: Report a bug or unexpected behavior in PARE
 title: "[Bug]: "
 labels: ["bug", "needs-triage"]
 body:
@@ -52,11 +52,11 @@ body:
     attributes:
       value: |
         **Component Guide:**
-        - **Core**: All Python source files in the root `pas` directory (e.g., `pas/environment.py`, `pas/scenario_runner.py`, `pas/notification_system.py`)
-        - **Agents**: All files in `pas/agents/` (e.g., `pas/agents/user/`, `pas/agents/proactive/`, `pas/agents/agent_log.py`)
-        - **Scenarios**: All files in `pas/scenarios/` (scenario definitions, not runner code)
-        - **Scenario Generator**: All files in `pas/scenario_generator/`
-        - **Apps**: All files in `pas/apps/` (e.g., `pas/apps/contacts/`, `pas/apps/email/`, `pas/apps/calendar/`)
+        - **Core**: All Python source files in the root `pare` directory (e.g., `pare/environment.py`, `pare/scenario_runner.py`, `pare/notification_system.py`)
+        - **Agents**: All files in `pare/agents/` (e.g., `pare/agents/user/`, `pare/agents/proactive/`, `pare/agents/agent_log.py`)
+        - **Scenarios**: All files in `pare/scenarios/` (scenario definitions, not runner code)
+        - **Scenario Generator**: All files in `pare/scenario_generator/`
+        - **Apps**: All files in `pare/apps/` (e.g., `pare/apps/contacts/`, `pare/apps/email/`, `pare/apps/calendar/`)
         - **Documentation**: Documentation files (e.g., `docs/`, `mkdocs.yml`, `README.md`)
         - **Testing Infrastructure**: Testing and CI/CD (e.g., `tests/`, `.github/workflows/`, `.pre-commit-config.yaml`, `pytest.ini`)
         - **Other**: Project configuration and other files (e.g., `pyproject.toml`, `Makefile`, `.gitignore`)
@@ -86,7 +86,7 @@ body:
       value: |
         - OS: [e.g., macOS 14.0, Ubuntu 22.04]
         - Python version: [e.g., 3.12.1]
-        - PAS version/commit: [e.g., v0.1.0 or commit hash]
+        - PARE version/commit: [e.g., v0.1.0 or commit hash]
         - Installed via: [e.g., pip, uv, git clone]
       render: markdown
     validations:
@@ -99,7 +99,7 @@ body:
       description: If possible, provide a minimal code example that reproduces the issue
       placeholder: |
         ```python
-        from pas import StateAwareEnvironmentWrapper
+        from pare import StateAwareEnvironmentWrapper
         # Minimal code that reproduces the bug...
         ```
       render: python
@@ -108,7 +108,7 @@ body:
     id: logs
     attributes:
       label: Relevant Logs
-      description: Any relevant logs from `logs/pas/` directory
+      description: Any relevant logs from `logs/pare/` directory
       placeholder: Paste relevant log excerpts here
       render: shell
 

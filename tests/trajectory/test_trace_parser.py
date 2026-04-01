@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from pas.trajectory.trace_parser import _parse_notification_timestamp, extract_decision_points
+from pare.trajectory.trace_parser import _parse_notification_timestamp, extract_decision_points
 
 if TYPE_CHECKING:
     from pathlib import Path
