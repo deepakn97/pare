@@ -22,7 +22,6 @@
             max-width: 100%;
             overflow-wrap: break-word;
         }
-        /* Chat bubble styles */
         .user-bubble {
             background-color: #dbeafe;
             border-radius: 1rem 1rem 1rem 0.25rem;
@@ -45,7 +44,10 @@
     <div class="max-w-3xl mx-auto px-4 py-8">
         <!-- Header -->
         <div class="bg-white rounded-lg shadow-sm p-4 mb-6 flex justify-between items-center">
-            <h1 class="text-xl font-semibold text-gray-800">PAS Annotation Study</h1>
+            <div class="flex items-center gap-2">
+                <h1 class="text-xl font-semibold text-gray-800">PAS Annotation Study</h1>
+                <span id="tutorial-badge" class="hidden bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-semibold">TUTORIAL</span>
+            </div>
             <div id="progress-display" class="text-sm text-gray-600">
                 Progress: <span id="progress-completed">0</span>/<span id="progress-total">0</span>
             </div>
@@ -75,8 +77,124 @@
                 <p class="text-gray-600">Loading...</p>
             </div>
 
+            <!-- Instructions state (hidden initially) -->
+            <div id="instructions-state" class="hidden">
+                <div class="bg-white rounded-lg shadow-sm p-7 mb-5">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-2">Welcome to the PAS Annotation Study</h2>
+                    <p class="text-gray-500 text-sm">Thank you for participating in this study. You'll be evaluating proposals made by an AI assistant on a mobile phone.</p>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3">Your Task</h3>
+                    <p class="text-sm text-gray-700 leading-relaxed mb-3">
+                        You will see a timeline of interactions between a <strong>user</strong> and their <strong>AI assistant</strong> on a simulated mobile phone. The user performs actions like opening apps, reading emails, checking their calendar, and browsing messages. At some point, the AI assistant notices an opportunity to help and makes a <strong>proposal</strong> -- a suggestion to take action on the user's behalf.
+                    </p>
+                    <p class="text-sm text-gray-700 leading-relaxed font-semibold mb-3">
+                        Your job: If you were this user, would you want the assistant to do what it's proposing?
+                    </p>
+                    <p class="text-sm text-gray-700 leading-relaxed">Think about:</p>
+                    <ul class="text-sm text-gray-700 leading-relaxed list-disc ml-5 mt-1">
+                        <li>Does the assistant understand the situation correctly?</li>
+                        <li>Is the proposed action actually what the user would want right now?</li>
+                        <li>Does the user have enough context to trust this proposal?</li>
+                        <li>Is the timing appropriate?</li>
+                    </ul>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">Your Three Options</h3>
+
+                    <div class="flex gap-3 mb-4 p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
+                        <span class="bg-green-500 text-white px-3 py-1 rounded text-xs font-bold h-fit">ACCEPT</span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700">The proposal is helpful and appropriate</p>
+                            <p class="text-xs text-gray-500 mt-1">The assistant correctly understood the user's situation. The proposed action makes sense, the information is accurate, and the user would benefit from the assistant doing this. The user has seen enough context to trust the proposal.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 mb-4 p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
+                        <span class="bg-red-500 text-white px-3 py-1 rounded text-xs font-bold h-fit">REJECT</span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700">The proposal is wrong, unhelpful, or inappropriate</p>
+                            <p class="text-xs text-gray-500 mt-1">The assistant misunderstood the situation, the proposed action is incorrect, the timing is bad, or the assistant is being too pushy (e.g., trying to complete a purchase without the user actively wanting to buy). Reject even if the proposal seems "close" -- if it's not what the user would actually want, reject it.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                        <span class="bg-blue-500 text-white px-3 py-1 rounded text-[10px] font-bold h-fit whitespace-nowrap">I NEED MORE INFO</span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700">You can't decide without checking something first</p>
+                            <p class="text-xs text-gray-500 mt-1">The proposal might be good, but the user would need to verify something before committing. For example: they'd want to read a full email before replying to it, check their calendar before accepting a meeting, or review their shopping cart before checking out. You'll be asked to briefly describe what information you'd need. <strong>Important:</strong> Only choose this when there's a genuine information gap -- if the user has already seen the relevant information, make a decision (accept or reject) rather than defaulting to "I need more info."</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-300 rounded-lg p-5 mb-5">
+                    <p class="text-sm font-semibold text-blue-800 mb-1">Starting State</p>
+                    <p class="text-xs text-blue-700 leading-relaxed">
+                        The user always starts on the <strong>home screen</strong> of their mobile phone with <strong>no apps open</strong>. They navigate by opening apps and performing actions. You can track which app they're currently in by following their actions from top to bottom.
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">How to Read the Timeline</h3>
+                    <div class="flex flex-wrap gap-4 mb-4">
+                        <div class="flex-1 min-w-[180px] p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">U</span>
+                                <span class="text-xs font-semibold text-gray-700">User Actions</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Blue bubbles on the left show what the user did, with the result shown below.</p>
+                        </div>
+                        <div class="flex-1 min-w-[180px] p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">A</span>
+                                <span class="text-xs font-semibold text-gray-700">Assistant Proposal</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Amber bubble on the right marked "NEW" is what you're deciding on.</p>
+                        </div>
+                        <div class="flex-1 min-w-[180px] p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-green-500 text-sm">&#128276;</span>
+                                <span class="text-xs font-semibold text-gray-700">Notifications</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Green centered bubbles show system notifications that appeared during the interaction.</p>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-600 leading-relaxed space-y-1">
+                        <p><strong>What the user has already seen:</strong> If they opened and read an email, they know its contents. If they only saw a truncated notification, they might not know the full details.</p>
+                        <p><strong>The proposal appears as an amber bubble</strong> marked "NEW" on the right side. Everything above it is context that happened before the proposal arrived.</p>
+                    </div>
+                </div>
+
+                <div class="bg-amber-50 border border-amber-300 rounded-lg p-5 mb-6">
+                    <p class="text-sm font-semibold text-amber-800 mb-1">Important</p>
+                    <p class="text-xs text-amber-700 leading-relaxed">
+                        Put yourself in the user's shoes. The key question is: <strong>what does the user know at the moment the proposal arrives?</strong> A proposal that's objectively correct can still deserve "I need more info" if the user hasn't seen the relevant information yet. Conversely, don't choose "I need more info" if the user has already verified the details -- make a decision. There are no trick questions. Trust your instincts.
+                    </p>
+                </div>
+
+                <div class="text-center">
+                    <button id="start-tutorial-btn"
+                            class="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-colors">
+                        I Understand, Show Me Examples
+                    </button>
+                    <p class="text-xs text-gray-400 mt-2">You'll complete practice examples before starting</p>
+                </div>
+            </div>
+
             <!-- Sample state (hidden initially) -->
             <div id="sample-state" class="hidden">
+                <!-- Phone starting state reminder -->
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-2 mb-3 text-xs text-gray-600 text-center">
+                    The user is currently on the <strong>home screen</strong> with no apps open.
+                </div>
+
+                <!-- Tutorial practice banner (shown only during tutorial) -->
+                <div id="tutorial-banner" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                    <strong>Practice mode</strong> -- annotate this example like a real sample. You'll see feedback after submitting.
+                </div>
+
                 <!-- Scenario Context -->
                 <div id="context-section" class="bg-white rounded-lg shadow-sm p-4 mb-4 hidden">
                     <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Scenario Context</h2>
@@ -85,40 +203,76 @@
 
                 <!-- Chat Container -->
                 <div id="chat-container" class="bg-white rounded-lg shadow-sm p-4 mb-4 space-y-4">
-                    <!-- Chat messages will be rendered here -->
                 </div>
 
-                <!-- Agent Proposal (final message) -->
-                <div class="mb-6">
-                    <div class="flex justify-end items-start gap-2">
-                        <div class="max-w-[85%]">
-                            <div class="flex items-center justify-end gap-2 mb-1">
-                                <span class="text-xs text-gray-500 uppercase font-semibold">Assistant's Proposal</span>
-                                <span class="bg-amber-500 text-white text-xs px-2 py-0.5 rounded">NEW</span>
-                            </div>
-                            <div class="agent-bubble p-4 shadow-sm">
-                                <pre id="proposal-text" class="text-gray-800 text-sm"></pre>
-                            </div>
+                <!-- Decision Panel -->
+                <div id="decision-panel" class="bg-white rounded-lg shadow-sm p-6 text-center">
+                    <div id="decision-buttons">
+                        <p class="text-gray-700 mb-4">What would you do with this proposal?</p>
+                        <div class="flex justify-center gap-3 flex-wrap">
+                            <button id="accept-btn"
+                                    class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                                ACCEPT
+                            </button>
+                            <button id="reject-btn"
+                                    class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                                REJECT
+                            </button>
+                            <button id="gather-btn"
+                                    class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap">
+                                I NEED MORE INFO
+                            </button>
                         </div>
-                        <div class="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 font-bold text-sm">
-                            A
+                    </div>
+
+                    <div id="rationale-input" class="hidden">
+                        <p class="text-gray-800 font-semibold mb-1">What information would you need before deciding?</p>
+                        <p class="text-gray-500 text-sm mb-3">Briefly describe what you'd want to check or verify.</p>
+                        <textarea id="rationale-text"
+                                  class="w-full border-2 border-blue-300 rounded-lg p-3 text-sm focus:border-blue-500 focus:outline-none resize-y"
+                                  rows="3"
+                                  placeholder="e.g., I'd want to check if Bob is available at 3pm first..."></textarea>
+                        <div class="flex justify-end gap-3 mt-3">
+                            <button id="cancel-rationale-btn"
+                                    class="px-6 py-2 border border-gray-300 text-gray-600 font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+                                CANCEL
+                            </button>
+                            <button id="submit-rationale-btn"
+                                    class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled>
+                                SUBMIT
+                            </button>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Decision Buttons -->
-                <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-                    <p class="text-gray-700 mb-4">Would you accept this proposal from your assistant?</p>
-                    <div class="flex justify-center gap-4">
-                        <button id="accept-btn"
-                                class="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
-                            ACCEPT
-                        </button>
-                        <button id="reject-btn"
-                                class="px-8 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
-                            REJECT
-                        </button>
-                    </div>
+            <!-- Tutorial feedback state (hidden initially) -->
+            <div id="tutorial-feedback-state" class="hidden">
+                <div id="tutorial-feedback-banner" class="rounded-xl p-6 text-center mb-5">
+                </div>
+                <div id="tutorial-feedback-explanation" class="bg-white rounded-lg shadow-sm p-5 mb-5">
+                </div>
+                <div class="text-center">
+                    <button id="tutorial-next-btn"
+                            class="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-colors">
+                        Next Example
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tutorial summary state (hidden initially) -->
+            <div id="tutorial-summary-state" class="hidden">
+                <div class="bg-white rounded-xl shadow-sm p-8 text-center mb-5">
+                    <p class="text-sm text-gray-500 mb-1">Tutorial Complete</p>
+                    <p id="tutorial-score" class="text-5xl font-extrabold text-gray-800 mb-1"></p>
+                    <p id="tutorial-percentage" class="text-base text-gray-500"></p>
+                </div>
+                <div class="text-center">
+                    <button id="begin-annotation-btn"
+                            class="px-10 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg shadow-md text-lg transition-colors">
+                        Begin Annotation
+                    </button>
                 </div>
             </div>
 
@@ -170,13 +324,26 @@
 
         const annotatorId = getAnnotatorId();
         let currentSampleId = null;
+        let isTutorialMode = false;
 
         function showState(stateName) {
-            document.getElementById('loading-state').classList.add('hidden');
-            document.getElementById('sample-state').classList.add('hidden');
-            document.getElementById('completion-state').classList.add('hidden');
-            document.getElementById('error-state').classList.add('hidden');
-            document.getElementById(stateName + '-state').classList.remove('hidden');
+            const states = ['loading', 'instructions', 'sample', 'tutorial-feedback', 'tutorial-summary', 'completion', 'error'];
+            states.forEach(s => {
+                const el = document.getElementById(s + '-state');
+                if (el) el.classList.add('hidden');
+            });
+            const target = document.getElementById(stateName + '-state');
+            if (target) target.classList.remove('hidden');
+
+            // Show/hide tutorial badge
+            const badge = document.getElementById('tutorial-badge');
+            if (stateName === 'sample' && isTutorialMode) {
+                badge.classList.remove('hidden');
+            } else if (stateName === 'tutorial-feedback') {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
         }
 
         function updateProgress(completed, total) {
@@ -215,58 +382,102 @@
             return wrapper;
         }
 
-        // Render a user action (left side)
-        function renderUserAction(action) {
+        // Render a user action with optional paired observation
+        function renderUserAction(content, timestamp, observation) {
             const wrapper = document.createElement('div');
             wrapper.className = 'flex items-start gap-2';
-            const timestamp = action.timestamp ? formatTimestamp(action.timestamp) : '';
+            const ts = timestamp ? formatTimestamp(timestamp) : '';
+            let obsHtml = '';
+            if (observation) {
+                obsHtml = `
+                    <div class="observation-text mt-1 ml-2 p-2 rounded text-xs">
+                        <pre class="text-gray-600">${escapeHtml(observation)}</pre>
+                    </div>`;
+            }
             wrapper.innerHTML = `
                 <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">
                     U
                 </div>
                 <div class="max-w-[80%]">
-                    ${timestamp ? `<div class="text-xs text-gray-400 mb-1">${timestamp}</div>` : ''}
+                    ${ts ? `<div class="text-xs text-gray-400 mb-1">${ts}</div>` : ''}
                     <div class="user-bubble p-3 shadow-sm">
-                        <div class="action-code text-blue-800">${escapeHtml(action.action)}</div>
+                        <div class="action-code text-blue-800">${escapeHtml(content)}</div>
                     </div>
-                    <div class="observation-text mt-1 ml-2 p-2 rounded text-xs">
-                        <pre class="text-gray-600">${escapeHtml(action.observation)}</pre>
-                    </div>
+                    ${obsHtml}
                 </div>
             `;
             return wrapper;
         }
 
-        // Render turns into the chat container
-        function renderTurns(turns) {
-            const chatContainer = document.getElementById('chat-container');
-            chatContainer.innerHTML = '';
+        // Render agent proposal (right side)
+        function renderProposal(content, timestamp) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex justify-end items-start gap-2';
+            const ts = timestamp ? formatTimestamp(timestamp) : '';
+            wrapper.innerHTML = `
+                <div class="max-w-[85%]">
+                    <div class="flex items-center justify-end gap-2 mb-1">
+                        ${ts ? `<span class="text-xs text-gray-400">${ts}</span>` : ''}
+                        <span class="text-xs text-gray-500 uppercase font-semibold">Proposal</span>
+                        <span class="bg-amber-500 text-white text-xs px-2 py-0.5 rounded font-semibold">NEW</span>
+                    </div>
+                    <div class="agent-bubble p-4 shadow-sm">
+                        <pre class="text-gray-800 text-sm">${escapeHtml(content)}</pre>
+                    </div>
+                </div>
+                <div class="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 font-bold text-sm">
+                    A
+                </div>
+            `;
+            return wrapper;
+        }
 
-            if (!turns || turns.length === 0) {
-                chatContainer.innerHTML = '<p class="text-gray-400 text-center italic">No previous actions</p>';
+        // Render messages chronologically into a target container
+        function renderMessagesInto(messages, container) {
+            container.innerHTML = '';
+
+            if (!messages || messages.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center italic">No previous actions</p>';
                 return;
             }
 
-            turns.forEach(turn => {
-                // Render notifications first (centered)
-                if (turn.notifications && turn.notifications.length > 0) {
-                    turn.notifications.forEach(notif => {
-                        chatContainer.appendChild(renderNotification(notif));
-                    });
-                }
+            for (let i = 0; i < messages.length; i++) {
+                const msg = messages[i];
 
-                // Render user actions (left side)
-                if (turn.actions && turn.actions.length > 0) {
-                    turn.actions.forEach(action => {
-                        chatContainer.appendChild(renderUserAction(action));
-                    });
+                if (msg.msg_type === 'user_action') {
+                    let observation = null;
+                    if (i + 1 < messages.length && messages[i + 1].msg_type === 'tool_observation') {
+                        observation = messages[i + 1].content;
+                        i++;
+                    }
+                    container.appendChild(renderUserAction(msg.content, msg.timestamp, observation));
+                } else if (msg.msg_type === 'tool_observation') {
+                    container.appendChild(renderUserAction('(observation)', msg.timestamp, msg.content));
+                } else if (msg.msg_type === 'proposal') {
+                    container.appendChild(renderProposal(msg.content, msg.timestamp));
+                } else if (msg.msg_type === 'environment_notification') {
+                    container.appendChild(renderNotification(msg.content));
                 }
-            });
+            }
+        }
+
+        // Render messages into the main chat container
+        function renderMessages(messages) {
+            renderMessagesInto(messages, document.getElementById('chat-container'));
         }
 
         function renderSample(data) {
             currentSampleId = data.sample_id;
-            updateProgress(data.progress.completed, data.progress.total);
+            isTutorialMode = data.tutorial || false;
+            updateProgress(data.progress_completed, data.progress_total);
+
+            // Show/hide tutorial banner
+            const tutorialBanner = document.getElementById('tutorial-banner');
+            if (isTutorialMode) {
+                tutorialBanner.classList.remove('hidden');
+            } else {
+                tutorialBanner.classList.add('hidden');
+            }
 
             // Scenario context
             const contextSection = document.getElementById('context-section');
@@ -278,14 +489,66 @@
                 contextSection.classList.add('hidden');
             }
 
-            // Render turns
-            renderTurns(data.turns);
+            // Render chronological messages
+            renderMessages(data.messages);
 
-            // Agent proposal
-            document.getElementById('proposal-text').textContent = data.agent_proposal;
+            // Reset decision panel to buttons state
+            document.getElementById('decision-buttons').classList.remove('hidden');
+            document.getElementById('rationale-input').classList.add('hidden');
+            document.getElementById('rationale-text').value = '';
 
             showState('sample');
         }
+
+        // --- Tutorial feedback and summary ---
+
+        function showTutorialFeedback(feedback) {
+            const banner = document.getElementById('tutorial-feedback-banner');
+            const explanation = document.getElementById('tutorial-feedback-explanation');
+
+            if (feedback.correct === null || feedback.correct === undefined) {
+                // Ambiguous example (gather context)
+                banner.className = 'rounded-xl p-6 text-center mb-5 bg-blue-50 border-2 border-blue-400';
+                banner.innerHTML = `
+                    <p class="text-lg font-bold text-blue-800 mb-1">Here's how to think about this:</p>
+                `;
+            } else if (feedback.correct) {
+                banner.className = 'rounded-xl p-6 text-center mb-5 bg-green-50 border-2 border-green-500';
+                banner.innerHTML = `
+                    <p class="text-2xl mb-2">&#10003;</p>
+                    <p class="text-lg font-bold text-green-800">Correct!</p>
+                `;
+            } else {
+                const correctLabel = escapeHtml((feedback.correct_decision || '').replace('_', ' ').toUpperCase());
+                banner.className = 'rounded-xl p-6 text-center mb-5 bg-red-50 border-2 border-red-500';
+                banner.innerHTML = `
+                    <p class="text-2xl mb-2">&#10007;</p>
+                    <p class="text-lg font-bold text-red-800 mb-1">Incorrect</p>
+                    <p class="text-sm text-gray-600">Correct answer: <strong class="text-green-600">${correctLabel}</strong></p>
+                `;
+            }
+
+            const headingDecision = escapeHtml((feedback.correct_decision || '').replace('_', ' '));
+            const heading = feedback.correct === null ? 'Reasoning:' :
+                           (feedback.correct ? 'Why this is correct:' :
+                           `Why ${headingDecision} is correct:`);
+            explanation.innerHTML = `
+                <p class="text-sm font-semibold text-gray-700 mb-2">${heading}</p>
+                <p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(feedback.explanation)}</p>
+            `;
+
+            showState('tutorial-feedback');
+        }
+
+        function showTutorialSummary(summary) {
+            document.getElementById('tutorial-score').textContent = `${summary.correct}/${summary.scored_total}`;
+            const pct = summary.scored_total > 0 ? Math.round(summary.correct / summary.scored_total * 100) : 0;
+            document.getElementById('tutorial-percentage').textContent = `${pct}% correct on scored examples`;
+            localStorage.setItem('pas_tutorial_completed', 'true');
+            showState('tutorial-summary');
+        }
+
+        // --- Loading and submission ---
 
         async function loadNextSample() {
             showState('loading');
@@ -303,9 +566,11 @@
 
                 const data = await response.json();
 
-                if (data.sample_id === null) {
+                if (data.sample_id === null || data.sample_id === undefined) {
                     document.getElementById('completion-message').textContent = data.message || 'You have completed all available samples.';
-                    updateProgress(data.progress.completed, data.progress.total);
+                    if (data.progress) {
+                        updateProgress(data.progress.completed, data.progress.total);
+                    }
                     showState('completion');
                 } else {
                     renderSample(data);
@@ -317,9 +582,61 @@
             }
         }
 
-        async function submitAnnotation(decision) {
-            document.getElementById('accept-btn').disabled = true;
-            document.getElementById('reject-btn').disabled = true;
+        async function checkTutorialStatus() {
+            showState('loading');
+
+            try {
+                const response = await fetch('/api/sample', {
+                    headers: { 'X-Annotator-ID': annotatorId }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.sample_id === null || data.sample_id === undefined) {
+                    // No samples at all
+                    document.getElementById('completion-message').textContent = data.message || 'No samples available.';
+                    showState('completion');
+                } else if (data.tutorial) {
+                    // Tutorial sample -- show instructions first (if not seen before)
+                    if (localStorage.getItem('pas_tutorial_completed') === 'true') {
+                        // Already completed tutorial in previous session, but server says otherwise
+                        // Server is authority -- clear localStorage and re-do tutorial
+                        localStorage.removeItem('pas_tutorial_completed');
+                    }
+                    showState('instructions');
+                } else {
+                    // Real sample -- tutorial already completed
+                    renderSample(data);
+                }
+            } catch (error) {
+                console.error('Error checking tutorial status:', error);
+                document.getElementById('error-message').textContent = error.message;
+                showState('error');
+            }
+        }
+
+        function setButtonsDisabled(disabled) {
+            document.getElementById('accept-btn').disabled = disabled;
+            document.getElementById('reject-btn').disabled = disabled;
+            document.getElementById('gather-btn').disabled = disabled;
+            document.getElementById('submit-rationale-btn').disabled = disabled;
+            document.getElementById('cancel-rationale-btn').disabled = disabled;
+        }
+
+        async function submitAnnotation(decision, rationale) {
+            setButtonsDisabled(true);
+
+            const body = {
+                sample_id: currentSampleId,
+                decision: decision
+            };
+            if (rationale) {
+                body.gather_context_rationale = rationale;
+            }
 
             try {
                 const response = await fetch('/api/annotate', {
@@ -328,10 +645,7 @@
                         'Content-Type': 'application/json',
                         'X-Annotator-ID': annotatorId
                     },
-                    body: JSON.stringify({
-                        sample_id: currentSampleId,
-                        decision: decision
-                    })
+                    body: JSON.stringify(body)
                 });
 
                 if (!response.ok) {
@@ -341,11 +655,32 @@
 
                 const data = await response.json();
 
-                if (data.next_sample) {
+                // Handle tutorial feedback
+                if (data.tutorial_feedback) {
+                    showTutorialFeedback(data.tutorial_feedback);
+
+                    // Check if tutorial is complete
+                    if (data.tutorial_complete) {
+                        // Store summary for after feedback is dismissed
+                        document.getElementById('tutorial-next-btn').onclick = function() {
+                            showTutorialSummary(data.tutorial_summary);
+                        };
+                        document.getElementById('tutorial-next-btn').textContent = 'View Results';
+                    } else if (data.next_sample) {
+                        // More tutorial samples -- "Next" loads the next one
+                        document.getElementById('tutorial-next-btn').onclick = function() {
+                            renderSample(data.next_sample);
+                        };
+                        document.getElementById('tutorial-next-btn').textContent = 'Next Example';
+                    }
+                } else if (data.next_sample) {
+                    // Real annotation -- render next sample
                     renderSample(data.next_sample);
                 } else {
                     document.getElementById('completion-message').textContent = data.message || 'You have completed all available samples.';
-                    updateProgress(data.progress.completed, data.progress.total);
+                    if (data.progress) {
+                        updateProgress(data.progress.completed, data.progress.total);
+                    }
                     showState('completion');
                 }
             } catch (error) {
@@ -354,14 +689,47 @@
                 showState('error');
             }
 
-            document.getElementById('accept-btn').disabled = false;
-            document.getElementById('reject-btn').disabled = false;
+            setButtonsDisabled(false);
         }
 
-        document.getElementById('accept-btn').addEventListener('click', () => submitAnnotation(true));
-        document.getElementById('reject-btn').addEventListener('click', () => submitAnnotation(false));
+        // --- Button listeners ---
 
-        loadNextSample();
+        // Accept and Reject submit immediately
+        document.getElementById('accept-btn').addEventListener('click', () => submitAnnotation('accept'));
+        document.getElementById('reject-btn').addEventListener('click', () => submitAnnotation('reject'));
+
+        // Gather context flow
+        document.getElementById('gather-btn').addEventListener('click', () => {
+            document.getElementById('decision-buttons').classList.add('hidden');
+            document.getElementById('rationale-input').classList.remove('hidden');
+            document.getElementById('rationale-text').focus();
+        });
+
+        document.getElementById('cancel-rationale-btn').addEventListener('click', () => {
+            document.getElementById('rationale-input').classList.add('hidden');
+            document.getElementById('decision-buttons').classList.remove('hidden');
+            document.getElementById('rationale-text').value = '';
+        });
+
+        document.getElementById('rationale-text').addEventListener('input', (e) => {
+            document.getElementById('submit-rationale-btn').disabled = e.target.value.trim().length === 0;
+        });
+
+        document.getElementById('submit-rationale-btn').addEventListener('click', () => {
+            const rationale = document.getElementById('rationale-text').value.trim();
+            if (rationale) {
+                submitAnnotation('gather_context', rationale);
+            }
+        });
+
+        // Tutorial: "I Understand" -> load first tutorial sample
+        document.getElementById('start-tutorial-btn').addEventListener('click', loadNextSample);
+
+        // Tutorial: "Begin Annotation" -> load first real sample
+        document.getElementById('begin-annotation-btn').addEventListener('click', loadNextSample);
+
+        // Start with tutorial check
+        checkTutorialStatus();
     </script>
 </body>
 </html>
