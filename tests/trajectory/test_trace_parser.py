@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from pas.trajectory.trace_parser import extract_decision_points
+from pas.trajectory.trace_parser import _parse_notification_timestamp, extract_decision_points
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -64,3 +65,81 @@ def test_llm_input_has_timestamp_annotations(trace_accept: Path) -> None:
     proposal_msgs = [m for m in dp.llm_input if m["msg_type"] == "proposal"]
     assert len(proposal_msgs) == 1
     assert proposal_msgs[0]["timestamp"] is not None
+
+
+def test_parse_notification_timestamp_single_event() -> None:
+    """Parse timestamp from a single non-None notification line."""
+    content = "Environment notifications updates:\n***\n[2025-01-15 09:00:05] Ride completed\n***"
+    ts = _parse_notification_timestamp(content)
+    expected = datetime(2025, 1, 15, 9, 0, 5, tzinfo=UTC).timestamp()
+    assert ts == expected
+
+
+def test_parse_notification_timestamp_skips_none_lines() -> None:
+    """Last non-None line's timestamp is used, None lines are skipped."""
+    content = (
+        "Environment notifications updates:\n***\n"
+        "[2025-11-18 09:00:10] None\n"
+        "[2025-11-18 09:00:15] New email from bob@example.com: Hello\n"
+        "[2025-11-18 09:00:20] None\n"
+        "***"
+    )
+    ts = _parse_notification_timestamp(content)
+    expected = datetime(2025, 11, 18, 9, 0, 15, tzinfo=UTC).timestamp()
+    assert ts == expected
+
+
+def test_parse_notification_timestamp_multiple_events_uses_last() -> None:
+    """When multiple non-None events exist, use the last one's timestamp."""
+    content = (
+        "Environment notifications updates:\n***\n"
+        "[2025-11-18 09:00:05] Ride completed\n"
+        "[2025-11-18 09:00:10] New email from alice@example.com: Meeting\n"
+        "***"
+    )
+    ts = _parse_notification_timestamp(content)
+    expected = datetime(2025, 11, 18, 9, 0, 10, tzinfo=UTC).timestamp()
+    assert ts == expected
+
+
+def test_parse_notification_timestamp_all_none_returns_none() -> None:
+    """When all notification lines are None, return None."""
+    content = (
+        "Environment notifications updates:\n***\n"
+        "[2025-11-18 09:00:10] None\n"
+        "[2025-11-18 09:00:20] None\n"
+        "***"
+    )
+    ts = _parse_notification_timestamp(content)
+    assert ts is None
+
+
+def test_parse_notification_timestamp_skips_empty_content() -> None:
+    """Lines with empty content after timestamp are skipped."""
+    content = (
+        "Environment notifications updates:\n***\n"
+        "[2025-11-18 09:00:10] \n"
+        "[2025-11-18 09:00:15] New email from bob@example.com: Hello\n"
+        "***"
+    )
+    ts = _parse_notification_timestamp(content)
+    expected = datetime(2025, 11, 18, 9, 0, 15, tzinfo=UTC).timestamp()
+    assert ts == expected
+
+
+def test_parse_notification_timestamp_no_match_returns_none() -> None:
+    """Content without timestamp pattern returns None."""
+    content = "Some random content"
+    ts = _parse_notification_timestamp(content)
+    assert ts is None
+
+
+def test_llm_input_notification_has_timestamp(trace_accept: Path) -> None:
+    """Notification messages in llm_input get timestamps parsed from content."""
+    dps = extract_decision_points(trace_accept, proactive_model_id="claude-4.5-sonnet", user_model_id="gpt-5-mini")
+    dp = dps[0]
+    notif_msgs = [m for m in dp.llm_input if m["msg_type"] == "environment_notification"]
+    assert len(notif_msgs) == 1
+    # The trace_accept fixture has "[2025-01-01 09:00:10] New calendar event"
+    expected_ts = datetime(2025, 1, 1, 9, 0, 10, tzinfo=UTC).timestamp()
+    assert notif_msgs[0]["timestamp"] == expected_ts

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -484,6 +486,8 @@ def _annotate_messages(
             msg_type = "proposal"
         else:
             msg_type = _classify_user_message(role, content)
+            if msg_type == "environment_notification":
+                ts = _parse_notification_timestamp(content)
 
         annotated.append({**msg, "timestamp": ts, "msg_type": msg_type})
 
@@ -541,3 +545,25 @@ def _classify_user_message(role: str, content: str) -> str:
     if role == "system":
         return "system_prompt"
     return "unknown"
+
+
+def _parse_notification_timestamp(content: str) -> float | None:
+    """Parse the last non-None notification timestamp from content text.
+
+    Searches for ``[YYYY-MM-DD HH:MM:SS]`` prefixed lines, skipping lines
+    where the content after the timestamp is just ``None``.
+
+    Args:
+        content: Raw notification message content.
+
+    Returns:
+        UTC epoch float of the last non-None notification, or None if no valid timestamps found.
+    """
+    last_ts: float | None = None
+    for match in re.finditer(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\][ \t]*([^\n]*)", content):
+        timestamp_str, line_content = match.group(1), match.group(2).strip()
+        if not line_content or line_content == "None":
+            continue
+        dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
+        last_ts = dt.timestamp()
+    return last_ts
