@@ -1,7 +1,7 @@
 # Stateful Reminder App
 
-`pas.apps.reminder.app.StatefulReminderApp` extends the Meta-ARE `ReminderApp`
-with PAS navigation support.
+`pare.apps.reminder.app.StatefulReminderApp` extends the Meta-ARE `ReminderApp`
+with PARE navigation support.
 It launches in `ReminderList` and transitions between list, detail,
 and edit flows based on completed reminder backend operations.
 

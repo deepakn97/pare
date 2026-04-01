@@ -1,47 +1,73 @@
 # Stateful Apps API
 
-Stateful wrappers around Meta-ARE mobile apps with navigation state machines.
+## Package Exports
 
-## Core Base Classes
+::: pare.apps
 
-::: pas.apps.core
+## Core Framework
+
+::: pare.apps.core
+
+::: pare.apps.tool_decorators
+
+## System and Agent UI Apps
+
+::: pare.apps.system
+
+::: pare.apps.proactive_aui
 
 ## Contacts App
 
-::: pas.apps.contacts.app
+::: pare.apps.contacts.app
 
-### Contacts States
-
-::: pas.apps.contacts.states
-
-## Email App
-
-::: pas.apps.email.app
-
-### Email States
-
-::: pas.apps.email.states
-
-## Calendar App
-
-::: pas.apps.calendar.app
-
-### Calendar States
-
-::: pas.apps.calendar.states
+::: pare.apps.contacts.states
 
 ## Messaging App
 
-::: pas.apps.messaging.app
+::: pare.apps.messaging.app
 
-### Messaging States
+::: pare.apps.messaging.states
 
-::: pas.apps.messaging.states
+## Email App
 
-## Proactive Agent UI
+::: pare.apps.email.app
 
-::: pas.apps.proactive_aui
+::: pare.apps.email.states
 
-## System Apps
+## Calendar App
 
-::: pas.apps.system
+::: pare.apps.calendar.app
+
+::: pare.apps.calendar.states
+
+## Cab App
+
+::: pare.apps.cab.app
+
+::: pare.apps.cab.states
+
+## Apartment App
+
+::: pare.apps.apartment.app
+
+::: pare.apps.apartment.states
+
+## Reminder App
+
+::: pare.apps.reminder.app
+
+::: pare.apps.reminder.states
+
+## Shopping App
+
+::: pare.apps.shopping.app
+
+::: pare.apps.shopping.states
+
+## Notes App
+
+::: pare.apps.note.app
+
+::: pare.apps.note.states
+
+::: pare.apps.note.types

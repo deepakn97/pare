@@ -1,37 +1,57 @@
-site_name: Proactive Agent Sandbox
-repo_url: https://github.com/deepakn97/pas
-site_url: https://deepakn97.github.io/pas
+site_name: Proactive Agent Research Environment
+repo_url: https://github.com/deepakn97/pare
+site_url: https://deepakn97.github.io/pare
 site_description: This repository contains code for the Proactive Goal Inference Agent project in collaboration with Apple.
 site_author: Deepak Nathani
 edit_uri: edit/main/docs/
-repo_name: deepakn97/pas
+repo_name: deepakn97/pare
 copyright: Maintained by <a href="https://deepakn97.com">deepakn97</a>.
 
 nav:
   - Home: index.md
   - Getting Started:
-      - Scenario Authoring Guide: scenario_author_guide.md
       - Running Local LLM Models Guide: run_local_llm_model.md
-      - Scenario Generation: scenario_generator.md
+      - Dec-POMDP Formulation: dec_pomdp_formulation.md
   - Architecture:
       - Visual Overview: architecture_visual.md
-      - Environment Formalization: dec_pomdp_formulation.md
+      - Runtime Execution Flow: runtime_execution_flow.md
+      - Runtime Execution Config: runtime_execution.md
+      - Trace Export Semantics: trace_export.md
+  - Agents:
+      - Agents Overview: agents/index.md
+      - Agent Interaction Lifecycle: agents/interaction_lifecycle.md
   - Apps:
-      - App APIs Overview: apps/index.md
+      - Apps Overview: apps/index.md
       - Adding a Stateful App: apps/adding_stateful_app.md
       - Contacts App: apps/contacts.md
       - Messaging App: apps/messaging.md
       - Email App: apps/email.md
       - Calendar App: apps/calendar.md
-      - Cab Booking App: apps/cab.md
+      - Cab App: apps/cab.md
+      - Apartment App: apps/apartment.md
+      - Reminder App: apps/reminder.md
       - Shopping App: apps/shopping.md
-      - Notes Taking App: apps/notes.md
+      - Notes App: apps/notes.md
+  - Scenarios:
+      - Scenarios Overview: scenarios/index.md
+      - Scenario Authoring Guide: scenarios/authoring.md
+      - Benchmark Scenarios: scenarios/benchmark.md
+      - Scenarios CLI Usage: scenarios/cli_usage.md
+      - Multi-Step Scenario Generator Flow: scenarios/scenario_generator_flow.md
+  - Scripts:
+      - Scripts Overview: scripts/index.md
+  - Annotation:
+      - Annotation Workflow: annotation/index.md
   - API Reference:
-      - Overview: modules.md
+      - API Overview: api/index.md
       - Environment: api/environment.md
+      - Agents: api/agents.md
       - Stateful Apps: api/apps.md
       - Scenarios: api/scenarios.md
       - Scenario Generator: api/scenario_generator.md
+      - Summary and Deduplication: api/summary_and_deduplication.md
+      - Annotation: api/annotation.md
+      - Logging: api/logging.md
 
 exclude_docs: |
   _plans/
@@ -42,11 +62,11 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: ["pas"]
+          paths: ["pare"]
 theme:
   name: material
-  feature:
-    tabs: true
+  features:
+    - navigation.tabs
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -68,9 +88,9 @@ theme:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/deepakn97/pas
+      link: https://github.com/deepakn97/pare
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/pas
+      link: https://pypi.org/project/pare
 
 markdown_extensions:
   - toc:

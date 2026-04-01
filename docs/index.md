@@ -1,99 +1,83 @@
-# Proactive Agent Sandbox
+# Proactive Agent Research Environment
 
-This documentation set describes the PAS runtime used in our proactive goal
-inference experiments. It builds on Meta-ARE and adds stateful navigation,
-user-proxy orchestration, and proactive planning layers.
+This documentation is organized around the most common task in this repo: running and understanding the benchmark.
+
+Most users only need four things:
+
+1. List available scenarios.
+2. Run a benchmark sweep with chosen models.
+3. Inspect traces or generated scenarios.
+4. Optionally annotate traces for human evaluation.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.12 or higher
-- [uv](https://github.com/astral-sh/uv) package manager
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv)
 
-### Installation
+### Setup
 
-1. Clone the repository:
 ```bash
-git clone git@github.com:deepakn97/pas.git
-cd pas
-```
-
-2. Install the environment and pre-commit hooks:
-```bash
+git clone git@github.com:deepakn97/pare.git
+cd pare
 make install
-```
-
-This will:
-- Create a virtual environment using uv
-- Install all dependencies from `pyproject.toml`
-- Install pre-commit hooks for code quality checks
-
-3. Verify installation:
-```bash
-make check  # Run linting, type checking, and dependency checks
-make test   # Run test suite
-```
-
-### Running The Demos
-
-Two runnable scripts exercise the sandbox end-to-end. They require a valid
-`OPENAI_API_KEY` (loaded automatically via `dotenv`).
-
-```bash
-uv run python -m pas.scripts.run_contacts_demo
-uv run python -m pas.scripts.run_meta_tutorial_demo
-# generic runner example
-uv run python -m pas.scripts.run_demo \
-  --builder pas.scenarios.contacts_followup.build_contacts_followup_components
-```
-
-Each script prints the proposed goal, execution summary, and the locations of
-the generated logs under `logs/pas/`. Both demos rely on oracle expectations to
-ensure the agent truly forwards the target email; if a run completes without
-meeting the oracle criteria the session raises an error instead of silently
-accepting a partial result.
-
-## Contributing
-
-### Running Code Quality Checks
-
-```bash
 make check
-```
-
-This runs:
-- `uv lock --locked` - Verify lock file consistency
-- `pre-commit run -a` - Run all pre-commit hooks (ruff, mypy, etc.)
-- `mypy` - Static type checking
-- `deptry` - Check for dependency issues
-
-### Running Tests
-
-```bash
 make test
 ```
 
-Run tests with coverage report:
+## Most Common Commands
+
+The installed CLI entrypoint is documented here as `pare` from `pare/main.py`.
+
 ```bash
-uv run pytest --cov --cov-report=html --cov-report=term-missing
-open htmlcov/index.html  # View coverage in browser
+uv run pare scenarios list
+uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+uv run pare scenarios generate --num-scenarios 1
+uv run pare annotation status
+uv run pare cache status
 ```
 
-### Scenario Integration Options
+## Benchmark Workflow
 
-- **Meta-authored scenarios** – use `pas.meta_adapter.build_meta_scenario_components`
-  to convert any Meta ARE `Scenario` (e.g. `ScenarioTutorial`) into the PAS
-  runtime stack. The adapter preserves Meta's apps, events, and oracles, so the
-  proactive session will enforce the same validation rules.
-- **PAS-authored scenarios** – build directly with `pas.scenarios.contacts_followup.build_contacts_followup_components`
-  (or your own builder). This path gives full control over seeding the PAS
-  stateful apps while still supplying `OracleAction` entries for validation.
+### 1. Inspect the benchmark
 
-In practice new scenarios should follow Meta's format whenever possible: emit a
-standard `Scenario` with events + oracle expectations, then reuse the adapter to
-obtain a PAS environment. This keeps the codebase minimal and lets us leverage
-Meta's judge ecosystem while adding PAS-specific UX (stateful navigation,
-decision prompts, etc.). If a scenario truly needs bespoke PAS state, use the
-contacts example as a template and provide matching oracle actions so the loop
-still detects success.
+Use `pare scenarios list` to see what scenarios are available and filter by app usage.
+
+```bash
+uv run pare scenarios list --apps StatefulEmailApp
+```
+
+### 2. Run a benchmark sweep
+
+Choose the observe and execute models, then run a split or a custom subset.
+
+```bash
+uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+```
+
+### 3. Generate new scenarios if needed
+
+Use the scenario generator when you want additional candidate tasks beyond the curated benchmark.
+
+```bash
+uv run pare scenarios generate --num-scenarios 3
+```
+
+### 4. Review traces or annotate results
+
+After benchmark runs complete, use the annotation commands to sample decision points and launch the review UI.
+
+```bash
+uv run pare annotation sample --traces-dir traces --sample-size 200
+uv run pare annotation launch --annotators-per-sample 2 --port 8000
+```
+
+## Section Guide
+
+- **Agents**: how model roles are split and how to configure user/proactive agents for benchmark runs.
+- **Apps**: what tool surfaces each app exposes and how to tell which scenarios use them.
+- **Scenarios**: how to list, run, author, and generate benchmark scenarios.
+- **Scripts**: helper scripts for batch runs, review set creation, and analysis.
+- **Annotation**: the human evaluation workflow for exported traces.
+- **Architecture**: deeper runtime details if you need implementation internals.

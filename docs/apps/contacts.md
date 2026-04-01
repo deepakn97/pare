@@ -1,6 +1,6 @@
 # Stateful Contacts App
 
-`pas.apps.contacts.app.StatefulContactsApp` extends the Meta-ARE `ContactsApp` with PAS navigation. It launches in `ContactsList` and moves between list, detail, and edit flows based on the backend tool that just completed.
+`pare.apps.contacts.app.StatefulContactsApp` extends the Meta-ARE `ContactsApp` with PARE navigation. It launches in `ContactsList` and moves between list, detail, and edit flows based on the backend tool that just completed.
 
 ## Navigation States
 

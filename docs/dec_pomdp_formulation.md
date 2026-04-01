@@ -1,8 +1,8 @@
-# Dec-POMDP Formulation for PAS
+# Dec-POMDP Formulation for PARE
 
 ## 1. Overview
 
-The Proactive Agent Sandbox (PAS) models a two-agent system where a **User** interacts with mobile applications while a **Proactive Agent** observes user behavior and proposes helpful interventions. We formalize this as a **Decentralized Partially Observable Markov Decision Process (Dec-POMDP)** with asymmetric information, state-dependent action spaces, and Stackelberg turn structure.
+The Proactive Agent Sandbox (PARE) models a two-agent system where a **User** interacts with mobile applications while a **Proactive Agent** observes user behavior and proposes helpful interventions. We formalize this as a **Decentralized Partially Observable Markov Decision Process (Dec-POMDP)** with asymmetric information, state-dependent action spaces, and Stackelberg turn structure.
 
 ### Key Characteristics
 
@@ -15,7 +15,7 @@ The Proactive Agent Sandbox (PAS) models a two-agent system where a **User** int
 
 ## 2. Formal Definition
 
-A PAS Dec-POMDP is defined by the tuple:
+A PARE Dec-POMDP is defined by the tuple:
 
 $$\mathcal{M} = \langle \mathcal{N}, \mathcal{S}, \{\mathcal{A}_i\}_{i \in \mathcal{N}}, T, R, \{\Omega_i\}_{i \in \mathcal{N}}, \{O_i\}_{i \in \mathcal{N}}, \mathcal{I}, \gamma \rangle$$
 
@@ -41,7 +41,7 @@ $$\mathcal{N} = \{\text{user}, \text{agent}\}$$
 
 **Definition**: The set of decision-making entities in the environment.
 
-**PAS Mapping**:
+**PARE Mapping**:
 
 - `user`: Simulated by `UserAgent` - interacts with apps to accomplish tasks
 - `agent`: Implemented by `ProactiveAgent` - observes user and proposes interventions
@@ -63,7 +63,7 @@ $$\mathcal{S}_{\text{app}} = \bigcup_{a \in \text{Apps}} \text{States}(a)$$
 
 **Definition**: The current screen/view within the active application.
 
-**PAS Mapping**: `StatefulApp.current_state: AppState`
+**PARE Mapping**: `StatefulApp.current_state: AppState`
 
 **Example (Contacts App)**:
 
@@ -77,7 +77,7 @@ $$\mathcal{S}_{\text{global}} = \{\texttt{Home}, \texttt{Contacts}, \texttt{Emai
 
 **Definition**: Which application is currently active (foreground).
 
-**PAS Mapping**: `StateAwareEnvironmentWrapper.active_app: App`
+**PARE Mapping**: `StateAwareEnvironmentWrapper.active_app: App`
 
 **Example**: $s_{\text{global}} = \texttt{Email}$ means the Email app is in foreground.
 
@@ -87,7 +87,7 @@ $$\mathcal{S}_{\text{db}} = \prod_{a \in \text{Apps}} \text{Data}(a)$$
 
 **Definition**: The persistent data across all applications.
 
-**PAS Mapping**: App backend data stores (e.g., `contacts_app._backend.contacts`)
+**PARE Mapping**: App backend data stores (e.g., `contacts_app._backend.contacts`)
 
 **Example**:
 
@@ -125,7 +125,7 @@ $\mathcal{H}_{\text{agent}}$: Agent-relevant history
 - Agent's own previous proposals
 - Recent environment notifications
 
-**PAS Mapping**:
+**PARE Mapping**:
 
 - Navigation: `StatefulApp.navigation_stack`
 - User actions: `UserActionLog` entries
@@ -163,7 +163,7 @@ $$\mathcal{A}_{\text{user}}: \mathcal{S}_{\text{app}} \times \mathcal{S}_{\text{
 
 $$a_{\text{user}}^t \in \mathcal{A}_{\text{user}}(s_{\text{app}}^t, s_{\text{global}}^t)$$
 
-**PAS Mapping**: `environment.get_user_tools()`
+**PARE Mapping**: `environment.get_user_tools()`
 
 **Example**:
 
@@ -187,7 +187,7 @@ $$\mathcal{A}_{\text{agent}} = \mathcal{A}_{\text{propose}} \cup \{\texttt{wait}
 
 where $\mathcal{A}_{\text{privileged}}$ includes all app tools without state constraints.
 
-**PAS Mapping**: `environment.get_tools()`
+**PARE Mapping**: `environment.get_tools()`
 
 **Example**:
 
@@ -202,7 +202,7 @@ $$T: \mathcal{S} \times \mathcal{A}_{\text{user}} \times \mathcal{A}_{\text{agen
 
 **Definition**: Given current state and joint action, produces next state. Base model is deterministic; stochastic extension supports tool failure probability.
 
-**PAS Mapping**: State transitions handled by `handle_state_transition()` in `StatefulApp`
+**PARE Mapping**: State transitions handled by `handle_state_transition()` in `StatefulApp`
 
 **Example**:
 
@@ -233,7 +233,7 @@ $$O_{\text{user}}: \mathcal{S} \rightarrow \Omega_{\text{user}}$$
 
 User observation depends only on current state.
 
-**PAS Mapping**: `CurrentAppStateLog`, `AvailableToolsLog`, `AgentMessageLog`, `EnvironmentNotificationLog`
+**PARE Mapping**: `CurrentAppStateLog`, `AvailableToolsLog`, `AgentMessageLog`, `EnvironmentNotificationLog`
 
 **Example**:
 
@@ -262,7 +262,7 @@ $$O_{\text{agent}}: \mathcal{S} \times \mathcal{A}_{\text{user}} \rightarrow \Om
 
 Agent observation depends on state **and** user's action (agent sees what user did).
 
-**PAS Mapping**: `UserActionLog`, `EnvironmentNotificationLog`
+**PARE Mapping**: `UserActionLog`, `EnvironmentNotificationLog`
 
 **Example**:
 
@@ -288,7 +288,7 @@ $$\mathcal{I} = \mathcal{I}_{\text{user}} \times \mathcal{I}_{\text{agent}}$$
 - $\mathcal{I}_{\text{user}}$: User's goal in natural language
 - $\mathcal{I}_{\text{agent}}$: Agent's objective (observe and assist)
 
-**PAS Mapping**: Scenario definitions in `PASScenario`
+**PARE Mapping**: Scenario definitions in `PAREScenario`
 
 **Example**:
 
@@ -303,7 +303,7 @@ I_agent = "Observe user actions and propose helpful interventions when appropria
 
 $$R: \mathcal{S} \times \mathcal{A}_{\text{user}} \times \mathcal{A}_{\text{agent}} \rightarrow \mathbb{R}^2$$
 
-**Definition**: PAS uses a dual reward structure:
+**Definition**: PARE uses a dual reward structure:
 
 $$R(s, a_{\text{user}}, a_{\text{agent}}) = (R_{\text{success}}(s), R_{\text{proposal}}(a_{\text{user}}, a_{\text{agent}}))$$
 
@@ -317,7 +317,7 @@ $$R_{\text{success}}(s) = \begin{cases} 1 & \text{if } s_{\text{db}} \models \ph
 
 where $\phi_{\text{goal}}$ is the goal predicate from the scenario oracle.
 
-**PAS Mapping**: `scenario.validate(env)`
+**PARE Mapping**: `scenario.validate(env)`
 
 **Example**: For "create calendar event" task:
 
@@ -335,7 +335,7 @@ $$R_{\text{proposal}}(a_{\text{user}}, a_{\text{agent}}) = \begin{cases}
 0 & \text{otherwise}
 \end{cases}$$
 
-**PAS Mapping**: Computed from `proposal_count` and `acceptance_count`
+**PARE Mapping**: Computed from `proposal_count` and `acceptance_count`
 
 **Example**:
 
@@ -349,7 +349,7 @@ $$R_{\text{proposal}}(a_{\text{user}}, a_{\text{agent}}) = \begin{cases}
 
 $$\gamma \in [0, 1]$$
 
-**PAS Setting**: $\gamma = 1$ (undiscounted) since episodes have bounded length via `max_turns`.
+**PARE Setting**: $\gamma = 1$ (undiscounted) since episodes have bounded length via `max_turns`.
 
 ---
 
@@ -398,7 +398,7 @@ $$G = \sum_{t=0}^{T} \gamma^t R_{\text{proposal}}(a_{\text{user}}^t, a_{\text{ag
 
 ## 5. Summary
 
-| Component | Symbol | Type | PAS Implementation |
+| Component | Symbol | Type | PARE Implementation |
 |-----------|--------|------|-------------------|
 | Agents | $\mathcal{N}$ | Set | `{UserAgent, ProactiveAgent}` |
 | App State | $\mathcal{S}_{\text{app}}$ | Finite | `StatefulApp.current_state` |
@@ -410,6 +410,6 @@ $$G = \sum_{t=0}^{T} \gamma^t R_{\text{proposal}}(a_{\text{user}}^t, a_{\text{ag
 | Transition | $T$ | Deterministic | `handle_state_transition()` |
 | User Obs | $O_{\text{user}}(s)$ | Function of $s$ | Agent logs |
 | Agent Obs | $O_{\text{agent}}(s, a_{\text{user}})$ | Function of $s$, $a_{\text{user}}$ | Agent logs |
-| Instructions | $\mathcal{I}$ | Natural language | `PASScenario` |
+| Instructions | $\mathcal{I}$ | Natural language | `PAREScenario` |
 | Success Reward | $R_{\text{success}}$ | $\{0, 1\}$ | `scenario.validate()` |
 | Proposal Reward | $R_{\text{proposal}}$ | $\{-1, 0, 1\}$ | acceptance tracking |

@@ -1,7 +1,7 @@
 # Stateful Apartment App
 
-`pas.apps.apartment.app.StatefulApartmentApp` extends the Meta-ARE
-`ApartmentListingApp` with PAS navigation support.
+`pare.apps.apartment.app.StatefulApartmentApp` extends the Meta-ARE
+`ApartmentListingApp` with PARE navigation support.
 It launches in `ApartmentHome` and transitions between home, search,
 favorites, and detail views based on completed apartment backend operations.
 
