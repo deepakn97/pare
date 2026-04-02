@@ -1,12 +1,12 @@
-# Dec-POMDP Formulation for PARE
+# Stackelberg POMDP Formulation for PARE
 
 ## 1. Overview
 
-The Proactive Agent Sandbox (PARE) models a two-agent system where a **User** interacts with mobile applications while a **Proactive Agent** observes user behavior and proposes helpful interventions. We formalize this as a **Decentralized Partially Observable Markov Decision Process (Dec-POMDP)** with asymmetric information, state-dependent action spaces, and Stackelberg turn structure.
+The Proactive Agent Research Environment (PARE) models a two-agent system where a **User** interacts with mobile applications while a **Proactive Agent** observes user behavior and proposes helpful interventions. We formalize this as a **Stackelberg POMDP** with asymmetric information, state-dependent action spaces, and leader-follower turn structure.
 
 ### Key Characteristics
 
-- **Asymmetric agents**: User has state-constrained actions; agent has privileged access
+- **Asymmetric agents**: User (leader) has state-constrained actions; agent (follower) has privileged access
 - **Partial observability**: Agents receive different observations of the same state
 - **Stackelberg turns**: Within each turn, user acts first, agent observes user action, then agent acts
 - **Dual rewards**: Task success (terminal) + proposal acceptance (per-step)
@@ -15,21 +15,21 @@ The Proactive Agent Sandbox (PARE) models a two-agent system where a **User** in
 
 ## 2. Formal Definition
 
-A PARE Dec-POMDP is defined by the tuple:
+A PARE Stackelberg POMDP is defined by the tuple:
 
-$$\mathcal{M} = \langle \mathcal{N}, \mathcal{S}, \{\mathcal{A}_i\}_{i \in \mathcal{N}}, T, R, \{\Omega_i\}_{i \in \mathcal{N}}, \{O_i\}_{i \in \mathcal{N}}, \mathcal{I}, \gamma \rangle$$
+$$\mathcal{M} = \langle \mathcal{N}, \mathcal{S}, \{\mathcal{A}_i\}_{i \in \mathcal{N}}, T, R, \{\mathcal{O}_i\}_{i \in \mathcal{N}}, \mathcal{I} \rangle$$
+
+where $\mathcal{N} = \{\mathbf{U}, \mathbf{A}\}$ denotes the user (leader) and the proactive agent (follower).
 
 | Symbol | Name | Description |
 |--------|------|-------------|
-| $\mathcal{N}$ | Agent set | Set of agents |
+| $\mathcal{N}$ | Agent set | $\{\mathbf{U}, \mathbf{A}\}$ -- user and proactive agent |
 | $\mathcal{S}$ | State space | Global environment state |
 | $\mathcal{A}_i$ | Action space | Actions available to agent $i$ |
 | $T$ | Transition function | State dynamics |
 | $R$ | Reward function | Reward signal |
-| $\Omega_i$ | Observation space | What agent $i$ can observe |
-| $O_i$ | Observation function | How observations are generated for agent $i$ |
+| $\mathcal{O}_i$ | Observation space | What agent $i$ can observe |
 | $\mathcal{I}$ | Instruction space | Task specifications for agents |
-| $\gamma$ | Discount factor | Future reward discounting |
 
 ---
 
@@ -37,14 +37,14 @@ $$\mathcal{M} = \langle \mathcal{N}, \mathcal{S}, \{\mathcal{A}_i\}_{i \in \math
 
 ### 3.1 Agent Set $\mathcal{N}$
 
-$$\mathcal{N} = \{\text{user}, \text{agent}\}$$
+$$\mathcal{N} = \{\mathbf{U}, \mathbf{A}\}$$
 
-**Definition**: The set of decision-making entities in the environment.
+**Definition**: The set of decision-making entities in the environment. $\mathbf{U}$ is the leader (acts first), $\mathbf{A}$ is the follower (observes user action before acting).
 
 **PARE Mapping**:
 
-- `user`: Simulated by `UserAgent` - interacts with apps to accomplish tasks
-- `agent`: Implemented by `ProactiveAgent` - observes user and proposes interventions
+- $\mathbf{U}$: Simulated by `UserAgent` - interacts with apps to accomplish tasks
+- $\mathbf{A}$: Implemented by `ProactiveAgent` - observes user and proposes interventions
 
 **Example**: In a "schedule meeting" scenario:
 
@@ -107,19 +107,19 @@ s_db = {
 
 #### 3.2.4 History State $\mathcal{S}_{\text{history}}$
 
-$$\mathcal{S}_{\text{history}} = \mathcal{H}_{\text{user}} \times \mathcal{H}_{\text{agent}}$$
+$$\mathcal{S}_{\text{history}} = \mathcal{H}_\mathbf{U} \times \mathcal{H}_\mathbf{A}$$
 
 **Definition**: Truncated, bounded view of past events relevant to each agent's decision-making. Since history is truncated (finite window), $|\mathcal{S}_{\text{history}}|$ is bounded, preserving the Markov property.
 
 **Components**:
 
-$\mathcal{H}_{\text{user}}$: User-relevant history
+$\mathcal{H}_\mathbf{U}$: User-relevant history
 
 - Navigation stack for `go_back()` functionality
 - Most recent agent proposal (if any)
 - Recent environment notifications
 
-$\mathcal{H}_{\text{agent}}$: Agent-relevant history
+$\mathcal{H}_\mathbf{A}$: Agent-relevant history
 
 - Recent user actions (truncated window)
 - Agent's own previous proposals
@@ -136,12 +136,12 @@ $\mathcal{H}_{\text{agent}}$: Agent-relevant history
 
 ```
 s_history = (
-    h_user: {
+    h_U: {
         nav_stack: [ContactsList],
         pending_proposal: "Create calendar event for meeting?",
         env_notifs: ["New email from alice@example.com"]
     },
-    h_agent: {
+    h_A: {
         user_actions: ["open_app(email)", "search_emails('meeting')", "open_email('E001')"],
         last_proposal: "Create calendar event for meeting?",
         env_notifs: ["Reminder: Meeting at 2pm"]
@@ -153,44 +153,46 @@ s_history = (
 
 ### 3.3 Action Spaces $\mathcal{A}_i$
 
-#### 3.3.1 User Action Space $\mathcal{A}_{\text{user}}$
+#### 3.3.1 User Action Space $\mathcal{A}_\mathbf{U}$
 
-$$\mathcal{A}_{\text{user}}: \mathcal{S}_{\text{app}} \times \mathcal{S}_{\text{global}} \rightarrow 2^{\mathcal{A}_{\text{user}}^{\text{all}}}$$
+$$\mathcal{A}_\mathbf{U}: \mathcal{S}_{\text{app}} \times \mathcal{S}_{\text{global}} \rightarrow 2^{\mathcal{A}_\mathbf{U}^{\text{all}}}$$
 
 **Definition**: The user's available actions depend on the current app state. This is a **state-dependent action space**.
 
 **Constraint**: At state $s$, user must select from valid actions:
 
-$$a_{\text{user}}^t \in \mathcal{A}_{\text{user}}(s_{\text{app}}^t, s_{\text{global}}^t)$$
+$$a_\mathbf{U}^t \in \mathcal{A}_\mathbf{U}(s_{\text{app}}^t, s_{\text{global}}^t)$$
+
+When a proposal from the agent is pending, the user's action space is augmented with $\texttt{accept\_proposal}$ and $\texttt{reject\_proposal}$.
 
 **PARE Mapping**: `environment.get_user_tools()`
 
 **Example**:
 
-| State | Available Actions $\mathcal{A}_{\text{user}}(s)$ |
+| State | Available Actions $\mathcal{A}_\mathbf{U}(s)$ |
 |-------|--------------------------------------------------|
 | $s_{\text{app}} = \texttt{Home}$ | `{open_app(contacts), open_app(email), open_app(calendar), ...}` |
 | $s_{\text{app}} = \texttt{ContactsList}$ | `{list_contacts(), search_contacts(), open_contact(), create_contact(), go_home(), switch_app()}` |
 | $s_{\text{app}} = \texttt{ContactDetail(C001)}$ | `{view_contact(), start_edit(), delete_contact(), go_back(), go_home()}` |
-| Any state + pending proposal | Above $\cup$ `{accept, reject}` |
+| Any state + pending proposal | Above $\cup$ `{accept_proposal, reject_proposal}` |
 
-#### 3.3.2 Proactive Agent Action Space $\mathcal{A}_{\text{agent}}$
+#### 3.3.2 Proactive Agent Action Space $\mathcal{A}_\mathbf{A}$
 
-$$\mathcal{A}_{\text{agent}} = \mathcal{A}_{\text{propose}} \cup \{\texttt{wait}\}$$
+$$\mathcal{A}_\mathbf{A} = \mathcal{A}_{\text{read}} \cup \mathcal{A}_{\text{propose}} \cup \{\texttt{wait}\}$$
 
 **Definition**: The agent's action space is **state-independent** (privileged access).
 
 **Components**:
 
-- $\mathcal{A}_{\text{propose}} = \{\texttt{propose}(a) \mid a \in \mathcal{A}_{\text{privileged}}\}$: Propose executing a tool
-- $\texttt{wait}$: Take no action this turn
-
-where $\mathcal{A}_{\text{privileged}}$ includes all app tools without state constraints.
+- $\mathcal{A}_{\text{read}}$: Read-only queries across all apps for information gathering
+- $\mathcal{A}_{\text{propose}} = \{\texttt{propose}(a) \mid a \in \mathcal{A}_{\text{privileged}}\}$: Propose a task to the user
+- $\texttt{wait}$: Continue observation without intervention
 
 **PARE Mapping**: `environment.get_tools()`
 
 **Example**:
 
+- $\texttt{list\_emails}(\text{folder="INBOX"})$ (read action)
 - $\texttt{propose}(\texttt{create\_calendar\_event}(\text{title="Meeting", time="2pm"}))$
 - $\texttt{wait}$
 
@@ -198,7 +200,7 @@ where $\mathcal{A}_{\text{privileged}}$ includes all app tools without state con
 
 ### 3.4 Transition Function $T$
 
-$$T: \mathcal{S} \times \mathcal{A}_{\text{user}} \times \mathcal{A}_{\text{agent}} \rightarrow \mathcal{S}$$
+$$T: \mathcal{S} \times \mathcal{A}_\mathbf{U} \times \mathcal{A}_\mathbf{A} \rightarrow \mathcal{S}$$
 
 **Definition**: Given current state and joint action, produces next state. Base model is deterministic; stochastic extension supports tool failure probability.
 
@@ -208,37 +210,33 @@ $$T: \mathcal{S} \times \mathcal{A}_{\text{user}} \times \mathcal{A}_{\text{agen
 
 Initial: $s = (\texttt{ContactsList}, \texttt{Contacts}, \{...\}, ([], \emptyset, []))$
 
-Action: $a_{\text{user}} = \texttt{open\_contact}(\text{"C001"})$, $a_{\text{agent}} = \texttt{wait}$
+Action: $a_\mathbf{U} = \texttt{open\_contact}(\text{"C001"})$, $a_\mathbf{A} = \texttt{wait}$
 
 Result: $s' = (\texttt{ContactDetail("C001")}, \texttt{Contacts}, \{...\}, ([\texttt{ContactsList}], \emptyset, [...]))$
 
 ---
 
-### 3.5 Observation Spaces $\Omega_i$ and Functions $O_i$
+### 3.5 Observation Spaces $\mathcal{O}_i$
 
-#### 3.5.1 User Observation Space $\Omega_{\text{user}}$
+#### 3.5.1 User Observation $\mathcal{O}_\mathbf{U}$
 
-$$\Omega_{\text{user}} = \mathcal{O}_{\text{screen}} \times \mathcal{O}_{\text{tools}} \times \mathcal{O}_{\text{proposals}} \times \mathcal{O}_{\text{env}}$$
+$$\mathcal{O}_\mathbf{U}(s) = (\mathcal{O}_{\text{screen}}, \mathcal{O}_{\text{tools}}, \mathcal{O}_{\text{proposals}}, \mathcal{O}_{\text{env}})$$
+
+The user's observation is a function of the current state only.
 
 **Components**:
 
 - $\mathcal{O}_{\text{screen}}$: Current app and state information
 - $\mathcal{O}_{\text{tools}}$: Available actions with descriptions
 - $\mathcal{O}_{\text{proposals}}$: Pending proposal from agent (if any)
-- $\mathcal{O}_{\text{env}}$: Environment notifications
-
-**User Observation Function**:
-
-$$O_{\text{user}}: \mathcal{S} \rightarrow \Omega_{\text{user}}$$
-
-User observation depends only on current state.
+- $\mathcal{O}_{\text{env}}$: Environment notifications (truncated -- e.g., new email shows sender and subject, not full content)
 
 **PARE Mapping**: `CurrentAppStateLog`, `AvailableToolsLog`, `AgentMessageLog`, `EnvironmentNotificationLog`
 
 **Example**:
 
 ```
-o_user = O_user(s) = (
+O_U(s) = (
     screen: "Email -> MailboxView(INBOX)",
     tools: ["list_emails()", "search_emails()", "open_email()", ...],
     proposal: "Agent suggests: Create calendar event for meeting?",
@@ -246,9 +244,11 @@ o_user = O_user(s) = (
 )
 ```
 
-#### 3.5.2 Agent Observation Space $\Omega_{\text{agent}}$
+#### 3.5.2 Agent Observation $\mathcal{O}_\mathbf{A}$
 
-$$\Omega_{\text{agent}} = \mathcal{O}_{\text{user\_actions}} \times \mathcal{O}_{\text{env}} \times \mathcal{O}_{\text{proposal\_response}}$$
+$$\mathcal{O}_\mathbf{A}(s, a_\mathbf{U}) = (\mathcal{O}_{\text{user\_actions}}, \mathcal{O}_{\text{env}}, \mathcal{O}_{\text{proposal\_response}})$$
+
+The agent's observation is a function of both the state **and** the user's action, reflecting the Stackelberg structure.
 
 **Components**:
 
@@ -256,18 +256,12 @@ $$\Omega_{\text{agent}} = \mathcal{O}_{\text{user\_actions}} \times \mathcal{O}_
 - $\mathcal{O}_{\text{env}}$: Environment notifications
 - $\mathcal{O}_{\text{proposal\_response}}$: User's response to last proposal (if any)
 
-**Agent Observation Function**:
-
-$$O_{\text{agent}}: \mathcal{S} \times \mathcal{A}_{\text{user}} \rightarrow \Omega_{\text{agent}}$$
-
-Agent observation depends on state **and** user's action (agent sees what user did).
-
 **PARE Mapping**: `UserActionLog`, `EnvironmentNotificationLog`
 
 **Example**:
 
 ```
-o_agent = O_agent(s, a_user) = (
+O_A(s, a_U) = (
     user_action: "open_email(id='E001')",
     user_action_history: ["open_app(email)", "search_emails('meeting')"],
     env: ["[09:55] Reminder: Meeting at 2pm"],
@@ -279,41 +273,41 @@ o_agent = O_agent(s, a_user) = (
 
 ### 3.6 Instruction Space $\mathcal{I}$
 
-$$\mathcal{I} = \mathcal{I}_{\text{user}} \times \mathcal{I}_{\text{agent}}$$
+$$\mathcal{I} = \mathcal{I}_\mathbf{U} \times \mathcal{I}_\mathbf{A}$$
 
 **Definition**: Task specifications provided to each agent at episode start. Instructions are part of policy conditioning.
 
 **Components**:
 
-- $\mathcal{I}_{\text{user}}$: User's goal in natural language
-- $\mathcal{I}_{\text{agent}}$: Agent's objective (observe and assist)
+- $\mathcal{I}_\mathbf{U}$: User's goal in natural language
+- $\mathcal{I}_\mathbf{A}$: Agent's objective (observe and assist)
 
 **PARE Mapping**: Scenario definitions in `PAREScenario`
 
 **Example**:
 
 ```
-I_user = "You received an email about a meeting with Alice. Schedule it on your calendar."
-I_agent = "Observe user actions and propose helpful interventions when appropriate."
+I_U = "You received an email about a meeting with Alice. Schedule it on your calendar."
+I_A = "Observe user actions and propose helpful interventions when appropriate."
 ```
 
 ---
 
 ### 3.7 Reward Function $R$
 
-$$R: \mathcal{S} \times \mathcal{A}_{\text{user}} \times \mathcal{A}_{\text{agent}} \rightarrow \mathbb{R}^2$$
+$$R: \mathcal{S} \times \mathcal{A}_\mathbf{U} \times \mathcal{A}_\mathbf{A} \rightarrow \mathbb{R}^2$$
 
 **Definition**: PARE uses a dual reward structure:
 
-$$R(s, a_{\text{user}}, a_{\text{agent}}) = (R_{\text{success}}(s), R_{\text{proposal}}(a_{\text{user}}, a_{\text{agent}}))$$
+$$R(s, a_\mathbf{U}, a_\mathbf{A}) = (R_\textrm{Succeed}(s), R_\textrm{Accept}(a_\mathbf{U}, a_\mathbf{A}))$$
 
-#### 3.7.1 Success Reward $R_{\text{success}}$
+#### 3.7.1 Success Reward $R_\textrm{Succeed}$
 
-$$R_{\text{success}}: \mathcal{S} \rightarrow \{0, 1\}$$
+$$R_\textrm{Succeed}: \mathcal{S} \rightarrow \{0, 1\}$$
 
-Terminal reward indicating task goal achievement:
+Terminal reward indicating whether the user's goals $\mathcal{G}_\mathbf{U}$ are fulfilled in the final environment state, as verified by the scenario oracle:
 
-$$R_{\text{success}}(s) = \begin{cases} 1 & \text{if } s_{\text{db}} \models \phi_{\text{goal}} \\ 0 & \text{otherwise} \end{cases}$$
+$$R_\textrm{Succeed}(s) = \begin{cases} 1 & \text{if } s_{\text{db}} \models \phi_{\text{goal}} \\ 0 & \text{otherwise} \end{cases}$$
 
 where $\phi_{\text{goal}}$ is the goal predicate from the scenario oracle.
 
@@ -323,15 +317,15 @@ where $\phi_{\text{goal}}$ is the goal predicate from the scenario oracle.
 
 $$\phi_{\text{goal}} = \exists e \in \text{CalendarEvents}: e.\text{title} = \text{"Meeting"} \land e.\text{time} = \text{"2pm"}$$
 
-#### 3.7.2 Proposal Reward $R_{\text{proposal}}$
+#### 3.7.2 Acceptance Reward $R_\textrm{Accept}$
 
-$$R_{\text{proposal}}: \mathcal{A}_{\text{user}} \times \mathcal{A}_{\text{agent}} \rightarrow \{-1, 0, 1\}$$
+$$R_\textrm{Accept}: \mathcal{A}_\mathbf{U} \times \mathcal{A}_\mathbf{A} \rightarrow \{-1, 0, 1\}$$
 
 Per-step reward for proposal quality:
 
-$$R_{\text{proposal}}(a_{\text{user}}, a_{\text{agent}}) = \begin{cases}
-+1 & \text{if } a_{\text{agent}} = \texttt{propose}(\cdot) \land a_{\text{user}} = \texttt{accept} \\
--1 & \text{if } a_{\text{agent}} = \texttt{propose}(\cdot) \land a_{\text{user}} = \texttt{reject} \\
+$$R_\textrm{Accept}(a_\mathbf{U}, a_\mathbf{A}) = \begin{cases}
++1 & \text{if } a_\mathbf{A} = \texttt{propose}(\cdot) \land a_\mathbf{U} = \texttt{accept} \\
+-1 & \text{if } a_\mathbf{A} = \texttt{propose}(\cdot) \land a_\mathbf{U} = \texttt{reject} \\
 0 & \text{otherwise}
 \end{cases}$$
 
@@ -339,17 +333,9 @@ $$R_{\text{proposal}}(a_{\text{user}}, a_{\text{agent}}) = \begin{cases}
 
 **Example**:
 
-- Agent proposes calendar event, user accepts: $R_{\text{proposal}} = +1$
-- Agent proposes irrelevant action, user rejects: $R_{\text{proposal}} = -1$
-- Agent waits (no proposal): $R_{\text{proposal}} = 0$
-
----
-
-### 3.8 Discount Factor $\gamma$
-
-$$\gamma \in [0, 1]$$
-
-**PARE Setting**: $\gamma = 1$ (undiscounted) since episodes have bounded length via `max_turns`.
+- Agent proposes calendar event, user accepts: $R_\textrm{Accept} = +1$
+- Agent proposes irrelevant action, user rejects: $R_\textrm{Accept} = -1$
+- Agent waits (no proposal): $R_\textrm{Accept} = 0$
 
 ---
 
@@ -358,28 +344,28 @@ $$\gamma \in [0, 1]$$
 ### 4.1 Initialization
 
 1. Sample initial state $s^0 \sim P_0(\mathcal{S})$ from scenario definition
-2. Provide instructions $I = (I_{\text{user}}, I_{\text{agent}}) \in \mathcal{I}$
+2. Provide instructions $I = (I_\mathbf{U}, I_\mathbf{A}) \in \mathcal{I}$
 
 ### 4.2 Turn Structure (Stackelberg)
 
-Each turn $t$ follows a **sequential structure** where the agent observes the user's action before acting:
+Each turn $t$ follows the Stackelberg structure: the user acts first, the agent observes the user's action, then the agent acts:
 
 ```
 Turn t:
 +---------------------------------------------------------------------------+
-|  USER PHASE                                                               |
-|  1. o_user^t = O_user(s^t)                                                |
-|  2. a_user^t ~ pi_user(. | o_user^t, h_user^t, I_user)                    |
-|         subject to: a_user^t in A_user(s_app^t, s_global^t)               |
+|  USER PHASE (Leader)                                                      |
+|  1. o_U^t = O_U(s^t)                                                     |
+|  2. a_U^t ~ pi_U(. | o_U^t, h_U^t, I_U)                                 |
+|         subject to: a_U^t in A_U(s_app^t, s_global^t)                    |
 +---------------------------------------------------------------------------+
-|  AGENT PHASE                                                              |
-|  3. o_agent^t = O_agent(s^t, a_user^t)     <- agent sees user's action    |
-|  4. a_agent^t ~ pi_agent(. | o_agent^t, h_agent^t, I_agent)               |
+|  AGENT PHASE (Follower)                                                   |
+|  3. o_A^t = O_A(s^t, a_U^t)            <- agent sees user's action       |
+|  4. a_A^t ~ pi_A(. | o_A^t, h_A^t, I_A)                                 |
 +---------------------------------------------------------------------------+
 |  ENVIRONMENT UPDATE                                                       |
-|  5. s^{t+1} = T(s^t, a_user^t, a_agent^t)                                 |
-|  6. r^t = R(s^t, a_user^t, a_agent^t)                                     |
-|  7. Update histories: h_i^{t+1} = update(h_i^t, o_i^t, a_i^t)             |
+|  5. s^{t+1} = T(s^t, a_U^t, a_A^t)                                      |
+|  6. r^t = R(s^t, a_U^t, a_A^t)                                           |
+|  7. Update histories: h_i^{t+1} = update(h_i^t, o_i^t, a_i^t)           |
 +---------------------------------------------------------------------------+
 ```
 
@@ -392,7 +378,7 @@ Episode ends when:
 
 ### 4.4 Cumulative Return
 
-$$G = \sum_{t=0}^{T} \gamma^t R_{\text{proposal}}(a_{\text{user}}^t, a_{\text{agent}}^t) + R_{\text{success}}(s^T)$$
+$$G = \sum_{t=0}^{T} R_\textrm{Accept}(a_\mathbf{U}^t, a_\mathbf{A}^t) + R_\textrm{Succeed}(s^T)$$
 
 ---
 
@@ -400,16 +386,16 @@ $$G = \sum_{t=0}^{T} \gamma^t R_{\text{proposal}}(a_{\text{user}}^t, a_{\text{ag
 
 | Component | Symbol | Type | PARE Implementation |
 |-----------|--------|------|-------------------|
-| Agents | $\mathcal{N}$ | Set | `{UserAgent, ProactiveAgent}` |
+| Agents | $\mathcal{N} = \{\mathbf{U}, \mathbf{A}\}$ | Set | `{UserAgent, ProactiveAgent}` |
 | App State | $\mathcal{S}_{\text{app}}$ | Finite | `StatefulApp.current_state` |
 | Global State | $\mathcal{S}_{\text{global}}$ | Finite | `env.active_app` |
 | Database | $\mathcal{S}_{\text{db}}$ | Structured | App backends |
 | History | $\mathcal{S}_{\text{history}}$ | Bounded | Logs, nav stack |
-| User Actions | $\mathcal{A}_{\text{user}}(s)$ | State-dependent | `env.get_user_tools()` |
-| Agent Actions | $\mathcal{A}_{\text{agent}}$ | Fixed | `{propose(...), wait}` |
+| User Actions | $\mathcal{A}_\mathbf{U}(s)$ | State-dependent | `env.get_user_tools()` |
+| Agent Actions | $\mathcal{A}_\mathbf{A}$ | Fixed | `{read(...), propose(...), wait}` |
 | Transition | $T$ | Deterministic | `handle_state_transition()` |
-| User Obs | $O_{\text{user}}(s)$ | Function of $s$ | Agent logs |
-| Agent Obs | $O_{\text{agent}}(s, a_{\text{user}})$ | Function of $s$, $a_{\text{user}}$ | Agent logs |
+| User Obs | $\mathcal{O}_\mathbf{U}(s)$ | Function of $s$ | Agent logs |
+| Agent Obs | $\mathcal{O}_\mathbf{A}(s, a_\mathbf{U})$ | Function of $s$, $a_\mathbf{U}$ | Agent logs |
 | Instructions | $\mathcal{I}$ | Natural language | `PAREScenario` |
-| Success Reward | $R_{\text{success}}$ | $\{0, 1\}$ | `scenario.validate()` |
-| Proposal Reward | $R_{\text{proposal}}$ | $\{-1, 0, 1\}$ | acceptance tracking |
+| Success Reward | $R_\textrm{Succeed}$ | $\{0, 1\}$ | `scenario.validate()` |
+| Acceptance Reward | $R_\textrm{Accept}$ | $\{-1, 0, 1\}$ | acceptance tracking |

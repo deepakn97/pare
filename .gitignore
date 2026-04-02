@@ -222,7 +222,7 @@ traces/
 results/
 analyses/
 uv.lock
-docs/_plans/paper
+docs/_plans/
 
 # Personal notes (not for version control)
 personal_notes/

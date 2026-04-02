@@ -10,8 +10,7 @@ copyright: Maintained by <a href="https://deepakn97.com">deepakn97</a>.
 nav:
   - Home: index.md
   - Getting Started:
-      - Running Local LLM Models Guide: run_local_llm_model.md
-      - Dec-POMDP Formulation: dec_pomdp_formulation.md
+      - Stackelberg POMDP Formulation: stackelberg_pomdp_formulation.md
   - Architecture:
       - Visual Overview: architecture_visual.md
       - Runtime Execution Flow: runtime_execution_flow.md
