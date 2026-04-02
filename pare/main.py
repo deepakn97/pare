@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from pare.cli import annotation, benchmark, cache
+from pare.cli import annotation, benchmark, cache, scenarios
 
 app = typer.Typer(
     name="pare",
@@ -16,6 +16,7 @@ app = typer.Typer(
 app.add_typer(annotation.app, name="annotation")
 app.add_typer(benchmark.app, name="benchmark")
 app.add_typer(cache.app, name="cache")
+app.add_typer(scenarios.app, name="scenarios")
 
 
 def main() -> None:

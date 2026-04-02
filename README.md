@@ -37,11 +37,25 @@ This will:
 - Create a virtual environment using uv
 - Install all dependencies from `pyproject.toml`
 - Install pre-commit hooks for code quality checks
+- Install the `pare` CLI entrypoint into the project environment
 
 3. Verify installation:
 ```bash
 make check  # Run linting, type checking, and dependency checks
 make test   # Run test suite
+```
+
+4. Run the CLI:
+```bash
+uv run pare --help
+uv run pare scenarios list
+```
+
+If you prefer an activated shell instead of `uv run`, use:
+
+```bash
+source .venv/bin/activate
+pare --help
 ```
 
 ## Development
