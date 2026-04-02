@@ -1,105 +1,132 @@
-# Contributing to `pare`
+# Contributing to PARE
 
-# Get Started!
+## Development Setup
 
-Ready to contribute? Here's how to set up the Proactive Agent Sandbox (`pare`) for local development.
-Please note this documentation assumes you already have `uv` and `Git` installed and ready to go.
+### Prerequisites
 
-1. Fork the `pare` repo on GitHub.
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv) package manager
+- [Git](https://git-scm.com/)
+
+### Getting Started
+
+1. Fork the [PARE repo](https://github.com/deepakn97/pare) on GitHub.
 
 2. Clone your fork locally:
 
 ```bash
-cd <directory_in_which_repo_should_be_created>
 git clone git@github.com:YOUR_NAME/pare.git
-```
-
-3. Now we need to install the environment. Navigate into the directory
-
-```bash
 cd pare
 ```
 
-Then, install and activate the environment with:
+3. Install the environment and pre-commit hooks:
 
 ```bash
-uv sync
+make install
 ```
 
-4. Install pre-commit to run linters/formatters at commit time:
+This will:
+- Create a virtual environment using uv
+- Install all dependencies from `pyproject.toml`
+- Install pre-commit hooks for code quality checks
 
-```bash
-uv run pre-commit install
-```
-
-5. Create a branch for local development:
+4. Create a branch for your work:
 
 ```bash
 git checkout -b name-of-your-bugfix-or-feature
 ```
 
-Now you can make your changes locally.
+## Development Workflow
 
-6. Don't forget to add test cases for your added functionality to the `tests` directory.
-
-7. When you're done making changes, check that your changes pass the formatting tests.
+### Running Code Quality Checks
 
 ```bash
 make check
 ```
 
-Now, validate that all unit tests are passing:
+This runs:
+- `uv lock --locked` -- verify lock file consistency
+- `pre-commit run -a` -- run all pre-commit hooks (ruff linting and formatting)
+- `mypy` -- static type checking (strict mode)
+- `deptry` -- check for dependency issues
+
+### Running Tests
 
 ```bash
 make test
 ```
 
-9. Before raising a pull request you should also run tox.
-   This will run the tests across different versions of Python:
+Run tests with a detailed coverage report:
 
 ```bash
-tox
+uv run pytest --cov --cov-report=html --cov-report=term-missing
+open htmlcov/index.html  # View coverage in browser
 ```
 
-This requires you to have multiple versions of python installed.
-This step is also triggered in the CI/CD pipeline, so you could also choose to skip this step locally.
-
-10. Commit your changes and push your branch to GitHub:
+### Building Documentation
 
 ```bash
-git add .
-git commit -m "Your detailed description of your changes."
-git push origin name-of-your-bugfix-or-feature
+make docs-test    # Build docs and check for warnings/errors
+make docs-serve   # Serve docs locally at http://127.0.0.1:8000
 ```
 
-11. Submit a pull request through the GitHub website.
+## Project Structure
 
-# Code Style Guidelines
+```
+pare/
+  agents/          # User and proactive agent implementations
+  apps/            # 9 domain apps + 2 core system apps (FSM-based)
+  annotation/      # Human evaluation pipeline
+  benchmark/       # Benchmark execution and reporting
+  cli/             # CLI commands (benchmark, annotation, cache)
+  data_handler/    # Trace export
+  scenarios/       # 143 benchmark scenarios + scenario infrastructure
+  scenario_generator/  # LLM-driven scenario generation
+tests/             # Unit and integration tests
+docs/              # MkDocs documentation source
+data/              # Benchmark splits and augmentation data
+```
 
-When contributing to this project, please follow these coding conventions:
+## Code Style Guidelines
 
-1. **Use f-strings for all string formatting and manipulation**
-   - Use f-strings instead of `%` formatting or `.format()`
-   - Examples:
-     ```python
-     # Good
-     logger.debug(f"Processing {count} items from {source}")
-     message = f"User {user.name} completed task {task.id}"
+### Python
 
-     # Avoid
-     logger.debug("Processing %d items from %s", count, source)
-     message = "User {} completed task {}".format(user.name, task.id)
-     ```
+- **Use f-strings** for all string formatting (never `%` or `.format()`)
+- **Google-style docstrings** for all public functions and classes
+- **Type annotations** on all function signatures -- avoid `Any`, use precise types (`object`, `TypedDict`, etc.)
+- Follow existing patterns in the codebase for consistency
 
-2. **Follow existing patterns in the codebase**
-   - Check similar files for conventions before implementing new features
-   - Maintain consistency with Meta-ARE base framework patterns
+### Linting and Formatting
 
-# Pull Request Guidelines
+PARE uses [ruff](https://github.com/astral-sh/ruff) for linting and formatting, and [mypy](https://mypy-lang.org/) for static type checking. Both are enforced by pre-commit hooks and CI.
 
-Before you submit a pull request, check that it meets these guidelines:
+Key ruff settings:
+- Line length: 120 characters
+- Target: Python 3.12+
+- Docstring convention: Google style
 
-1. The pull request should include tests.
+### Commit Messages
 
-2. If the pull request adds functionality, the docs should be updated.
-   Put your new functionality into a function with a docstring, and add the feature to the list in `README.md`.
+Follow the [Conventional Commits](https://www.conventionalcommits.org/) format with module-level scopes:
+
+```
+feat(benchmark): add oracle-only execution mode
+fix(apps): handle missing navigation stack in go_back
+refactor(agents): simplify observe-execute state transitions
+docs(scenarios): document scenario metadata schema
+```
+
+Common scopes: `core`, `cli`, `apps`, `agents`, `benchmark`, `scenarios`, `annotation`, `cache`, `docs`.
+
+## Pull Request Guidelines
+
+1. The pull request should include tests for new functionality.
+2. If the pull request adds functionality, update the relevant documentation.
+3. Ensure all checks pass before requesting review:
+
+```bash
+make check
+make test
+```
+
+4. Follow the pull request template when creating your PR.

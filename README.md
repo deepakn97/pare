@@ -1,221 +1,161 @@
-# Proactive Agent Sandbox (PARE)
+<img src="docs/assets/pear.png" width="30" align="left" style="margin-right: 8px;"/> 
 
-[![Release](https://img.shields.io/github/v/release/deepakn97/pare)](https://img.shields.io/github/v/release/deepakn97/pare)
-[![Build status](https://img.shields.io/github/actions/workflow/status/deepakn97/pare/main.yml?branch=main)](https://github.com/deepakn97/pare/actions/workflows/main.yml?query=branch%3Amain)
+# PARE: Proactive Agent Research Environment
+
+[![arXiv](https://img.shields.io/badge/arXiv-2604.00842-b31b1b.svg?style=flat)](https://arxiv.org/abs/2604.00842)
 [![codecov](https://codecov.io/gh/deepakn97/pare/branch/main/graph/badge.svg)](https://codecov.io/gh/deepakn97/pare)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/deepakn97/pare)](https://img.shields.io/github/commit-activity/m/deepakn97/pare)
 [![License](https://img.shields.io/github/license/deepakn97/pare)](https://img.shields.io/github/license/deepakn97/pare)
 
-This repository contains code for the Proactive Goal Inference Agent project in collaboration with Apple.
+**PARE** is a Python research framework for evaluating proactive AI assistants through active user simulation. Built on top of [Meta-ARE](https://github.com/deepakn97/meta-are), it provides a realistic mobile-phone simulation environment where a proactive assistant must observe user behavior, infer goals, and intervene helpfully -- without being asked.
 
-PARE extends [Meta-ARE](https://github.com/deepakn97/meta-are) with state-based navigation architecture for mobile app simulation, enabling proactive agent research with context-aware action spaces.
+- **Paper**: [PARE: Simulating Active Users to Evaluate Proactive Assistants](https://arxiv.org/abs/2604.00842)
+- **Documentation**: [deepakn97.github.io/pare](https://deepakn97.github.io/pare/)
 
-- **Github repository**: <https://github.com/deepakn97/pare/>
-- **Documentation**: <https://deepakn97.github.io/pare/>
+## What is PARE?
 
-## Setup
+Proactive assistants need to decide *when* to help and *what* to do -- all from passively observing user activity. Evaluating this requires simulating realistic users in realistic environments, which is what PARE provides:
+
+- **9 domain apps** modeled as finite state machines: Apartment, Cab, Calendar, Contacts, Email, Messaging, Note, Reminder, and Shopping
+- **2 core system apps**: `HomeScreenSystemApp` for navigation (open, switch, go home) and `PAREAgentUserInterface` for proposal management (accept/reject)
+- **143 benchmark scenarios** spanning multi-app orchestration, goal inference, and intervention timing
+- **Observe-Execute agent architecture** with configurable models per stage
+- **Oracle validation** to automatically verify task completion
+
+<p align="center">
+  <img src="docs/assets/overview.png" width="90%" alt="PARE framework overview"/>
+</p>
+
+## How It Works
+
+PARE orchestrates a **two-agent simulation**: a *user agent* that navigates the phone realistically, and a *proactive agent* that observes and intervenes.
+
+The key insight is **asymmetric interfaces**. The user agent sees only the tools available on the current screen (just like a real user tapping through apps), while the proactive agent gets flat API access to all apps for efficient task execution. This forces realistic user behavior without handicapping the assistant.
+
+<p align="center">
+  <img src="docs/assets/tool_chain_comparison.png" width="85%" alt="FSM-based navigation vs flat API access"/>
+</p>
+<p align="center"><em>Sending a message requires navigating through screens for the user (right), but a single API call for the assistant (left).</em></p>
+
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.12 or higher
+- Python 3.12+
 - [uv](https://github.com/astral-sh/uv) package manager
 
 ### Installation
 
-1. Clone the repository:
 ```bash
 git clone git@github.com:deepakn97/pare.git
 cd pare
-```
-
-2. Install the environment and pre-commit hooks:
-```bash
 make install
 ```
 
-This will:
-- Create a virtual environment using uv
-- Install all dependencies from `pyproject.toml`
-- Install pre-commit hooks for code quality checks
+### Configure API Keys
 
-3. Verify installation:
+Copy the example environment file and fill in your API keys:
+
 ```bash
-make check  # Run linting, type checking, and dependency checks
-make test   # Run test suite
+cp .env.example .env
 ```
 
-## Development
-
-### Running Code Quality Checks
+Edit `.env` with the keys for the providers you plan to use:
 
 ```bash
-make check
+# Required for GPT models (gpt-5, gpt-5-mini, gpt-4o, etc.)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Required for Hugging Face model access
+HF_TOKEN=your_hf_token_here
+
+# Required for AWS Bedrock models (llama-4-scout, llama-4-maverick, etc.)
+AWS_ACCESS_KEY_ID=aws_access_key_id
+AWS_SECRET_ACCESS_KEY=secret_access_key_id
+AWS_REGION_NAME="us-east-1"
+# Or use the new Bedrock API key:
+AWS_BEARER_TOKEN_BEDROCK=new_aws_api_key_here
+
+# Scenario configuration (defaults to benchmark/)
+PARE_SCENARIOS_DIR=benchmark
+
+# Path to environment augmentation data (relative to project root)
+ENV_AUGMENTATION_DATA_PATH="data/metaare_augmentation_data.json"
 ```
 
-This runs:
-- `uv lock --locked` - Verify lock file consistency
-- `pre-commit run -a` - Run all pre-commit hooks (ruff, mypy, etc.)
-- `mypy` - Static type checking
-- `deptry` - Check for dependency issues
-
-### Running Tests
+### Run a Single Scenario
 
 ```bash
-make test
+pare benchmark sweep -s email_notification -om gpt-5 -em gpt-5
 ```
 
-Run tests with coverage report:
+### Run the Full Benchmark
+
 ```bash
-uv run pytest --cov --cov-report=html --cov-report=term-missing
-open htmlcov/index.html  # View coverage in browser
+pare benchmark sweep --split full -om gpt-5 -em gpt-5 --runs 3
 ```
 
-This requires the corresponding Python interpreters to be available locally; if
-they are missing, rely on the CI job instead.
+### Model Sweep
 
-For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-### Project Structure
-
-- `pare/` -- main package containing stateful apps, environment wrapper,
-  proactive agent orchestration, scenarios, and user proxy implementations
-- `tests/` – unit tests covering navigation states, adapters, planners, and
-  demos
-- `docs/` – developer documentation and app API references
-
-### Running The Demos
-
-PARE includes demo scenarios that showcase the proactive agent system. All demos require a valid `OPENAI_API_KEY` in your environment (loaded automatically via `dotenv`).
-
-#### Quick Start: Contacts Follow-up Demo
-
-The contacts demo simulates a proactive assistant that monitors user activity and suggests helpful actions:
+Model pairs are zipped (not crossed). Each `--observe-model` is paired with the corresponding `--execute-model`:
 
 ```bash
-# Create a .env file with your API key
-echo "OPENAI_API_KEY=your-key-here" > .env
-
-# Run the contacts follow-up scenario
-uv run python -m pare.scripts.run_contacts_demo
-```
-
-**What happens in this demo:**
-1. The user agent receives a notification about a new message
-2. The user agent interacts with the messaging app using ReAct reasoning
-3. The proactive agent observes the interaction and proposes a helpful goal
-4. If accepted, the proactive agent executes the task (e.g., forwarding an email)
-5. Control returns to the user with a summary
-
-#### Other Demos
-
-```bash
-# Meta ARE tutorial scenario
-uv run python -m pare.scripts.run_meta_tutorial_demo
-
-# Generic runner with custom scenario
-uv run python -m pare.scripts.run_demo \
-  --builder pare.scenarios.contacts_followup.build_contacts_followup_components
-```
-
-#### Output and Logs
-
-Each demo prints:
-- The initial user action (e.g., reading a message)
-- The proposed proactive goal
-- Execution result and summary
-- Log file locations
-
-Logs are written to `logs/pare/`:
-- `user_proxy.log` – User agent ReAct reasoning and tool executions
-- `proactive_agent.log` – Proactive agent observations and decisions
-- `events.log` – Complete event stream for audit
-
-All demos use oracle expectations to validate that the proactive agent correctly completes the intended task. If oracle criteria aren't met, the session raises an error rather than silently accepting a partial result.
-
-### Running Benchmarks
-
-PARE includes a CLI for running benchmark experiments with config sweeps, multiple runs, caching, and reporting.
-
-#### Quick Start
-
-```bash
-# Run a single scenario
-pare benchmark sweep --scenarios email_notification --observe-model gpt-5 --execute-model gpt-5
-
-# Run benchmark with specific scenarios (comma-separated or file path)
-pare benchmark sweep --scenarios scenario1,scenario2,scenario3 --observe-model gpt-5 --execute-model gpt-5 --runs 3
-
-# Run benchmark with model sweep (zipped pairs)
 pare benchmark sweep --split full \
-  --observe-model gpt-5 --observe-model claude-4.5-sonnet \
-  --execute-model gpt-5 --execute-model claude-4.5-sonnet \
-  --runs 3
-
-# Run benchmark with noise sweep
-pare benchmark sweep --split full \
-  --observe-model gpt-5 --execute-model gpt-5 \
-  --tool-failure-probability 0.0 --tool-failure-probability 0.1 \
+  -om gpt-5 -om claude-4.5-sonnet \
+  -em gpt-5 -em claude-4.5-sonnet \
   --runs 3
 ```
 
-#### CLI Options
+### Results
 
-| Flag | Description |
-|------|-------------|
-| `--scenarios` / `-s` | Scenario IDs: single ID, comma-separated, or file path |
-| `--split` | Benchmark split: `full` or `ablation` |
-| `--observe-model` / `-om` | Observe model(s) for sweep (zipped with `--execute-model`) |
-| `--execute-model` / `-em` | Execute model(s) for sweep (zipped with `--observe-model`) |
-| `--user-model` / `-um` | User agent model (default: `gpt-5-mini`) |
-| `--max-turns` / `-mt` | Maximum turns per scenario (default: 10) |
-| `--runs` / `-r` | Number of runs per scenario (default: 1) |
-| `--max-concurrent` / `-c` | Max concurrent scenarios (default: CPU count) |
-| `--timeout` / `-t` | Timeout per scenario in seconds |
-| `--executor-type` | Executor: `sequential`, `thread`, or `process` (default: `thread`) |
-| `--results-dir` | Directory for JSON result files (default: `results`) |
-| `--output-dir` | Directory for trace exports (requires `--export`) |
-| `--export` / `--no-export` | Export scenario traces |
-| `--experiment-name` / `-n` | Name for this experiment |
-| `--log-level` | Logging level: DEBUG, INFO, WARNING, ERROR |
-| `--no-cache` | Disable result caching |
-| `--limit` / `-l` | Limit number of scenarios to load |
-
-See `pare benchmark sweep --help` for full details.
-
-#### Output
-
-Results are saved in a structured directory:
+Results are saved in a structured directory under `results/`:
 
 ```
 results/
-└── {experiment}_{split}_user_{model}_mt_{turns}_umi_..._omi_..._emi_.../
-    ├── obs_{model}_exec_{model}_enmi_0_es_42_tfp_0.0_result.json
-    ├── obs_{model}_exec_{model}_enmi_0_es_42_tfp_0.0_report.txt
-    └── combined_report.txt
+  {experiment}_{split}_user_{model}_mt_{turns}_umi_..._omi_..._emi_.../
+    obs_{model}_exec_{model}_..._result.json
+    obs_{model}_exec_{model}_..._report.txt
+    combined_report.txt
 ```
 
-### Platform Notes
+Use `pare benchmark sweep --help` for the full list of configuration options.
 
-#### macOS: Process-Based Execution
+### Other CLI Commands
 
-On macOS, the `--executor-type process` option may fail with `FileNotFoundError` during process spawn. This is a known issue with Python's multiprocessing 'spawn' method on macOS, where semaphore file handles cannot be properly reconstructed in child processes.
+```bash
+pare annotation sample -t <traces_dir> -n <size>   # Sample decision points for human eval
+pare annotation launch                               # Launch annotation UI
+pare cache status                                    # Show cache location and entry count
+pare cache invalidate                                # Clear cached results
+```
 
-**Workaround**: Use `--executor-type thread` (the default) instead of `--executor-type process` on macOS.
+> [!NOTE]
+> **macOS users**: The `--executor-type process` option may fail due to a known Python multiprocessing issue with the 'spawn' method on macOS. Use the default `--executor-type thread` instead.
 
-### Scenario Integration Options
+## Documentation
 
-- **Meta-authored scenarios** – use `pare.meta_adapter.build_meta_scenario_components`
-  to convert any Meta ARE `Scenario` (e.g. `ScenarioTutorial`) into the PARE
-  runtime stack. The adapter preserves Meta's apps, events, and oracles, so the
-  proactive session will enforce the same validation rules.
-- **PARE-authored scenarios** – build directly with `pare.scenarios.contacts_followup.build_contacts_followup_components`
-  (or your own builder). This path gives full control over seeding the PARE
-  stateful apps while still supplying `OracleAction` entries for validation.
+Full API reference and architecture docs are available at [deepakn97.github.io/pare](https://deepakn97.github.io/pare/).
 
-In practice new scenarios should follow Meta's format whenever possible: emit a
-standard `Scenario` with events + oracle expectations, then reuse the adapter to
-obtain a PARE environment. This keeps the codebase minimal and lets us leverage
-Meta's judge ecosystem while adding PARE-specific UX (stateful navigation,
-decision prompts, etc.). If a scenario truly needs bespoke PARE state, use the
-contacts example as a template and provide matching oracle actions so the loop
-still detects success.
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style guidelines, and how to submit pull requests.
+
+## License
+
+This project is licensed under the terms of the [MIT License](LICENSE).
+
+## Citation
+
+If you use PARE in your research, please cite:
+
+```bibtex
+@misc{nathani2026proactiveagentresearchenvironment,
+      title={Proactive Agent Research Environment: Simulating Active Users to Evaluate Proactive Assistants},
+      author={Deepak Nathani and Cheng Zhang and Chang Huan and Jiaming Shan and Yinfei Yang and Alkesh Patel and Zhe Gan and William Yang Wang and Michael Saxon and Xin Eric Wang},
+      year={2026},
+      eprint={2604.00842},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2604.00842},
+}
+```

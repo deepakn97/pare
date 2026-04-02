@@ -141,20 +141,6 @@ MODELS_MAP = {
     "deepseek-v3.2": {"model_name": "accounts/fireworks/models/deepseek-v3p2", "provider": "fireworks_ai"},
     "qwen-3-8B-base": {"model_name": "accounts/fireworks/models/qwen3-8b", "provider": "fireworks_ai"},
     "minimax-2.5": {"model_name": "accounts/fireworks/models/minimax-m2p5", "provider": "fireworks_ai"},
-    # These models do not support serverless so we use a autoscaled deployment.
-    "llama-3.2-3b-it": {
-        "model_name": "accounts/eric-lab/deployments/n6f1bvuo",
-        "provider": "fireworks_ai",
-    },
-    "gemma-3-4b-it": {
-        "model_name": "accounts/eric-lab/deployments/y65wjbfd",
-        "provider": "fireworks_ai",
-    },
-    "qwen-3-4b-it": {
-        "model_name": "accounts/eric-lab/deployments/dsvhze7q",
-        "provider": "fireworks_ai",
-    },
-    "ministral-3-3b-it": {"model_name": "accounts/eric-lab/deployments/ncvfom3m", "provider": "fireworks_ai"},
     # GEMINI Models
     "gemini-3-pro": {"model_name": "gemini/gemini-3-pro-preview", "provider": "gemini"},
     "gemini-3-flash": {"model_name": "gemini/gemini-3-flash-preview", "provider": "gemini"},
