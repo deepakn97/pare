@@ -12,28 +12,31 @@
         <meta name="author" content="Deepak Nathani">
       
       
-        <link rel="canonical" href="https://deepakn97.github.io/pas/run_local_llm_model/">
+        <link rel="canonical" href="https://deepakn97.github.io/pare/run_local_llm_model/">
       
       
-        <link rel="prev" href="../scenario_author_guide/">
+        <link rel="prev" href="..">
       
       
-        <link rel="next" href="../scenario_generator/">
+        <link rel="next" href="../dec_pomdp_formulation/">
+      
+      
+        
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.19">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
     
     
       
-        <title>Running Local LLM Models Guide - Proactive Agent Sandbox</title>
+        <title>Running Local LLM Models Guide - Proactive Agent Research Environment</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -60,7 +63,6 @@
 
     
     
-    
   </head>
   
   
@@ -80,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#using-local-llm-models-with-meta-are" class="md-skip">
+        <a href="#running-local-llm-models" class="md-skip">
           Skip to content
         </a>
       
@@ -92,11 +94,9 @@
     
       
 
-  
-
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="Proactive Agent Sandbox" class="md-header__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
+    <a href=".." title="Proactive Agent Research Environment" class="md-header__button md-logo" aria-label="Proactive Agent Research Environment" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +110,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            Proactive Agent Sandbox
+            Proactive Agent Research Environment
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -196,13 +196,13 @@
     
     
       <div class="md-header__source">
-        <a href="https://github.com/deepakn97/pas" title="Go to repository" class="md-source" data-md-component="source">
+        <a href="https://github.com/deepakn97/pare" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
   </div>
   <div class="md-source__repository">
-    deepakn97/pas
+    deepakn97/pare
   </div>
 </a>
       </div>
@@ -215,6 +215,196 @@
       
       
         
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../architecture_visual/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../agents/" class="md-tabs__link">
+          
+  
+  
+  Agents
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../apps/" class="md-tabs__link">
+          
+  
+  
+  Apps
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../scenarios/" class="md-tabs__link">
+          
+  
+  
+  Scenarios
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../scripts/" class="md-tabs__link">
+          
+  
+  
+  Scripts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../annotation/" class="md-tabs__link">
+          
+  
+  
+  Annotation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../api/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
           
         
       
@@ -229,26 +419,28 @@
                     
 
 
+  
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="Proactive Agent Sandbox" class="md-nav__button md-logo" aria-label="Proactive Agent Sandbox" data-md-component="logo">
+    <a href=".." title="Proactive Agent Research Environment" class="md-nav__button md-logo" aria-label="Proactive Agent Research Environment" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    Proactive Agent Sandbox
+    Proactive Agent Research Environment
   </label>
   
     <div class="md-nav__source">
-      <a href="https://github.com/deepakn97/pas" title="Go to repository" class="md-source" data-md-component="source">
+      <a href="https://github.com/deepakn97/pare" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
   </div>
   <div class="md-source__repository">
-    deepakn97/pas
+    deepakn97/pare
   </div>
 </a>
     </div>
@@ -267,9 +459,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Home
+  
+
     
   </span>
+  
   
 
       </a>
@@ -289,22 +486,33 @@
     
     
     
+      
+        
+        
+      
+      
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
   <span class="md-ellipsis">
+    
+  
     Getting Started
+  
+
     
   </span>
+  
   
 
             <span class="md-nav__icon md-icon"></span>
@@ -313,101 +521,13 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
-            Getting Started
+            
+  
+    Getting Started
+  
+
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../interface-guide/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Integration Guide
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../user_proxy_guide/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    User Proxy Guide
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../proactive_agent_guide/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Proactive Agent Guide
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../scenario_author_guide/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Scenario Authoring Guide
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -430,9 +550,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Running Local LLM Models Guide
+  
+
     
   </span>
+  
   
 
           <span class="md-nav__icon md-icon"></span>
@@ -443,9 +568,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Running Local LLM Models Guide
+  
+
     
   </span>
+  
   
 
       </a>
@@ -468,7 +598,9 @@
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
-      Prerequisites
+      
+        Prerequisites
+      
     </span>
   </a>
   
@@ -477,7 +609,9 @@
         <li class="md-nav__item">
   <a href="#installation-setup" class="md-nav__link">
     <span class="md-ellipsis">
-      Installation Setup
+      
+        Installation Setup
+      
     </span>
   </a>
   
@@ -487,7 +621,9 @@
           <li class="md-nav__item">
   <a href="#1-environment-setup" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Environment Setup
+      
+        1. Environment Setup
+      
     </span>
   </a>
   
@@ -496,7 +632,9 @@
           <li class="md-nav__item">
   <a href="#2-install-ollama" class="md-nav__link">
     <span class="md-ellipsis">
-      2. Install Ollama
+      
+        2. Install Ollama
+      
     </span>
   </a>
   
@@ -510,7 +648,9 @@
         <li class="md-nav__item">
   <a href="#managing-ollama-models" class="md-nav__link">
     <span class="md-ellipsis">
-      Managing Ollama Models
+      
+        Managing Ollama Models
+      
     </span>
   </a>
   
@@ -520,7 +660,9 @@
           <li class="md-nav__item">
   <a href="#1-start-ollama-server" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Start Ollama Server
+      
+        1. Start Ollama Server
+      
     </span>
   </a>
   
@@ -529,7 +671,9 @@
           <li class="md-nav__item">
   <a href="#2-download-models" class="md-nav__link">
     <span class="md-ellipsis">
-      2. Download Models
+      
+        2. Download Models
+      
     </span>
   </a>
   
@@ -538,7 +682,9 @@
           <li class="md-nav__item">
   <a href="#3-verify-installation" class="md-nav__link">
     <span class="md-ellipsis">
-      3. Verify Installation
+      
+        3. Verify Installation
+      
     </span>
   </a>
   
@@ -547,7 +693,9 @@
           <li class="md-nav__item">
   <a href="#4-test-model" class="md-nav__link">
     <span class="md-ellipsis">
-      4. Test Model
+      
+        4. Test Model
+      
     </span>
   </a>
   
@@ -559,19 +707,23 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-meta-are-with-local-models" class="md-nav__link">
+  <a href="#using-meta-are-compatible-commands-with-local-models" class="md-nav__link">
     <span class="md-ellipsis">
-      Using Meta-ARE with Local Models
+      
+        Using Meta-ARE-Compatible Commands with Local Models
+      
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Using Meta-ARE with Local Models">
+    <nav class="md-nav" aria-label="Using Meta-ARE-Compatible Commands with Local Models">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#basic-command-structure" class="md-nav__link">
     <span class="md-ellipsis">
-      Basic Command Structure
+      
+        Basic Command Structure
+      
     </span>
   </a>
   
@@ -580,7 +732,9 @@
           <li class="md-nav__item">
   <a href="#example-with-gemma3" class="md-nav__link">
     <span class="md-ellipsis">
-      Example with Gemma3
+      
+        Example with Gemma3
+      
     </span>
   </a>
   
@@ -589,7 +743,9 @@
           <li class="md-nav__item">
   <a href="#example-with-qwen25" class="md-nav__link">
     <span class="md-ellipsis">
-      Example with Qwen2.5
+      
+        Example with Qwen2.5
+      
     </span>
   </a>
   
@@ -603,7 +759,9 @@
         <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
-      Troubleshooting
+      
+        Troubleshooting
+      
     </span>
   </a>
   
@@ -613,7 +771,9 @@
           <li class="md-nav__item">
   <a href="#common-issues" class="md-nav__link">
     <span class="md-ellipsis">
-      Common Issues
+      
+        Common Issues
+      
     </span>
   </a>
   
@@ -622,7 +782,9 @@
           <li class="md-nav__item">
   <a href="#port-configuration" class="md-nav__link">
     <span class="md-ellipsis">
-      Port Configuration
+      
+        Port Configuration
+      
     </span>
   </a>
   
@@ -636,7 +798,9 @@
         <li class="md-nav__item">
   <a href="#performance-notes" class="md-nav__link">
     <span class="md-ellipsis">
-      Performance Notes
+      
+        Performance Notes
+      
     </span>
   </a>
   
@@ -658,14 +822,19 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenario_generator/" class="md-nav__link">
+      <a href="../dec_pomdp_formulation/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Scenario Generation
+    
+  
+    Dec-POMDP Formulation
+  
+
     
   </span>
+  
   
 
       </a>
@@ -691,6 +860,9 @@
     
     
     
+      
+      
+    
     
     <li class="md-nav__item md-nav__item--nested">
       
@@ -704,9 +876,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Architecture
+  
+
     
   </span>
+  
   
 
             <span class="md-nav__icon md-icon"></span>
@@ -715,7 +892,11 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Architecture
+            
+  
+    Architecture
+  
+
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -731,9 +912,98 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Visual Overview
+  
+
     
   </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime_execution_flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Execution Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime_execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Execution Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trace_export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trace Export Semantics
+  
+
+    
+  </span>
+  
   
 
       </a>
@@ -759,6 +1029,9 @@
     
     
     
+      
+      
+    
     
     <li class="md-nav__item md-nav__item--nested">
       
@@ -772,9 +1045,14 @@
   
   
   <span class="md-ellipsis">
-    Apps
+    
+  
+    Agents
+  
+
     
   </span>
+  
   
 
             <span class="md-nav__icon md-icon"></span>
@@ -783,7 +1061,124 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Apps
+            
+  
+    Agents
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agents Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agents/interaction_lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Interaction Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apps
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Apps
+  
+
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -799,9 +1194,42 @@
   
   
   <span class="md-ellipsis">
-    App APIs Overview
+    
+  
+    Apps Overview
+  
+
     
   </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps/adding_stateful_app/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Stateful App
+  
+
+    
+  </span>
+  
   
 
       </a>
@@ -822,9 +1250,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Contacts App
+  
+
     
   </span>
+  
   
 
       </a>
@@ -845,9 +1278,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Messaging App
+  
+
     
   </span>
+  
   
 
       </a>
@@ -868,9 +1306,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Email App
+  
+
     
   </span>
+  
   
 
       </a>
@@ -891,9 +1334,154 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Calendar App
+  
+
     
   </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps/cab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cab App
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps/apartment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apartment App
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps/reminder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reminder App
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps/shopping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shopping App
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps/notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notes App
+  
+
+    
+  </span>
+  
   
 
       </a>
@@ -919,31 +1507,43 @@
     
     
     
+      
+      
+    
     
     <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    API Reference
+    
+  
+    Scenarios
+  
+
     
   </span>
+  
   
 
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            API Reference
+            
+  
+    Scenarios
+  
+
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -954,14 +1554,19 @@
   
   
     <li class="md-nav__item">
-      <a href="../modules/" class="md-nav__link">
+      <a href="../scenarios/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Overview
+    
+  
+    Scenarios Overview
+  
+
     
   </span>
+  
   
 
       </a>
@@ -977,14 +1582,358 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/system/" class="md-nav__link">
+      <a href="../scenarios/authoring/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    System & Session
+    
+  
+    Scenario Authoring Guide
+  
+
     
   </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/benchmark/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/cli_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/scenario_generator_flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Step Scenario Generator Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Scripts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scripts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripts Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Annotation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Overview
+  
+
+    
+  </span>
+  
   
 
       </a>
@@ -1005,9 +1954,42 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Environment
+  
+
     
   </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agents
+  
+
+    
+  </span>
+  
   
 
       </a>
@@ -1028,55 +2010,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Stateful Apps
+  
+
     
   </span>
   
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api/user_proxy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    User Proxy
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api/proactive_agent/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Proactive Agent
-    
-  </span>
   
 
       </a>
@@ -1097,9 +2038,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Scenarios
+  
+
     
   </span>
+  
   
 
       </a>
@@ -1120,9 +2066,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Scenario Generator
+  
+
     
   </span>
+  
   
 
       </a>
@@ -1138,14 +2089,47 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/adapters/" class="md-nav__link">
+      <a href="../api/summary_and_deduplication/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Adapters & Validation
+    
+  
+    Summary and Deduplication
+  
+
     
   </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
   
 
       </a>
@@ -1166,9 +2150,14 @@
   
   
   <span class="md-ellipsis">
+    
+  
     Logging
+  
+
     
   </span>
+  
   
 
       </a>
@@ -1213,7 +2202,9 @@
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
-      Prerequisites
+      
+        Prerequisites
+      
     </span>
   </a>
   
@@ -1222,7 +2213,9 @@
         <li class="md-nav__item">
   <a href="#installation-setup" class="md-nav__link">
     <span class="md-ellipsis">
-      Installation Setup
+      
+        Installation Setup
+      
     </span>
   </a>
   
@@ -1232,7 +2225,9 @@
           <li class="md-nav__item">
   <a href="#1-environment-setup" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Environment Setup
+      
+        1. Environment Setup
+      
     </span>
   </a>
   
@@ -1241,7 +2236,9 @@
           <li class="md-nav__item">
   <a href="#2-install-ollama" class="md-nav__link">
     <span class="md-ellipsis">
-      2. Install Ollama
+      
+        2. Install Ollama
+      
     </span>
   </a>
   
@@ -1255,7 +2252,9 @@
         <li class="md-nav__item">
   <a href="#managing-ollama-models" class="md-nav__link">
     <span class="md-ellipsis">
-      Managing Ollama Models
+      
+        Managing Ollama Models
+      
     </span>
   </a>
   
@@ -1265,7 +2264,9 @@
           <li class="md-nav__item">
   <a href="#1-start-ollama-server" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Start Ollama Server
+      
+        1. Start Ollama Server
+      
     </span>
   </a>
   
@@ -1274,7 +2275,9 @@
           <li class="md-nav__item">
   <a href="#2-download-models" class="md-nav__link">
     <span class="md-ellipsis">
-      2. Download Models
+      
+        2. Download Models
+      
     </span>
   </a>
   
@@ -1283,7 +2286,9 @@
           <li class="md-nav__item">
   <a href="#3-verify-installation" class="md-nav__link">
     <span class="md-ellipsis">
-      3. Verify Installation
+      
+        3. Verify Installation
+      
     </span>
   </a>
   
@@ -1292,7 +2297,9 @@
           <li class="md-nav__item">
   <a href="#4-test-model" class="md-nav__link">
     <span class="md-ellipsis">
-      4. Test Model
+      
+        4. Test Model
+      
     </span>
   </a>
   
@@ -1304,19 +2311,23 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-meta-are-with-local-models" class="md-nav__link">
+  <a href="#using-meta-are-compatible-commands-with-local-models" class="md-nav__link">
     <span class="md-ellipsis">
-      Using Meta-ARE with Local Models
+      
+        Using Meta-ARE-Compatible Commands with Local Models
+      
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Using Meta-ARE with Local Models">
+    <nav class="md-nav" aria-label="Using Meta-ARE-Compatible Commands with Local Models">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#basic-command-structure" class="md-nav__link">
     <span class="md-ellipsis">
-      Basic Command Structure
+      
+        Basic Command Structure
+      
     </span>
   </a>
   
@@ -1325,7 +2336,9 @@
           <li class="md-nav__item">
   <a href="#example-with-gemma3" class="md-nav__link">
     <span class="md-ellipsis">
-      Example with Gemma3
+      
+        Example with Gemma3
+      
     </span>
   </a>
   
@@ -1334,7 +2347,9 @@
           <li class="md-nav__item">
   <a href="#example-with-qwen25" class="md-nav__link">
     <span class="md-ellipsis">
-      Example with Qwen2.5
+      
+        Example with Qwen2.5
+      
     </span>
   </a>
   
@@ -1348,7 +2363,9 @@
         <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
-      Troubleshooting
+      
+        Troubleshooting
+      
     </span>
   </a>
   
@@ -1358,7 +2375,9 @@
           <li class="md-nav__item">
   <a href="#common-issues" class="md-nav__link">
     <span class="md-ellipsis">
-      Common Issues
+      
+        Common Issues
+      
     </span>
   </a>
   
@@ -1367,7 +2386,9 @@
           <li class="md-nav__item">
   <a href="#port-configuration" class="md-nav__link">
     <span class="md-ellipsis">
-      Port Configuration
+      
+        Port Configuration
+      
     </span>
   </a>
   
@@ -1381,7 +2402,9 @@
         <li class="md-nav__item">
   <a href="#performance-notes" class="md-nav__link">
     <span class="md-ellipsis">
-      Performance Notes
+      
+        Performance Notes
+      
     </span>
   </a>
   
@@ -1397,6 +2420,7 @@
           
           
             <div class="md-content" data-md-component="content">
+              
               <article class="md-content__inner md-typeset">
                 
                   
@@ -1406,11 +2430,17 @@
   
 
 
-<h1 id="using-local-llm-models-with-meta-are">Using Local LLM Models with Meta-ARE<a class="headerlink" href="#using-local-llm-models-with-meta-are" title="Permanent link">&para;</a></h1>
-<p>This guide explains how to set up and use local Large Language Models (LLMs) with the Meta-ARE framework using Ollama.</p>
+<h1 id="running-local-llm-models">Running Local LLM Models<a class="headerlink" href="#running-local-llm-models" title="Permanent link">&para;</a></h1>
+<p>This page is primarily about local Ollama-style model setup for Meta-ARE-compatible backends.</p>
+<p>For PARE-specific scenario commands, prefer the <code>pare</code> CLI and the scenarios docs:</p>
+<ul>
+<li><code>docs/scenarios/cli_usage.md</code></li>
+<li><code>docs/scenarios/scenario_generator_flow.md</code></li>
+</ul>
+<p>This guide explains how to set up and use local Large Language Models (LLMs) with Ollama.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Python 3.10 or higher</li>
+<li>Python 3.12 or higher</li>
 <li><code>uv</code> package manager installed</li>
 <li>Homebrew (for macOS/Linux)</li>
 </ul>
@@ -1418,12 +2448,12 @@
 <h3 id="1-environment-setup">1. Environment Setup<a class="headerlink" href="#1-environment-setup" title="Permanent link">&para;</a></h3>
 <p>First, ensure your project dependencies are installed:</p>
 <pre><code class="language-bash"># Enter the project directory if needed, then sync dependencies
-uv -v sync
+uv sync
 </code></pre>
-<p>The project uses Python 3.10. Make sure <code>uv</code> is configured to use this version:</p>
-<pre><code class="language-bash"># Install uv and configure Python version
-uv --version  # Verify installation
-uvx --python 3.10  # Pin Python 3.10 for uvx commands
+<p>The project requires Python 3.12+. Make sure <code>uv</code> is using a compatible version:</p>
+<pre><code class="language-bash"># Verify uv installation and Python version
+uv --version
+uv run python --version  # Should show Python 3.12 or higher
 </code></pre>
 <h3 id="2-install-ollama">2. Install Ollama<a class="headerlink" href="#2-install-ollama" title="Permanent link">&para;</a></h3>
 <p>Install Ollama, a local LLM server:</p>
@@ -1459,7 +2489,7 @@ ollama pull qwen2.5:1.5b-instruct
 <p>Test your model with a simple prompt:</p>
 <pre><code class="language-bash">ollama run qwen2.5:1.5b-instruct &quot;test&quot;
 </code></pre>
-<h2 id="using-meta-are-with-local-models">Using Meta-ARE with Local Models<a class="headerlink" href="#using-meta-are-with-local-models" title="Permanent link">&para;</a></h2>
+<h2 id="using-meta-are-compatible-commands-with-local-models">Using Meta-ARE-Compatible Commands with Local Models<a class="headerlink" href="#using-meta-are-compatible-commands-with-local-models" title="Permanent link">&para;</a></h2>
 <h3 id="basic-command-structure">Basic Command Structure<a class="headerlink" href="#basic-command-structure" title="Permanent link">&para;</a></h3>
 <p>Use the <code>are-run</code> command with the <code>local</code> provider to run scenarios with local models:</p>
 <pre><code class="language-bash">are-run -s scenario_name -a agent_name \
@@ -1484,7 +2514,7 @@ ollama pull qwen2.5:1.5b-instruct
 <ol>
 <li><strong>Connection refused</strong>: Ensure Ollama server is running (<code>ollama serve</code>)</li>
 <li><strong>Model not found</strong>: Make sure the model is downloaded (<code>ollama pull model_name</code>)</li>
-<li><strong>Python version mismatch</strong>: Ensure you're using Python 3.10+</li>
+<li><strong>Python version mismatch</strong>: Ensure you're using Python 3.12+</li>
 </ol>
 <h3 id="port-configuration">Port Configuration<a class="headerlink" href="#port-configuration" title="Permanent link">&para;</a></h3>
 <p>The default Ollama endpoint is <code>http://127.0.0.1:11434</code>. If you need to use a different port, update the <code>--endpoint</code> parameter in your <code>are-run</code> commands.</p>
@@ -1544,8 +2574,8 @@ ollama pull qwen2.5:1.5b-instruct
       
       
     
-    <a href="https://github.com/deepakn97/pas" target="_blank" rel="noopener" title="github.com" class="md-social__link">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    <a href="https://github.com/deepakn97/pare" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
     </a>
   
     
@@ -1555,8 +2585,8 @@ ollama pull qwen2.5:1.5b-instruct
       
       
     
-    <a href="https://pypi.org/project/pas" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    <a href="https://pypi.org/project/pare" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
     </a>
   
 </div>
@@ -1573,10 +2603,11 @@ ollama pull qwen2.5:1.5b-instruct
     
     
       
-      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
       
     
   </body>

@@ -1,95 +1,147 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://deepakn97.github.io/pas/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/architecture_visual/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/architecture_visual/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/interface-guide/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/dec_pomdp_formulation/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/modules/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/run_local_llm_model/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/proactive_agent_guide/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/runtime_execution/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/run_local_llm_model/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/runtime_execution_flow/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/scenario_author_guide/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/trace_export/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/scenario_generator/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/agents/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/user_proxy_guide/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/agents/interaction_lifecycle/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/adapters/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/annotation/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/apps/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/environment/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/agents/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/logging/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/annotation/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/proactive_agent/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/apps/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/scenario_generator/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/environment/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/scenarios/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/logging/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/system/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/scenario_generator/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/api/user_proxy/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/scenarios/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/apps/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/api/summary_and_deduplication/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/apps/calendar/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/apps/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/apps/contacts/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/apps/adding_stateful_app/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/apps/email/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/apps/apartment/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
     <url>
-         <loc>https://deepakn97.github.io/pas/apps/messaging/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <loc>https://deepakn97.github.io/pare/apps/cab/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/apps/calendar/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/apps/contacts/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/apps/email/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/apps/messaging/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/apps/notes/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/apps/reminder/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/apps/shopping/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/scenarios/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/scenarios/authoring/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/scenarios/benchmark/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/scenarios/cli_usage/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/scenarios/scenario_generator_flow/</loc>
+         <lastmod>2026-04-02</lastmod>
+    </url>
+    <url>
+         <loc>https://deepakn97.github.io/pare/scripts/</loc>
+         <lastmod>2026-04-02</lastmod>
     </url>
 </urlset>
