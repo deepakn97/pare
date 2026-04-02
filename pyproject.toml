@@ -214,7 +214,7 @@ branch = true
 source = ["pare"]
 
 [tool.deptry]
-known_first_party = ["pare", "scripts"]
+known_first_party = ["pare"]
 extend_exclude = ["pare/_archives/.*"]
 
 [tool.deptry.package_module_name_map]

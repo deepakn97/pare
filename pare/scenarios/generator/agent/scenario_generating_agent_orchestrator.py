@@ -18,7 +18,7 @@ from pare.scenarios.generator.prompt import scenario_generating_agent_prompts as
 from pare.scenarios.generator.prompt.scenario_generating_agent_prompts import (
     configure_dynamic_context,
 )
-from scripts.run_scenarios import run_scenarios
+from pare.scenarios.run_scenarios import run_scenarios
 
 from .claude_backend import ClaudeAgentRuntimeConfig, ClaudeFilesystemConfig
 from .scenario_uniqueness_agent import ScenarioUniquenessCheckAgent
