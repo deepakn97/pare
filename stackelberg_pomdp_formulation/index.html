@@ -12,13 +12,13 @@
         <meta name="author" content="Deepak Nathani">
       
       
-        <link rel="canonical" href="https://deepakn97.github.io/pare/run_local_llm_model/">
+        <link rel="canonical" href="https://deepakn97.github.io/pare/stackelberg_pomdp_formulation/">
       
       
         <link rel="prev" href="..">
       
       
-        <link rel="next" href="../dec_pomdp_formulation/">
+        <link rel="next" href="../architecture_visual/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Running Local LLM Models Guide - Proactive Agent Research Environment</title>
+        <title>Stackelberg POMDP Formulation - Proactive Agent Research Environment</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#running-local-llm-models" class="md-skip">
+        <a href="#stackelberg-pomdp-formulation-for-pare" class="md-skip">
           Skip to content
         </a>
       
@@ -116,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Running Local LLM Models Guide
+              Stackelberg POMDP Formulation
             
           </span>
         </div>
@@ -552,7 +552,7 @@
   <span class="md-ellipsis">
     
   
-    Running Local LLM Models Guide
+    Stackelberg POMDP Formulation
   
 
     
@@ -570,7 +570,7 @@
   <span class="md-ellipsis">
     
   
-    Running Local LLM Models Guide
+    Stackelberg POMDP Formulation
   
 
     
@@ -596,44 +596,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
+  <a href="#1-overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prerequisites
+        1. Overview
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation Setup
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Installation Setup">
+    <nav class="md-nav" aria-label="1. Overview">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-environment-setup" class="md-nav__link">
+  <a href="#key-characteristics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Environment Setup
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-install-ollama" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Install Ollama
+        Key Characteristics
       
     </span>
   </a>
@@ -646,22 +624,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#managing-ollama-models" class="md-nav__link">
+  <a href="#2-formal-definition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Managing Ollama Models
+        2. Formal Definition
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Managing Ollama Models">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-component-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Component Definitions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Component Definitions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-start-ollama-server" class="md-nav__link">
+  <a href="#31-agent-set-mathcaln" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Start Ollama Server
+        3.1 Agent Set \(\mathcal{N}\)
       
     </span>
   </a>
@@ -669,10 +658,22 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-download-models" class="md-nav__link">
+  <a href="#32-state-space-mathcals" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Download Models
+        3.2 State Space \(\mathcal{S}\)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.2 State Space \(\mathcal{S}\)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#321-app-state-mathcals_textapp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2.1 App State \(\mathcal{S}_{\text{app}}\)
       
     </span>
   </a>
@@ -680,10 +681,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-verify-installation" class="md-nav__link">
+  <a href="#322-global-state-mathcals_textglobal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Verify Installation
+        3.2.2 Global State \(\mathcal{S}_{\text{global}}\)
       
     </span>
   </a>
@@ -691,10 +692,226 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-test-model" class="md-nav__link">
+  <a href="#323-database-state-mathcals_textdb" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Test Model
+        3.2.3 Database State \(\mathcal{S}_{\text{db}}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#324-history-state-mathcals_texthistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2.4 History State \(\mathcal{S}_{\text{history}}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-action-spaces-mathcala_i" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Action Spaces \(\mathcal{A}_i\)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.3 Action Spaces \(\mathcal{A}_i\)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#331-user-action-space-mathcala_mathbfu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3.1 User Action Space \(\mathcal{A}_\mathbf{U}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#332-proactive-agent-action-space-mathcala_mathbfa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3.2 Proactive Agent Action Space \(\mathcal{A}_\mathbf{A}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-transition-function-t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Transition Function \(T\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-observation-spaces-mathcalo_i" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Observation Spaces \(\mathcal{O}_i\)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.5 Observation Spaces \(\mathcal{O}_i\)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#351-user-observation-mathcalo_mathbfu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5.1 User Observation \(\mathcal{O}_\mathbf{U}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#352-agent-observation-mathcalo_mathbfa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5.2 Agent Observation \(\mathcal{O}_\mathbf{A}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-instruction-space-mathcali" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 Instruction Space \(\mathcal{I}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-reward-function-r" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 Reward Function \(R\)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.7 Reward Function \(R\)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#371-success-reward-r_textrmsucceed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7.1 Success Reward \(R_\textrm{Succeed}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#372-acceptance-reward-r_textrmaccept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7.2 Acceptance Reward \(R_\textrm{Accept}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-episode-dynamics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Episode Dynamics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Episode Dynamics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-turn-structure-stackelberg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Turn Structure (Stackelberg)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-termination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Termination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-cumulative-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Cumulative Return
       
     </span>
   </a>
@@ -707,99 +924,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-meta-are-compatible-commands-with-local-models" class="md-nav__link">
+  <a href="#5-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using Meta-ARE-Compatible Commands with Local Models
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Using Meta-ARE-Compatible Commands with Local Models">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic-command-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Command Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example-with-gemma3" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example with Gemma3
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example-with-qwen25" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example with Qwen2.5
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#common-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Issues
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#port-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Port Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#performance-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Performance Notes
+        5. Summary
       
     </span>
   </a>
@@ -810,34 +938,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../dec_pomdp_formulation/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Dec-POMDP Formulation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -2200,44 +2300,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
+  <a href="#1-overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prerequisites
+        1. Overview
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation Setup
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Installation Setup">
+    <nav class="md-nav" aria-label="1. Overview">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-environment-setup" class="md-nav__link">
+  <a href="#key-characteristics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Environment Setup
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-install-ollama" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Install Ollama
+        Key Characteristics
       
     </span>
   </a>
@@ -2250,22 +2328,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#managing-ollama-models" class="md-nav__link">
+  <a href="#2-formal-definition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Managing Ollama Models
+        2. Formal Definition
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Managing Ollama Models">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-component-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Component Definitions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Component Definitions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-start-ollama-server" class="md-nav__link">
+  <a href="#31-agent-set-mathcaln" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Start Ollama Server
+        3.1 Agent Set \(\mathcal{N}\)
       
     </span>
   </a>
@@ -2273,10 +2362,22 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-download-models" class="md-nav__link">
+  <a href="#32-state-space-mathcals" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Download Models
+        3.2 State Space \(\mathcal{S}\)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.2 State Space \(\mathcal{S}\)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#321-app-state-mathcals_textapp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2.1 App State \(\mathcal{S}_{\text{app}}\)
       
     </span>
   </a>
@@ -2284,10 +2385,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-verify-installation" class="md-nav__link">
+  <a href="#322-global-state-mathcals_textglobal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Verify Installation
+        3.2.2 Global State \(\mathcal{S}_{\text{global}}\)
       
     </span>
   </a>
@@ -2295,10 +2396,226 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-test-model" class="md-nav__link">
+  <a href="#323-database-state-mathcals_textdb" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Test Model
+        3.2.3 Database State \(\mathcal{S}_{\text{db}}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#324-history-state-mathcals_texthistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2.4 History State \(\mathcal{S}_{\text{history}}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-action-spaces-mathcala_i" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Action Spaces \(\mathcal{A}_i\)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.3 Action Spaces \(\mathcal{A}_i\)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#331-user-action-space-mathcala_mathbfu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3.1 User Action Space \(\mathcal{A}_\mathbf{U}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#332-proactive-agent-action-space-mathcala_mathbfa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3.2 Proactive Agent Action Space \(\mathcal{A}_\mathbf{A}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-transition-function-t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Transition Function \(T\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-observation-spaces-mathcalo_i" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Observation Spaces \(\mathcal{O}_i\)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.5 Observation Spaces \(\mathcal{O}_i\)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#351-user-observation-mathcalo_mathbfu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5.1 User Observation \(\mathcal{O}_\mathbf{U}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#352-agent-observation-mathcalo_mathbfa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5.2 Agent Observation \(\mathcal{O}_\mathbf{A}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-instruction-space-mathcali" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 Instruction Space \(\mathcal{I}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-reward-function-r" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 Reward Function \(R\)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.7 Reward Function \(R\)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#371-success-reward-r_textrmsucceed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7.1 Success Reward \(R_\textrm{Succeed}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#372-acceptance-reward-r_textrmaccept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7.2 Acceptance Reward \(R_\textrm{Accept}\)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-episode-dynamics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Episode Dynamics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Episode Dynamics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-turn-structure-stackelberg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Turn Structure (Stackelberg)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-termination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Termination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-cumulative-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Cumulative Return
       
     </span>
   </a>
@@ -2311,99 +2628,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-meta-are-compatible-commands-with-local-models" class="md-nav__link">
+  <a href="#5-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using Meta-ARE-Compatible Commands with Local Models
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Using Meta-ARE-Compatible Commands with Local Models">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic-command-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Command Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example-with-gemma3" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example with Gemma3
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example-with-qwen25" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example with Qwen2.5
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#common-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Issues
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#port-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Port Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#performance-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Performance Notes
+        5. Summary
       
     </span>
   </a>
@@ -2430,100 +2658,419 @@
   
 
 
-<h1 id="running-local-llm-models">Running Local LLM Models<a class="headerlink" href="#running-local-llm-models" title="Permanent link">&para;</a></h1>
-<p>This page is primarily about local Ollama-style model setup for Meta-ARE-compatible backends.</p>
-<p>For PARE-specific scenario commands, prefer the <code>pare</code> CLI and the scenarios docs:</p>
+<h1 id="stackelberg-pomdp-formulation-for-pare">Stackelberg POMDP Formulation for PARE<a class="headerlink" href="#stackelberg-pomdp-formulation-for-pare" title="Permanent link">&para;</a></h1>
+<h2 id="1-overview">1. Overview<a class="headerlink" href="#1-overview" title="Permanent link">&para;</a></h2>
+<p>The Proactive Agent Research Environment (PARE) models a two-agent system where a <strong>User</strong> interacts with mobile applications while a <strong>Proactive Agent</strong> observes user behavior and proposes helpful interventions. We formalize this as a <strong>Stackelberg POMDP</strong> with asymmetric information, state-dependent action spaces, and leader-follower turn structure.</p>
+<h3 id="key-characteristics">Key Characteristics<a class="headerlink" href="#key-characteristics" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>docs/scenarios/cli_usage.md</code></li>
-<li><code>docs/scenarios/scenario_generator_flow.md</code></li>
+<li><strong>Asymmetric agents</strong>: User (leader) has state-constrained actions; agent (follower) has privileged access</li>
+<li><strong>Partial observability</strong>: Agents receive different observations of the same state</li>
+<li><strong>Stackelberg turns</strong>: Within each turn, user acts first, agent observes user action, then agent acts</li>
+<li><strong>Dual rewards</strong>: Task success (terminal) + proposal acceptance (per-step)</li>
 </ul>
-<p>This guide explains how to set up and use local Large Language Models (LLMs) with Ollama.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<hr />
+<h2 id="2-formal-definition">2. Formal Definition<a class="headerlink" href="#2-formal-definition" title="Permanent link">&para;</a></h2>
+<p>A PARE Stackelberg POMDP is defined by the tuple:</p>
+<div class="arithmatex">\[\mathcal{M} = \langle \mathcal{N}, \mathcal{S}, \{\mathcal{A}_i\}_{i \in \mathcal{N}}, T, R, \{\mathcal{O}_i\}_{i \in \mathcal{N}}, \mathcal{I} \rangle\]</div>
+<p>where <span class="arithmatex">\(\mathcal{N} = \{\mathbf{U}, \mathbf{A}\}\)</span> denotes the user (leader) and the proactive agent (follower).</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="arithmatex">\(\mathcal{N}\)</span></td>
+<td>Agent set</td>
+<td><span class="arithmatex">\(\{\mathbf{U}, \mathbf{A}\}\)</span> -- user and proactive agent</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\mathcal{S}\)</span></td>
+<td>State space</td>
+<td>Global environment state</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\mathcal{A}_i\)</span></td>
+<td>Action space</td>
+<td>Actions available to agent <span class="arithmatex">\(i\)</span></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(T\)</span></td>
+<td>Transition function</td>
+<td>State dynamics</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(R\)</span></td>
+<td>Reward function</td>
+<td>Reward signal</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\mathcal{O}_i\)</span></td>
+<td>Observation space</td>
+<td>What agent <span class="arithmatex">\(i\)</span> can observe</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\mathcal{I}\)</span></td>
+<td>Instruction space</td>
+<td>Task specifications for agents</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-component-definitions">3. Component Definitions<a class="headerlink" href="#3-component-definitions" title="Permanent link">&para;</a></h2>
+<h3 id="31-agent-set-mathcaln">3.1 Agent Set <span class="arithmatex">\(\mathcal{N}\)</span><a class="headerlink" href="#31-agent-set-mathcaln" title="Permanent link">&para;</a></h3>
+<div class="arithmatex">\[\mathcal{N} = \{\mathbf{U}, \mathbf{A}\}\]</div>
+<p><strong>Definition</strong>: The set of decision-making entities in the environment. <span class="arithmatex">\(\mathbf{U}\)</span> is the leader (acts first), <span class="arithmatex">\(\mathbf{A}\)</span> is the follower (observes user action before acting).</p>
+<p><strong>PARE Mapping</strong>:</p>
 <ul>
-<li>Python 3.12 or higher</li>
-<li><code>uv</code> package manager installed</li>
-<li>Homebrew (for macOS/Linux)</li>
+<li><span class="arithmatex">\(\mathbf{U}\)</span>: Simulated by <code>UserAgent</code> - interacts with apps to accomplish tasks</li>
+<li><span class="arithmatex">\(\mathbf{A}\)</span>: Implemented by <code>ProactiveAgent</code> - observes user and proposes interventions</li>
 </ul>
-<h2 id="installation-setup">Installation Setup<a class="headerlink" href="#installation-setup" title="Permanent link">&para;</a></h2>
-<h3 id="1-environment-setup">1. Environment Setup<a class="headerlink" href="#1-environment-setup" title="Permanent link">&para;</a></h3>
-<p>First, ensure your project dependencies are installed:</p>
-<pre><code class="language-bash"># Enter the project directory if needed, then sync dependencies
-uv sync
+<p><strong>Example</strong>: In a "schedule meeting" scenario:</p>
+<ul>
+<li>User navigates Email app to find meeting request</li>
+<li>Agent observes user reading email, proposes creating calendar event</li>
+</ul>
+<hr />
+<h3 id="32-state-space-mathcals">3.2 State Space <span class="arithmatex">\(\mathcal{S}\)</span><a class="headerlink" href="#32-state-space-mathcals" title="Permanent link">&para;</a></h3>
+<div class="arithmatex">\[\mathcal{S} = \mathcal{S}_{\text{app}} \times \mathcal{S}_{\text{global}} \times \mathcal{S}_{\text{db}} \times \mathcal{S}_{\text{history}}\]</div>
+<h4 id="321-app-state-mathcals_textapp">3.2.1 App State <span class="arithmatex">\(\mathcal{S}_{\text{app}}\)</span><a class="headerlink" href="#321-app-state-mathcals_textapp" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[\mathcal{S}_{\text{app}} = \bigcup_{a \in \text{Apps}} \text{States}(a)\]</div>
+<p><strong>Definition</strong>: The current screen/view within the active application.</p>
+<p><strong>PARE Mapping</strong>: <code>StatefulApp.current_state: AppState</code></p>
+<p><strong>Example (Contacts App)</strong>:</p>
+<div class="arithmatex">\[\mathcal{S}_{\text{app}}^{\text{contacts}} = \{\texttt{ContactsList}, \texttt{ContactDetail}(c), \texttt{ContactEdit}(c) \mid c \in \text{ContactIDs}\}\]</div>
+<p>Concrete instance: <span class="arithmatex">\(s_{\text{app}} = \texttt{ContactDetail}(\text{"C001"})\)</span> - viewing contact with ID "C001"</p>
+<h4 id="322-global-state-mathcals_textglobal">3.2.2 Global State <span class="arithmatex">\(\mathcal{S}_{\text{global}}\)</span><a class="headerlink" href="#322-global-state-mathcals_textglobal" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[\mathcal{S}_{\text{global}} = \{\texttt{Home}, \texttt{Contacts}, \texttt{Email}, \texttt{Calendar}, \texttt{Notes}, \texttt{Reminder}, \texttt{Messaging}\}\]</div>
+<p><strong>Definition</strong>: Which application is currently active (foreground).</p>
+<p><strong>PARE Mapping</strong>: <code>StateAwareEnvironmentWrapper.active_app: App</code></p>
+<p><strong>Example</strong>: <span class="arithmatex">\(s_{\text{global}} = \texttt{Email}\)</span> means the Email app is in foreground.</p>
+<h4 id="323-database-state-mathcals_textdb">3.2.3 Database State <span class="arithmatex">\(\mathcal{S}_{\text{db}}\)</span><a class="headerlink" href="#323-database-state-mathcals_textdb" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[\mathcal{S}_{\text{db}} = \prod_{a \in \text{Apps}} \text{Data}(a)\]</div>
+<p><strong>Definition</strong>: The persistent data across all applications.</p>
+<p><strong>PARE Mapping</strong>: App backend data stores (e.g., <code>contacts_app._backend.contacts</code>)</p>
+<p><strong>Example</strong>:</p>
+<pre><code>s_db = {
+    contacts: {
+        &quot;C001&quot;: Contact(first_name=&quot;Alice&quot;, email=&quot;alice@example.com&quot;),
+        &quot;C002&quot;: Contact(first_name=&quot;Bob&quot;, email=&quot;bob@example.com&quot;)
+    },
+    emails: {
+        &quot;E001&quot;: Email(subject=&quot;Meeting Request&quot;, from=&quot;alice@example.com&quot;, folder=&quot;INBOX&quot;)
+    },
+    calendar: {...},
+    notes: {...}
+}
 </code></pre>
-<p>The project requires Python 3.12+. Make sure <code>uv</code> is using a compatible version:</p>
-<pre><code class="language-bash"># Verify uv installation and Python version
-uv --version
-uv run python --version  # Should show Python 3.12 or higher
+<h4 id="324-history-state-mathcals_texthistory">3.2.4 History State <span class="arithmatex">\(\mathcal{S}_{\text{history}}\)</span><a class="headerlink" href="#324-history-state-mathcals_texthistory" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[\mathcal{S}_{\text{history}} = \mathcal{H}_\mathbf{U} \times \mathcal{H}_\mathbf{A}\]</div>
+<p><strong>Definition</strong>: Truncated, bounded view of past events relevant to each agent's decision-making. Since history is truncated (finite window), <span class="arithmatex">\(|\mathcal{S}_{\text{history}}|\)</span> is bounded, preserving the Markov property.</p>
+<p><strong>Components</strong>:</p>
+<p><span class="arithmatex">\(\mathcal{H}_\mathbf{U}\)</span>: User-relevant history</p>
+<ul>
+<li>Navigation stack for <code>go_back()</code> functionality</li>
+<li>Most recent agent proposal (if any)</li>
+<li>Recent environment notifications</li>
+</ul>
+<p><span class="arithmatex">\(\mathcal{H}_\mathbf{A}\)</span>: Agent-relevant history</p>
+<ul>
+<li>Recent user actions (truncated window)</li>
+<li>Agent's own previous proposals</li>
+<li>Recent environment notifications</li>
+</ul>
+<p><strong>PARE Mapping</strong>:</p>
+<ul>
+<li>Navigation: <code>StatefulApp.navigation_stack</code></li>
+<li>User actions: <code>UserActionLog</code> entries</li>
+<li>Proposals: <code>AgentMessageLog</code> (latest only)</li>
+<li>Notifications: <code>EnvironmentNotificationLog</code></li>
+</ul>
+<p><strong>Example</strong>:</p>
+<pre><code>s_history = (
+    h_U: {
+        nav_stack: [ContactsList],
+        pending_proposal: &quot;Create calendar event for meeting?&quot;,
+        env_notifs: [&quot;New email from alice@example.com&quot;]
+    },
+    h_A: {
+        user_actions: [&quot;open_app(email)&quot;, &quot;search_emails('meeting')&quot;, &quot;open_email('E001')&quot;],
+        last_proposal: &quot;Create calendar event for meeting?&quot;,
+        env_notifs: [&quot;Reminder: Meeting at 2pm&quot;]
+    }
+)
 </code></pre>
-<h3 id="2-install-ollama">2. Install Ollama<a class="headerlink" href="#2-install-ollama" title="Permanent link">&para;</a></h3>
-<p>Install Ollama, a local LLM server:</p>
-<pre><code class="language-bash"># Install Ollama using Homebrew
-brew install ollama
+<hr />
+<h3 id="33-action-spaces-mathcala_i">3.3 Action Spaces <span class="arithmatex">\(\mathcal{A}_i\)</span><a class="headerlink" href="#33-action-spaces-mathcala_i" title="Permanent link">&para;</a></h3>
+<h4 id="331-user-action-space-mathcala_mathbfu">3.3.1 User Action Space <span class="arithmatex">\(\mathcal{A}_\mathbf{U}\)</span><a class="headerlink" href="#331-user-action-space-mathcala_mathbfu" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[\mathcal{A}_\mathbf{U}: \mathcal{S}_{\text{app}} \times \mathcal{S}_{\text{global}} \rightarrow 2^{\mathcal{A}_\mathbf{U}^{\text{all}}}\]</div>
+<p><strong>Definition</strong>: The user's available actions depend on the current app state. This is a <strong>state-dependent action space</strong>.</p>
+<p><strong>Constraint</strong>: At state <span class="arithmatex">\(s\)</span>, user must select from valid actions:</p>
+<div class="arithmatex">\[a_\mathbf{U}^t \in \mathcal{A}_\mathbf{U}(s_{\text{app}}^t, s_{\text{global}}^t)\]</div>
+<p>When a proposal from the agent is pending, the user's action space is augmented with <span class="arithmatex">\(\texttt{accept\_proposal}\)</span> and <span class="arithmatex">\(\texttt{reject\_proposal}\)</span>.</p>
+<p><strong>PARE Mapping</strong>: <code>environment.get_user_tools()</code></p>
+<p><strong>Example</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Available Actions <span class="arithmatex">\(\mathcal{A}_\mathbf{U}(s)\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="arithmatex">\(s_{\text{app}} = \texttt{Home}\)</span></td>
+<td><code>{open_app(contacts), open_app(email), open_app(calendar), ...}</code></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(s_{\text{app}} = \texttt{ContactsList}\)</span></td>
+<td><code>{list_contacts(), search_contacts(), open_contact(), create_contact(), go_home(), switch_app()}</code></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(s_{\text{app}} = \texttt{ContactDetail(C001)}\)</span></td>
+<td><code>{view_contact(), start_edit(), delete_contact(), go_back(), go_home()}</code></td>
+</tr>
+<tr>
+<td>Any state + pending proposal</td>
+<td>Above <span class="arithmatex">\(\cup\)</span> <code>{accept_proposal, reject_proposal}</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="332-proactive-agent-action-space-mathcala_mathbfa">3.3.2 Proactive Agent Action Space <span class="arithmatex">\(\mathcal{A}_\mathbf{A}\)</span><a class="headerlink" href="#332-proactive-agent-action-space-mathcala_mathbfa" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[\mathcal{A}_\mathbf{A} = \mathcal{A}_{\text{read}} \cup \mathcal{A}_{\text{propose}} \cup \{\texttt{wait}\}\]</div>
+<p><strong>Definition</strong>: The agent's action space is <strong>state-independent</strong> (privileged access).</p>
+<p><strong>Components</strong>:</p>
+<ul>
+<li><span class="arithmatex">\(\mathcal{A}_{\text{read}}\)</span>: Read-only queries across all apps for information gathering</li>
+<li><span class="arithmatex">\(\mathcal{A}_{\text{propose}} = \{\texttt{propose}(a) \mid a \in \mathcal{A}_{\text{privileged}}\}\)</span>: Propose a task to the user</li>
+<li><span class="arithmatex">\(\texttt{wait}\)</span>: Continue observation without intervention</li>
+</ul>
+<p><strong>PARE Mapping</strong>: <code>environment.get_tools()</code></p>
+<p><strong>Example</strong>:</p>
+<ul>
+<li><span class="arithmatex">\(\texttt{list\_emails}(\text{folder="INBOX"})\)</span> (read action)</li>
+<li><span class="arithmatex">\(\texttt{propose}(\texttt{create\_calendar\_event}(\text{title="Meeting", time="2pm"}))\)</span></li>
+<li><span class="arithmatex">\(\texttt{wait}\)</span></li>
+</ul>
+<hr />
+<h3 id="34-transition-function-t">3.4 Transition Function <span class="arithmatex">\(T\)</span><a class="headerlink" href="#34-transition-function-t" title="Permanent link">&para;</a></h3>
+<div class="arithmatex">\[T: \mathcal{S} \times \mathcal{A}_\mathbf{U} \times \mathcal{A}_\mathbf{A} \rightarrow \mathcal{S}\]</div>
+<p><strong>Definition</strong>: Given current state and joint action, produces next state. Base model is deterministic; stochastic extension supports tool failure probability.</p>
+<p><strong>PARE Mapping</strong>: State transitions handled by <code>handle_state_transition()</code> in <code>StatefulApp</code></p>
+<p><strong>Example</strong>:</p>
+<p>Initial: <span class="arithmatex">\(s = (\texttt{ContactsList}, \texttt{Contacts}, \{...\}, ([], \emptyset, []))\)</span></p>
+<p>Action: <span class="arithmatex">\(a_\mathbf{U} = \texttt{open\_contact}(\text{"C001"})\)</span>, <span class="arithmatex">\(a_\mathbf{A} = \texttt{wait}\)</span></p>
+<p>Result: <span class="arithmatex">\(s' = (\texttt{ContactDetail("C001")}, \texttt{Contacts}, \{...\}, ([\texttt{ContactsList}], \emptyset, [...]))\)</span></p>
+<hr />
+<h3 id="35-observation-spaces-mathcalo_i">3.5 Observation Spaces <span class="arithmatex">\(\mathcal{O}_i\)</span><a class="headerlink" href="#35-observation-spaces-mathcalo_i" title="Permanent link">&para;</a></h3>
+<h4 id="351-user-observation-mathcalo_mathbfu">3.5.1 User Observation <span class="arithmatex">\(\mathcal{O}_\mathbf{U}\)</span><a class="headerlink" href="#351-user-observation-mathcalo_mathbfu" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[\mathcal{O}_\mathbf{U}(s) = (\mathcal{O}_{\text{screen}}, \mathcal{O}_{\text{tools}}, \mathcal{O}_{\text{proposals}}, \mathcal{O}_{\text{env}})\]</div>
+<p>The user's observation is a function of the current state only.</p>
+<p><strong>Components</strong>:</p>
+<ul>
+<li><span class="arithmatex">\(\mathcal{O}_{\text{screen}}\)</span>: Current app and state information</li>
+<li><span class="arithmatex">\(\mathcal{O}_{\text{tools}}\)</span>: Available actions with descriptions</li>
+<li><span class="arithmatex">\(\mathcal{O}_{\text{proposals}}\)</span>: Pending proposal from agent (if any)</li>
+<li><span class="arithmatex">\(\mathcal{O}_{\text{env}}\)</span>: Environment notifications (truncated -- e.g., new email shows sender and subject, not full content)</li>
+</ul>
+<p><strong>PARE Mapping</strong>: <code>CurrentAppStateLog</code>, <code>AvailableToolsLog</code>, <code>AgentMessageLog</code>, <code>EnvironmentNotificationLog</code></p>
+<p><strong>Example</strong>:</p>
+<pre><code>O_U(s) = (
+    screen: &quot;Email -&gt; MailboxView(INBOX)&quot;,
+    tools: [&quot;list_emails()&quot;, &quot;search_emails()&quot;, &quot;open_email()&quot;, ...],
+    proposal: &quot;Agent suggests: Create calendar event for meeting?&quot;,
+    env: [&quot;[10:00] New email received&quot;]
+)
 </code></pre>
-<p>After installation, you can run a model directly with below cmd:</p>
-<h2 id="managing-ollama-models">Managing Ollama Models<a class="headerlink" href="#managing-ollama-models" title="Permanent link">&para;</a></h2>
-<h3 id="1-start-ollama-server">1. Start Ollama Server<a class="headerlink" href="#1-start-ollama-server" title="Permanent link">&para;</a></h3>
-<p>Start the Ollama server in the background:</p>
-<pre><code class="language-bash">ollama serve
+<h4 id="352-agent-observation-mathcalo_mathbfa">3.5.2 Agent Observation <span class="arithmatex">\(\mathcal{O}_\mathbf{A}\)</span><a class="headerlink" href="#352-agent-observation-mathcalo_mathbfa" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[\mathcal{O}_\mathbf{A}(s, a_\mathbf{U}) = (\mathcal{O}_{\text{user\_actions}}, \mathcal{O}_{\text{env}}, \mathcal{O}_{\text{proposal\_response}})\]</div>
+<p>The agent's observation is a function of both the state <strong>and</strong> the user's action, reflecting the Stackelberg structure.</p>
+<p><strong>Components</strong>:</p>
+<ul>
+<li><span class="arithmatex">\(\mathcal{O}_{\text{user\_actions}}\)</span>: User's executed actions (not user's observations)</li>
+<li><span class="arithmatex">\(\mathcal{O}_{\text{env}}\)</span>: Environment notifications</li>
+<li><span class="arithmatex">\(\mathcal{O}_{\text{proposal\_response}}\)</span>: User's response to last proposal (if any)</li>
+</ul>
+<p><strong>PARE Mapping</strong>: <code>UserActionLog</code>, <code>EnvironmentNotificationLog</code></p>
+<p><strong>Example</strong>:</p>
+<pre><code>O_A(s, a_U) = (
+    user_action: &quot;open_email(id='E001')&quot;,
+    user_action_history: [&quot;open_app(email)&quot;, &quot;search_emails('meeting')&quot;],
+    env: [&quot;[09:55] Reminder: Meeting at 2pm&quot;],
+    proposal_response: None
+)
 </code></pre>
-<h3 id="2-download-models">2. Download Models<a class="headerlink" href="#2-download-models" title="Permanent link">&para;</a></h3>
-<p>Choose and download one of the supported models:</p>
-<pre><code class="language-bash"># Lightweight models for testing
-ollama pull llama3.2:1b-instruct
-ollama pull phi3:mini-4k-instruct
-ollama pull qwen2.5:1.5b-instruct
-ollama pull gemma3:1b
+<hr />
+<h3 id="36-instruction-space-mathcali">3.6 Instruction Space <span class="arithmatex">\(\mathcal{I}\)</span><a class="headerlink" href="#36-instruction-space-mathcali" title="Permanent link">&para;</a></h3>
+<div class="arithmatex">\[\mathcal{I} = \mathcal{I}_\mathbf{U} \times \mathcal{I}_\mathbf{A}\]</div>
+<p><strong>Definition</strong>: Task specifications provided to each agent at episode start. Instructions are part of policy conditioning.</p>
+<p><strong>Components</strong>:</p>
+<ul>
+<li><span class="arithmatex">\(\mathcal{I}_\mathbf{U}\)</span>: User's goal in natural language</li>
+<li><span class="arithmatex">\(\mathcal{I}_\mathbf{A}\)</span>: Agent's objective (observe and assist)</li>
+</ul>
+<p><strong>PARE Mapping</strong>: Scenario definitions in <code>PAREScenario</code></p>
+<p><strong>Example</strong>:</p>
+<pre><code>I_U = &quot;You received an email about a meeting with Alice. Schedule it on your calendar.&quot;
+I_A = &quot;Observe user actions and propose helpful interventions when appropriate.&quot;
 </code></pre>
-<h3 id="3-verify-installation">3. Verify Installation<a class="headerlink" href="#3-verify-installation" title="Permanent link">&para;</a></h3>
-<p>Check that Ollama is running and list installed models:</p>
-<pre><code class="language-bash"># Check version and server status
-ollama --version &amp;&amp; curl -sS http://127.0.0.1:11434/api/version || true
-
-echo &quot;--- Installed models ---&quot;
-ollama list || true
-
-echo &quot;--- Pulling qwen2.5:1.5b-instruct ---&quot;
-ollama pull qwen2.5:1.5b-instruct
-</code></pre>
-<h3 id="4-test-model">4. Test Model<a class="headerlink" href="#4-test-model" title="Permanent link">&para;</a></h3>
-<p>Test your model with a simple prompt:</p>
-<pre><code class="language-bash">ollama run qwen2.5:1.5b-instruct &quot;test&quot;
-</code></pre>
-<h2 id="using-meta-are-compatible-commands-with-local-models">Using Meta-ARE-Compatible Commands with Local Models<a class="headerlink" href="#using-meta-are-compatible-commands-with-local-models" title="Permanent link">&para;</a></h2>
-<h3 id="basic-command-structure">Basic Command Structure<a class="headerlink" href="#basic-command-structure" title="Permanent link">&para;</a></h3>
-<p>Use the <code>are-run</code> command with the <code>local</code> provider to run scenarios with local models:</p>
-<pre><code class="language-bash">are-run -s scenario_name -a agent_name \
- --provider local \
- --model ollama/model_name \
- --endpoint http://127.0.0.1:11434 \
-</code></pre>
-<h3 id="example-with-gemma3">Example with Gemma3<a class="headerlink" href="#example-with-gemma3" title="Permanent link">&para;</a></h3>
-<pre><code class="language-bash">are-run -s scenario_find_image_file -a default \
- --provider local \
- --model ollama/gemma3:1b \
- --endpoint http://127.0.0.1:11434 \
-</code></pre>
-<h3 id="example-with-qwen25">Example with Qwen2.5<a class="headerlink" href="#example-with-qwen25" title="Permanent link">&para;</a></h3>
-<pre><code class="language-bash">are-run -s scenario_find_image_file -a default \
- --provider local \
- --model ollama/qwen2.5:1.5b-instruct \
- --endpoint http://127.0.0.1:11434
-</code></pre>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h3>
+<hr />
+<h3 id="37-reward-function-r">3.7 Reward Function <span class="arithmatex">\(R\)</span><a class="headerlink" href="#37-reward-function-r" title="Permanent link">&para;</a></h3>
+<div class="arithmatex">\[R: \mathcal{S} \times \mathcal{A}_\mathbf{U} \times \mathcal{A}_\mathbf{A} \rightarrow \mathbb{R}^2\]</div>
+<p><strong>Definition</strong>: PARE uses a dual reward structure:</p>
+<div class="arithmatex">\[R(s, a_\mathbf{U}, a_\mathbf{A}) = (R_\textrm{Succeed}(s), R_\textrm{Accept}(a_\mathbf{U}, a_\mathbf{A}))\]</div>
+<h4 id="371-success-reward-r_textrmsucceed">3.7.1 Success Reward <span class="arithmatex">\(R_\textrm{Succeed}\)</span><a class="headerlink" href="#371-success-reward-r_textrmsucceed" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[R_\textrm{Succeed}: \mathcal{S} \rightarrow \{0, 1\}\]</div>
+<p>Terminal reward indicating whether the user's goals <span class="arithmatex">\(\mathcal{G}_\mathbf{U}\)</span> are fulfilled in the final environment state, as verified by the scenario oracle:</p>
+<div class="arithmatex">\[R_\textrm{Succeed}(s) = \begin{cases} 1 &amp; \text{if } s_{\text{db}} \models \phi_{\text{goal}} \\ 0 &amp; \text{otherwise} \end{cases}\]</div>
+<p>where <span class="arithmatex">\(\phi_{\text{goal}}\)</span> is the goal predicate from the scenario oracle.</p>
+<p><strong>PARE Mapping</strong>: <code>scenario.validate(env)</code></p>
+<p><strong>Example</strong>: For "create calendar event" task:</p>
+<div class="arithmatex">\[\phi_{\text{goal}} = \exists e \in \text{CalendarEvents}: e.\text{title} = \text{"Meeting"} \land e.\text{time} = \text{"2pm"}\]</div>
+<h4 id="372-acceptance-reward-r_textrmaccept">3.7.2 Acceptance Reward <span class="arithmatex">\(R_\textrm{Accept}\)</span><a class="headerlink" href="#372-acceptance-reward-r_textrmaccept" title="Permanent link">&para;</a></h4>
+<div class="arithmatex">\[R_\textrm{Accept}: \mathcal{A}_\mathbf{U} \times \mathcal{A}_\mathbf{A} \rightarrow \{-1, 0, 1\}\]</div>
+<p>Per-step reward for proposal quality:</p>
+<div class="arithmatex">\[R_\textrm{Accept}(a_\mathbf{U}, a_\mathbf{A}) = \begin{cases}
++1 &amp; \text{if } a_\mathbf{A} = \texttt{propose}(\cdot) \land a_\mathbf{U} = \texttt{accept} \\
+-1 &amp; \text{if } a_\mathbf{A} = \texttt{propose}(\cdot) \land a_\mathbf{U} = \texttt{reject} \\
+0 &amp; \text{otherwise}
+\end{cases}\]</div>
+<p><strong>PARE Mapping</strong>: Computed from <code>proposal_count</code> and <code>acceptance_count</code></p>
+<p><strong>Example</strong>:</p>
+<ul>
+<li>Agent proposes calendar event, user accepts: <span class="arithmatex">\(R_\textrm{Accept} = +1\)</span></li>
+<li>Agent proposes irrelevant action, user rejects: <span class="arithmatex">\(R_\textrm{Accept} = -1\)</span></li>
+<li>Agent waits (no proposal): <span class="arithmatex">\(R_\textrm{Accept} = 0\)</span></li>
+</ul>
+<hr />
+<h2 id="4-episode-dynamics">4. Episode Dynamics<a class="headerlink" href="#4-episode-dynamics" title="Permanent link">&para;</a></h2>
+<h3 id="41-initialization">4.1 Initialization<a class="headerlink" href="#41-initialization" title="Permanent link">&para;</a></h3>
 <ol>
-<li><strong>Connection refused</strong>: Ensure Ollama server is running (<code>ollama serve</code>)</li>
-<li><strong>Model not found</strong>: Make sure the model is downloaded (<code>ollama pull model_name</code>)</li>
-<li><strong>Python version mismatch</strong>: Ensure you're using Python 3.12+</li>
+<li>Sample initial state <span class="arithmatex">\(s^0 \sim P_0(\mathcal{S})\)</span> from scenario definition</li>
+<li>Provide instructions <span class="arithmatex">\(I = (I_\mathbf{U}, I_\mathbf{A}) \in \mathcal{I}\)</span></li>
 </ol>
-<h3 id="port-configuration">Port Configuration<a class="headerlink" href="#port-configuration" title="Permanent link">&para;</a></h3>
-<p>The default Ollama endpoint is <code>http://127.0.0.1:11434</code>. If you need to use a different port, update the <code>--endpoint</code> parameter in your <code>are-run</code> commands.</p>
-<h2 id="performance-notes">Performance Notes<a class="headerlink" href="#performance-notes" title="Permanent link">&para;</a></h2>
+<h3 id="42-turn-structure-stackelberg">4.2 Turn Structure (Stackelberg)<a class="headerlink" href="#42-turn-structure-stackelberg" title="Permanent link">&para;</a></h3>
+<p>Each turn <span class="arithmatex">\(t\)</span> follows the Stackelberg structure: the user acts first, the agent observes the user's action, then the agent acts:</p>
+<pre><code>Turn t:
++---------------------------------------------------------------------------+
+|  USER PHASE (Leader)                                                      |
+|  1. o_U^t = O_U(s^t)                                                     |
+|  2. a_U^t ~ pi_U(. | o_U^t, h_U^t, I_U)                                 |
+|         subject to: a_U^t in A_U(s_app^t, s_global^t)                    |
++---------------------------------------------------------------------------+
+|  AGENT PHASE (Follower)                                                   |
+|  3. o_A^t = O_A(s^t, a_U^t)            &lt;- agent sees user's action       |
+|  4. a_A^t ~ pi_A(. | o_A^t, h_A^t, I_A)                                 |
++---------------------------------------------------------------------------+
+|  ENVIRONMENT UPDATE                                                       |
+|  5. s^{t+1} = T(s^t, a_U^t, a_A^t)                                      |
+|  6. r^t = R(s^t, a_U^t, a_A^t)                                           |
+|  7. Update histories: h_i^{t+1} = update(h_i^t, o_i^t, a_i^t)           |
++---------------------------------------------------------------------------+
+</code></pre>
+<h3 id="43-termination">4.3 Termination<a class="headerlink" href="#43-termination" title="Permanent link">&para;</a></h3>
+<p>Episode ends when:</p>
 <ul>
-<li>Smaller models (1B-1.5B parameters) are recommended for local development</li>
-<li>These models provide good performance for testing while keeping resource usage manageable</li>
-<li>For production use, consider more powerful models or cloud-based solutions</li>
+<li><span class="arithmatex">\(t = T_{\max}\)</span> (maximum turns reached), or</li>
+<li>Environment signals completion</li>
 </ul>
+<h3 id="44-cumulative-return">4.4 Cumulative Return<a class="headerlink" href="#44-cumulative-return" title="Permanent link">&para;</a></h3>
+<div class="arithmatex">\[G = \sum_{t=0}^{T} R_\textrm{Accept}(a_\mathbf{U}^t, a_\mathbf{A}^t) + R_\textrm{Succeed}(s^T)\]</div>
+<hr />
+<h2 id="5-summary">5. Summary<a class="headerlink" href="#5-summary" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Symbol</th>
+<th>Type</th>
+<th>PARE Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agents</td>
+<td><span class="arithmatex">\(\mathcal{N} = \{\mathbf{U}, \mathbf{A}\}\)</span></td>
+<td>Set</td>
+<td><code>{UserAgent, ProactiveAgent}</code></td>
+</tr>
+<tr>
+<td>App State</td>
+<td><span class="arithmatex">\(\mathcal{S}_{\text{app}}\)</span></td>
+<td>Finite</td>
+<td><code>StatefulApp.current_state</code></td>
+</tr>
+<tr>
+<td>Global State</td>
+<td><span class="arithmatex">\(\mathcal{S}_{\text{global}}\)</span></td>
+<td>Finite</td>
+<td><code>env.active_app</code></td>
+</tr>
+<tr>
+<td>Database</td>
+<td><span class="arithmatex">\(\mathcal{S}_{\text{db}}\)</span></td>
+<td>Structured</td>
+<td>App backends</td>
+</tr>
+<tr>
+<td>History</td>
+<td><span class="arithmatex">\(\mathcal{S}_{\text{history}}\)</span></td>
+<td>Bounded</td>
+<td>Logs, nav stack</td>
+</tr>
+<tr>
+<td>User Actions</td>
+<td><span class="arithmatex">\(\mathcal{A}_\mathbf{U}(s)\)</span></td>
+<td>State-dependent</td>
+<td><code>env.get_user_tools()</code></td>
+</tr>
+<tr>
+<td>Agent Actions</td>
+<td><span class="arithmatex">\(\mathcal{A}_\mathbf{A}\)</span></td>
+<td>Fixed</td>
+<td><code>{read(...), propose(...), wait}</code></td>
+</tr>
+<tr>
+<td>Transition</td>
+<td><span class="arithmatex">\(T\)</span></td>
+<td>Deterministic</td>
+<td><code>handle_state_transition()</code></td>
+</tr>
+<tr>
+<td>User Obs</td>
+<td><span class="arithmatex">\(\mathcal{O}_\mathbf{U}(s)\)</span></td>
+<td>Function of <span class="arithmatex">\(s\)</span></td>
+<td>Agent logs</td>
+</tr>
+<tr>
+<td>Agent Obs</td>
+<td><span class="arithmatex">\(\mathcal{O}_\mathbf{A}(s, a_\mathbf{U})\)</span></td>
+<td>Function of <span class="arithmatex">\(s\)</span>, <span class="arithmatex">\(a_\mathbf{U}\)</span></td>
+<td>Agent logs</td>
+</tr>
+<tr>
+<td>Instructions</td>
+<td><span class="arithmatex">\(\mathcal{I}\)</span></td>
+<td>Natural language</td>
+<td><code>PAREScenario</code></td>
+</tr>
+<tr>
+<td>Success Reward</td>
+<td><span class="arithmatex">\(R_\textrm{Succeed}\)</span></td>
+<td><span class="arithmatex">\(\{0, 1\}\)</span></td>
+<td><code>scenario.validate()</code></td>
+</tr>
+<tr>
+<td>Acceptance Reward</td>
+<td><span class="arithmatex">\(R_\textrm{Accept}\)</span></td>
+<td><span class="arithmatex">\(\{-1, 0, 1\}\)</span></td>
+<td>acceptance tracking</td>
+</tr>
+</tbody>
+</table>
 
 
 
