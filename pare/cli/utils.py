@@ -146,6 +146,56 @@ MODELS_MAP = {
 }
 
 
+def resolve_model_config(
+    model: str,
+    provider: str | None,
+    endpoint: str | None,
+) -> tuple[LLMEngineConfig, str]:
+    """Resolve model parameters into an LLMEngineConfig and alias.
+
+    Resolution order:
+    1. If model is in MODELS_MAP, use its values as defaults for model_name, provider, endpoint.
+    2. CLI provider/endpoint override MODELS_MAP values if provided.
+    3. If provider is still None after resolution, raise ValueError.
+
+    Alias is the MODELS_MAP key if matched, otherwise the last segment after '/' in model name.
+
+    Args:
+        model: Model name or MODELS_MAP alias.
+        provider: Provider override (None to use MODELS_MAP or fail).
+        endpoint: Endpoint override (None to use MODELS_MAP or omit).
+
+    Returns:
+        Tuple of (LLMEngineConfig, alias).
+
+    Raises:
+        ValueError: If provider cannot be resolved.
+    """
+    map_entry = MODELS_MAP.get(model)
+
+    if map_entry:
+        resolved_model = map_entry.get("model_name", model)
+        resolved_provider = provider or map_entry.get("provider")
+        resolved_endpoint = endpoint or map_entry.get("endpoint")
+        alias = model
+    else:
+        resolved_model = model
+        resolved_provider = provider
+        resolved_endpoint = endpoint
+        alias = model.rsplit("/", 1)[-1]
+
+    if not resolved_provider:
+        msg = f"Provider is required for model '{model}'. Use --<role>-provider or add the model to MODELS_MAP."
+        raise ValueError(msg)
+
+    engine_config = LLMEngineConfig(
+        model_name=resolved_model,
+        provider=resolved_provider,
+        endpoint=resolved_endpoint,
+    )
+    return engine_config, alias
+
+
 def get_pst_time() -> str:
     """Get the current time in PST."""
     date_format = "%Y%m%d_%H%M%S"
