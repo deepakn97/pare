@@ -182,8 +182,10 @@ def run_scenario_by_id(
     scenario_name: str = "email_notification",
     user_model: str = "gpt-4o-mini",
     user_model_provider: str = "openai",
+    user_model_endpoint: str | None = None,
     proactive_model: str = "gpt-4o-mini",
     proactive_model_provider: str = "openai",
+    proactive_model_endpoint: str | None = None,
     max_turns: int | None = 10,
     user_max_iterations: int = 1,
     observe_max_iterations: int = 10,
@@ -198,10 +200,12 @@ def run_scenario_by_id(
 
     Args:
         scenario_name: Name of the registered scenario to run.
-        user_model: LLM model to use for the user agent.
+        user_model: LLM model name for the user agent.
         user_model_provider: Provider for user model.
-        proactive_model: LLM model to use for the proactive observe and execute agents.
+        user_model_endpoint: Endpoint URL for user model (for locally hosted models).
+        proactive_model: LLM model name for the proactive observe and execute agents.
         proactive_model_provider: Provider for proactive model.
+        proactive_model_endpoint: Endpoint URL for proactive model (for locally hosted models).
         max_turns: Maximum number of agent turns to run (None for unlimited).
         user_max_iterations: Maximum number of iterations for the user agent.
         observe_max_iterations: Maximum number of iterations for the proactive observe agent.
@@ -244,31 +248,25 @@ def run_scenario_by_id(
 
     scenario.initialize(sandbox_dir=Path("sandbox"))
 
-    user_model_data = MODELS_MAP.get(user_model, {})
-    proactive_model_data = MODELS_MAP.get(proactive_model, {})
-
-    if user_model_data:
-        user_model = user_model_data["model_name"]
-        user_model_provider = user_model_data["provider"]
-    else:
-        logger.warning(
-            f"Provided user model {user_model} not found in MODELS_MAP. Provider information may be incorrect."
-        )
-    if proactive_model_data:
-        proactive_model = proactive_model_data["model_name"]
-        proactive_model_provider = proactive_model_data["provider"]
-    else:
-        logger.warning(
-            f"Provided proactive model {proactive_model} not found in MODELS_MAP. Provider information may be incorrect."
-        )
-
     # Create runner configuration
     runner_config = ScenarioRunnerConfig(
-        user_engine_config=LLMEngineConfig(model_name=user_model, provider=user_model_provider),
+        user_engine_config=LLMEngineConfig(
+            model_name=user_model,
+            provider=user_model_provider,
+            endpoint=user_model_endpoint,
+        ),
         user_max_iterations=user_max_iterations,
-        observe_engine_config=LLMEngineConfig(model_name=proactive_model, provider=proactive_model_provider),
+        observe_engine_config=LLMEngineConfig(
+            model_name=proactive_model,
+            provider=proactive_model_provider,
+            endpoint=proactive_model_endpoint,
+        ),
         observe_max_iterations=observe_max_iterations,
-        execute_engine_config=LLMEngineConfig(model_name=proactive_model, provider=proactive_model_provider),
+        execute_engine_config=LLMEngineConfig(
+            model_name=proactive_model,
+            provider=proactive_model_provider,
+            endpoint=proactive_model_endpoint,
+        ),
         execute_max_iterations=execute_max_iterations,
         max_turns=max_turns,
         oracle=oracle_mode,
