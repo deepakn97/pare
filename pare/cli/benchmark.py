@@ -285,8 +285,7 @@ def _print_config_result(
 
     if exceptions > 0:
         exc_groups = (
-            exception_df
-            .group_by("exception_type")
+            exception_df.group_by("exception_type")
             .agg(
                 pl.col("exception_message").first().alias("sample_message"),
                 pl.len().alias("count"),
