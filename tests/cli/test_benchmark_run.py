@@ -210,6 +210,86 @@ def test_parse_scenarios_arg_file_path(tmp_path: Path) -> None:
     assert "cab_booking" in result
 
 
+# --- Config file tests ---
+
+
+def test_run_with_yaml_config_file(tmp_path: Path) -> None:
+    """Should load parameters from a YAML config file."""
+    config_yaml = """\
+observe_model: "liquid/lfm2.5-350m"
+observe_provider: "hosted_vllm"
+observe_endpoint: "http://localhost:8001/v1"
+execute_model: "google/gemma-4-26b-a4b-it"
+execute_provider: "hosted_vllm"
+execute_endpoint: "http://localhost:8002/v1"
+user_model: "gpt-5-mini"
+user_provider: "openai"
+user_endpoint: "http://localhost:8003/v1"
+split: "full"
+"""
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(config_yaml)
+    results_dir = tmp_path / "results"
+
+    with (
+        patch("pare.cli.benchmark.probe_llm_endpoint"),
+        patch(
+            "pare.multi_scenario_runner.MultiScenarioRunner.run_with_scenarios",
+            side_effect=_mock_run_with_scenarios,
+        ) as mock_runner,
+    ):
+        result = runner.invoke(
+            app, ["run", "--results-dir", str(results_dir), "--config", str(config_file)]
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        config = mock_runner.call_args[0][0]
+        assert config.observe_engine_config.model_name == "liquid/lfm2.5-350m"
+        assert config.observe_engine_config.provider == "hosted_vllm"
+        assert config.observe_engine_config.endpoint == "http://localhost:8001/v1"
+        assert config.execute_engine_config.model_name == "google/gemma-4-26b-a4b-it"
+        assert config.execute_engine_config.provider == "hosted_vllm"
+        assert config.execute_engine_config.endpoint == "http://localhost:8002/v1"
+        assert config.user_engine_config.model_name == "gpt-5-mini"
+        assert config.user_engine_config.provider == "openai"
+        assert config.user_engine_config.endpoint == "http://localhost:8003/v1"
+
+
+def test_cli_flags_override_config_file(tmp_path: Path) -> None:
+    """CLI flags should take precedence over config file values."""
+    config_yaml = """\
+observe_model: "original-model"
+observe_provider: "original-provider"
+split: "full"
+"""
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(config_yaml)
+    results_dir = tmp_path / "results"
+
+    with (
+        patch("pare.cli.benchmark.probe_llm_endpoint"),
+        patch(
+            "pare.multi_scenario_runner.MultiScenarioRunner.run_with_scenarios",
+            side_effect=_mock_run_with_scenarios,
+        ) as mock_runner,
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "run", "--results-dir", str(results_dir),
+                "--config", str(config_file),
+                "--observe-model", "override-model",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        config = mock_runner.call_args[0][0]
+        # Overridden value
+        assert config.observe_engine_config.model_name == "override-model"
+        # Non-overridden value should remain from config file
+        assert config.observe_engine_config.provider == "original-provider"
+
+
 # --- Sweep removal test ---
 
 
