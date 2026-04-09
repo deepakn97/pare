@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import polars as pl
 import typer
+from typer_config import use_yaml_config
 
 from pare.benchmark.report_stats import (
     generate_json_stats_report,
@@ -16,9 +17,15 @@ from pare.benchmark.report_stats import (
 )
 from pare.benchmark.scenario_executor import multiply_scenarios_iterator
 from pare.benchmark.scenario_loader import (
+    Split,
     load_scenario_ids_from_file,
+    load_scenarios_by_split,
+    load_scenarios_from_registry,
 )
+from pare.cli.utils import probe_llm_endpoint
+from pare.logging_config import configure_logging, suppress_noisy_are_loggers, suppress_noisy_loggers
 from pare.multi_scenario_runner import MultiScenarioRunner
+from pare.scenarios.config import MultiScenarioRunnerConfig
 from pare.scenarios.validation_result import PARE_RESULT_SCHEMA
 
 if TYPE_CHECKING:
@@ -27,7 +34,6 @@ if TYPE_CHECKING:
     from are.simulation.utils.countable_iterator import CountableIterator
 
     from pare.scenarios import PAREScenario
-    from pare.scenarios.config import MultiScenarioRunnerConfig
     from pare.scenarios.validation_result import PAREMultiScenarioValidationResult
 
 logger = logging.getLogger(__name__)
@@ -262,7 +268,8 @@ def _print_config_result(
 
     if exceptions > 0:
         exc_groups = (
-            exception_df.group_by("exception_type")
+            exception_df
+            .group_by("exception_type")
             .agg(
                 pl.col("exception_message").first().alias("sample_message"),
                 pl.len().alias("count"),
@@ -274,6 +281,267 @@ def _print_config_result(
             if len(msg) > 100:
                 msg = msg[:100] + "..."
             typer.echo(f"{prefix}  [{row['exception_type']}] x{row['count']}: {msg}")
+
+
+@app.command()
+@use_yaml_config()
+def run(
+    # Scenario selection (mutually exclusive)
+    scenarios: Annotated[
+        str | None,
+        typer.Option("--scenarios", "-s", help="Scenario IDs: single ID, comma-separated, or file path"),
+    ] = None,
+    split: Annotated[
+        Split | None,
+        typer.Option("--split", help="Benchmark split: full or ablation"),
+    ] = None,
+    # Observe model configuration
+    observe_model: Annotated[
+        str,
+        typer.Option("--observe-model", "-om", help="Observe model name"),
+    ] = "gpt-5",
+    observe_provider: Annotated[
+        str,
+        typer.Option("--observe-provider", "-op", help="Observe model provider"),
+    ] = "openai",
+    observe_endpoint: Annotated[
+        str | None,
+        typer.Option("--observe-endpoint", "-oe", help="Observe model endpoint URL"),
+    ] = None,
+    # Execute model configuration
+    execute_model: Annotated[
+        str,
+        typer.Option("--execute-model", "-em", help="Execute model name"),
+    ] = "gpt-5",
+    execute_provider: Annotated[
+        str,
+        typer.Option("--execute-provider", "-ep", help="Execute model provider"),
+    ] = "openai",
+    execute_endpoint: Annotated[
+        str | None,
+        typer.Option("--execute-endpoint", "-ee", help="Execute model endpoint URL"),
+    ] = None,
+    # User model configuration
+    user_model: Annotated[
+        str,
+        typer.Option("--user-model", "-um", help="User agent model name"),
+    ] = "gpt-5-mini",
+    user_provider: Annotated[
+        str,
+        typer.Option("--user-provider", "-up", help="User agent model provider"),
+    ] = "openai",
+    user_endpoint: Annotated[
+        str | None,
+        typer.Option("--user-endpoint", "-ue", help="User agent model endpoint URL"),
+    ] = None,
+    # Iteration limits
+    max_turns: Annotated[
+        int,
+        typer.Option("--max-turns", "-mt", help="Maximum turns per scenario"),
+    ] = 10,
+    observe_max_iterations: Annotated[
+        int,
+        typer.Option("--observe-max-iterations", "-omi", help="Max iterations for observe agent per turn"),
+    ] = 1,
+    execute_max_iterations: Annotated[
+        int,
+        typer.Option("--execute-max-iterations", "-emi", help="Max iterations for execute agent per turn"),
+    ] = 1,
+    user_max_iterations: Annotated[
+        int,
+        typer.Option("--user-max-iterations", "-umi", help="Max iterations for user agent per turn"),
+    ] = 1,
+    # Noise configuration
+    tool_failure_probability: Annotated[
+        float | None,
+        typer.Option("--tool-failure-probability", "-tfp", help="Tool failure probability"),
+    ] = None,
+    env_events_per_min: Annotated[
+        int | None,
+        typer.Option("--env-events-per-min", "-epm", help="Environmental events per minute"),
+    ] = None,
+    env_events_seed: Annotated[
+        int,
+        typer.Option("--env-events-seed", help="Seed for env events generation"),
+    ] = 42,
+    # Execution configuration
+    runs: Annotated[
+        int,
+        typer.Option("--runs", "-r", help="Number of runs per scenario"),
+    ] = 1,
+    max_concurrent: Annotated[
+        int | None,
+        typer.Option("--max-concurrent", "-c", help="Max concurrent scenarios (default: CPU count)"),
+    ] = None,
+    timeout: Annotated[
+        int | None,
+        typer.Option("--timeout", "-t", help="Timeout per scenario in seconds"),
+    ] = None,
+    executor_type: Annotated[
+        str,
+        typer.Option("--executor-type", help="Executor: sequential, thread, or process"),
+    ] = "thread",
+    # Output configuration
+    results_dir: Annotated[
+        Path,
+        typer.Option("--results-dir", help="Directory for JSON result files"),
+    ] = Path("results"),
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Directory for trace exports"),
+    ] = None,
+    export: Annotated[
+        bool,
+        typer.Option("--export/--no-export", help="Export scenario traces"),
+    ] = False,
+    export_format: Annotated[
+        str,
+        typer.Option("--export-format", help="Trace export format: hf or lite"),
+    ] = "hf",
+    experiment_name: Annotated[
+        str,
+        typer.Option("--experiment-name", "-n", help="Name for this experiment"),
+    ] = "benchmark",
+    # Misc
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Logging level: DEBUG, INFO, WARNING, ERROR"),
+    ] = "INFO",
+    no_cache: Annotated[
+        bool,
+        typer.Option("--no-cache", help="Disable result caching"),
+    ] = False,
+    oracle: Annotated[
+        bool,
+        typer.Option("--oracle", help="Run in oracle mode (no agents, execute oracle events only)"),
+    ] = False,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", "-l", help="Limit number of scenarios to load"),
+    ] = None,
+) -> None:
+    """Run benchmark experiments with a single model configuration."""
+    from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
+    from are.simulation.scenarios.utils.scenario_expander import EnvEventsConfig
+    from are.simulation.types import ToolAugmentationConfig
+
+    # Setup logging
+    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    configure_logging(level=numeric_level, use_tqdm=True)
+    suppress_noisy_loggers()
+    suppress_noisy_are_loggers()
+
+    # Validate scenario selection: exactly one of --scenarios or --split must be provided
+    if (scenarios is None) == (split is None):
+        msg = (
+            "--scenarios and --split are mutually exclusive"
+            if scenarios is not None
+            else "Either --scenarios or --split must be provided"
+        )
+        raise typer.BadParameter(msg)
+
+    # Build scenario iterator factory
+    if scenarios is not None:
+        scenario_ids = parse_scenarios_arg(scenarios)
+        split_name = "custom"
+
+        def scenario_factory() -> CountableIterator[PAREScenario]:
+            return load_scenarios_from_registry(scenario_ids=scenario_ids, limit=limit)
+
+    elif split is not None:
+        split_name = split.value
+
+        def scenario_factory() -> CountableIterator[PAREScenario]:
+            return load_scenarios_by_split(split, limit=limit)
+
+    # Build engine configs with endpoint support
+    observe_engine_config = LLMEngineConfig(
+        model_name=observe_model,
+        provider=observe_provider,
+        endpoint=observe_endpoint,
+    )
+    execute_engine_config = LLMEngineConfig(
+        model_name=execute_model,
+        provider=execute_provider,
+        endpoint=execute_endpoint,
+    )
+    user_engine_config = LLMEngineConfig(
+        model_name=user_model,
+        provider=user_provider,
+        endpoint=user_endpoint,
+    )
+
+    # Build noise configs
+    tool_augmentation_config = None
+    if tool_failure_probability is not None and tool_failure_probability > 0:
+        tool_augmentation_config = ToolAugmentationConfig(
+            tool_failure_probability=tool_failure_probability,
+        )
+
+    env_events_config = None
+    if env_events_per_min is not None and env_events_per_min > 0:
+        env_events_config = EnvEventsConfig(
+            num_env_events_per_minute=env_events_per_min,
+            env_events_seed=env_events_seed,
+        )
+
+    # Build the full config
+    config = MultiScenarioRunnerConfig(
+        user_engine_config=user_engine_config,
+        observe_engine_config=observe_engine_config,
+        execute_engine_config=execute_engine_config,
+        user_max_iterations=user_max_iterations,
+        observe_max_iterations=observe_max_iterations,
+        execute_max_iterations=execute_max_iterations,
+        max_turns=max_turns,
+        oracle=oracle,
+        export=export,
+        trace_dump_format=export_format,
+        max_concurrent_scenarios=max_concurrent,
+        timeout_seconds=timeout,
+        executor_type=executor_type,
+        log_level=log_level,
+        enable_caching=not no_cache,
+        experiment_name=experiment_name,
+        use_custom_logger=False,
+        tool_augmentation_config=tool_augmentation_config,
+        env_events_config=env_events_config,
+    )
+
+    # Probe all unique LLM endpoints before running scenarios
+    probed: set[tuple[str, str | None]] = set()
+    for engine in (user_engine_config, observe_engine_config, execute_engine_config):
+        engine_key = (engine.model_name, engine.provider)
+        if engine_key not in probed:
+            probe_llm_endpoint(engine)
+            probed.add(engine_key)
+
+    # Build directory names
+    base_dir_name = build_base_dir_name(
+        experiment_name=experiment_name,
+        split=split_name,
+        user_model=user_model,
+        max_turns=max_turns,
+        user_max_iterations=user_max_iterations,
+        observe_max_iterations=observe_max_iterations,
+        execute_max_iterations=execute_max_iterations,
+    )
+
+    # Run the config
+    _config_descriptor, result = run_single_config(
+        config=config,
+        scenario_iterator_factory=scenario_factory,
+        runs=runs,
+        split_name=split_name,
+        base_dir_name=base_dir_name,
+        results_dir=results_dir,
+        output_dir=output_dir,
+    )
+
+    # Print results
+    config_key = build_result_key(config)
+    typer.echo("\nBenchmark complete:")
+    _print_config_result(config_key, result)
 
 
 @app.command()
