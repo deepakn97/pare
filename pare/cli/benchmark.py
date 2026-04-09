@@ -23,7 +23,7 @@ from pare.benchmark.scenario_loader import (
     load_scenarios_by_split,
     load_scenarios_from_registry,
 )
-from pare.cli.utils import probe_llm_endpoint
+from pare.cli.utils import probe_llm_endpoint, resolve_model_config
 from pare.logging_config import configure_logging, suppress_noisy_are_loggers, suppress_noisy_loggers
 from pare.multi_scenario_runner import MultiScenarioRunner
 from pare.scenarios.config import MultiScenarioRunnerConfig
@@ -317,9 +317,9 @@ def run(
         typer.Option("--observe-model", "-om", help="Observe model name"),
     ] = "gpt-5",
     observe_provider: Annotated[
-        str,
+        str | None,
         typer.Option("--observe-provider", "-op", help="Observe model provider"),
-    ] = "openai",
+    ] = None,
     observe_endpoint: Annotated[
         str | None,
         typer.Option("--observe-endpoint", "-oe", help="Observe model endpoint URL"),
@@ -330,9 +330,9 @@ def run(
         typer.Option("--execute-model", "-em", help="Execute model name"),
     ] = "gpt-5",
     execute_provider: Annotated[
-        str,
+        str | None,
         typer.Option("--execute-provider", "-ep", help="Execute model provider"),
-    ] = "openai",
+    ] = None,
     execute_endpoint: Annotated[
         str | None,
         typer.Option("--execute-endpoint", "-ee", help="Execute model endpoint URL"),
@@ -343,9 +343,9 @@ def run(
         typer.Option("--user-model", "-um", help="User agent model name"),
     ] = "gpt-5-mini",
     user_provider: Annotated[
-        str,
+        str | None,
         typer.Option("--user-provider", "-up", help="User agent model provider"),
-    ] = "openai",
+    ] = None,
     user_endpoint: Annotated[
         str | None,
         typer.Option("--user-endpoint", "-ue", help="User agent model endpoint URL"),
@@ -437,7 +437,6 @@ def run(
     ] = None,
 ) -> None:
     """Run benchmark experiments with a single model configuration."""
-    from are.simulation.agents.are_simulation_agent_config import LLMEngineConfig
     from are.simulation.scenarios.utils.scenario_expander import EnvEventsConfig
     from are.simulation.types import ToolAugmentationConfig
 
@@ -470,22 +469,10 @@ def run(
         def scenario_factory() -> CountableIterator[PAREScenario]:
             return load_scenarios_by_split(split, limit=limit)
 
-    # Build engine configs with endpoint support
-    observe_engine_config = LLMEngineConfig(
-        model_name=observe_model,
-        provider=observe_provider,
-        endpoint=observe_endpoint,
-    )
-    execute_engine_config = LLMEngineConfig(
-        model_name=execute_model,
-        provider=execute_provider,
-        endpoint=execute_endpoint,
-    )
-    user_engine_config = LLMEngineConfig(
-        model_name=user_model,
-        provider=user_provider,
-        endpoint=user_endpoint,
-    )
+    # Resolve model configs (MODELS_MAP lookup + alias normalization)
+    observe_engine_config, observe_alias = resolve_model_config(observe_model, observe_provider, observe_endpoint)
+    execute_engine_config, execute_alias = resolve_model_config(execute_model, execute_provider, execute_endpoint)
+    user_engine_config, user_alias = resolve_model_config(user_model, user_provider, user_endpoint)
 
     # Build noise configs
     tool_augmentation_config = None
@@ -506,6 +493,9 @@ def run(
         user_engine_config=user_engine_config,
         observe_engine_config=observe_engine_config,
         execute_engine_config=execute_engine_config,
+        user_model_alias=user_alias,
+        observe_model_alias=observe_alias,
+        execute_model_alias=execute_alias,
         user_max_iterations=user_max_iterations,
         observe_max_iterations=observe_max_iterations,
         execute_max_iterations=execute_max_iterations,
@@ -536,7 +526,7 @@ def run(
     base_dir_name = build_base_dir_name(
         experiment_name=experiment_name,
         split=split_name,
-        user_model=user_model,
+        user_model=user_alias,
         max_turns=max_turns,
         user_max_iterations=user_max_iterations,
         observe_max_iterations=observe_max_iterations,

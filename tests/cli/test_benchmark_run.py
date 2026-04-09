@@ -6,9 +6,11 @@ import tempfile
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from pare.cli.benchmark import app, parse_scenarios_arg
+from pare.cli.utils import resolve_model_config
 from pare.scenarios.validation_result import PAREMultiScenarioValidationResult
 
 if TYPE_CHECKING:
@@ -208,6 +210,62 @@ def test_parse_scenarios_arg_file_path(tmp_path: Path) -> None:
     result = parse_scenarios_arg(str(scenario_file))
     assert "email_notification" in result
     assert "cab_booking" in result
+
+
+# --- resolve_model_config unit tests ---
+
+
+def test_resolve_model_config_models_map_entry() -> None:
+    """Should use MODELS_MAP values when model matches a known alias."""
+    config, alias = resolve_model_config("gpt-5", None, None)
+    assert config.model_name == "gpt-5"
+    assert config.provider == "openai"
+    assert config.endpoint is None
+    assert alias == "gpt-5"
+
+
+def test_resolve_model_config_models_map_with_cli_override() -> None:
+    """CLI provider/endpoint should override MODELS_MAP values."""
+    config, alias = resolve_model_config("gpt-5", "custom-provider", "http://localhost:9999/v1")
+    assert config.model_name == "gpt-5"
+    assert config.provider == "custom-provider"
+    assert config.endpoint == "http://localhost:9999/v1"
+    assert alias == "gpt-5"
+
+
+def test_resolve_model_config_unknown_model_with_provider() -> None:
+    """Should use raw values for unknown models with explicit provider."""
+    config, alias = resolve_model_config("org/team/custom-model", "hosted_vllm", "http://localhost:8001/v1")
+    assert config.model_name == "org/team/custom-model"
+    assert config.provider == "hosted_vllm"
+    assert config.endpoint == "http://localhost:8001/v1"
+    assert alias == "custom-model"
+
+
+def test_resolve_model_config_requires_provider_for_unknown_models() -> None:
+    """Should raise ValueError if model not in MODELS_MAP and no provider specified."""
+    with pytest.raises(ValueError, match="Provider is required"):
+        resolve_model_config("unknown/model", None, None)
+
+
+def test_resolve_model_config_alias_no_slash() -> None:
+    """Alias for models without slashes should be the full model name."""
+    _config, alias = resolve_model_config("simple-model", "openai", None)
+    assert alias == "simple-model"
+
+
+def test_resolve_model_config_alias_multiple_slashes() -> None:
+    """Alias should use last segment after final slash."""
+    _config, alias = resolve_model_config("accounts/fireworks/models/deepseek-v3p2", "fireworks_ai", None)
+    assert alias == "deepseek-v3p2"
+
+
+def test_resolve_model_config_fireworks_via_models_map() -> None:
+    """Fireworks models in MODELS_MAP should resolve correctly."""
+    config, alias = resolve_model_config("deepseek-v3.2", None, None)
+    assert config.model_name == "accounts/fireworks/models/deepseek-v3p2"
+    assert config.provider == "fireworks_ai"
+    assert alias == "deepseek-v3.2"
 
 
 # --- Config file tests ---

@@ -85,14 +85,16 @@ ENV_AUGMENTATION_DATA_PATH="data/metaare_augmentation_data.json"
 
 ### Run a Single Scenario
 
+Models registered in `MODELS_MAP` (see `pare/cli/utils.py`) can be used by alias without specifying `--provider`:
+
 ```bash
-pare benchmark run -s email_notification -om gpt-5 -op openai -em gpt-5 -ep openai
+pare benchmark run -s email_notification -om gpt-5 -em gpt-5
 ```
 
 ### Run the Full Benchmark
 
 ```bash
-pare benchmark run --split full -om gpt-5 -op openai -em gpt-5 -ep openai --runs 3
+pare benchmark run --split full -om gpt-5 -em gpt-5 --runs 3
 ```
 
 ### Using a YAML Config File
@@ -105,18 +107,15 @@ Example config file:
 
 ```yaml
 observe_model: "gpt-5"
-observe_provider: "openai"
 execute_model: "gpt-5"
-execute_provider: "openai"
 user_model: "gpt-5-mini"
-user_provider: "openai"
 split: "full"
 runs: 3
 ```
 
 ### Locally Hosted Models
 
-For models served via vLLM or other OpenAI-compatible servers:
+For models not in `MODELS_MAP`, specify `--provider` (and `--endpoint` for locally served models):
 
 ```bash
 pare benchmark run --split full \
