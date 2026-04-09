@@ -89,6 +89,7 @@ def probe_llm_endpoint(
                 model=model_name,
                 custom_llm_provider=provider if provider != "local" else None,
                 messages=[{"role": "user", "content": "Reply with only the word ok"}],
+                api_base=engine_config.endpoint,
                 num_retries=0,
             )
         except _RETRYABLE_PROBE_ERRORS as e:
