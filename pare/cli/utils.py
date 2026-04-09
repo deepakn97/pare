@@ -79,8 +79,9 @@ def probe_llm_endpoint(
     """
     model_name = engine_config.model_name
     provider = engine_config.provider
+    endpoint = engine_config.endpoint
 
-    logger.info(f"Probing LLM endpoint: {model_name} (provider: {provider})")
+    logger.info(f"Probing LLM: {model_name} (provider: {provider}, endpoint: {endpoint})")
     start_time = time.monotonic()
 
     while True:
@@ -89,7 +90,7 @@ def probe_llm_endpoint(
                 model=model_name,
                 custom_llm_provider=provider if provider != "local" else None,
                 messages=[{"role": "user", "content": "Reply with only the word ok"}],
-                api_base=engine_config.endpoint,
+                api_base=endpoint,
                 num_retries=0,
             )
         except _RETRYABLE_PROBE_ERRORS as e:
@@ -99,18 +100,15 @@ def probe_llm_endpoint(
                     f"LLM endpoint {model_name} not ready after {timeout_seconds}s. Last error: {type(e).__name__}: {e}"
                 ) from e
             logger.warning(
-                f"LLM endpoint {model_name} returned {type(e).__name__}, "
-                f"retrying in {poll_interval}s ({elapsed:.0f}s elapsed)"
+                f"LLM {model_name} returned {type(e).__name__}, retrying in {poll_interval}s ({elapsed:.0f}s elapsed)"
             )
             time.sleep(poll_interval)
 
         except Exception as e:
-            raise LLMProbeError(
-                f"LLM endpoint {model_name} failed with non-retryable error: {type(e).__name__}: {e}"
-            ) from e
+            raise LLMProbeError(f"LLM {model_name} failed with non-retryable error: {type(e).__name__}: {e}") from e
         else:
             elapsed = time.monotonic() - start_time
-            logger.info(f"LLM endpoint ready: {model_name} ({elapsed:.1f}s)")
+            logger.info(f"LLM ready: {model_name} ({elapsed:.1f}s)")
             return
 
 

@@ -1,4 +1,4 @@
-<img src="docs/assets/pear.png" width="30" align="left" style="margin-right: 8px;"/> 
+<img src="docs/assets/pear.png" width="30" align="left" style="margin-right: 8px;"/>
 
 # PARE: Proactive Agent Research Environment
 
