@@ -86,24 +86,46 @@ ENV_AUGMENTATION_DATA_PATH="data/metaare_augmentation_data.json"
 ### Run a Single Scenario
 
 ```bash
-pare benchmark sweep -s email_notification -om gpt-5 -em gpt-5
+pare benchmark run -s email_notification -om gpt-5 -op openai -em gpt-5 -ep openai
 ```
 
 ### Run the Full Benchmark
 
 ```bash
-pare benchmark sweep --split full -om gpt-5 -em gpt-5 --runs 3
+pare benchmark run --split full -om gpt-5 -op openai -em gpt-5 -ep openai --runs 3
 ```
 
-### Model Sweep
-
-Model pairs are zipped (not crossed). Each `--observe-model` is paired with the corresponding `--execute-model`:
+### Using a YAML Config File
 
 ```bash
-pare benchmark sweep --split full \
-  -om gpt-5 -om claude-4.5-sonnet \
-  -em gpt-5 -em claude-4.5-sonnet \
-  --runs 3
+pare benchmark run --config experiments/my_experiment.yaml
+```
+
+Example config file:
+
+```yaml
+observe_model: "gpt-5"
+observe_provider: "openai"
+execute_model: "gpt-5"
+execute_provider: "openai"
+user_model: "gpt-5-mini"
+user_provider: "openai"
+split: "full"
+runs: 3
+```
+
+### Locally Hosted Models
+
+For models served via vLLM or other OpenAI-compatible servers:
+
+```bash
+pare benchmark run --split full \
+  --observe-model liquid/lfm2.5-350m \
+  --observe-provider hosted_vllm \
+  --observe-endpoint http://localhost:8001/v1 \
+  --execute-model google/gemma-4-26b-a4b-it \
+  --execute-provider hosted_vllm \
+  --execute-endpoint http://localhost:8002/v1
 ```
 
 ### Results
@@ -115,10 +137,9 @@ results/
   {experiment}_{split}_user_{model}_mt_{turns}_umi_..._omi_..._emi_.../
     obs_{model}_exec_{model}_..._result.json
     obs_{model}_exec_{model}_..._report.txt
-    combined_report.txt
 ```
 
-Use `pare benchmark sweep --help` for the full list of configuration options.
+Use `pare benchmark run --help` for the full list of configuration options.
 
 ### Other CLI Commands
 
