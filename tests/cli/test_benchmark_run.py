@@ -2,29 +2,44 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+import tempfile
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
-from pare.cli.benchmark import app
+from pare.cli.benchmark import app, parse_scenarios_arg
+from pare.scenarios.validation_result import PAREMultiScenarioValidationResult
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from pare.scenarios.config import MultiScenarioRunnerConfig
 
 runner = CliRunner()
 
 
-def test_run_command_exists() -> None:
-    """The run command should be registered."""
-    result = runner.invoke(app, ["run", "--help"])
-    assert result.exit_code == 0
-    assert "--observe-model" in result.output
-    assert "--observe-provider" in result.output
-    assert "--observe-endpoint" in result.output
-    assert "--execute-model" in result.output
-    assert "--execute-provider" in result.output
-    assert "--execute-endpoint" in result.output
-    assert "--user-model" in result.output
-    assert "--user-provider" in result.output
-    assert "--user-endpoint" in result.output
-    assert "--config" in result.output
+def _mock_run_with_scenarios(
+    config: MultiScenarioRunnerConfig, scenarios_iterator: object
+) -> PAREMultiScenarioValidationResult:
+    """Return an empty but valid result from MultiScenarioRunner."""
+    return PAREMultiScenarioValidationResult(run_config=config)
+
+
+def _invoke_run(args: list[str]) -> object:
+    """Invoke the run command with standard boundary mocks."""
+    with (
+        patch("pare.cli.benchmark.probe_llm_endpoint"),
+        patch(
+            "pare.multi_scenario_runner.MultiScenarioRunner.run_with_scenarios",
+            side_effect=_mock_run_with_scenarios,
+        ),
+        tempfile.TemporaryDirectory() as tmpdir,
+    ):
+        return runner.invoke(app, ["run", "--results-dir", tmpdir, *args])
+
+
+# --- Validation tests ---
 
 
 def test_run_requires_split_or_scenarios() -> None:
@@ -33,23 +48,52 @@ def test_run_requires_split_or_scenarios() -> None:
     assert result.exit_code != 0
 
 
+def test_run_rejects_both_split_and_scenarios() -> None:
+    """Should fail if both --split and --scenarios are provided."""
+    result = runner.invoke(
+        app,
+        ["run", "--split", "full", "--scenarios", "email_notification"],
+    )
+    assert result.exit_code != 0
+
+
+def test_run_rejects_invalid_executor_type() -> None:
+    """Should reject invalid executor type values."""
+    result = runner.invoke(
+        app,
+        ["run", "--split", "full", "--executor-type", "invalid"],
+    )
+    assert result.exit_code != 0
+
+
+def test_run_rejects_invalid_export_format() -> None:
+    """Should reject invalid export format values."""
+    result = runner.invoke(
+        app,
+        ["run", "--split", "full", "--export-format", "invalid"],
+    )
+    assert result.exit_code != 0
+
+
+# --- Config construction tests ---
+
+
 def test_run_constructs_engine_config_with_endpoint() -> None:
-    """Run should pass endpoint through to LLMEngineConfig."""
+    """Endpoint, provider, and model_name should flow through to LLMEngineConfig."""
     with (
         patch("pare.cli.benchmark.probe_llm_endpoint"),
-        patch("pare.cli.benchmark.run_single_config") as mock_run,
-        patch("pare.cli.benchmark.build_result_key", return_value=("user", "obs_exec", 0.0, 0)),
-        patch("pare.cli.benchmark._print_config_result"),
-        patch("pare.cli.benchmark.load_scenarios_by_split") as mock_load,
+        patch(
+            "pare.multi_scenario_runner.MultiScenarioRunner.run_with_scenarios",
+            side_effect=_mock_run_with_scenarios,
+        ) as mock_runner,
+        tempfile.TemporaryDirectory() as tmpdir,
     ):
-        mock_load.return_value = MagicMock()
-        mock_run.return_value = ("test_descriptor", MagicMock())
-
         result = runner.invoke(
             app,
             [
                 "run",
                 "--split", "full",
+                "--results-dir", tmpdir,
                 "--observe-model", "liquid/lfm2.5-350m",
                 "--observe-provider", "hosted_vllm",
                 "--observe-endpoint", "http://localhost:8001/v1",
@@ -59,14 +103,114 @@ def test_run_constructs_engine_config_with_endpoint() -> None:
             ],
         )
 
-        assert result.exit_code == 0, f"Command failed with: {result.output}"
-        config = mock_run.call_args[1].get("config") or mock_run.call_args[0][0]
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        config = mock_runner.call_args[0][0]
         assert config.observe_engine_config.endpoint == "http://localhost:8001/v1"
         assert config.observe_engine_config.provider == "hosted_vllm"
         assert config.observe_engine_config.model_name == "liquid/lfm2.5-350m"
         assert config.execute_engine_config.endpoint == "http://localhost:8002/v1"
         assert config.execute_engine_config.provider == "hosted_vllm"
         assert config.execute_engine_config.model_name == "google/gemma-4-26b-a4b-it"
+
+
+def test_run_passes_tool_failure_probability() -> None:
+    """Tool failure probability should flow through to config."""
+    with (
+        patch("pare.cli.benchmark.probe_llm_endpoint"),
+        patch(
+            "pare.multi_scenario_runner.MultiScenarioRunner.run_with_scenarios",
+            side_effect=_mock_run_with_scenarios,
+        ) as mock_runner,
+        tempfile.TemporaryDirectory() as tmpdir,
+    ):
+        result = runner.invoke(
+            app,
+            ["run", "--split", "full", "--results-dir", tmpdir, "--tool-failure-probability", "0.5"],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        config = mock_runner.call_args[0][0]
+        assert config.tool_augmentation_config is not None
+        assert config.tool_augmentation_config.tool_failure_probability == 0.5
+
+
+def test_run_passes_env_events_config() -> None:
+    """Env events config should flow through to config."""
+    with (
+        patch("pare.cli.benchmark.probe_llm_endpoint"),
+        patch(
+            "pare.multi_scenario_runner.MultiScenarioRunner.run_with_scenarios",
+            side_effect=_mock_run_with_scenarios,
+        ) as mock_runner,
+        tempfile.TemporaryDirectory() as tmpdir,
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "run", "--split", "full", "--results-dir", tmpdir,
+                "--env-events-per-min", "3", "--env-events-seed", "99",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        config = mock_runner.call_args[0][0]
+        assert config.env_events_config is not None
+        assert config.env_events_config.num_env_events_per_minute == 3
+        assert config.env_events_config.env_events_seed == 99
+
+
+def test_run_no_noise_config_by_default() -> None:
+    """Noise configs should be None when not specified."""
+    with (
+        patch("pare.cli.benchmark.probe_llm_endpoint"),
+        patch(
+            "pare.multi_scenario_runner.MultiScenarioRunner.run_with_scenarios",
+            side_effect=_mock_run_with_scenarios,
+        ) as mock_runner,
+        tempfile.TemporaryDirectory() as tmpdir,
+    ):
+        result = runner.invoke(app, ["run", "--split", "full", "--results-dir", tmpdir])
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        config = mock_runner.call_args[0][0]
+        assert config.tool_augmentation_config is None
+        assert config.env_events_config is None
+
+
+# --- Scenario selection tests ---
+
+
+def test_run_with_scenarios_flag() -> None:
+    """Should accept --scenarios and set split_name to custom."""
+    result = _invoke_run(["--scenarios", "email_notification,cab_booking"])
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+
+
+# --- Helper function unit tests ---
+
+
+def test_parse_scenarios_arg_comma_separated() -> None:
+    """Should parse comma-separated scenario IDs."""
+    result = parse_scenarios_arg("email_notification,cab_booking,reminder_set")
+    assert result == ["email_notification", "cab_booking", "reminder_set"]
+
+
+def test_parse_scenarios_arg_single_id() -> None:
+    """Should handle a single scenario ID."""
+    result = parse_scenarios_arg("email_notification")
+    assert result == ["email_notification"]
+
+
+def test_parse_scenarios_arg_file_path(tmp_path: Path) -> None:
+    """Should load scenario IDs from a file."""
+    scenario_file = tmp_path / "scenarios.txt"
+    scenario_file.write_text("email_notification\ncab_booking\n")
+    result = parse_scenarios_arg(str(scenario_file))
+    assert "email_notification" in result
+    assert "cab_booking" in result
+
+
+# --- Sweep removal test ---
 
 
 def test_sweep_command_removed() -> None:

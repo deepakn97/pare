@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -37,6 +38,22 @@ if TYPE_CHECKING:
     from pare.scenarios.validation_result import PAREMultiScenarioValidationResult
 
 logger = logging.getLogger(__name__)
+
+
+class ExecutorType(StrEnum):
+    """Executor type for parallel scenario execution."""
+
+    sequential = "sequential"
+    thread = "thread"
+    process = "process"
+
+
+class ExportFormat(StrEnum):
+    """Trace export format."""
+
+    hf = "hf"
+    lite = "lite"
+
 
 app = typer.Typer(
     name="benchmark",
@@ -378,9 +395,9 @@ def run(
         typer.Option("--timeout", "-t", help="Timeout per scenario in seconds"),
     ] = None,
     executor_type: Annotated[
-        str,
+        ExecutorType,
         typer.Option("--executor-type", help="Executor: sequential, thread, or process"),
-    ] = "thread",
+    ] = ExecutorType.thread,
     # Output configuration
     results_dir: Annotated[
         Path,
@@ -395,9 +412,9 @@ def run(
         typer.Option("--export/--no-export", help="Export scenario traces"),
     ] = False,
     export_format: Annotated[
-        str,
+        ExportFormat,
         typer.Option("--export-format", help="Trace export format: hf or lite"),
-    ] = "hf",
+    ] = ExportFormat.hf,
     experiment_name: Annotated[
         str,
         typer.Option("--experiment-name", "-n", help="Name for this experiment"),
@@ -509,9 +526,9 @@ def run(
     )
 
     # Probe all unique LLM endpoints before running scenarios
-    probed: set[tuple[str, str | None]] = set()
+    probed: set[tuple[str, str | None, str | None]] = set()
     for engine in (user_engine_config, observe_engine_config, execute_engine_config):
-        engine_key = (engine.model_name, engine.provider)
+        engine_key = (engine.model_name, engine.provider, engine.endpoint)
         if engine_key not in probed:
             probe_llm_endpoint(engine)
             probed.add(engine_key)
