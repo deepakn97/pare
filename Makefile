@@ -44,10 +44,6 @@ docs-deploy: ## Deploy the documentation to GitHub Pages
 	@uv run mkdocs build -s
 	@uv run mkdocs gh-deploy
 
-.PHONY: demo
-demo: ## Run a sample scenario interaction and show log locations
-	@uv run python -m pare.scripts.run_contacts_demo
-
 .PHONY: help
 help:
 	@uv run python -c "import re; \
