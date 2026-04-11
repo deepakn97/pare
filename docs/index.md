@@ -32,6 +32,7 @@ The installed CLI entrypoint is documented here as `pare` from `pare/main.py`.
 
 ```bash
 uv run pare scenarios list
+uv run pare scenarios split --split full
 uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
 uv run pare scenarios generate --num-scenarios 1
 uv run pare annotation status
@@ -46,6 +47,7 @@ Use `pare scenarios list` to see what scenarios are available and filter by app 
 
 ```bash
 uv run pare scenarios list --apps StatefulEmailApp
+uv run pare scenarios split --split full
 ```
 
 ### 2. Run a benchmark sweep

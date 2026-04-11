@@ -1,11 +1,12 @@
 # `pare scenarios` CLI Usage
 
-This project exposes `pare scenarios` (implemented in `pare/cli/scenarios.py`) for two primary tasks:
+This project exposes `pare scenarios` (implemented in `pare/cli/scenarios.py`) to:
 
-- list benchmark scenarios under `pare/scenarios/benchmark/`
-- generate new scenarios using the multi-step generator pipeline
+- list registered scenarios from `pare/scenarios/`
+- inspect benchmark split files and validate scenario ID lists
+- generate new scenarios with the multi-step generator pipeline
 
-If `pare` is not available in your shell, run via module entrypoint:
+If `pare` is not available in your shell, run via the module entrypoint:
 
 ```bash
 uv run python -m pare.main scenarios --help
@@ -13,13 +14,25 @@ uv run python -m pare.main scenarios --help
 
 ## List Scenarios
 
-`pare scenarios list` scans benchmark modules for `@register_scenario("...")`.
+`pare scenarios list` queries the PARE registry. By default, scenario-loading commands read `PARE_SCENARIOS_DIR`; if it is unset, they fall back to `benchmark`.
+
+Accepted directory values are relative to `pare/scenarios/`, for example:
+
+- `benchmark`
+- `generator`
+- `benchmark,generator`
 
 ### Examples
 
 ```bash
 # List all benchmark scenarios
 pare scenarios list
+
+# Root shortcut for the list command
+pare scenarios --list
+
+# Explicitly choose scenario directories
+pare scenarios list --scenarios-dir benchmark,generator
 
 # Require all listed apps (repeatable flags)
 pare scenarios list --apps StatefulEmailApp --apps StatefulCalendarApp
@@ -39,11 +52,51 @@ pare scenarios list --json
 
 ### Flags
 
-- `--benchmark-dir PATH`: override benchmark directory (default `pare/scenarios/benchmark`)
-- `--apps, -a TEXT`: required-app filter (repeatable and/or comma-separated)
+- `--scenarios-dir, --benchmark-dir TEXT`: override scenario directories to inspect; repeatable and/or comma-separated. Defaults to `PARE_SCENARIOS_DIR` or `benchmark`.
+- `--apps, -a TEXT`: required-app filter; repeatable and/or comma-separated. All listed apps must be present in the scenario.
 - `--id-contains TEXT`: substring match on scenario IDs
 - `--limit INT`: max number of rows
 - `--json`: emit JSON output
+
+## Benchmark Split Helpers
+
+These commands reuse the benchmark-loading helpers in `pare/benchmark/scenario_loader.py`.
+
+### Examples
+
+```bash
+# Show the active splits directory and available split files
+pare scenarios splits
+
+# List scenarios referenced by the full split
+pare scenarios split --split full
+
+# List scenarios referenced by the ablation split as JSON
+pare scenarios split --split ablation --json
+
+# Validate a scenario-id file against registered scenarios
+pare scenarios check-ids-file data/splits/full.txt
+
+# Validate against other directories under pare/scenarios/
+pare scenarios check-ids-file my_ids.txt --scenarios-dir generator
+
+# Override the split directory used by the loader
+PARE_BENCHMARK_SPLITS_DIR=data/splits pare scenarios split --split full
+```
+
+### Commands
+
+- `pare scenarios splits`: show the active benchmark splits directory and available `.txt` split files
+- `pare scenarios split --split {full|ablation}`: load scenarios via the benchmark split helpers and print their metadata
+- `pare scenarios check-ids-file FILE`: read one scenario ID per line and report which IDs are present or missing in the selected scenario directories
+
+### Relevant Flags
+
+- `pare scenarios split --scenarios-dir TEXT`: override scenario directories used during split resolution. Defaults to `PARE_SCENARIOS_DIR` or `benchmark`.
+- `pare scenarios split --limit INT`: limit the number of listed scenarios
+- `pare scenarios split --json`: output as JSON
+- `pare scenarios check-ids-file --scenarios-dir TEXT`: validate IDs against different scenario directories under `pare/scenarios/`
+- `pare scenarios check-ids-file --json`: output validation results as JSON and exit nonzero if any IDs are missing
 
 ## Generate Scenarios
 
@@ -86,7 +139,7 @@ pare scenarios generate --json --full-json
 ### Flags
 
 - `--output-dir PATH`: directory for intermediate step files
-- `--trajectory-dir PATH`: trajectory directory (or base dir for multi-run)
+- `--trajectory-dir PATH`: trajectory directory or base dir for multi-run generation
 - `--num-scenarios INT`: number of scenarios to generate
 - `--max-iterations INT`: retry budget per step
 - `--resume-from-step TEXT`: `step2`, `step3`, or `step4`

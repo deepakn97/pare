@@ -13,6 +13,13 @@ If you mainly want to use the benchmark, this is the most important section. The
 uv run pare scenarios list
 ```
 
+### Inspect benchmark split files
+
+```bash
+uv run pare scenarios splits
+uv run pare scenarios split --split full
+```
+
 ### Filter scenarios by app usage
 
 ```bash
