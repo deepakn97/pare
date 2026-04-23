@@ -2,7 +2,7 @@
 
 Benchmark scenarios are Python classes registered with `@register_scenario(...)` and loaded from `pare/scenarios/benchmark/`.
 
-This is the part of the docs most users need for day-to-day benchmark usage: how to inspect scenarios, choose subsets, and run sweeps.
+This is the part of the docs most users need for day-to-day benchmark usage: how to inspect scenarios, choose subsets, and run them.
 
 ## Where They Live
 
@@ -18,17 +18,19 @@ List scenarios:
 uv run pare scenarios list
 ```
 
-Run benchmark sweeps:
+Run the benchmark with a single model configuration:
 
 ```bash
-uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+uv run pare benchmark run --split full --observe-model gpt-5 --execute-model gpt-5
 ```
 
 Run custom subset by IDs:
 
 ```bash
-uv run pare benchmark sweep --scenarios scenario_a,scenario_b --observe-model gpt-5 --execute-model gpt-5
+uv run pare benchmark run --scenarios scenario_a,scenario_b --observe-model gpt-5 --execute-model gpt-5
 ```
+
+To compare multiple models, run `pare benchmark run` once per configuration -- result files live alongside each other in the same parent directory and `pare benchmark report` aggregates them.
 
 ## Review and Curation
 

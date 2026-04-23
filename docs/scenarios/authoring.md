@@ -63,7 +63,7 @@ uv run python scripts/run_scenarios.py --scenarios your_scenario_id --oracle
 4. Run agent mode checks:
 
 ```bash
-uv run pare benchmark sweep --scenarios your_scenario_id --observe-model gpt-5 --execute-model gpt-5
+uv run pare benchmark run --scenarios your_scenario_id --observe-model gpt-5 --execute-model gpt-5
 ```
 
 5. If needed, update scenario metadata in `pare/scenarios/scenario_metadata.json` through generation/review workflows.

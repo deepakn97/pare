@@ -14,7 +14,7 @@ Use the scripts in this folder when you need to:
 If you only want to run the benchmark once, start here instead:
 
 ```bash
-uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+uv run pare benchmark run --split full --observe-model gpt-5 --execute-model gpt-5
 ```
 
 ## Core Scripts
@@ -32,6 +32,8 @@ uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model g
 
 ## Experiment Wrappers
 
+Bash wrappers for sweeping over multiple model configurations. Each iteration calls `pare benchmark run` with a different config:
+
 - `scripts/experiments/run_models_sweep.sh`
 - `scripts/experiments/model_sweep_tfp.sh`
 - `scripts/experiments/model_sweep_env_noise.sh`
@@ -40,6 +42,7 @@ uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model g
 
 For new workflows, prefer the `pare` CLI where possible:
 
-- `pare benchmark sweep`
+- `pare benchmark run`
+- `pare benchmark report`
 - `pare scenarios list`
 - `pare scenarios generate`
