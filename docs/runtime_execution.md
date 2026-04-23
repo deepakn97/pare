@@ -5,7 +5,7 @@ This page explains how PARE execution is configured, how result caching works, a
 ## Core Config Models
 
 - `pare.scenarios.config.ScenarioRunnerConfig`: configuration for one scenario run
-- `pare.scenarios.config.MultiScenarioRunnerConfig`: batch/sweep configuration for multiple scenarios
+- `pare.scenarios.config.MultiScenarioRunnerConfig`: batch configuration for running many scenarios under one model configuration
 
 ## Single-Scenario Controls
 

@@ -5,7 +5,7 @@ This documentation is organized around the most common task in this repo: runnin
 Most users only need four things:
 
 1. List available scenarios.
-2. Run a benchmark sweep with chosen models.
+2. Run the benchmark with chosen models.
 3. Inspect traces or generated scenarios.
 4. Optionally annotate traces for human evaluation.
 
@@ -32,7 +32,7 @@ The installed CLI entrypoint is documented here as `pare` from `pare/main.py`.
 
 ```bash
 uv run pare scenarios list
-uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+uv run pare benchmark run --split full --observe-model gpt-5 --execute-model gpt-5
 uv run pare scenarios generate --num-scenarios 1
 uv run pare annotation status
 uv run pare cache status
@@ -48,12 +48,18 @@ Use `pare scenarios list` to see what scenarios are available and filter by app 
 uv run pare scenarios list --apps StatefulEmailApp
 ```
 
-### 2. Run a benchmark sweep
+### 2. Run the benchmark
 
-Choose the observe and execute models, then run a split or a custom subset.
+Choose the observe and execute models, then run a split or a custom subset. Each `pare benchmark run` invocation takes one model configuration -- run multiple times (or script a loop) to compare different models. Models registered in `MODELS_MAP` (see `pare/cli/utils.py`) work without explicit `--observe-provider` / `--execute-provider`. For locally hosted models, also pass `--observe-endpoint` / `--execute-endpoint`.
 
 ```bash
-uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+uv run pare benchmark run --split full --observe-model gpt-5 --execute-model gpt-5
+```
+
+You can also pass parameters via a YAML config file:
+
+```bash
+uv run pare benchmark run --config experiments/my_experiment.yaml
 ```
 
 ### 3. Generate new scenarios if needed

@@ -12,7 +12,7 @@ PARE uses two agent roles:
 For normal benchmark runs, the main choice is which models power the proactive agent's observe and execute phases:
 
 ```bash
-uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+uv run pare benchmark run --split full --observe-model gpt-5 --execute-model gpt-5
 ```
 
 Read this section when you want to:

@@ -22,7 +22,7 @@ uv run pare scenarios list --apps StatefulEmailApp --apps StatefulCalendarApp
 ### Run the benchmark
 
 ```bash
-uv run pare benchmark sweep --split full --observe-model gpt-5 --execute-model gpt-5
+uv run pare benchmark run --split full --observe-model gpt-5 --execute-model gpt-5
 ```
 
 ### Generate additional scenarios
@@ -43,7 +43,7 @@ Core modules:
 CLI entrypoints:
 
 - `pare scenarios list`
-- `pare benchmark sweep`
+- `pare benchmark run`
 
 Execution/runtime details:
 

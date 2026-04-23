@@ -81,7 +81,7 @@ These exported traces are later used by:
 
 ## Batch Execution
 
-`MultiScenarioRunner` wraps the single-scenario runner for benchmark sweeps:
+`MultiScenarioRunner` wraps the single-scenario runner for batch execution within a benchmark run:
 
 - derives `ScenarioRunnerConfig` from a shared multi-scenario config
 - runs scenarios sequentially or in parallel
@@ -93,7 +93,7 @@ These exported traces are later used by:
 
 The main user-facing runtime entrypoints are:
 
-- `pare benchmark sweep`
+- `pare benchmark run`
 - `scripts/run_scenarios.py`
 
 The first is the preferred benchmark path; the second remains useful as a direct runner script.
