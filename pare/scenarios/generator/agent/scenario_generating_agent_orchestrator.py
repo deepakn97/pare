@@ -12,17 +12,22 @@ import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from pare.benchmark.scenario_loader import load_scenarios_from_registry
+from pare.multi_scenario_runner import MultiScenarioRunner
+from pare.scenarios.config import MultiScenarioRunnerConfig
 from pare.scenarios.generator.prompt import scenario_generating_agent_prompts as prompt_module
 from pare.scenarios.generator.prompt.scenario_generating_agent_prompts import (
     configure_dynamic_context,
 )
-from scripts.run_scenarios import run_scenarios
 
 from .claude_backend import ClaudeAgentRuntimeConfig, ClaudeFilesystemConfig
 from .scenario_uniqueness_agent import ScenarioUniquenessCheckAgent
 from .step_agents import StepEditAgent, StepResult
+
+if TYPE_CHECKING:
+    from pare.scenarios.validation_result import PAREMultiScenarioValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -1163,14 +1168,7 @@ class ScenarioGeneratingAgentOrchestrator:
         # Use the two-agent demo runner in oracle mode (no LLM calls) to execute
         # the scenario deterministically and obtain a ScenarioValidationResult.
         try:
-            validation_result = run_scenarios(
-                scenario_names=[scenario_id],
-                oracle_mode=True,
-                max_turns=None,
-                tool_failure_prob=0.0,
-                env_events_per_min=0.0,
-                env_events_seed=42,
-            )
+            validation_result = self._run_generated_scenario_check(scenario_id)
         except Exception as exc:  # pragma: no cover - runtime failure path
             runtime_error = True
             validation_reached = False
@@ -1193,10 +1191,10 @@ class ScenarioGeneratingAgentOrchestrator:
             self._last_check_result = result
             return result
 
-        # `run_demo` returns the ScenarioValidationResult from the runner.
-        runtime_error = validation_result.results[0].exception is not None if validation_result.results else False
+        scenario_result = validation_result.scenario_results.get((scenario_id, None))
+        runtime_error = scenario_result is None or scenario_result.exception is not None
         validation_reached = True
-        validation_success = getattr(validation_result, "passed", 0) > 0
+        validation_success = validation_result.successful_count > 0
 
         passed = True
         if runtime_error or (require_validation_success and not validation_success):
@@ -1205,9 +1203,9 @@ class ScenarioGeneratingAgentOrchestrator:
         # Build a concise feedback summary; detailed logs are already emitted by
         # the runner and its logging configuration.
         status_line = "SUCCESS" if validation_success else "FAILED"
-        rationale = getattr(validation_result, "rationale", None)
-        exception = getattr(validation_result, "exception", None)
-        export_path = getattr(validation_result, "export_path", None)
+        rationale = getattr(scenario_result, "rationale", None)
+        exception = getattr(scenario_result, "exception", None)
+        export_path = getattr(scenario_result, "export_path", None)
         details: list[str] = [f"Validation: {status_line}"]
         if rationale:
             details.append(f"Rationale: {rationale}")
@@ -1215,6 +1213,8 @@ class ScenarioGeneratingAgentOrchestrator:
             details.append(f"Exception: {exception}")
         if export_path:
             details.append(f"Trace export path: {export_path}")
+        if scenario_result is None:
+            details.append("No validation result was returned for the generated scenario.")
         summary = "\n".join(details) if details else "No additional validation details."
 
         feedback = f"[{label}] {'PARESED' if passed else 'FAILED'} run for scenario '{scenario_id}'.\n{summary}"
@@ -1227,6 +1227,26 @@ class ScenarioGeneratingAgentOrchestrator:
         )
         self._last_check_result = result
         return result
+
+    @staticmethod
+    def _run_generated_scenario_check(scenario_id: str) -> PAREMultiScenarioValidationResult:
+        """Run one generated scenario through the package runner in oracle mode."""
+        scenarios_iterator = load_scenarios_from_registry(scenario_ids=[scenario_id])
+        config = MultiScenarioRunnerConfig(
+            oracle=True,
+            max_turns=None,
+            max_concurrent_scenarios=1,
+            executor_type="thread",
+            log_to_file=False,
+            enable_caching=False,
+            experiment_name="scenario_generator_check",
+            use_custom_logger=False,
+        )
+        return MultiScenarioRunner().run_with_scenarios(
+            config,
+            scenarios_iterator,
+            progress_description="Checking generated scenario",
+        )
 
     def _get_or_initialize_scenario_file(self) -> str:
         """Return current scenario file contents, seeding from template if missing."""
